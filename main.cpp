@@ -315,6 +315,22 @@ bool send_chunk(SDLNet_StreamSocket* sock, int chunk_x, int chunk_z, int max_y)
     return send_buffer(sock, dat);
 }
 
+struct client_t
+{
+    SDLNet_StreamSocket* sock = NULL;
+    bool recv = true;
+    size_t no_recv_counter = 0;
+    std::string username;
+    int counter = 0;
+    double player_x = 0.0;
+    double player_y = 0.0;
+    double player_stance = 0.0;
+    double player_z = 0.0;
+    float player_yaw = 0.0;
+    float player_pitch = 0.0;
+    Uint8 player_on_ground = 0;
+};
+
 int main(int argc, char** argv)
 {
     /* KDevelop fully buffers the output and will not display anything */
@@ -357,7 +373,7 @@ int main(int argc, char** argv)
     LOG("Creating server");
 
     SDLNet_Server* server = SDLNet_CreateServer(addr, 25565);
-    SDLNet_StreamSocket* client;
+    std::vector<client_t> clients;
 
     if (!server)
     {
@@ -369,82 +385,97 @@ int main(int argc, char** argv)
 
     while (!done)
     {
-
-        if (!SDLNet_AcceptClient(server, &client))
+        int done_client_searching = false;
+        while (!done_client_searching)
         {
-            LOG("SDLNet_AcceptClient: %s", SDL_GetError());
-            exit(1);
+            client_t new_client;
+            if (!SDLNet_AcceptClient(server, &new_client.sock))
+            {
+                LOG("SDLNet_AcceptClient: %s", SDL_GetError());
+                exit(1);
+            }
+            if (new_client.sock == NULL)
+            {
+                done_client_searching = true;
+                continue;
+            }
+
+            /* Setting this to values other than 0 breaks everything, TODO: fix */
+            SDLNet_SimulateStreamPacketLoss(new_client.sock, 0);
+
+            SDLNet_Address* client_addr = SDLNet_GetStreamSocketAddress(new_client.sock);
+            LOG("New Socket: %s:%u", SDLNet_GetAddressString(client_addr), SDLNet_GetStreamSocketPort(new_client.sock));
+            SDLNet_UnrefAddress(client_addr);
+
+            clients.push_back(new_client);
         }
-        if (client == NULL)
+
+        for (auto it = clients.begin(); it != clients.end();)
         {
-            // LOG("No clients available");
-            SDL_Delay(50);
-            continue;
+            if (!(*it).sock)
+                it = clients.erase(it);
+            else
+                it = next(it);
         }
 
-        /* Setting this to values other than 0 breaks everything, TODO: fix */
-        SDLNet_SimulateStreamPacketLoss(client, 0);
+        for (size_t client_index = 0; client_index < clients.size(); client_index++)
+        {
+            client_t* client = &clients.data()[client_index];
+            SDLNet_StreamSocket* sock = client->sock;
 
-        SDLNet_Address* client_addr = SDLNet_GetStreamSocketAddress(client);
-        LOG("New Socket: %s:%u", SDLNet_GetAddressString(client_addr), SDLNet_GetStreamSocketPort(client));
-        SDLNet_UnrefAddress(client_addr);
-
-#define KICK(sock, msg)  \
-    do                   \
-    {                    \
-        kick(sock, msg); \
-        client = NULL;   \
-        goto loop_end;   \
+#define KICK(sock, msg)      \
+    do                       \
+    {                        \
+        kick(sock, msg);     \
+        client->sock = NULL; \
+        goto loop_end;       \
     } while (0)
-        bool recv = true;
-        std::string username;
-        int counter = 0;
 
-        double player_x;
-        double player_y;
-        double player_stance;
-        double player_z;
-        float player_yaw;
-        float player_pitch;
-        Uint8 player_on_ground;
-
-        while (recv && client)
-        {
+            if (client->no_recv_counter > 500 || !client->sock)
+                continue;
 
             Uint8 buf[1024];
             buf[0] = 0;
 
-            recv = false;
-            for (int i = 0; i < 5000 && !recv; i++)
+            client->recv = false;
+            client->no_recv_counter++;
+            for (int i = 0; i < 10 && !client->recv; i++)
             {
-                if (SDLNet_ReadFromStreamSocket(client, buf, 1))
-                    recv = 1;
-                if (SDLNet_GetConnectionStatus(client) != 1)
-                    recv = 0;
+                if (SDLNet_ReadFromStreamSocket(sock, buf, 1))
+                    client->recv = 1;
+                if (SDLNet_GetConnectionStatus(sock) != 1)
+                    client->recv = 0;
                 SDL_Delay(1);
             }
+            if (client->recv)
+                client->no_recv_counter = 0;
 
             /* TODO: Create assemble_packet_* functions */
 
-            if (!recv || counter > 1200)
+            if (client->no_recv_counter > 500 || client->counter > 1200)
             {
-                KICK(client, "Timed out!");
+                KICK(sock, "Timed out!");
             }
 
-            counter++;
-            if (counter % 5 == 0 && counter > 4)
+            if (!client->recv)
+                continue;
+
+            client->counter++;
+            if (client->counter % 5 == 0 && client->counter > 4)
             {
                 std::vector<Uint8> dat;
                 dat.push_back(0x00);
-                assemble_int(dat, counter);
-                send_buffer(client, dat);
+                assemble_int(dat, client->counter);
+                send_buffer(sock, dat);
 
                 dat.clear();
                 dat.push_back(0xC9);
-                assemble_string16(dat, username);
+                assemble_string16(dat, client->username);
                 assemble_ubyte(dat, 1);
-                assemble_short(dat, counter);
-                send_buffer(client, dat);
+                assemble_short(dat, client->counter);
+                for (size_t i = 0; i < clients.size(); i++)
+                    if (clients[i].sock && clients[i].username.length() > 0)
+                        send_buffer(clients[i].sock, dat);
             }
 
             switch (buf[0])
@@ -452,38 +483,41 @@ int main(int argc, char** argv)
             case 0x00:
             {
                 Sint32 id;
-                read_int(client, &id);
-                counter = 0;
+                read_int(sock, &id);
+                client->counter = 0;
                 break;
             }
             case 0xfe:
             {
                 std::string s = "A mcs_b181 server§";
-                Uint32 r = SDL_rand_bits();
-                s.append(std::to_string(r >> 16 & 0xFFFF));
+                Uint32 playercount = 0;
+                for (size_t i = 0; i < clients.size(); i++)
+                    if (clients[i].username.length() > 0)
+                        playercount++;
+                s.append(std::to_string(playercount));
                 s.append("§");
-                s.append(std::to_string(r & 0xFFFF));
-                kick(client, s.c_str(), 0);
-                client = NULL;
+                s.append(std::to_string(MAX_PLAYERS));
+                kick(sock, s.c_str(), 0);
+                client->sock = NULL;
                 break;
             }
             case 0x01:
             {
                 Sint32 protocol_ver;
-                int status = !read_int(client, &protocol_ver);
-                status += !read_string16(client, username);
-                status += !read_long(client, 0);
-                status += !read_int(client, 0);
-                status += !read_byte(client, 0);
-                status += !read_byte(client, 0);
-                status += !read_ubyte(client, 0);
-                status += !read_ubyte(client, 0);
+                int status = !read_int(sock, &protocol_ver);
+                status += !read_string16(sock, client->username);
+                status += !read_long(sock, 0);
+                status += !read_int(sock, 0);
+                status += !read_byte(sock, 0);
+                status += !read_byte(sock, 0);
+                status += !read_ubyte(sock, 0);
+                status += !read_ubyte(sock, 0);
                 if (status)
-                    KICK(client, STR_PACKET_TOO_SHORT);
+                    KICK(sock, STR_PACKET_TOO_SHORT);
 
-                LOG("Player \"%s\" has protocol version: %d", username.c_str(), protocol_ver);
+                LOG("Player \"%s\" has protocol version: %d", client->username.c_str(), protocol_ver);
                 if (protocol_ver != 17)
-                    KICK(client, "Nope");
+                    KICK(sock, "Nope");
 
                 std::vector<Uint8> dat;
                 dat.push_back(0x01);
@@ -495,89 +529,106 @@ int main(int argc, char** argv)
                 assemble_byte(dat, 0);
                 assemble_ubyte(dat, WORLD_HEIGHT);
                 assemble_ubyte(dat, MAX_PLAYERS);
-                send_buffer(client, dat);
+                send_buffer(sock, dat);
 
                 for (int x = -2; x < 2; x++)
                 {
                     for (int z = -2; z < 2; z++)
                     {
-                        send_chunk(client, x, z, 32);
+                        send_chunk(sock, x, z, 32);
                     }
                 }
 
-                player_y = 64.0;
-                player_stance = player_y + 0.2;
-                player_on_ground = 1;
+                client->player_y = 64.0;
+                client->player_stance = client->player_y + 0.2;
+                client->player_on_ground = 1;
 
                 dat.clear();
                 dat.push_back(0x0d);
-                assemble_double(dat, player_x);
-                assemble_double(dat, player_stance);
-                assemble_double(dat, player_y);
-                assemble_double(dat, player_z);
-                assemble_float(dat, player_yaw);
-                assemble_float(dat, player_pitch);
-                assemble_ubyte(dat, player_on_ground);
+                assemble_double(dat, client->player_x);
+                assemble_double(dat, client->player_stance);
+                assemble_double(dat, client->player_y);
+                assemble_double(dat, client->player_z);
+                assemble_float(dat, client->player_yaw);
+                assemble_float(dat, client->player_pitch);
+                assemble_ubyte(dat, client->player_on_ground);
 
-                send_buffer(client, dat);
+                send_buffer(sock, dat);
 
                 for (int x = -4; x < -2; x++)
                 {
                     for (int z = -2; z < 2; z++)
                     {
-                        send_chunk(client, x, z, 28);
+                        send_chunk(sock, x, z, 28);
                     }
                 }
+
+                if (client->username.length() == 0)
+                    break;
+
+                std::string msg = "§e";
+                msg += client->username;
+                msg += " joined the game.";
+
+                dat.clear();
+                dat.push_back(0x03);
+                assemble_string16(dat, msg);
+
+                for (size_t j = 0; j < clients.size(); j++)
+                    if (clients[j].sock && clients[j].username.length() > 0)
+                        send_buffer(clients[j].sock, dat);
 
                 break;
             }
             case 0x02:
             {
-                if (!read_string16(client, username))
-                    KICK(client, STR_PACKET_TOO_SHORT);
+                if (!read_string16(sock, client->username))
+                    KICK(sock, STR_PACKET_TOO_SHORT);
 
-                LOG("Player \"%s\" has initiated handshake", username.c_str());
+                LOG("Player \"%s\" has initiated handshake", client->username.c_str());
                 std::vector<Uint8> dat;
                 dat.push_back(0x02);
                 assemble_string16(dat, "-");
-                send_buffer(client, dat);
+                send_buffer(sock, dat);
                 break;
             }
             case 0x03:
             {
                 std::string msg;
-                read_string16(client, msg);
+                read_string16(sock, msg);
                 if (msg.length() > 100)
-                    KICK(client, "Message too long!");
+                    KICK(sock, "Message too long!");
 
                 if (msg.length() > 0 && msg[0] == '/')
                 {
-                    LOG("Player \"%s\" issued: %s", username.c_str(), msg.c_str());
+                    LOG("Player \"%s\" issued: %s", client->username.c_str(), msg.c_str());
                     if (msg == "/stop")
                     {
                         done = true;
-                        KICK(client, "Server stopping!");
+                        KICK(sock, "Server stopping!");
                     }
                     else if (msg == "/smite")
                     {
                         std::vector<Uint8> dat;
                         dat.push_back(0x47);
-                        assemble_int(dat, counter);
+                        assemble_int(dat, client->counter);
                         assemble_ubyte(dat, 1);
-                        assemble_int(dat, (int)player_x);
-                        assemble_int(dat, (int)player_y);
-                        assemble_int(dat, (int)player_z);
-                        send_buffer(client, dat);
+                        assemble_int(dat, (int)client->player_x);
+                        assemble_int(dat, (int)client->player_y);
+                        assemble_int(dat, (int)client->player_z);
+                        send_buffer(sock, dat);
                     }
                     else if (msg == "/unload")
                     {
-                        int x = (int)player_x >> 4;
-                        int z = (int)player_z >> 4;
+                        int x = (int)client->player_x >> 4;
+                        int z = (int)client->player_z >> 4;
                         LOG("Unloading chunk %d %d", x, z);
 
                         /* The notchian client does not like chunks being unloaded near it */
                         for (int i = 0; i < 16; i++)
-                            send_prechunk(client, x, z, 0);
+                            for (size_t j = 0; j < clients.size(); j++)
+                                if (clients[j].sock && clients[j].username.length() > 0)
+                                    send_prechunk(clients[j].sock, x, z, 0);
                     }
                     else if (msg == "/help")
                     {
@@ -587,53 +638,55 @@ int main(int argc, char** argv)
                             std::vector<Uint8> dat;
                             dat.push_back(0x03);
                             assemble_string16(dat, commands[i]);
-                            send_buffer(client, dat);
+                            send_buffer(sock, dat);
                         }
                     }
                 }
                 else
                 {
                     char buf2[128];
-                    snprintf(buf2, ARR_SIZE(buf2), "<%s> %s", username.c_str(), msg.c_str());
+                    snprintf(buf2, ARR_SIZE(buf2), "<%s> %s", client->username.c_str(), msg.c_str());
 
                     LOG("%s", buf2);
 
                     std::vector<Uint8> dat;
                     dat.push_back(0x03);
                     assemble_string16(dat, buf2);
-                    send_buffer(client, dat);
+                    for (size_t i = 0; i < clients.size(); i++)
+                        if (clients[i].sock && clients[i].username.length() > 0)
+                            send_buffer(clients[i].sock, dat);
                 }
             }
             case 0x0a:
-                read_ubyte(client, &player_on_ground);
+                read_ubyte(sock, &client->player_on_ground);
                 break;
             case 0x0b:
             {
-                read_double(client, &player_x);
-                read_double(client, &player_y);
-                read_double(client, &player_stance);
-                read_double(client, &player_z);
-                read_ubyte(client, &player_on_ground);
+                read_double(sock, &client->player_x);
+                read_double(sock, &client->player_y);
+                read_double(sock, &client->player_stance);
+                read_double(sock, &client->player_z);
+                read_ubyte(sock, &client->player_on_ground);
                 // LOG("Player pos: <%.2f, %.2f(%.2f), %.2f> On Ground: %d", player_x, player_y, player_stance, player_z, player_on_ground != 0);
                 break;
             }
             case 0x0c:
             {
-                read_float(client, &player_yaw);
-                read_float(client, &player_pitch);
-                read_ubyte(client, &player_on_ground);
+                read_float(sock, &client->player_yaw);
+                read_float(sock, &client->player_pitch);
+                read_ubyte(sock, &client->player_on_ground);
                 // LOG("Player look: <%.2f, %.2f> On Ground: %d", player_yaw, player_pitch, player_on_ground != 0);
                 break;
             }
             case 0x0d:
             {
-                read_double(client, &player_x);
-                read_double(client, &player_y);
-                read_double(client, &player_stance);
-                read_double(client, &player_z);
-                read_float(client, &player_yaw);
-                read_float(client, &player_pitch);
-                read_ubyte(client, &player_on_ground);
+                read_double(sock, &client->player_x);
+                read_double(sock, &client->player_y);
+                read_double(sock, &client->player_stance);
+                read_double(sock, &client->player_z);
+                read_float(sock, &client->player_yaw);
+                read_float(sock, &client->player_pitch);
+                read_ubyte(sock, &client->player_on_ground);
                 // LOG("Player pos: <%.2f, %.2f(%.2f), %.2f> On Ground: %d", player_x, player_y, player_stance, player_z, player_on_ground != 0);
                 // LOG("Player look: <%.2f, %.2f> On Ground: %d", player_yaw, player_pitch, player_on_ground != 0);
                 break;
@@ -643,21 +696,23 @@ int main(int argc, char** argv)
                 Sint32 x;
                 Sint8 y;
                 Sint32 z;
-                read_int(client, &x);
-                read_byte(client, &y);
-                read_int(client, &z);
-                read_byte(client, 0);
+                read_int(sock, &x);
+                read_byte(sock, &y);
+                read_int(sock, &z);
+                read_byte(sock, 0);
                 Sint16 id;
-                read_short(client, &id);
+                read_short(sock, &id);
                 LOG("id: %d", id);
                 if (id >= 0)
-                    consume_bytes(client, 3);
+                    consume_bytes(sock, 3);
 
-                x = player_x;
-                z = player_z;
+                x = client->player_x;
+                z = client->player_z;
 
                 LOG("Loading chunk %d %d", x >> 4, z >> 4);
-                send_chunk(client, x >> 4, z >> 4, 0);
+                for (size_t j = 0; j < clients.size(); j++)
+                    if (clients[j].sock && clients[j].username.length() > 0)
+                        send_chunk(clients[j].sock, x >> 4, z >> 4, 0);
 
                 break;
             }
@@ -668,38 +723,66 @@ int main(int argc, char** argv)
                 Sint8 y;
                 Sint32 z;
                 Sint8 face;
-                read_byte(client, &status);
-                read_int(client, &x);
-                read_byte(client, &y);
-                read_int(client, &z);
-                read_byte(client, &face);
+                read_byte(sock, &status);
+                read_int(sock, &x);
+                read_byte(sock, &y);
+                read_int(sock, &z);
+                read_byte(sock, &face);
 
                 LOG("Unloading chunk %d %d", x >> 4, z >> 4);
 
                 /* The notchian client does not like chunks being unloaded near it */
                 for (int i = 0; i < 16; i++)
-                    send_prechunk(client, x >> 4, z >> 4, 0);
+                    for (size_t j = 0; j < clients.size(); j++)
+                        if (clients[j].sock && clients[j].username.length() > 0)
+                            send_prechunk(clients[j].sock, x >> 4, z >> 4, 0);
                 break;
             }
             case 0x10:
-                consume_bytes(client, 2);
+                consume_bytes(sock, 2);
                 break;
             case 0x12:
             case 0x13:
-                consume_bytes(client, 5);
+                consume_bytes(sock, 5);
                 break;
             case 0x65:
-                consume_bytes(client, 1);
+                consume_bytes(sock, 1);
                 break;
             case 0x6b:
-                consume_bytes(client, 8);
+                consume_bytes(sock, 8);
                 break;
+            case 0xff:
+            {
+                std::string str;
+                read_string16(sock, str);
+                client->sock = NULL;
+                if (str != "Quitting")
+                {
+                    LOG("Client kicked server with unknown message \"%s\"", str.c_str());
+                    break;
+                }
+                if (client->username.length() == 0)
+                    break;
+
+                std::string msg = "§e";
+                msg += client->username;
+                msg += " left the game.";
+
+                std::vector<Uint8> dat;
+                dat.push_back(0x03);
+                assemble_string16(dat, msg);
+
+                for (size_t j = 0; j < clients.size(); j++)
+                    if (clients[j].sock && clients[j].username.length() > 0)
+                        send_buffer(clients[j].sock, dat);
+                break;
+            }
             default:
             {
                 char buf2[32];
                 snprintf(buf2, ARR_SIZE(buf2), "Unknown packet: 0x%02x", buf[0]);
                 LOG("Unknown packet: 0x%02x", buf[0]);
-                KICK(client, buf2);
+                KICK(sock, buf2);
                 break;
             }
             }
@@ -709,8 +792,11 @@ int main(int argc, char** argv)
     }
 
     LOG("Destroying server");
-    if (client)
-        SDLNet_DestroyStreamSocket(client);
+    for (size_t i = 0; i < clients.size(); i++)
+    {
+        if (clients[i].sock)
+            SDLNet_DestroyStreamSocket(clients[i].sock);
+    }
     SDLNet_DestroyServer(server);
 
     SDLNet_Quit();
