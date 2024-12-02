@@ -9,6 +9,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(SDL_VERSION 3)
 
 find_package(SDL3 REQUIRED)
+find_package(PkgConfig)
+pkg_check_modules(zlib REQUIRED zlib)
 
 set(mcs_b181_server_SRC
    main.cpp
@@ -25,6 +27,9 @@ else()
 endif()
 
 target_compile_options(mcs_b181_server PUBLIC -Wall -Wextra)
+
+target_link_libraries(mcs_b181_server ${zlib_LIBRARIES})
+target_compile_options(mcs_b181_server PUBLIC ${zlib_CFLAGS_OTHER})
 
 target_link_libraries(mcs_b181_server SDL3::SDL3)
 target_link_libraries(mcs_b181_server SDL3_net::SDL3_net-static)
