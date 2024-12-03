@@ -38,9 +38,12 @@
 #include <string>
 #include <vector>
 
+#include "ids.h"
 #include "java_strings.h"
 #include "misc.h"
 #include "packet.h"
+
+#include "simplex_noise/SimplexNoise.h"
 
 void kick(SDLNet_StreamSocket* sock, std::string reason, bool log = true)
 {
@@ -74,6 +77,55 @@ class chunk_t
 {
 public:
     chunk_t() { data.resize(CHUNK_SIZE_X * CHUNK_SIZE_Y * CHUNK_SIZE_Z * 5 / 2, 0); }
+
+    void generate_from_seed_over(long seed, int cx, int cz)
+    {
+        for (int x = 0; x < CHUNK_SIZE_X; x++)
+        {
+            for (int z = 0; z < CHUNK_SIZE_Z; z++)
+            {
+                float fx = x + cx * CHUNK_SIZE_X + (seed >> 32);
+                float fz = z + cz * CHUNK_SIZE_X + (seed & 0xFFFFFFF);
+                int height = (SimplexNoise::noise(fx / 100, fz / 100) + 1.0) * 0.1 * CHUNK_SIZE_Y + 56;
+                for (int i = 1; i < height; i++)
+                    set_type(x, i, z, BLOCK_ID_STONE);
+                for (int i = height - 2; i < CHUNK_SIZE_Y; i++)
+                    set_light_sky(x, i, z, 15);
+                set_type(x, 0, z, BLOCK_ID_BEDROCK);
+            }
+        }
+    }
+
+    void generate_from_seed_nether(long seed, int cx, int cz)
+    {
+        for (int x = 0; x < CHUNK_SIZE_X; x++)
+        {
+            for (int z = 0; z < CHUNK_SIZE_Z; z++)
+            {
+                float fx = x + cx * CHUNK_SIZE_X + (seed >> 32);
+                float fz = z + cz * CHUNK_SIZE_X + (seed & 0xFFFFFFF);
+                int height = (SimplexNoise::noise(fx / 100, fz / 100) + 1.0) * 0.1 * CHUNK_SIZE_Y + 56;
+                int height2 = CHUNK_SIZE_Y - (SimplexNoise::noise(fx / 200, fz / 200) + 1.0) * 0.3 * CHUNK_SIZE_Y;
+                for (int i = 1; i < height; i++)
+                    set_type(x, i, z, BLOCK_ID_NETHERACK);
+                for (int i = height - 2; i < height2; i++)
+                {
+                    if (i < 63)
+                    {
+                        set_type(x, i, z, BLOCK_ID_LAVA_FLOWING);
+                        set_light_block(x, i, z, 15);
+                    }
+                    else
+                        set_light_sky(x, i, z, 15);
+                }
+                for (int i = height2; i < CHUNK_SIZE_Y; i++)
+                    set_type(x, i, z, BLOCK_ID_NETHERACK);
+                set_type(x, 0, z, BLOCK_ID_BEDROCK);
+                set_type(x, CHUNK_SIZE_Y - 1, z, BLOCK_ID_BEDROCK);
+                set_light_sky(x, CHUNK_SIZE_Y - 1, z, 15);
+            }
+        }
+    }
 
     void generate_special_ascending_type(int max_y)
     {
@@ -131,30 +183,30 @@ public:
     {
         int index = (y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z))) + CHUNK_SIZE_Y * CHUNK_SIZE_Z * CHUNK_SIZE_X * 2;
 
-        if (index % 2 == 0)
-            data[index / 2] |= (metadata & 0x0F) << 4;
+        if (index % 2 == 1)
+            data[index / 2] = ((metadata & 0x0F) << 4) | (data[index / 2] & 0x0F);
         else
-            data[index / 2] |= metadata & 0x0F;
+            data[index / 2] = (metadata & 0x0F) | (data[index / 2] & 0xF0);
     }
 
     inline void set_light_block(int x, int y, int z, Uint8 level)
     {
         int index = (y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z))) + CHUNK_SIZE_Y * CHUNK_SIZE_Z * CHUNK_SIZE_X * 3;
 
-        if (index % 2 == 0)
-            data[index / 2] |= (level & 0x0F) << 4;
+        if (index % 2 == 1)
+            data[index / 2] = ((level & 0x0F) << 4) | (data[index / 2] & 0x0F);
         else
-            data[index / 2] |= level & 0x0F;
+            data[index / 2] = (level & 0x0F) | (data[index / 2] & 0xF0);
     }
 
     inline void set_light_sky(int x, int y, int z, Uint8 level)
     {
         int index = (y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z))) + CHUNK_SIZE_Y * CHUNK_SIZE_Z * CHUNK_SIZE_X * 4;
 
-        if (index % 2 == 0)
-            data[index / 2] = (level & 0x0F) << 4;
+        if (index % 2 == 1)
+            data[index / 2] = ((level & 0x0F) << 4) | (data[index / 2] & 0x0F);
         else
-            data[index / 2] = level & 0x0F;
+            data[index / 2] = (level & 0x0F) | (data[index / 2] & 0xF0);
     }
 
     bool compress_to_buf(std::vector<Uint8>& out)
@@ -172,12 +224,68 @@ private:
     std::vector<Uint8> data;
 };
 
+class region_t
+{
+public:
+    region_t() { }
+
+    void generate_from_seed(long seed, int dimension, int region_x, int region_z)
+    {
+        for (int cx = 0; cx < REGION_SIZE_X; cx++)
+        {
+            for (int cz = 0; cz < REGION_SIZE_Z; cz++)
+            {
+                chunk_t* c = get_chunk(cx, cz);
+                assert(c);
+                if (dimension < 0)
+                    c->generate_from_seed_nether(seed, cx + region_x * REGION_SIZE_X, cz + region_z * REGION_SIZE_Z);
+                else
+                    c->generate_from_seed_over(seed, cx + region_x * REGION_SIZE_X, cz + region_z * REGION_SIZE_Z);
+            }
+        }
+    }
+
+    chunk_t* get_chunk(int cx, int cz)
+    {
+        if (cx < 0 || cx > REGION_SIZE_X)
+            return NULL;
+        if (cz < 0 || cz > REGION_SIZE_Z)
+            return NULL;
+
+        return &chunks[cx][cz];
+    }
+
+private:
+    chunk_t chunks[REGION_SIZE_X][REGION_SIZE_Z];
+};
+
+bool send_chunk(SDLNet_StreamSocket* sock, chunk_t* chunk, int chunk_x, int chunk_z)
+{
+    packet_chunk_t packet;
+    packet.block_x = chunk_x * CHUNK_SIZE_X;
+    packet.block_y = 0;
+    packet.block_z = chunk_z * CHUNK_SIZE_Z;
+    packet.size_x = CHUNK_SIZE_X - 1;
+    packet.size_y = CHUNK_SIZE_Y - 1;
+    packet.size_z = CHUNK_SIZE_Z - 1;
+
+    if (chunk == NULL)
+        return 0;
+
+    chunk->compress_to_buf(packet.compressed_data);
+
+    send_prechunk(sock, chunk_x, chunk_z, 1);
+    send_prechunk(sock, chunk_x, chunk_z, 1);
+
+    return send_buffer(sock, packet.assemble());
+}
+
 bool send_chunk(SDLNet_StreamSocket* sock, int chunk_x, int chunk_z, int max_y)
 {
     packet_chunk_t packet;
     packet.block_x = chunk_x * CHUNK_SIZE_X;
     packet.block_y = 0;
-    packet.block_z = chunk_z * CHUNK_SIZE_Y;
+    packet.block_z = chunk_z * CHUNK_SIZE_Z;
     packet.size_x = CHUNK_SIZE_X - 1;
     packet.size_y = CHUNK_SIZE_Y - 1;
     packet.size_z = CHUNK_SIZE_Z - 1;
@@ -250,6 +358,16 @@ int main(int argc, char** argv)
         LOG("SDLNet_Init: %s", SDL_GetError());
         exit(1);
     }
+
+    LOG("Generating regions");
+    Uint64 tick_region_start = SDL_GetTicks();
+    region_t region[2];
+    region[0].generate_from_seed(1, 0, 0, 0);
+    region[1].generate_from_seed(1, -1, 1, 0);
+    Uint64 tick_region_time = SDL_GetTicks() - tick_region_start;
+    LOG("Regions generated in %lu ms", tick_region_time);
+
+    LOG("Initializing server");
 
     bool done = false;
 
@@ -449,20 +567,12 @@ int main(int argc, char** argv)
                     {
                         for (int z = -2; z < 2; z++)
                         {
-                            send_chunk(sock, x, z, 32);
+                            if (!send_chunk(sock, region[client->dimension < 0].get_chunk(x, z), x, z))
+                                send_chunk(sock, x, z, 29);
                         }
                     }
-                    send_chunk(sock, 4, 1, 0);
-                    send_chunk(sock, 4, 0, 0);
-                    send_chunk(sock, 4, -1, 0);
-                    send_chunk(sock, 3, 1, 0);
-                    send_chunk(sock, 3, 0, 128);
-                    send_chunk(sock, 3, -1, 0);
-                    send_chunk(sock, 2, 0, 0);
-                    send_chunk(sock, 2, -1, 0);
-                    send_chunk(sock, 2, 1, 0);
 
-                    client->player_y = 64.0;
+                    client->player_y = 75.0;
                     client->player_stance = client->player_y + 0.2;
                     client->player_on_ground = 1;
 
@@ -477,13 +587,26 @@ int main(int argc, char** argv)
 
                     send_buffer(sock, pack_player_pos.assemble());
 
-                    for (int x = -4; x < -2; x++)
+                    for (int x = 0; x < 16; x++)
                     {
-                        for (int z = -2; z < 2; z++)
+                        for (int z = 0; z < 16; z++)
                         {
-                            send_chunk(sock, x, z, 28);
+                            send_chunk(
+                                sock, region[client->dimension < 0].get_chunk(x + 16 * !(client->dimension < 0), z), x - 16 * !(client->dimension < 0), z);
+                            send_chunk(
+                                sock, region[!(client->dimension < 0)].get_chunk(x + 16 * (client->dimension < 0), z), x - 16 * (client->dimension < 0), z);
                         }
                     }
+
+                    send_chunk(sock, 4, 1, 0);
+                    send_chunk(sock, 4, 0, 0);
+                    send_chunk(sock, 4, -1, 0);
+                    send_chunk(sock, 3, 1, 0);
+                    send_chunk(sock, 3, 0, 128);
+                    send_chunk(sock, 3, -1, 0);
+                    send_chunk(sock, 2, 0, 0);
+                    send_chunk(sock, 2, -1, 0);
+                    send_chunk(sock, 2, 1, 0);
 
                     if (client->username.length() == 0)
                         break;
@@ -569,11 +692,12 @@ int main(int argc, char** argv)
                             {
                                 for (int z = -2; z < 2; z++)
                                 {
-                                    send_chunk(sock, x, z, 32);
+                                    if (!send_chunk(sock, region[client->dimension < 0].get_chunk(x, z), x, z))
+                                        send_chunk(sock, x, z, 29);
                                 }
                             }
 
-                            client->player_y = 64.0;
+                            client->player_y = 75.0;
                             client->player_stance = client->player_y + 0.2;
                             client->player_on_ground = 1;
 
@@ -588,11 +712,14 @@ int main(int argc, char** argv)
 
                             send_buffer(sock, pack_player_pos.assemble());
 
-                            for (int x = -4; x < -2; x++)
+                            for (int x = 0; x < 16; x++)
                             {
-                                for (int z = -2; z < 2; z++)
+                                for (int z = 0; z < 16; z++)
                                 {
-                                    send_chunk(sock, x, z, 28);
+                                    send_chunk(sock, region[client->dimension < 0].get_chunk(x + 16 * !(client->dimension < 0), z),
+                                        x - 16 * !(client->dimension < 0), z);
+                                    send_chunk(sock, region[!(client->dimension < 0)].get_chunk(x + 16 * (client->dimension < 0), z),
+                                        x - 16 * (client->dimension < 0), z);
                                 }
                             }
                         }

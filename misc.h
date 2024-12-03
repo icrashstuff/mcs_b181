@@ -53,4 +53,7 @@
 #define CHUNK_SIZE_Y WORLD_HEIGHT
 #define CHUNK_SIZE_Z 16
 
+#define REGION_SIZE_X 32
+#define REGION_SIZE_Z 32
+
 #endif

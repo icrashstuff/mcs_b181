@@ -16,6 +16,7 @@ set(mcs_b181_server_SRC
    main.cpp
    packet.cpp
    java_strings.cpp
+   simplex_noise/SimplexNoise.cpp
 )
 
 set(BUILD_SHARED_LIBS OFF)
