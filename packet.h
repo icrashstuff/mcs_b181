@@ -548,6 +548,26 @@ struct packet_inventory_action_creative_t : packet_t
     }
 };
 
+struct packet_play_list_item_t : packet_t
+{
+    packet_play_list_item_t() { id = 0xc9; }
+
+    std::string username;
+    jbool online;
+    jshort ping;
+
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == 0xc9);
+        dat.push_back(id);
+        assemble_string16(dat, username);
+        assemble_bool(dat, online);
+        assemble_short(dat, ping);
+        return dat;
+    }
+};
+
 struct packet_server_list_ping_t : packet_t
 {
     packet_server_list_ping_t() { id = 0xfe; }

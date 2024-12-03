@@ -274,12 +274,18 @@ int main(int argc, char** argv)
                 for (size_t i = 0; i < players_kicked.size(); i++)
                 {
                     packet_chat_message_t pack_leave_msg;
-
                     pack_leave_msg.msg = "§e";
                     pack_leave_msg.msg += players_kicked[i];
                     pack_leave_msg.msg += " left the game.";
 
                     send_buffer(sock, pack_leave_msg.assemble());
+
+                    packet_play_list_item_t pack_player_list_leave;
+                    pack_player_list_leave.username = players_kicked[i];
+                    pack_player_list_leave.online = 0;
+                    pack_player_list_leave.ping = 0;
+
+                    send_buffer(sock, pack_player_list_leave.assemble());
                 }
 
                 if (sdl_tick_cur - client->time_keep_alive_sent > 200)
@@ -294,14 +300,14 @@ int main(int argc, char** argv)
                     client->time_keep_alive_sent = sdl_tick_cur;
 
                     {
-                        std::vector<Uint8> dat;
-                        dat.push_back(0xC9);
-                        assemble_string16(dat, client->username);
-                        assemble_ubyte(dat, 1);
-                        assemble_short(dat, client->counter);
+                        packet_play_list_item_t pack_player_list;
+                        pack_player_list.username = client->username;
+                        pack_player_list.online = 1;
+                        pack_player_list.ping = sdl_tick_cur - client->packet.get_last_packet_time();
+
                         for (size_t i = 0; i < clients.size(); i++)
                             if (clients[i].sock && clients[i].username.length() > 0)
-                                send_buffer(clients[i].sock, dat);
+                                send_buffer(clients[i].sock, pack_player_list.assemble());
                     }
                 }
             }
