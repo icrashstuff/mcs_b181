@@ -140,7 +140,16 @@ struct client_t
     Uint8 player_on_ground = 0;
     int dimension = 0;
     int player_mode = 1;
+
+    bool is_raining = 0;
 };
+
+void send_buffer_to_players(std::vector<client_t> clients, std::vector<Uint8> buf)
+{
+    for (size_t i = 0; i < clients.size(); i++)
+        if (clients[i].sock && clients[i].username.length() > 0)
+            send_buffer(clients[i].sock, buf);
+}
 
 int main(int argc, char** argv)
 {
@@ -193,6 +202,8 @@ int main(int argc, char** argv)
     }
 
     SDLNet_UnrefAddress(addr);
+
+    bool is_raining = 0;
 
     while (!done)
     {
@@ -297,10 +308,21 @@ int main(int argc, char** argv)
                         pack_player_list.online = 1;
                         pack_player_list.ping = sdl_tick_cur - client->packet.get_last_packet_time();
 
-                        for (size_t i = 0; i < clients.size(); i++)
-                            if (clients[i].sock && clients[i].username.length() > 0)
-                                send_buffer(clients[i].sock, pack_player_list.assemble());
+                        send_buffer_to_players(clients, pack_player_list.assemble());
                     }
+                }
+
+                if (client->is_raining != is_raining)
+                {
+                    client->is_raining = is_raining;
+                    packet_new_state_t pack_rain;
+                    if (client->is_raining)
+                        pack_rain.reason = PACK_NEW_STATE_REASON_RAIN_START;
+                    else
+                        pack_rain.reason = PACK_NEW_STATE_REASON_RAIN_END;
+                    pack_rain.mode = 0;
+
+                    send_buffer(sock, pack_rain.assemble());
                 }
             }
 
@@ -328,8 +350,8 @@ int main(int argc, char** argv)
 
                     packet_login_request_s2c_t packet_login_s2c;
                     packet_login_s2c.player_eid = 0;
-                    packet_login_s2c.seed = client->player_mode;
-                    packet_login_s2c.mode = 1;
+                    packet_login_s2c.seed = 0;
+                    packet_login_s2c.mode = client->player_mode;
                     packet_login_s2c.dimension = client->dimension;
                     packet_login_s2c.difficulty = 0;
                     packet_login_s2c.world_height = WORLD_HEIGHT;
@@ -382,9 +404,7 @@ int main(int argc, char** argv)
                     pack_join_msg.msg += client->username;
                     pack_join_msg.msg += " joined the game.";
 
-                    for (size_t j = 0; j < clients.size(); j++)
-                        if (clients[j].sock && clients[j].username.length() > 0)
-                            send_buffer(clients[j].sock, pack_join_msg.assemble());
+                    send_buffer_to_players(clients, pack_join_msg.assemble());
 
                     break;
                 }
@@ -487,9 +507,23 @@ int main(int argc, char** argv)
                                 }
                             }
                         }
+                        else if (p->msg == "/c" || p->msg == "/s")
+                        {
+                            client->player_mode = (p->msg == "/c") ? 1 : 0;
+
+                            packet_new_state_t pack_mode;
+                            pack_mode.reason = PACK_NEW_STATE_REASON_CHANGE_MODE;
+                            pack_mode.mode = client->player_mode;
+
+                            send_buffer(sock, pack_mode.assemble());
+                        }
+                        else if (p->msg == "/rain_on" || p->msg == "/rain_off")
+                        {
+                            is_raining = (p->msg == "/rain_on") ? 1 : 0;
+                        }
                         else if (p->msg == "/help")
                         {
-                            const char* commands[] = { "/stop", "/smite", "/unload", "/overworld", "/nether", NULL };
+                            const char* commands[] = { "/stop", "/smite", "/unload", "/overworld", "/nether", "/c", "/s", "/rain_on", "/rain_off", NULL };
                             for (int i = 0; commands[i] != 0; i++)
                             {
                                 packet_chat_message_t pack_msg;
@@ -507,9 +541,7 @@ int main(int argc, char** argv)
                         packet_chat_message_t pack_msg;
                         pack_msg.msg = buf2;
 
-                        for (size_t i = 0; i < clients.size(); i++)
-                            if (clients[i].sock && clients[i].username.length() > 0)
-                                send_buffer(clients[i].sock, pack_msg.assemble());
+                        send_buffer_to_players(clients, pack_msg.assemble());
                     }
                 }
                 case 0x0a:

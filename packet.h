@@ -486,6 +486,29 @@ struct packet_chunk_t : packet_t
     }
 };
 
+#define PACK_NEW_STATE_REASON_INVALID_BED 0
+#define PACK_NEW_STATE_REASON_RAIN_START 1
+#define PACK_NEW_STATE_REASON_RAIN_END 2
+#define PACK_NEW_STATE_REASON_CHANGE_MODE 3
+
+struct packet_new_state_t : packet_t
+{
+    packet_new_state_t() { id = 0x46; }
+
+    jbyte reason = 0;
+    jbyte mode = 0;
+
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == 0x46);
+        dat.push_back(id);
+        assemble_byte(dat, reason);
+        assemble_byte(dat, mode);
+        return dat;
+    }
+};
+
 struct packet_thunder_t : packet_t
 {
     packet_thunder_t() { id = 0x47; }
