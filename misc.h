@@ -29,4 +29,22 @@
 #define LOG_WARN(fmt, ...) printf("[WARN]: %s:%d %s(): " fmt "\n", __FILE_NAME__, __LINE__, __func__, ##__VA_ARGS__)
 #define LOG_TRACE(fmt, ...) printf("[TRACE]: %s:%d %s(): " fmt "\n", __FILE_NAME__, __LINE__, __func__, ##__VA_ARGS__)
 
+#ifdef ENABLE_TRACE
+#define TRACE(fmt, ...) LOG_TRACE(fmt, ##__VA_ARGS__)
+#else
+#define TRACE(fmt, ...) (0)
+#endif
+
+#define MAX_PLAYERS 20
+
+#define WORLD_HEIGHT 128
+
+#if (WORLD_HEIGHT > 128)
+#error "World height cannot exceed 128 (Seriously, there are some fields that will rollover with anything bigger)"
+#endif
+
+#if (WORLD_HEIGHT < 0)
+#error "World height cannot be below 0 (Will crash the server, there is a vector that expects WORLD_HEIGHT to be non negative)"
+#endif
+
 #endif

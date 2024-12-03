@@ -20,18 +20,17 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+
+#if 0
+#define ENABLE_TRACE
+#endif
+
 #include <SDL3/SDL_endian.h>
 #include <SDL3_net/SDL_net.h>
 
 #include "java_strings.h"
 #include "misc.h"
 #include "packet.h"
-
-#if 0
-#define TRACE(fmt, ...) LOG_TRACE(fmt, ##__VA_ARGS__)
-#else
-#define TRACE(fmt, ...) (0)
-#endif
 
 void assemble_string16(std::vector<Uint8>& dat, std::string str)
 {

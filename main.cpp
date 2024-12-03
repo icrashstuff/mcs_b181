@@ -21,6 +21,10 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+#if 0
+#define ENABLE_TRACE
+#endif
+
 #include <SDL3/SDL.h>
 #include <SDL3_net/SDL_net.h>
 
@@ -37,18 +41,6 @@
 #include "java_strings.h"
 #include "misc.h"
 #include "packet.h"
-
-#if 0
-#define TRACE(fmt, ...) LOG_TRACE(fmt, ##__VA_ARGS__)
-#else
-#define TRACE(fmt, ...) (0)
-#endif
-
-#define STR_PACKET_TOO_SHORT "Packet too short"
-
-#define MAX_PLAYERS 20
-
-#define WORLD_HEIGHT 128
 
 void kick(SDLNet_StreamSocket* sock, std::string reason, bool log = true)
 {
