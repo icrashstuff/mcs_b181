@@ -94,13 +94,13 @@ bool send_chunk(SDLNet_StreamSocket* sock, int chunk_x, int chunk_z, int max_y)
     uLongf compressed_len;
     {
         std::vector<Uint8> precompress;
-        precompress.resize(h * 16 * 16 * 5 / 2);
+        precompress.resize(h * sx * sz * 5 / 2);
 
-        for (int x = 0; x < 16; x++)
+        for (int x = 0; x < sx; x++)
         {
             for (int y = 0; y < h; y++)
             {
-                for (int z = 0; z < 16; z++)
+                for (int z = 0; z < sz; z++)
                 {
                     int index_type = y + (z * (h)) + (x * (h) * (sz));
                     int index_light_block = (y + (z * (h)) + (x * (h) * (sz))) / 2 + h * sz * sx * 3 / 2;
