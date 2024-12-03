@@ -133,10 +133,10 @@ struct client_t
 {
     SDLNet_StreamSocket* sock = NULL;
     packet_buffer_t packet;
-    bool recv = true;
-    size_t no_recv_counter = 0;
+
     Uint64 time_keep_alive_sent = 0;
     Uint64 time_keep_alive_recv = 0;
+
     std::string username;
     int counter = 0;
     double player_x = 0.0;
@@ -146,6 +146,8 @@ struct client_t
     float player_yaw = 0.0;
     float player_pitch = 0.0;
     Uint8 player_on_ground = 0;
+    int dimension = 0;
+    int player_mode = 1;
 };
 
 int main(int argc, char** argv)
@@ -282,6 +284,10 @@ int main(int argc, char** argv)
 
                 if (sdl_tick_cur - client->time_keep_alive_sent > 200)
                 {
+                    packet_time_update_t pack_time;
+                    pack_time.time = sdl_tick_cur / 50;
+                    send_buffer(sock, pack_time.assemble());
+
                     packet_keep_alive_t pack_keep_alive;
                     pack_keep_alive.keep_alive_id = sdl_tick_cur % (SDL_MAX_SINT32 - 2);
                     send_buffer(sock, pack_keep_alive.assemble());
@@ -324,13 +330,17 @@ int main(int argc, char** argv)
 
                     packet_login_request_s2c_t packet_login_s2c;
                     packet_login_s2c.player_eid = 0;
-                    packet_login_s2c.seed = 0;
+                    packet_login_s2c.seed = client->player_mode;
                     packet_login_s2c.mode = 1;
-                    packet_login_s2c.dimension = 0;
+                    packet_login_s2c.dimension = client->dimension;
                     packet_login_s2c.difficulty = 0;
                     packet_login_s2c.world_height = WORLD_HEIGHT;
                     packet_login_s2c.max_players = MAX_PLAYERS;
                     send_buffer(sock, packet_login_s2c.assemble());
+
+                    packet_time_update_t pack_time;
+                    pack_time.time = sdl_tick_cur / 50;
+                    send_buffer(sock, pack_time.assemble());
 
                     /* We set the username here because at this point we are committed to having them */
                     client->username = p->username;
@@ -397,8 +407,6 @@ int main(int argc, char** argv)
                     if (p->msg.length() > 100)
                         KICK(sock, "Message too long!");
 
-                    LOG("%zu", p->msg.length());
-
                     if (p->msg.length() && p->msg[0] == '/')
                     {
                         LOG("Player \"%s\" issued: %s", client->username.c_str(), p->msg.c_str());
@@ -437,9 +445,53 @@ int main(int argc, char** argv)
                                     if (clients[j].sock && clients[j].username.length() > 0)
                                         send_prechunk(clients[j].sock, x, z, 0);
                         }
+                        else if (p->msg == "/nether" || p->msg == "/overworld")
+                        {
+                            packet_respawn pack_dim_change;
+                            client->dimension = p->msg == "/overworld" ? 0 : -1;
+                            pack_dim_change.dimension = client->dimension;
+                            pack_dim_change.mode = client->player_mode;
+                            pack_dim_change.world_height = WORLD_HEIGHT;
+                            send_buffer(sock, pack_dim_change.assemble());
+
+                            packet_time_update_t pack_time;
+                            pack_time.time = sdl_tick_cur / 50;
+                            send_buffer(sock, pack_time.assemble());
+
+                            for (int x = -2; x < 2; x++)
+                            {
+                                for (int z = -2; z < 2; z++)
+                                {
+                                    send_chunk(sock, x, z, 32);
+                                }
+                            }
+
+                            client->player_y = 64.0;
+                            client->player_stance = client->player_y + 0.2;
+                            client->player_on_ground = 1;
+
+                            packet_player_pos_look_s2c_t pack_player_pos;
+                            pack_player_pos.x = client->player_x;
+                            pack_player_pos.y = client->player_y;
+                            pack_player_pos.stance = client->player_stance;
+                            pack_player_pos.z = client->player_z;
+                            pack_player_pos.yaw = client->player_yaw;
+                            pack_player_pos.pitch = client->player_pitch;
+                            pack_player_pos.on_ground = client->player_on_ground;
+
+                            send_buffer(sock, pack_player_pos.assemble());
+
+                            for (int x = -4; x < -2; x++)
+                            {
+                                for (int z = -2; z < 2; z++)
+                                {
+                                    send_chunk(sock, x, z, 28);
+                                }
+                            }
+                        }
                         else if (p->msg == "/help")
                         {
-                            const char* commands[] = { "/stop", "/smite", "/unload", NULL };
+                            const char* commands[] = { "/stop", "/smite", "/unload", "/overworld", "/nether", NULL };
                             for (int i = 0; commands[i] != 0; i++)
                             {
                                 packet_chat_message_t pack_msg;

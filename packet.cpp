@@ -384,6 +384,11 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
             var_len = 1;
             break;
         }
+        case 0x09:
+        {
+            len = 14;
+            break;
+        }
         case 0x10:
         {
             len = 3;
@@ -574,6 +579,18 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
         P(packet_chat_message_t);
 
         err += !read_string16(buf, pos, p->msg);
+
+        break;
+    }
+    case 0x09:
+    {
+        P(packet_respawn);
+
+        err += !read_byte(buf, pos, &p->dimension);
+        err += !read_byte(buf, pos, &p->difficulty);
+        err += !read_byte(buf, pos, &p->mode);
+        err += !read_short(buf, pos, &p->world_height);
+        err += !read_long(buf, pos, &p->seed);
 
         break;
     }

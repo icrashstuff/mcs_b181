@@ -149,7 +149,8 @@ struct packet_login_request_s2c_t : packet_t
         assemble_string16(dat, unused);
         assemble_long(dat, seed);
         assemble_int(dat, mode);
-        assemble_byte(dat, dimension);
+        /* Prevent sending invalid dimension values which crash the notchian client */
+        assemble_byte(dat, dimension >= 0 ? 0 : -1);
         assemble_byte(dat, difficulty);
         assemble_ubyte(dat, world_height);
         assemble_ubyte(dat, max_players);
@@ -194,6 +195,50 @@ struct packet_chat_message_t : packet_t
         assert(id == 0x03);
         dat.push_back(id);
         assemble_string16(dat, msg);
+        return dat;
+    }
+};
+
+struct packet_time_update_t : packet_t
+{
+    packet_time_update_t() { id = 0x04; }
+
+    jlong time = 0;
+
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == 0x04);
+        dat.push_back(id);
+        assemble_long(dat, time);
+        return dat;
+    }
+};
+
+/**
+ * Sent by client after hitting respawn
+ * Sent by server to change dimension or as a response to the client
+ */
+struct packet_respawn : packet_t
+{
+    packet_respawn() { id = 0x09; }
+
+    jbyte dimension = 0;
+    jbyte difficulty = 0;
+    jbyte mode = 0;
+    jshort world_height = 0;
+    jlong seed = 0;
+
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == 0x09);
+        dat.push_back(id);
+        assemble_byte(dat, dimension >= 0 ? 0 : -1);
+        assemble_byte(dat, difficulty);
+        assemble_byte(dat, mode);
+        assemble_short(dat, world_height);
+        assemble_long(dat, seed);
         return dat;
     }
 };
