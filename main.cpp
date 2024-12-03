@@ -69,61 +69,131 @@ bool send_prechunk(SDLNet_StreamSocket* sock, int chunk_x, int chunk_z, bool mod
     return send_buffer(sock, packet.assemble());
 }
 
+/* A 16 * WORLD_HEIGHT * 16 chunk */
+class chunk_t
+{
+public:
+    chunk_t() { data.resize(CHUNK_SIZE_X * CHUNK_SIZE_Y * CHUNK_SIZE_Z * 5 / 2, 0); }
+
+    void generate_special_ascending_type(int max_y)
+    {
+        for (int x = 0; x < CHUNK_SIZE_X; x++)
+        {
+            for (int y = 0; y < CHUNK_SIZE_Y; y++)
+            {
+                for (int z = 0; z < CHUNK_SIZE_Z; z++)
+                {
+                    if (y < BLOCK_ID_MAX && y < max_y)
+                    {
+                        set_type(x, y, z, y);
+                    }
+                    set_light_block(x, y, z, 15);
+                    set_light_sky(x, y, z, 15);
+                }
+            }
+        }
+    }
+
+    void generate_special_metadata()
+    {
+        for (int x = 0; x < CHUNK_SIZE_X; x++)
+        {
+            for (int y = 0; y < CHUNK_SIZE_Y; y++)
+            {
+                for (int z = 0; z < CHUNK_SIZE_Z; z++)
+                {
+                    if (y < BLOCK_ID_MAX)
+                    {
+                        if (z == x)
+                        {
+                            set_type(x, y, z, y);
+                            set_metadata(x, y, z, x);
+                        }
+                    }
+                    set_light_block(x, y, z, 15);
+                    set_light_sky(x, y, z, 15);
+                }
+            }
+        }
+    }
+
+    inline void set_type(int x, int y, int z, Uint8 type)
+    {
+        int index = y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z));
+
+        if (type <= BLOCK_ID_MAX)
+            data[index] = type;
+        else
+            data[index] = 0;
+    }
+
+    inline void set_metadata(int x, int y, int z, Uint8 metadata)
+    {
+        int index = (y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z))) + CHUNK_SIZE_Y * CHUNK_SIZE_Z * CHUNK_SIZE_X * 2;
+
+        if (index % 2 == 0)
+            data[index / 2] |= (metadata & 0x0F) << 4;
+        else
+            data[index / 2] |= metadata & 0x0F;
+    }
+
+    inline void set_light_block(int x, int y, int z, Uint8 level)
+    {
+        int index = (y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z))) + CHUNK_SIZE_Y * CHUNK_SIZE_Z * CHUNK_SIZE_X * 3;
+
+        if (index % 2 == 0)
+            data[index / 2] |= (level & 0x0F) << 4;
+        else
+            data[index / 2] |= level & 0x0F;
+    }
+
+    inline void set_light_sky(int x, int y, int z, Uint8 level)
+    {
+        int index = (y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z))) + CHUNK_SIZE_Y * CHUNK_SIZE_Z * CHUNK_SIZE_X * 4;
+
+        if (index % 2 == 0)
+            data[index / 2] = (level & 0x0F) << 4;
+        else
+            data[index / 2] = level & 0x0F;
+    }
+
+    bool compress_to_buf(std::vector<Uint8>& out)
+    {
+        out.resize(compressBound(data.size()));
+
+        uLongf compressed_len = out.size();
+        int result = compress(out.data(), &compressed_len, data.data(), data.size());
+        out.resize(compressed_len);
+
+        return result == Z_OK;
+    }
+
+private:
+    std::vector<Uint8> data;
+};
+
 bool send_chunk(SDLNet_StreamSocket* sock, int chunk_x, int chunk_z, int max_y)
 {
     packet_chunk_t packet;
-    packet.block_x = chunk_x * 16;
+    packet.block_x = chunk_x * CHUNK_SIZE_X;
     packet.block_y = 0;
-    packet.block_z = chunk_z * 16;
-    packet.size_x = 15;
-    packet.size_y = WORLD_HEIGHT - 1;
-    packet.size_z = 15;
+    packet.block_z = chunk_z * CHUNK_SIZE_Y;
+    packet.size_x = CHUNK_SIZE_X - 1;
+    packet.size_y = CHUNK_SIZE_Y - 1;
+    packet.size_z = CHUNK_SIZE_Z - 1;
 
     int h = packet.size_y + 1;
     int sx = packet.size_x + 1;
     int sz = packet.size_z + 1;
 
-    uLongf compressed_len;
-    {
-        std::vector<Uint8> precompress;
-        precompress.resize(h * sx * sz * 5 / 2);
+    chunk_t c;
 
-        for (int x = 0; x < sx; x++)
-        {
-            for (int y = 0; y < h; y++)
-            {
-                for (int z = 0; z < sz; z++)
-                {
-                    int index_type = y + (z * (h)) + (x * (h) * (sz));
-                    int index_metadata = (y + (z * (h)) + (x * (h) * (sz))) + h * sz * sx * 2;
-                    int index_light_block = (y + (z * (h)) + (x * (h) * (sz))) / 2 + h * sz * sx * 3 / 2;
-                    int index_light_sky = (y + (z * (h)) + (x * (h) * (sz))) / 2 + h * sz * sx * 4 / 2;
-                    if (y < max_y && y < BLOCK_ID_MAX)
-                        precompress[index_type] = y;
-                    if (max_y >= BLOCK_ID_MAX)
-                    {
-                        if (z != x)
-                            precompress[index_type] = 0;
-                        if (index_metadata % 2 == 0)
-                            precompress[index_metadata / 2] |= x << 4;
-                        else
-                            precompress[index_metadata / 2] |= x;
-                    }
-                    precompress[index_light_block] = 255;
-                    precompress[index_light_sky] = 255;
-                }
-            }
-        }
-        packet.compressed_data.resize(compressBound(precompress.size()));
-        TRACE("precompress_len: %lu", precompress.size());
-        TRACE("precompress_bound: %lu", packet.compressed_data.size());
+    if (max_y >= BLOCK_ID_MAX)
+        c.generate_special_metadata();
+    else
+        c.generate_special_ascending_type(max_y);
 
-        compressed_len = packet.compressed_data.size();
-        compress(packet.compressed_data.data(), &compressed_len, precompress.data(), precompress.size());
-        packet.compressed_data.resize(compressed_len);
-    }
-
-    TRACE("compressed_len: %lu", compressed_len);
+    c.compress_to_buf(packet.compressed_data);
 
     send_prechunk(sock, chunk_x, chunk_z, 1);
     send_prechunk(sock, chunk_x, chunk_z, 1);

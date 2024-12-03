@@ -49,4 +49,8 @@
 #error "World height cannot be below 0 (Will crash the server, there is a vector that expects WORLD_HEIGHT to be non negative)"
 #endif
 
+#define CHUNK_SIZE_X 16
+#define CHUNK_SIZE_Y WORLD_HEIGHT
+#define CHUNK_SIZE_Z 16
+
 #endif
