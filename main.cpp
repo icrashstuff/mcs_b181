@@ -95,10 +95,20 @@ bool send_chunk(SDLNet_StreamSocket* sock, int chunk_x, int chunk_z, int max_y)
                 for (int z = 0; z < sz; z++)
                 {
                     int index_type = y + (z * (h)) + (x * (h) * (sz));
+                    int index_metadata = (y + (z * (h)) + (x * (h) * (sz))) + h * sz * sx * 2;
                     int index_light_block = (y + (z * (h)) + (x * (h) * (sz))) / 2 + h * sz * sx * 3 / 2;
                     int index_light_sky = (y + (z * (h)) + (x * (h) * (sz))) / 2 + h * sz * sx * 4 / 2;
-                    if (y < max_y)
+                    if (y < max_y && y < BLOCK_ID_MAX)
                         precompress[index_type] = y;
+                    if (max_y >= BLOCK_ID_MAX)
+                    {
+                        if (z != x)
+                            precompress[index_type] = 0;
+                        if (index_metadata % 2 == 0)
+                            precompress[index_metadata / 2] |= x << 4;
+                        else
+                            precompress[index_metadata / 2] |= x;
+                    }
                     precompress[index_light_block] = 255;
                     precompress[index_light_sky] = 255;
                 }
@@ -372,6 +382,15 @@ int main(int argc, char** argv)
                             send_chunk(sock, x, z, 32);
                         }
                     }
+                    send_chunk(sock, 4, 1, 0);
+                    send_chunk(sock, 4, 0, 0);
+                    send_chunk(sock, 4, -1, 0);
+                    send_chunk(sock, 3, 1, 0);
+                    send_chunk(sock, 3, 0, 128);
+                    send_chunk(sock, 3, -1, 0);
+                    send_chunk(sock, 2, 0, 0);
+                    send_chunk(sock, 2, -1, 0);
+                    send_chunk(sock, 2, 1, 0);
 
                     client->player_y = 64.0;
                     client->player_stance = client->player_y + 0.2;

@@ -39,6 +39,8 @@
 
 #define WORLD_HEIGHT 128
 
+#define BLOCK_ID_MAX 110
+
 #if (WORLD_HEIGHT > 128)
 #error "World height cannot exceed 128 (Seriously, there are some fields that will rollover with anything bigger)"
 #endif
