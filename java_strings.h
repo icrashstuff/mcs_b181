@@ -29,12 +29,12 @@
 /**
  * Does garbage in garbage out conversion of ucs-2 encoded text to utf-8
  */
-std::string UCS2_to_UTF8(const Uint16* str);
+std::string UCS2_to_UTF8(const Uint16* str, int len = -1);
 
 /**
  * Does garbage in garbage out conversion of ucs-2 encoded text to utf-8
  */
-SDL_FORCE_INLINE std::string UCS2_to_UTF8(const char16_t* str) { return UCS2_to_UTF8((const Uint16*)str); }
+SDL_FORCE_INLINE std::string UCS2_to_UTF8(const char16_t* str, int len = -1) { return UCS2_to_UTF8((const Uint16*)str, len); }
 
 /**
  * Does garbage in garbage out conversion of utf-8 encoded text to what is probably ucs-2 encoded text

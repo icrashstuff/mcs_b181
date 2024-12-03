@@ -26,10 +26,10 @@
 
 #include <SDL3/SDL.h>
 
-std::string UCS2_to_UTF8(const Uint16* str)
+std::string UCS2_to_UTF8(const Uint16* str, int len)
 {
     std::string out;
-    for (size_t i = 0; str[i] != 0; i++)
+    for (int i = 0; str[i] != 0 && (len == -1 || i < len); i++)
     {
         char buf[4];
         char* buf_end = SDL_UCS4ToUTF8(SDL_Swap16BE(str[i]), buf);
