@@ -439,12 +439,23 @@ struct client_t
     double player_x = 0.0;
     double player_y = 0.0;
     double player_stance = 0.0;
+    double y_last_ground = 0.0;
     double player_z = 0.0;
     float player_yaw = 0.0;
     float player_pitch = 0.0;
     Uint8 player_on_ground = 0;
     int dimension = 0;
     int player_mode = 1;
+
+    short health = 20;
+    short food = 20;
+    float food_satur = 5.0;
+
+    Uint64 time_last_health_update = 0;
+
+    Uint64 time_last_food_update = 0;
+
+    int update_health = 1;
 
     bool is_raining = 0;
 };
@@ -454,6 +465,43 @@ void send_buffer_to_players(std::vector<client_t> clients, std::vector<Uint8> bu
     for (size_t i = 0; i < clients.size(); i++)
         if (clients[i].sock && clients[i].username.length() > 0)
             send_buffer(clients[i].sock, buf);
+}
+
+void spawn_player(client_t* client, region_t* regions)
+{
+    SDLNet_StreamSocket* sock = client->sock;
+    for (int x = -2; x < 2; x++)
+    {
+        for (int z = -2; z < 2; z++)
+        {
+            if (!send_chunk(sock, regions[client->dimension < 0].get_chunk(x, z), x, z))
+                send_chunk(sock, x, z, 29);
+        }
+    }
+
+    regions[client->dimension < 0].get_chunk(0, 0)->find_spawn_point(client->player_x, client->player_y, client->player_z);
+    client->y_last_ground = client->player_y;
+    client->player_stance = client->player_y + 0.2;
+    client->player_on_ground = 1;
+
+    packet_player_pos_look_s2c_t pack_player_pos;
+    pack_player_pos.x = client->player_x;
+    pack_player_pos.y = client->player_y;
+    pack_player_pos.stance = client->player_stance;
+    pack_player_pos.z = client->player_z;
+    pack_player_pos.yaw = client->player_yaw;
+    pack_player_pos.pitch = client->player_pitch;
+    pack_player_pos.on_ground = client->player_on_ground;
+
+    send_buffer(sock, pack_player_pos.assemble());
+
+    for (int x = 0; x < 32; x++)
+    {
+        for (int z = 0; z < 32; z++)
+        {
+            send_chunk(sock, regions[client->dimension < 0].get_chunk(x, z), x, z);
+        }
+    }
 }
 
 int main(int argc, char** argv)
@@ -658,6 +706,53 @@ int main(int argc, char** argv)
 
                     send_buffer(sock, pack_rain.assemble());
                 }
+
+                if (sdl_tick_cur - client->time_last_food_update > 100000 && client->player_mode == 0)
+                {
+                    client->time_last_food_update = sdl_tick_cur;
+                    if (client->food_satur > 0.0)
+                        client->food_satur--;
+                    else if (client->food > 0)
+                        client->food--;
+
+                    client->update_health = 1;
+                }
+
+                if (sdl_tick_cur - client->time_last_health_update > 1000 && client->player_mode == 0)
+                {
+                    if (client->health < 20 && client->food >= 20)
+                        client->health++;
+                    if (client->food < 1 && client->health > 0)
+                        client->health--;
+
+                    client->update_health = 1;
+                }
+
+                if (client->player_on_ground && client->player_mode == 0)
+                {
+                    if (client->y_last_ground - client->player_y > 4)
+                    {
+                        client->health -= (client->y_last_ground - client->player_y) / 2;
+                        client->update_health = 1;
+                    }
+                }
+                if (client->player_on_ground || client->player_mode == 1)
+                {
+                    client->y_last_ground = client->player_y;
+                }
+
+                if (client->update_health == 1)
+                {
+                    client->update_health = 0;
+                    client->time_last_health_update = sdl_tick_cur;
+                    packet_health_t pack_health;
+                    pack_health.health = client->health;
+                    pack_health.food = client->food;
+                    pack_health.food_saturation = client->food_satur;
+                    send_buffer(sock, pack_health.assemble());
+                }
+                if (client->update_health)
+                    client->update_health--;
             }
 
             if (!pack && client->packet.get_error().length() > 0)
@@ -699,37 +794,7 @@ int main(int argc, char** argv)
                     /* We set the username here because at this point we are committed to having them */
                     client->username = p->username;
 
-                    for (int x = -2; x < 2; x++)
-                    {
-                        for (int z = -2; z < 2; z++)
-                        {
-                            if (!send_chunk(sock, region[client->dimension < 0].get_chunk(x, z), x, z))
-                                send_chunk(sock, x, z, 29);
-                        }
-                    }
-
-                    region[client->dimension < 0].get_chunk(0, 0)->find_spawn_point(client->player_x, client->player_y, client->player_z);
-                    client->player_stance = client->player_y + 0.2;
-                    client->player_on_ground = 1;
-
-                    packet_player_pos_look_s2c_t pack_player_pos;
-                    pack_player_pos.x = client->player_x;
-                    pack_player_pos.y = client->player_y;
-                    pack_player_pos.stance = client->player_stance;
-                    pack_player_pos.z = client->player_z;
-                    pack_player_pos.yaw = client->player_yaw;
-                    pack_player_pos.pitch = client->player_pitch;
-                    pack_player_pos.on_ground = client->player_on_ground;
-
-                    send_buffer(sock, pack_player_pos.assemble());
-
-                    for (int x = 0; x < 32; x++)
-                    {
-                        for (int z = 0; z < 32; z++)
-                        {
-                            send_chunk(sock, region[client->dimension < 0].get_chunk(x, z), x, z);
-                        }
-                    }
+                    spawn_player(client, region);
 
                     send_chunk(sock, 4, 1, 0);
                     send_chunk(sock, 4, 0, 0);
@@ -786,6 +851,11 @@ int main(int argc, char** argv)
                             }
                             goto loop_end;
                         }
+                        else if (p->msg == "/kill")
+                        {
+                            client->health = -100;
+                            client->update_health = 2;
+                        }
                         else if (p->msg == "/smite")
                         {
                             packet_thunder_t pack_thunder;
@@ -810,7 +880,7 @@ int main(int argc, char** argv)
                         }
                         else if (p->msg == "/nether" || p->msg == "/overworld")
                         {
-                            packet_respawn pack_dim_change;
+                            packet_respawn_t pack_dim_change;
                             client->dimension = p->msg == "/overworld" ? 0 : -1;
                             pack_dim_change.seed = world_seed;
                             pack_dim_change.dimension = client->dimension;
@@ -822,37 +892,7 @@ int main(int argc, char** argv)
                             pack_time.time = sdl_tick_cur / 50;
                             send_buffer(sock, pack_time.assemble());
 
-                            for (int x = -2; x < 2; x++)
-                            {
-                                for (int z = -2; z < 2; z++)
-                                {
-                                    if (!send_chunk(sock, region[client->dimension < 0].get_chunk(x, z), x, z))
-                                        send_chunk(sock, x, z, 29);
-                                }
-                            }
-
-                            region[client->dimension < 0].get_chunk(0, 0)->find_spawn_point(client->player_x, client->player_y, client->player_z);
-                            client->player_stance = client->player_y + 0.2;
-                            client->player_on_ground = 1;
-
-                            packet_player_pos_look_s2c_t pack_player_pos;
-                            pack_player_pos.x = client->player_x;
-                            pack_player_pos.y = client->player_y;
-                            pack_player_pos.stance = client->player_stance;
-                            pack_player_pos.z = client->player_z;
-                            pack_player_pos.yaw = client->player_yaw;
-                            pack_player_pos.pitch = client->player_pitch;
-                            pack_player_pos.on_ground = client->player_on_ground;
-
-                            send_buffer(sock, pack_player_pos.assemble());
-
-                            for (int x = 0; x < 32; x++)
-                            {
-                                for (int z = 0; z < 32; z++)
-                                {
-                                    send_chunk(sock, region[client->dimension < 0].get_chunk(x, z), x, z);
-                                }
-                            }
+                            spawn_player(client, region);
                         }
                         else if (p->msg == "/c" || p->msg == "/s")
                         {
@@ -870,7 +910,8 @@ int main(int argc, char** argv)
                         }
                         else if (p->msg == "/help")
                         {
-                            const char* commands[] = { "/stop", "/smite", "/unload", "/overworld", "/nether", "/c", "/s", "/rain_on", "/rain_off", NULL };
+                            const char* commands[]
+                                = { "/stop", "/smite", "/unload", "/overworld", "/nether", "/c", "/s", "/rain_on", "/rain_off", "/kill", NULL };
                             for (int i = 0; commands[i] != 0; i++)
                             {
                                 packet_chat_message_t pack_msg;
@@ -890,6 +931,29 @@ int main(int argc, char** argv)
 
                         send_buffer_to_players(clients, pack_msg.assemble());
                     }
+                }
+                case 0x09:
+                {
+                    if (client->health > 0 || client->update_health)
+                        break;
+
+                    client->health = 20;
+                    client->food = 20;
+                    client->food_satur = 5;
+                    client->update_health = 1;
+
+                    packet_respawn_t pack_respawn;
+                    pack_respawn.seed = world_seed;
+                    pack_respawn.dimension = client->dimension;
+                    pack_respawn.mode = client->player_mode;
+                    pack_respawn.world_height = WORLD_HEIGHT;
+                    send_buffer(sock, pack_respawn.assemble());
+
+                    packet_time_update_t pack_time;
+                    pack_time.time = sdl_tick_cur / 50;
+                    send_buffer(sock, pack_time.assemble());
+
+                    break;
                 }
                 case 0x0a:
                 {

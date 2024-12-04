@@ -215,13 +215,33 @@ struct packet_time_update_t : packet_t
     }
 };
 
+struct packet_health_t : packet_t
+{
+    packet_health_t() { id = 0x08; }
+
+    jshort health = 0;
+    jshort food = 0;
+    jfloat food_saturation = 0.0;
+
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == 0x08);
+        dat.push_back(id);
+        assemble_short(dat, health);
+        assemble_short(dat, food);
+        assemble_float(dat, food_saturation);
+        return dat;
+    }
+};
+
 /**
  * Sent by client after hitting respawn
  * Sent by server to change dimension or as a response to the client
  */
-struct packet_respawn : packet_t
+struct packet_respawn_t : packet_t
 {
-    packet_respawn() { id = 0x09; }
+    packet_respawn_t() { id = 0x09; }
 
     jbyte dimension = 0;
     jbyte difficulty = 0;

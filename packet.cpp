@@ -583,7 +583,7 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
     }
     case 0x09:
     {
-        P(packet_respawn);
+        P(packet_respawn_t);
 
         err += !read_byte(buf, pos, &p->dimension);
         err += !read_byte(buf, pos, &p->difficulty);
