@@ -585,8 +585,8 @@ int main(int argc, char** argv)
     /* Intentionally shift only 31 places so the number is negative */
     world_seed = (Sint64)((Uint64)SDL_rand_bits() << 31 | (Uint64)SDL_rand_bits());
 
-    /* We limit ourselves to 32 bits because larger values tend to break the generators */
-    world_seed = SDL_rand_bits();
+    /* We limit ourselves to 16 bits because larger values tend to break the generators */
+    world_seed = SDL_rand_bits() & 0xFFFF;
 
     LOG("World seed: %ld", world_seed);
 
@@ -798,6 +798,12 @@ int main(int argc, char** argv)
                     else if (client->food > 0)
                         client->food--;
 
+                    client->update_health = 1;
+                }
+
+                if (client->player_y < -100)
+                {
+                    client->health = -100;
                     client->update_health = 1;
                 }
 
@@ -1020,6 +1026,12 @@ int main(int argc, char** argv)
                     client->food = 20;
                     client->food_satur = 5;
                     client->update_health = 1;
+
+                    packet_health_t pack_health;
+                    pack_health.health = client->health;
+                    pack_health.food = client->food;
+                    pack_health.food_saturation = client->food_satur;
+                    send_buffer(sock, pack_health.assemble());
 
                     packet_respawn_t pack_respawn;
                     pack_respawn.seed = world_seed;
