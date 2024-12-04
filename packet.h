@@ -215,6 +215,17 @@ struct packet_time_update_t : packet_t
     }
 };
 
+struct packet_ent_use_t : packet_t
+{
+    packet_ent_use_t() { id = 0x07; }
+
+    jint user;
+    jint target;
+    jbool left_click;
+
+    NO_ASSEMBLE();
+};
+
 struct packet_health_t : packet_t
 {
     packet_health_t() { id = 0x08; }
@@ -449,6 +460,93 @@ struct packet_ent_action_t : packet_t
     NO_ASSEMBLE();
 };
 
+struct packet_named_ent_spawn_t : packet_t
+{
+    packet_named_ent_spawn_t() { id = 0x14; }
+
+    jint eid = 0;
+    std::string name;
+    jint x = 0;
+    jint y = 0;
+    jint z = 0;
+    jbyte rotation = 0;
+    jbyte pitch = 0;
+    jshort cur_item = 0;
+
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == 0x14);
+        dat.push_back(id);
+        assemble_int(dat, eid);
+        assemble_string16(dat, name);
+        assemble_int(dat, x);
+        assemble_int(dat, y);
+        assemble_int(dat, z);
+        assemble_byte(dat, rotation);
+        assemble_byte(dat, pitch);
+        assemble_short(dat, cur_item);
+        return dat;
+    }
+};
+
+struct packet_ent_create_t : packet_t
+{
+    packet_ent_create_t() { id = 0x1e; }
+
+    jint eid;
+
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == 0x1e);
+        dat.push_back(id);
+        assemble_int(dat, eid);
+        return dat;
+    }
+};
+struct packet_ent_destroy_t : packet_t
+{
+    packet_ent_destroy_t() { id = 0x1d; }
+
+    jint eid;
+
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == 0x1d);
+        dat.push_back(id);
+        assemble_int(dat, eid);
+        return dat;
+    }
+};
+
+struct packet_ent_teleport_t : packet_t
+{
+    packet_ent_teleport_t() { id = 0x22; }
+
+    jint eid = 0;
+    jint x = 0;
+    jint y = 0;
+    jint z = 0;
+    jbyte rotation = 0;
+    jbyte pitch = 0;
+
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == 0x22);
+        dat.push_back(id);
+        assemble_int(dat, eid);
+        assemble_int(dat, x);
+        assemble_int(dat, y);
+        assemble_int(dat, z);
+        assemble_byte(dat, rotation);
+        assemble_byte(dat, pitch);
+        return dat;
+    }
+};
+
 struct packet_prechunk_t : packet_t
 {
     packet_prechunk_t() { id = 0x32; }
@@ -526,6 +624,30 @@ struct packet_block_change_t : packet_t
         assemble_int(dat, block_z);
         assemble_byte(dat, type);
         assemble_byte(dat, metadata & 0x0F);
+        return dat;
+    }
+};
+
+struct packet_sound_effect_t : packet_t
+{
+    packet_sound_effect_t() { id = 0x3D; }
+
+    jint effect_id;
+    jint x;
+    jbyte y;
+    jint z;
+    jint sound_data;
+
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == 0x3D);
+        dat.push_back(id);
+        assemble_int(dat, effect_id);
+        assemble_int(dat, x);
+        assemble_byte(dat, y);
+        assemble_int(dat, z);
+        assemble_int(dat, sound_data);
         return dat;
     }
 };

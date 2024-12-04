@@ -250,6 +250,13 @@ public:
         return false;
     }
 
+    inline Uint8 get_type(int x, int y, int z)
+    {
+        int index = y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z));
+
+        return data[index];
+    }
+
     inline void set_type(int x, int y, int z, Uint8 type)
     {
         int index = y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z));
@@ -435,6 +442,7 @@ struct client_t
     Uint64 time_keep_alive_recv = 0;
 
     std::string username;
+    int eid = 0;
     int counter = 0;
     double player_x = 0.0;
     double player_y = 0.0;
@@ -451,9 +459,12 @@ struct client_t
     short food = 20;
     float food_satur = 5.0;
 
+    bool pos_updated = 1;
+
     Uint64 time_last_health_update = 0;
 
     Uint64 time_last_food_update = 0;
+    Uint64 pos_update_time;
 
     int update_health = 1;
 
@@ -467,15 +478,14 @@ void send_buffer_to_players(std::vector<client_t> clients, std::vector<Uint8> bu
             send_buffer(clients[i].sock, buf);
 }
 
-void spawn_player(client_t* client, region_t* regions)
+void spawn_player(std::vector<client_t> clients, client_t* client, region_t* regions)
 {
     SDLNet_StreamSocket* sock = client->sock;
     for (int x = -2; x < 2; x++)
     {
         for (int z = -2; z < 2; z++)
         {
-            if (!send_chunk(sock, regions[client->dimension < 0].get_chunk(x, z), x, z))
-                send_chunk(sock, x, z, 29);
+            send_chunk(sock, regions[client->dimension < 0].get_chunk(x, z), x, z);
         }
     }
 
@@ -483,6 +493,42 @@ void spawn_player(client_t* client, region_t* regions)
     client->y_last_ground = client->player_y;
     client->player_stance = client->player_y + 0.2;
     client->player_on_ground = 1;
+
+    packet_ent_create_t pack_player_ent;
+    packet_named_ent_spawn_t pack_player;
+
+    pack_player_ent.eid = client->eid;
+    pack_player.eid = client->eid;
+    pack_player.name = client->username;
+    pack_player.x = client->player_x * 32;
+    pack_player.y = client->player_y * 32;
+    pack_player.z = client->player_z * 32;
+    pack_player.rotation = ((int)client->player_yaw) * 255 / 360;
+    pack_player.pitch = client->player_pitch;
+
+    for (size_t i = 0; i < clients.size(); i++)
+    {
+        if (clients[i].sock && clients[i].username.length() > 0 && clients[i].sock != sock)
+        {
+            packet_ent_create_t pack_ext_player_ent;
+            packet_named_ent_spawn_t pack_ext_player;
+
+            pack_ext_player_ent.eid = clients[i].eid;
+            pack_ext_player.eid = clients[i].eid;
+            pack_ext_player.name = clients[i].username;
+            pack_ext_player.x = clients[i].player_x * 32;
+            pack_ext_player.y = clients[i].player_y * 32;
+            pack_ext_player.z = clients[i].player_z * 32;
+            pack_ext_player.rotation = ((int)clients[i].player_yaw) * 255 / 360;
+            pack_ext_player.pitch = clients[i].player_pitch;
+
+            send_buffer(sock, pack_ext_player_ent.assemble());
+            send_buffer(sock, pack_ext_player.assemble());
+
+            send_buffer(clients[i].sock, pack_player_ent.assemble());
+            send_buffer(clients[i].sock, pack_player.assemble());
+        }
+    }
 
     packet_player_pos_look_s2c_t pack_player_pos;
     pack_player_pos.x = client->player_x;
@@ -503,6 +549,8 @@ void spawn_player(client_t* client, region_t* regions)
         }
     }
 }
+
+int eid_counter = 0;
 
 int main(int argc, char** argv)
 {
@@ -618,13 +666,17 @@ int main(int argc, char** argv)
         }
 
         std::vector<std::string> players_kicked;
+        std::vector<jint> entities_kicked;
 
         for (auto it = clients.begin(); it != clients.end();)
         {
             if (!(*it).sock)
             {
                 if ((*it).username.length())
+                {
                     players_kicked.push_back((*it).username);
+                    entities_kicked.push_back((*it).eid);
+                }
                 it = clients.erase(it);
             }
             else
@@ -672,6 +724,13 @@ int main(int argc, char** argv)
 
                     send_buffer(sock, pack_player_list_leave.assemble());
                 }
+                for (size_t i = 0; i < entities_kicked.size(); i++)
+                {
+                    packet_ent_destroy_t pack_eid_no;
+                    pack_eid_no.eid = entities_kicked[i];
+
+                    send_buffer(sock, pack_eid_no.assemble());
+                }
 
                 if (sdl_tick_cur - client->time_keep_alive_sent > 200)
                 {
@@ -691,6 +750,30 @@ int main(int argc, char** argv)
                         pack_player_list.ping = sdl_tick_cur - client->packet.get_last_packet_time();
 
                         send_buffer_to_players(clients, pack_player_list.assemble());
+                    }
+                }
+
+                if ((sdl_tick_cur - client->pos_update_time > 50 && client->pos_updated) || sdl_tick_cur - client->pos_update_time > 1000)
+                {
+                    client->pos_update_time = sdl_tick_cur;
+                    client->pos_updated = 0;
+                    packet_ent_create_t pack_ext_player_ent;
+                    packet_ent_teleport_t pack_ext_player;
+
+                    pack_ext_player_ent.eid = client->eid;
+                    pack_ext_player.eid = client->eid;
+                    pack_ext_player.x = client->player_x * 32;
+                    pack_ext_player.y = client->player_y * 32;
+                    pack_ext_player.z = client->player_z * 32;
+                    pack_ext_player.rotation = ((int)client->player_yaw) * 255 / 360;
+                    pack_ext_player.pitch = client->player_pitch;
+                    for (size_t i = 0; i < clients.size(); i++)
+                    {
+                        if (clients[i].sock && clients[i].username.length() > 0 && clients[i].sock != sock)
+                        {
+                            send_buffer(clients[i].sock, pack_ext_player_ent.assemble());
+                            send_buffer(clients[i].sock, pack_ext_player.assemble());
+                        }
                     }
                 }
 
@@ -777,8 +860,10 @@ int main(int argc, char** argv)
                     if (p->protocol_ver != 17)
                         KICK(sock, "Nope");
 
+                    client->eid = eid_counter++;
+
                     packet_login_request_s2c_t packet_login_s2c;
-                    packet_login_s2c.player_eid = 0;
+                    packet_login_s2c.player_eid = client->eid;
                     packet_login_s2c.seed = world_seed;
                     packet_login_s2c.mode = client->player_mode;
                     packet_login_s2c.dimension = client->dimension;
@@ -794,18 +879,6 @@ int main(int argc, char** argv)
                     /* We set the username here because at this point we are committed to having them */
                     client->username = p->username;
 
-                    spawn_player(client, region);
-
-                    send_chunk(sock, 4, 1, 0);
-                    send_chunk(sock, 4, 0, 0);
-                    send_chunk(sock, 4, -1, 0);
-                    send_chunk(sock, 3, 1, 0);
-                    send_chunk(sock, 3, 0, 128);
-                    send_chunk(sock, 3, -1, 0);
-                    send_chunk(sock, 2, 0, 0);
-                    send_chunk(sock, 2, -1, 0);
-                    send_chunk(sock, 2, 1, 0);
-
                     if (client->username.length() == 0)
                         break;
 
@@ -813,6 +886,8 @@ int main(int argc, char** argv)
                     pack_join_msg.msg = "§e";
                     pack_join_msg.msg += client->username;
                     pack_join_msg.msg += " joined the game.";
+
+                    spawn_player(clients, client, region);
 
                     send_buffer_to_players(clients, pack_join_msg.assemble());
 
@@ -892,7 +967,7 @@ int main(int argc, char** argv)
                             pack_time.time = sdl_tick_cur / 50;
                             send_buffer(sock, pack_time.assemble());
 
-                            spawn_player(client, region);
+                            spawn_player(clients, client, region);
                         }
                         else if (p->msg == "/c" || p->msg == "/s")
                         {
@@ -931,6 +1006,10 @@ int main(int argc, char** argv)
 
                         send_buffer_to_players(clients, pack_msg.assemble());
                     }
+                }
+                case 0x07:
+                {
+                    break;
                 }
                 case 0x09:
                 {
@@ -973,6 +1052,8 @@ int main(int argc, char** argv)
                     client->player_z = p->z;
                     client->player_on_ground = p->on_ground;
 
+                    client->pos_updated = 1;
+
                     break;
                 }
                 case 0x0c:
@@ -982,6 +1063,8 @@ int main(int argc, char** argv)
                     client->player_yaw = p->yaw;
                     client->player_pitch = p->pitch;
                     client->player_on_ground = p->on_ground;
+
+                    client->pos_updated = 1;
 
                     break;
                 }
@@ -997,6 +1080,8 @@ int main(int argc, char** argv)
                     client->player_pitch = p->pitch;
                     client->player_on_ground = p->on_ground;
 
+                    client->pos_updated = 1;
+
                     break;
                 }
                 case 0x0e:
@@ -1007,7 +1092,7 @@ int main(int argc, char** argv)
                     double z_diff = p->z - client->player_z;
                     double radius = SDL_sqrt(x_diff * x_diff + y_diff * y_diff + z_diff * z_diff);
 
-                    LOG("Dig %d @ <%d, %d, %d>:%d (Radius: %.3f)", p->status, p->x, p->y, p->z, p->face, radius);
+                    TRACE("Dig %d @ <%d, %d, %d>:%d (Radius: %.3f)", p->status, p->x, p->y, p->z, p->face, radius);
 
                     if (p->status == PLAYER_DIG_STATUS_FINISH_DIG || p->status == PLAYER_DIG_STATUS_START_DIG)
                     {
@@ -1025,6 +1110,14 @@ int main(int argc, char** argv)
                         {
                             if (p->status == PLAYER_DIG_STATUS_FINISH_DIG || client->player_mode > 0)
                             {
+                                packet_sound_effect_t pack_break_sfx;
+                                pack_break_sfx.effect_id = 2001;
+                                pack_break_sfx.x = p->x;
+                                pack_break_sfx.y = p->y;
+                                pack_break_sfx.z = p->z;
+                                pack_break_sfx.sound_data = c->get_type(p->x % 16, p->y, p->z % 16);
+                                send_buffer_to_players(clients, pack_break_sfx.assemble());
+
                                 packet_block_change_t pack_block_change;
                                 pack_block_change.block_x = p->x;
                                 pack_block_change.block_y = p->y;
@@ -1056,7 +1149,7 @@ int main(int argc, char** argv)
                     double z_diff = p->z - client->player_z;
                     double radius = SDL_sqrt(x_diff * x_diff + y_diff * y_diff + z_diff * z_diff);
 
-                    LOG("Place %d @ <%d, %d, %d>:%d (Radius: %.3f)", p->block_item_id, p->x, p->y, p->z, p->direction, radius);
+                    TRACE("Place %d @ <%d, %d, %d>:%d (Radius: %.3f)", p->block_item_id, p->x, p->y, p->z, p->direction, radius);
 
                     int place_x = p->x;
                     int place_y = p->y;
@@ -1094,8 +1187,6 @@ int main(int argc, char** argv)
 
                         double diff_y = (double)place_y - client->player_y;
 
-                        LOG("%.3f", diff_y);
-
                         if (SDL_floor(client->player_x) == place_x && (-0.9 < diff_y && diff_y < 1.8) && SDL_floor(client->player_z) == place_z)
                         {
                             p->block_item_id = 0;
@@ -1125,10 +1216,18 @@ int main(int argc, char** argv)
                     break;
                 }
                 case 0x10:
+                    break;
                 case 0x12:
+                {
+                    for (size_t i = 0; i < clients.size(); i++)
+                        if (clients[i].sock && clients[i].username.length() > 0 && clients[i].sock != sock)
+                            send_buffer(clients[i].sock, pack->assemble());
+                    break;
+                }
                 case 0x13:
                     break;
                 case 0x65:
+                    break;
                 case 0x6b:
                     break;
                 case 0xfe:
