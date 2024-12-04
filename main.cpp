@@ -45,6 +45,8 @@
 
 #include "simplex_noise/SimplexNoise.h"
 
+long world_seed = 0;
+
 void kick(SDLNet_StreamSocket* sock, std::string reason, bool log = true)
 {
     packet_kick_t packet;
@@ -76,19 +78,43 @@ bool send_prechunk(SDLNet_StreamSocket* sock, int chunk_x, int chunk_z, bool mod
 class chunk_t
 {
 public:
-    chunk_t() { data.resize(CHUNK_SIZE_X * CHUNK_SIZE_Y * CHUNK_SIZE_Z * 5 / 2, 0); }
+    chunk_t()
+    {
+        data.resize(CHUNK_SIZE_X * CHUNK_SIZE_Y * CHUNK_SIZE_Z * 5 / 2, 0);
+        assert(data.size());
+        Uint8* ptr = data.data();
+        r_state = *(Uint64*)&ptr;
+    }
 
     void generate_from_seed_over(long seed, int cx, int cz)
     {
+        SimplexNoise noise;
+
+        /* Source: I made this up,*/
+        int r = (seed % 0x012476) << 4 & seed % 0xF6F0AFF;
+
         for (int x = 0; x < CHUNK_SIZE_X; x++)
         {
             for (int z = 0; z < CHUNK_SIZE_Z; z++)
             {
-                float fx = x + cx * CHUNK_SIZE_X + (seed >> 32);
-                float fz = z + cz * CHUNK_SIZE_X + (seed & 0xFFFFFFF);
-                int height = (SimplexNoise::noise(fx / 100, fz / 100) + 1.0) * 0.1 * CHUNK_SIZE_Y + 56;
-                for (int i = 1; i < height; i++)
+                double fx = x + cx * CHUNK_SIZE_X + r;
+                double fz = z + cz * CHUNK_SIZE_X + r;
+                int height_grass = (noise.fractal(2, fx / 100, fz / 100) + 1.0) + 2;
+                double height = (noise.fractal(4, fx / 100, fz / 100) + 1.0 + noise.noise((fx + 10.0) / 100, (fz + 10.0) / 100) + 1.0) * 0.05 * CHUNK_SIZE_Y
+                    + 56 - height_grass;
+                double aggressive = noise.fractal(4, fx / 150, fz / 150) + 1.0;
+                if (aggressive > 1.05)
+                    height = height * (noise.fractal(3, fx / 150, fz / 150) + 1.0);
+                if (aggressive > 1.5)
+                    height = height * 1.5 / (noise.fractal(2, fx / 150, fz / 150) + 1.0);
+                else
+                    height = height + 1.5 / (noise.fractal(2, fx / 150, fz / 150) + 1.0);
+
+                for (int i = 1; i < height && i < CHUNK_SIZE_Y; i++)
                     set_type(x, i, z, BLOCK_ID_STONE);
+                for (int i = height; i < height + height_grass && i < CHUNK_SIZE_Y; i++)
+                    set_type(x, i, z, BLOCK_ID_DIRT);
+                set_type(x, height + height_grass, z, BLOCK_ID_GRASS);
                 for (int i = height - 2; i < CHUNK_SIZE_Y; i++)
                     set_light_sky(x, i, z, 15);
                 set_type(x, 0, z, BLOCK_ID_BEDROCK);
@@ -98,14 +124,20 @@ public:
 
     void generate_from_seed_nether(long seed, int cx, int cz)
     {
+        SimplexNoise noise;
+
+        int r = (seed % 0xF2FFF << 4 | seed) & seed % 0xF6F0AFF;
+
         for (int x = 0; x < CHUNK_SIZE_X; x++)
         {
             for (int z = 0; z < CHUNK_SIZE_Z; z++)
             {
-                float fx = x + cx * CHUNK_SIZE_X + (seed >> 32);
-                float fz = z + cz * CHUNK_SIZE_X + (seed & 0xFFFFFFF);
-                int height = (SimplexNoise::noise(fx / 100, fz / 100) + 1.0) * 0.1 * CHUNK_SIZE_Y + 56;
-                int height2 = CHUNK_SIZE_Y - (SimplexNoise::noise(fx / 200, fz / 200) + 1.0) * 0.3 * CHUNK_SIZE_Y;
+                double fx = x + cx * CHUNK_SIZE_X + r;
+                double fz = z + cz * CHUNK_SIZE_X + r;
+                int height = (noise.fractal(4, fx / 100, fz / 100) + 1.0) * 0.1 * CHUNK_SIZE_Y + 56;
+                double noise2 = (noise.fractal(4, fx / 200, fz / 200) + 1.0) * 0.1 * CHUNK_SIZE_Y + 4;
+
+                int height2 = CHUNK_SIZE_Y - noise2;
                 for (int i = 1; i < height; i++)
                     set_type(x, i, z, BLOCK_ID_NETHERACK);
                 for (int i = height - 2; i < height2; i++)
@@ -169,6 +201,55 @@ public:
         }
     }
 
+    /**
+     * Attempts to find a suitable place to put a player in a chunk
+     *
+     * Returns true if a suitable location was found, false if a fallback location at world height was selected
+     */
+    inline bool find_spawn_point(double& x, double& y, double& z)
+    {
+        Uint32 pos = ((int)(x * 3) << 24) + ((int)(y * 3) << 12) + (int)(z * 3);
+        pos += SDL_rand_bits_r(&r_state);
+
+        int cx_s = (pos >> 16) % CHUNK_SIZE_X;
+        int cz_s = pos % CHUNK_SIZE_Z;
+
+        int found_air = 0;
+        Uint8 last_type[2] = { 0, 0 };
+
+        for (int ix = 0; ix < CHUNK_SIZE_X; ix++)
+        {
+            for (int iz = 0; iz < CHUNK_SIZE_Z; iz++)
+            {
+                int cx = (ix + cx_s) % CHUNK_SIZE_X;
+                int cz = (iz + cz_s) % CHUNK_SIZE_Z;
+                LOG("checking %d %d", cx, cz);
+                for (int i = CHUNK_SIZE_Y; i > 0; i--)
+                {
+                    int index = i - 1 + (cz * (CHUNK_SIZE_Y)) + (cx * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z));
+                    Uint8 type = data[index];
+                    if (type == 0)
+                        found_air++;
+
+                    if (type > 0 && found_air > 2 && last_type[0] == 0 && last_type[1] == 0 && type != BLOCK_ID_LAVA_FLOWING && type != BLOCK_ID_LAVA_SOURCE)
+                    {
+                        x = cx + 0.5;
+                        y = i + 1.8;
+                        z = cz + 0.5;
+                        return true;
+                    }
+                    last_type[1] = last_type[0];
+                    last_type[0] = type;
+                }
+            }
+        }
+
+        x = cx_s + 0.5;
+        y = CHUNK_SIZE_Y + 1.8;
+        z = cz_s + 0.5;
+        return false;
+    }
+
     inline void set_type(int x, int y, int z, Uint8 type)
     {
         int index = y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z));
@@ -221,8 +302,35 @@ public:
     }
 
 private:
+    Uint64 r_state;
     std::vector<Uint8> data;
 };
+
+struct chunk_thread_data_t
+{
+    chunk_t* c;
+    long seed;
+    int dimension;
+    int cx;
+    int cz;
+};
+
+int generate_chunk_thread_func(void* data)
+{
+    if (!data)
+        return 0;
+
+    chunk_thread_data_t* d = (chunk_thread_data_t*)data;
+
+    assert(d->c);
+    if (d->dimension < 0)
+        d->c->generate_from_seed_nether(d->seed, d->cx, d->cz);
+    else
+        d->c->generate_from_seed_over(d->seed, d->cx, d->cz);
+    return 1;
+}
+
+#define REGION_MULTITHREAD_GEN 1
 
 class region_t
 {
@@ -233,14 +341,25 @@ public:
     {
         for (int cx = 0; cx < REGION_SIZE_X; cx++)
         {
+            SDL_Thread* threads[REGION_SIZE_Z];
+            chunk_thread_data_t d[REGION_SIZE_Z];
             for (int cz = 0; cz < REGION_SIZE_Z; cz++)
             {
                 chunk_t* c = get_chunk(cx, cz);
                 assert(c);
-                if (dimension < 0)
-                    c->generate_from_seed_nether(seed, cx + region_x * REGION_SIZE_X, cz + region_z * REGION_SIZE_Z);
-                else
-                    c->generate_from_seed_over(seed, cx + region_x * REGION_SIZE_X, cz + region_z * REGION_SIZE_Z);
+                d[cz].c = c;
+                d[cz].seed = seed;
+                d[cz].dimension = dimension;
+                d[cz].cx = cx + region_x * REGION_SIZE_X;
+                d[cz].cz = cz + region_z * REGION_SIZE_Z;
+
+                threads[cz] = SDL_CreateThread(generate_chunk_thread_func, "Chunk Thread", &d[cz]);
+            }
+            for (size_t i = 0; i < ARR_SIZE(threads); i++)
+            {
+                int b;
+                SDL_WaitThread(threads[i], &b);
+                assert(b == 1);
             }
         }
     }
@@ -275,7 +394,6 @@ bool send_chunk(SDLNet_StreamSocket* sock, chunk_t* chunk, int chunk_x, int chun
     chunk->compress_to_buf(packet.compressed_data);
 
     send_prechunk(sock, chunk_x, chunk_z, 1);
-    send_prechunk(sock, chunk_x, chunk_z, 1);
 
     return send_buffer(sock, packet.assemble());
 }
@@ -303,7 +421,6 @@ bool send_chunk(SDLNet_StreamSocket* sock, int chunk_x, int chunk_z, int max_y)
 
     c.compress_to_buf(packet.compressed_data);
 
-    send_prechunk(sock, chunk_x, chunk_z, 1);
     send_prechunk(sock, chunk_x, chunk_z, 1);
 
     return send_buffer(sock, packet.assemble());
@@ -359,11 +476,30 @@ int main(int argc, char** argv)
         exit(1);
     }
 
+    /* These seeds break terrain gen */
+
+    world_seed = -1775145942054626728;
+    world_seed = SDL_MIN_SINT64;
+    world_seed = -1705145942054626728; /* More granular */
+
+    world_seed = -((Uint64)7 << 60); /* Even more granular */
+
+    world_seed = 5090434129841486344; /* Coarse: Nether only */
+
+    /* Intentionally shift only 31 places so the number is negative */
+    world_seed = (Sint64)((Uint64)SDL_rand_bits() << 31 | (Uint64)SDL_rand_bits());
+
+    /* We limit ourselves to 32 bits because larger values tend to break the generators */
+    world_seed = SDL_rand_bits();
+
+    LOG("World seed: %ld", world_seed);
+
     LOG("Generating regions");
     Uint64 tick_region_start = SDL_GetTicks();
     region_t region[2];
-    region[0].generate_from_seed(1, 0, 0, 0);
-    region[1].generate_from_seed(1, -1, 1, 0);
+    /* Setting region_x or region_z to values like 1000000 introduces generator errors */
+    region[0].generate_from_seed(world_seed, 0, 0, 0);
+    region[1].generate_from_seed(world_seed, -1, 1, 0);
     Uint64 tick_region_time = SDL_GetTicks() - tick_region_start;
     LOG("Regions generated in %lu ms", tick_region_time);
 
@@ -372,7 +508,7 @@ int main(int argc, char** argv)
     bool done = false;
 
     LOG("Resolving host");
-    SDLNet_Address* addr = SDLNet_ResolveHostname("localhost");
+    SDLNet_Address* addr = SDLNet_ResolveHostname("127.0.0.1");
 
     if (!addr)
     {
@@ -548,7 +684,7 @@ int main(int argc, char** argv)
 
                     packet_login_request_s2c_t packet_login_s2c;
                     packet_login_s2c.player_eid = 0;
-                    packet_login_s2c.seed = 0;
+                    packet_login_s2c.seed = world_seed;
                     packet_login_s2c.mode = client->player_mode;
                     packet_login_s2c.dimension = client->dimension;
                     packet_login_s2c.difficulty = 0;
@@ -572,7 +708,7 @@ int main(int argc, char** argv)
                         }
                     }
 
-                    client->player_y = 75.0;
+                    region[client->dimension < 0].get_chunk(0, 0)->find_spawn_point(client->player_x, client->player_y, client->player_z);
                     client->player_stance = client->player_y + 0.2;
                     client->player_on_ground = 1;
 
@@ -587,14 +723,11 @@ int main(int argc, char** argv)
 
                     send_buffer(sock, pack_player_pos.assemble());
 
-                    for (int x = 0; x < 16; x++)
+                    for (int x = 0; x < 32; x++)
                     {
-                        for (int z = 0; z < 16; z++)
+                        for (int z = 0; z < 32; z++)
                         {
-                            send_chunk(
-                                sock, region[client->dimension < 0].get_chunk(x + 16 * !(client->dimension < 0), z), x - 16 * !(client->dimension < 0), z);
-                            send_chunk(
-                                sock, region[!(client->dimension < 0)].get_chunk(x + 16 * (client->dimension < 0), z), x - 16 * (client->dimension < 0), z);
+                            send_chunk(sock, region[client->dimension < 0].get_chunk(x, z), x, z);
                         }
                     }
 
@@ -679,6 +812,7 @@ int main(int argc, char** argv)
                         {
                             packet_respawn pack_dim_change;
                             client->dimension = p->msg == "/overworld" ? 0 : -1;
+                            pack_dim_change.seed = world_seed;
                             pack_dim_change.dimension = client->dimension;
                             pack_dim_change.mode = client->player_mode;
                             pack_dim_change.world_height = WORLD_HEIGHT;
@@ -697,7 +831,7 @@ int main(int argc, char** argv)
                                 }
                             }
 
-                            client->player_y = 75.0;
+                            region[client->dimension < 0].get_chunk(0, 0)->find_spawn_point(client->player_x, client->player_y, client->player_z);
                             client->player_stance = client->player_y + 0.2;
                             client->player_on_ground = 1;
 
@@ -712,14 +846,11 @@ int main(int argc, char** argv)
 
                             send_buffer(sock, pack_player_pos.assemble());
 
-                            for (int x = 0; x < 16; x++)
+                            for (int x = 0; x < 32; x++)
                             {
-                                for (int z = 0; z < 16; z++)
+                                for (int z = 0; z < 32; z++)
                                 {
-                                    send_chunk(sock, region[client->dimension < 0].get_chunk(x + 16 * !(client->dimension < 0), z),
-                                        x - 16 * !(client->dimension < 0), z);
-                                    send_chunk(sock, region[!(client->dimension < 0)].get_chunk(x + 16 * (client->dimension < 0), z),
-                                        x - 16 * (client->dimension < 0), z);
+                                    send_chunk(sock, region[client->dimension < 0].get_chunk(x, z), x, z);
                                 }
                             }
                         }
