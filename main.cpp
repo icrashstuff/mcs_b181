@@ -938,24 +938,126 @@ int main(int argc, char** argv)
                 case 0x0e:
                 {
                     CAST_PACK_TO_P(packet_player_dig_t);
-                    LOG("Unloading chunk %d %d", p->x >> 4, p->z >> 4);
+                    double x_diff = p->x - client->player_x;
+                    double y_diff = p->y - client->player_y;
+                    double z_diff = p->z - client->player_z;
+                    double radius = SDL_sqrt(x_diff * x_diff + y_diff * y_diff + z_diff * z_diff);
 
-                    /* The notchian client does not like chunks being unloaded near it */
-                    for (int i = 0; i < 16; i++)
-                        for (size_t j = 0; j < clients.size(); j++)
-                            if (clients[j].sock && clients[j].username.length() > 0)
-                                send_prechunk(clients[j].sock, p->x >> 4, p->z >> 4, 0);
+                    LOG("Dig %d @ <%d, %d, %d>:%d (Radius: %.3f)", p->status, p->x, p->y, p->z, p->face, radius);
+
+                    if (p->status == PLAYER_DIG_STATUS_FINISH_DIG || p->status == PLAYER_DIG_STATUS_START_DIG)
+                    {
+                        if (radius > 6.0)
+                        {
+                            LOG("Player \"%s\" sent dig with invalid radius of %.3f", client->username.c_str(), radius);
+                            continue;
+                        }
+
+                        int cx = p->x >> 4;
+                        int cz = p->z >> 4;
+
+                        chunk_t* c = region[client->dimension < 0].get_chunk(cx, cz);
+                        if (c)
+                        {
+                            if (p->status == PLAYER_DIG_STATUS_FINISH_DIG || client->player_mode > 0)
+                            {
+                                packet_block_change_t pack_block_change;
+                                pack_block_change.block_x = p->x;
+                                pack_block_change.block_y = p->y;
+                                pack_block_change.block_z = p->z;
+                                pack_block_change.type = 0;
+                                pack_block_change.metadata = 0;
+                                c->set_type(p->x % 16, p->y, p->z % 16, 0);
+                                c->set_metadata(p->x % 16, p->y, p->z % 16, 0);
+                                c->set_light_sky(p->x % 16, p->y, p->z % 16, 15);
+                                send_buffer_to_players(clients, pack_block_change.assemble());
+                            }
+                        }
+                        else
+                            LOG("Unable to place block");
+                    }
+                    else
+                    {
+                        LOG("Player \"%s\" sent dig with unsupported status of %d", client->username.c_str(), p->status);
+                        continue;
+                    }
+
                     break;
                 }
                 case 0x0f:
                 {
-                    int x = client->player_x;
-                    int z = client->player_z;
+                    CAST_PACK_TO_P(packet_player_place_t);
+                    double x_diff = p->x - client->player_x;
+                    double y_diff = p->y - client->player_y;
+                    double z_diff = p->z - client->player_z;
+                    double radius = SDL_sqrt(x_diff * x_diff + y_diff * y_diff + z_diff * z_diff);
 
-                    LOG("Loading chunk %d %d", x >> 4, z >> 4);
-                    for (size_t j = 0; j < clients.size(); j++)
-                        if (clients[j].sock && clients[j].username.length() > 0)
-                            send_chunk(clients[j].sock, x >> 4, z >> 4, 0);
+                    LOG("Place %d @ <%d, %d, %d>:%d (Radius: %.3f)", p->block_item_id, p->x, p->y, p->z, p->direction, radius);
+
+                    int place_x = p->x;
+                    int place_y = p->y;
+                    int place_z = p->z;
+
+                    if (p->direction != -1 && p->block_item_id >= 0 && p->block_item_id < 256)
+                    {
+                        switch (p->direction)
+                        {
+                        case 0:
+                            place_y -= 1;
+                            break;
+                        case 1:
+                            place_y += 1;
+                            break;
+                        case 2:
+                            place_z -= 1;
+                            break;
+                        case 3:
+                            place_z += 1;
+                            break;
+                        case 4:
+                            place_x -= 1;
+                            break;
+                        case 5:
+                            place_x += 1;
+                            break;
+                        default:
+                            goto loop_end;
+                            break;
+                        }
+
+                        if (place_x < 0 || place_y < 0 || place_z < 0)
+                            goto loop_end;
+
+                        double diff_y = (double)place_y - client->player_y;
+
+                        LOG("%.3f", diff_y);
+
+                        if (SDL_floor(client->player_x) == place_x && (-0.9 < diff_y && diff_y < 1.8) && SDL_floor(client->player_z) == place_z)
+                        {
+                            p->block_item_id = 0;
+                            p->damage = 0;
+                        }
+
+                        int cx = place_x >> 4;
+                        int cz = place_z >> 4;
+
+                        chunk_t* c = region[client->dimension < 0].get_chunk(cx, cz);
+                        if (c)
+                        {
+                            packet_block_change_t pack_block_change;
+                            pack_block_change.block_x = place_x;
+                            pack_block_change.block_y = place_y;
+                            pack_block_change.block_z = place_z;
+                            pack_block_change.type = p->block_item_id;
+                            pack_block_change.metadata = p->damage;
+                            c->set_type(place_x % 16, place_y, place_z % 16, p->block_item_id);
+                            c->set_metadata(place_x % 16, place_y, place_z % 16, p->damage);
+                            send_buffer_to_players(clients, pack_block_change.assemble());
+                        }
+                        else
+                            LOG("Unable to place block");
+                    }
+
                     break;
                 }
                 case 0x10:

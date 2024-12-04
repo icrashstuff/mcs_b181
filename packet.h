@@ -486,6 +486,30 @@ struct packet_chunk_t : packet_t
     }
 };
 
+struct packet_block_change_t : packet_t
+{
+    packet_block_change_t() { id = 0x35; }
+
+    jint block_x;
+    jbyte block_y;
+    jint block_z;
+    jbyte type;
+    jbyte metadata;
+
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == 0x35);
+        dat.push_back(id);
+        assemble_int(dat, block_x);
+        assemble_byte(dat, block_y);
+        assemble_int(dat, block_z);
+        assemble_byte(dat, type);
+        assemble_byte(dat, metadata & 0x0F);
+        return dat;
+    }
+};
+
 #define PACK_NEW_STATE_REASON_INVALID_BED 0
 #define PACK_NEW_STATE_REASON_RAIN_START 1
 #define PACK_NEW_STATE_REASON_RAIN_END 2
