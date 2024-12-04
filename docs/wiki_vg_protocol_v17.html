@@ -1,0 +1,4958 @@
+<!DOCTYPE html>
+<html xmlns="http://www.w3.org/1999/xhtml" lang="" xml:lang="">
+<head>
+  <meta charset="utf-8" />
+  <meta name="generator" content="pandoc" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=yes" />
+  <title>Minecraft Protocol v17 (wiki.vg backup)</title>
+  <style>
+    html {
+      color: #fdfdfd;
+      background-color: #1a1a1a;
+    }
+    body {
+      margin: 0 auto;
+      padding-left: 50px;
+      padding-right: 50px;
+      padding-top: 50px;
+      padding-bottom: 50px;
+      hyphens: auto;
+      overflow-wrap: break-word;
+      text-rendering: optimizeLegibility;
+      font-kerning: normal;
+    }
+    @media (max-width: 600px) {
+      body {
+        font-size: 0.9em;
+        padding: 12px;
+      }
+      h1 {
+        font-size: 1.8em;
+      }
+    }
+    @media print {
+      html {
+        background-color: white;
+      }
+      body {
+        background-color: transparent;
+        color: black;
+        font-size: 12pt;
+      }
+      p, h2, h3 {
+        orphans: 3;
+        widows: 3;
+      }
+      h2, h3, h4 {
+        page-break-after: avoid;
+      }
+    }
+    p {
+      margin: 1em 0;
+    }
+    a {
+      color: #fdfdfd;
+    }
+    a:visited {
+      color: #fdfdfd;
+    }
+    img {
+      max-width: 100%;
+    }
+    svg {
+      height: auto;
+      max-width: 100%;
+    }
+    h1, h2, h3, h4, h5, h6 {
+      margin-top: 1.4em;
+    }
+    h5, h6 {
+      font-size: 1em;
+      font-style: italic;
+    }
+    h6 {
+      font-weight: normal;
+    }
+    ol, ul {
+      padding-left: 1.7em;
+      margin-top: 1em;
+    }
+    li > ol, li > ul {
+      margin-top: 0;
+    }
+    blockquote {
+      margin: 1em 0 1em 1.7em;
+      padding-left: 1em;
+      border-left: 2px solid #606060;
+      color: #e6e6e6;
+    }
+    code {
+      font-family: Menlo, Monaco, Consolas, 'Lucida Console', monospace;
+      font-size: 85%;
+      margin: 0;
+      hyphens: manual;
+    }
+    pre {
+      margin: 1em 0;
+      overflow: auto;
+    }
+    pre code {
+      padding: 0;
+      overflow: visible;
+      overflow-wrap: normal;
+    }
+    .sourceCode {
+     background-color: transparent;
+     overflow: visible;
+    }
+    hr {
+      background-color: #fdfdfd;
+      border: none;
+      height: 1px;
+      margin: 1em 0;
+    }
+    table {
+      margin: 1em 0;
+      border-collapse: collapse;
+      width: 100%;
+      overflow-x: auto;
+      display: block;
+      font-variant-numeric: lining-nums tabular-nums;
+    }
+    table caption {
+      margin-bottom: 0.75em;
+    }
+    tbody {
+      margin-top: 0.5em;
+      border: 1px solid #fdfdfd;
+    }
+    th {
+      border-bottom: 1px solid #fdfdfd;
+      padding: 0.25em 0.5em 0.25em 0.5em;
+    }
+    td {
+      padding: 0.125em 0.5em 0.25em 0.5em;
+      border-bottom: 1px solid #7e7e7e;
+    }
+    .even {
+      background-color: #303030;
+    }
+    header {
+      margin-bottom: 4em;
+      text-align: center;
+    }
+    #TOC li {
+      list-style: none;
+    }
+    #TOC ul {
+      padding-left: 1.3em;
+    }
+    #TOC > ul {
+      padding-left: 0;
+    }
+    #TOC a:not(:hover) {
+      text-decoration: none;
+    }
+    code{white-space: pre-wrap;}
+    span.smallcaps{font-variant: small-caps;}
+    div.columns{display: flex; gap: min(4vw, 1.5em);}
+    div.column{flex: auto; overflow-x: auto;}
+    div.hanging-indent{margin-left: 1.5em; text-indent: -1.5em;}
+    /* The extra [class] is a hack that increases specificity enough to
+       override a similar rule in reveal.js */
+    ul.task-list[class]{list-style: none;}
+    ul.task-list li input[type="checkbox"] {
+      font-size: inherit;
+      width: 0.8em;
+      margin: 0 0.8em 0.2em -1.6em;
+      vertical-align: middle;
+    }
+    .display.math{display: block; text-align: center; margin: 0.5rem auto;}
+  </style>
+</head>
+<body>
+<p>This page presents a dissection of the new <a
+href="http://minecraft.net/game/">Minecraft Beta</a> protocol. Credit
+goes to the Great Old Ones, and the citizens of <a
+href="irc://irc.freenode.net/#mcdevs">&lt;nowiki&gt;#mcdevs&lt;/nowiki&gt;</a>
+who helped by providing packet dumps and insight. If you're having
+trouble, check out the <a href="Protocol_FAQ"
+title="wikilink">FAQ</a>.</p>
+<p><strong>Note:</strong> While you may use the contents of this page
+without restriction to create servers, clients, bots, etc… you still
+need to provide the attribution above if you copy any of the contents of
+this page for publication elsewhere.</p>
+<h2 id="data_types">Data Types</h2>
+<p>All types in Java (and as such Minecraft) are <a
+href="http://en.wikipedia.org/wiki/Endianness#Big-endian">big-endian</a>,
+that is, the most significant byte comes first. The majority of everyday
+computers are little endian, and using most programming languages will
+require converting big endian values to little endian.</p>
+<p>These data formats are identical to those provided by the Java
+classes <a
+href="http://download.oracle.com/javase/1.4.2/docs/api/java/io/DataInputStream.html">DataInputStream</a>
+and <a
+href="http://download.oracle.com/javase/1.4.2/docs/api/java/io/DataOutputStream.html">DataOutputStream</a>.</p>
+<table>
+<tbody>
+<tr class="odd">
+<td class="col0"></td>
+<td class="col1"><p>Size</p></td>
+<td class="col2"><p>Range</p></td>
+<td class="col3"><p>Notes</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>byte</p></td>
+<td class="col1 centeralign"><p>1</p></td>
+<td class="col2"><p>-128 to 127</p></td>
+<td class="col3"><p>Signed, two's complement</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>short</p></td>
+<td class="col1 centeralign"><p>2</p></td>
+<td class="col2"><p>-32768 to 32767</p></td>
+<td class="col3"><p>Signed, two's complement</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>int</p></td>
+<td class="col1 centeralign"><p>4</p></td>
+<td class="col2"><p>-2147483648 to 2147483647</p></td>
+<td class="col3"><p>Signed, two's complement</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>long</p></td>
+<td class="col1 centeralign"><p>8</p></td>
+<td class="col2"><p>-9223372036854775808 to 9223372036854775807</p></td>
+<td class="col3"><p>Signed, two's complement</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>float</p></td>
+<td class="col1 centeralign"><p>4</p></td>
+<td class="col2"><p>See <a
+href="http://java.sun.com/docs/books/jls/third_edition/html/typesValues.html#4.2.3">this</a></p></td>
+<td class="col3"><p>Single-precision 32-bit IEEE 754 floating
+point</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>double</p></td>
+<td class="col1 centeralign"><p>8</p></td>
+<td class="col2"><p>See <a
+href="http://java.sun.com/docs/books/jls/third_edition/html/typesValues.html#4.2.3">this</a></p></td>
+<td class="col3"><p>Double-precision 64-bit IEEE 754 floating
+point</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>string8</p></td>
+<td class="col1 centeralign"><p>≥ 2</p></td>
+<td class="col2"><p>N/A</p></td>
+<td class="col3"><p><a
+href="http://en.wikipedia.org/wiki/UTF-8#Modified_UTF-8">Modified
+UTF-8</a> string. Prefixed by a short containing the length of the
+string.</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>string16</p></td>
+<td class="col1 centeralign"><p>≥ 2 <br/>≤ 240</p></td>
+<td class="col2"><p>N/A</p></td>
+<td class="col3"><p><a
+href="http://en.wikipedia.org/wiki/UTF-16/UCS-2">UCS-2</a> string,
+big-endian. Prefixed by a short containing the length of the string in
+characters. UCS-2 consists of 16-bit words, each of which represent a
+Unicode code point between U+0000 and U+FFFF inclusive.</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>bool</p></td>
+<td class="col1 centeralign"><p>1</p></td>
+<td class="col2"><p>0 or 1</p></td>
+<td class="col3"><p>Value can be either True (0x01) or False
+(0x00)</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Metadata</p></td>
+<td class="col1 centeralign"><p>varies</p></td>
+<td class="col2"><p>See below</p></td>
+<td class="Col3"><p>See below</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="metadata">Metadata</h3>
+<p>The Metadata type provides extra information about an entity, such as
+sheep color. Metadata was introduced in Beta 1.2. Currently, it takes
+the following form:</p>
+<p><code> let x = 0 of type UNSIGNED byte</code><br />
+<code> while (x = read byte from stream) does not equal 127:</code><br />
+<code>     select based on value of (x &gt;&gt; 5):</code><br />
+<code>         case 0: read byte from stream</code><br />
+<code>         case 1: read short from stream</code><br />
+<code>         case 2: read int from stream</code><br />
+<code>         case 3: read float from stream</code><br />
+<code>         case 4: read string (UCS-2) from stream</code><br />
+<code>         case 5: read short, byte, short from stream; save as item stack (id, count, damage, respectively)</code><br />
+<code>         case 6: read int, int, int from stream; save as extra entity information.</code><br />
+<code>     end select</code><br />
+<code> end while</code></p>
+<p>The last 5 bits of x (x &amp; 0x1F) are either an index or bitmask.
+<s>Currently, only "byte" type metadata has been seen from the
+server.</s></p>
+<p>For known extra entity information values, see <a href="Mob_Types"
+title="wikilink">Mob Types</a>.</p>
+<h2 id="terminology">Terminology</h2>
+<p>This is a fairly lengthy page, and to make it more readable certain
+terminology must be understood. Terms used on this page and their
+definition are provided below.</p>
+<table>
+<tbody>
+<tr class="odd">
+<td class="col0"></td>
+<td class="col1"><p>Definition</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Player</p></td>
+<td class="col1"><p>When used in in the singular, Player always refers
+to the client connected to the server</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Entity</p></td>
+<td class="col1"><p>Entity refers to any item, player, mob, minecart or
+boat in the world. This definition is subject to change as Notch extends
+the protocol</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>EID</p></td>
+<td class="col1"><p>An EID - or Entity ID - is a unique 4-byte integer
+used to identify a specific entity</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>XYZ</p></td>
+<td class="col1"><p>In this document, the axis names are the same as
+those used by Notch. Y points upwards, X points South, and Z points
+West.</p></td>
+</tr>
+</tbody>
+</table>
+<h2 id="units_of_measurement">Units of Measurement</h2>
+<p>There are several different units of measurement used in the protocol
+depending on what is being described. For example, it wouldn't make much
+sense to send the position of a block (which is a constant multiple of
+32) in a floating point double.</p>
+<p>A block represents 1 meter x 1 meter x 1 meter. There are 32 pixels
+per meter, and chunks are 16m x 128m x 16m.</p>
+<table>
+<tbody>
+<tr class="odd">
+<td class="col0"></td>
+<td class="col1 centeralign"><p>Data Types</p></td>
+<td class="col2 centeralign"><p>Units</p></td>
+<td class="col3"><p>Represents</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Absolute</p></td>
+<td class="col1 centeralign"><p>double</p></td>
+<td class="col2 centeralign"><p>meters</p></td>
+<td class="col3"><p>Represents an object's location in the
+world.</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Absolute Integer</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p>pixels</p></td>
+<td class="col3"><p>Represents an object's location in the world.
+<br/> Functions the same as Absolute Double, but requires fewer
+bytes and is less precise. <br/> In C/C++/Java:
+<code>absolute_int = (int)(absolute_double *
+32.0);</code></p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Block</p></td>
+<td class="col1 centeralign"><p>byte, short, int</p></td>
+<td class="col2 centeralign"><p>meters</p></td>
+<td class="col3"><p>Represents a block's location in the world.</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Chunk</p></td>
+<td class="col1 centeralign"><p>short, int</p></td>
+<td class="col2 centeralign"><p>chunks</p></td>
+<td class="col3"><p>Represents the position of a chunk.</p></td>
+</tr>
+</tbody>
+</table>
+<h2 id="packets">Packets</h2>
+<p>All packets begin with a single "Packet ID" byte. Listed packet size
+includes this byte. Packets are either "server to client", "client to
+server", or both. If not specified, assume that the packet can be sent
+both ways. There is no "length" field; for variable length packets, you
+must parse to the end to determine the length.</p>
+<h3 id="keep_alive_0x00">Keep Alive (0x00)</h3>
+<p>The server will frequently send out keep-alives contain a random ID.
+The client must respond with the same packet. The Beta server will
+disconnect a client if it doesn't receive at least one packet before
+1200 in-game ticks, and the Beta client will time out the connection
+under the same conditions. The client may send packets with Keep-alive
+ID=0.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0 centeralign"><p>0x00</p></td>
+<td class="col1 centeralign"><p>Keep-alive ID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td
+class="col3 centeralign"><p><code>957759560</code></p></td>
+<td class="col4"><p>Server-generated random id</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>5 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="login_request_0x01">Login Request (0x01)</h3>
+<h4 id="client_to_server">Client to Server</h4>
+<p>Sent by the client after the handshake to finish logging in. If the
+version is outdated or any field is invalid, the server will disconnect
+the client with a <a href="#Disconnect.2FKick_.280xFF.29"
+title="wikilink">kick</a>. If the client is started in offline mode, the
+player's username will default to <code>Player</code>,
+making LAN play with more than one player impossible (without
+authenticating) as the server will prevent multiple users with the same
+name.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="8" class="col0 centeralign"><p>0x01</p></td>
+<td class="col1 centeralign"><p>Protocol Version</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>17</code></p></td>
+<td class="col4"><p>The latest version of the protocol is 17</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Username</p></td>
+<td class="col1 centeralign"><p>string16</p></td>
+<td class="col2 centeralign"><p><code>TkTech</code></p></td>
+<td class="col3"><p>The name of the user attempting to login, max length
+of 16</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Not used</p></td>
+<td class="col1 centeralign"><p>long</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Not used</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Not used</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Not used</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Not used</p></td>
+<td class="col1 centeralign"><p>unsigned byte</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Not used</p></td>
+<td class="col1 centeralign"><p>unsigned byte</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>22 bytes + length of
+strings</p></td>
+</tr>
+</tbody>
+</table>
+<h4 id="server_to_client">Server to Client</h4>
+<p>Sent by the server if it accepts the clients <a
+href="#Login_Request_.280x01.29" title="wikilink">login request</a>. If
+it didn't, it'll send a <a href="#Disconnect.2FKick_.280xFF.29"
+title="wikilink">kick</a> instead.</p>
+<p>Max players is used by the client to draw the player list. Setting
+this value lower than the actual max players, or indeed the number of
+players online, will only affect the size and number of users displayed.
+Values above 127 will cause the player list not to be drawn. Values
+above 60 will cause usernames to overlap and not fit in their bounding
+boxes.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="8" class="col0 centeralign"><p>0x01</p></td>
+<td class="col1 centeralign"><p>Entity ID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>1298</code></p></td>
+<td class="col4"><p>The Players Entity ID</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Not used</p></td>
+<td class="col1 centeralign"><p>string16</p></td>
+<td class="col2 centeralign"><p>(empty string)</p></td>
+<td class="col3"><p>Not used</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Map Seed</p></td>
+<td class="col1 centeralign"><p>long</p></td>
+<td
+class="col2 centeralign"><p><code>971768181197178410</code></p></td>
+<td class="col3"><p>The server's map seed. Must be sent in respawn
+packets by the client.</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Server mode</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"><p>0 for survival, 1 for creative</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Dimension</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"><p>Used for specifying the players dimension -1 for
+hell, 0 otherwise</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Difficulty</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>1</code></p></td>
+<td class="col3"><p><code>0</code> thru
+<code>3</code> for Peaceful, Easy, Normal, Hard</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>World height</p></td>
+<td class="col1 centeralign"><p>unsigned byte</p></td>
+<td class="col2 centeralign"><p><code>128</code></p></td>
+<td class="col3"><p>Defaults to <code>128</code></p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Max players</p></td>
+<td class="col1 centeralign"><p>unsigned byte</p></td>
+<td class="col2 centeralign"><p><code>8</code></p></td>
+<td class="col3"><p>Used by the client to draw the player list</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>22 bytes + length of
+strings</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="handshake_0x02">Handshake (0x02)</h3>
+<h4 id="client_to_server_1">Client to Server</h4>
+<p>This is the first packet sent when the client connects and is used
+for <a href="Authentication" title="wikilink">Authentication</a>.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0 centeralign"><p>0x02</p></td>
+<td class="col1 centeralign"><p>Username</p></td>
+<td class="col2 centeralign"><p>string16</p></td>
+<td class="col3 centeralign"><p><code>TkTech</code></p></td>
+<td class="col4"><p>The username of the player attempting to connect,
+max length of 16</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>3 bytes + length of
+strings</p></td>
+</tr>
+</tbody>
+</table>
+<h4 id="server_to_client_1">Server to Client</h4>
+<p>This is the first packet sent when the client connects and is used
+for <a href="Authentication" title="wikilink">Authentication</a>. If the
+hash is '-', then the client continues without doing name
+authentication. If the hash is a '+', the client sends the server
+password in the <a href="#Login_Request_.280x01.29"
+title="wikilink">login request</a>. (Note that this hash, as of the
+latest version of the Beta server, is a randomly generated long in
+hexadecimal form, and has nothing to do with the client or the server he
+is connected to)</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0 centeralign"><p>0x02</p></td>
+<td class="col1 centeralign"><p>Connection Hash</p></td>
+<td class="col2 centeralign"><p>string16</p></td>
+<td
+class="col3 rightalign"><p><code>2e66f1dc032ab5f0</code></p></td>
+<td class="col4"><p>A unique, per-connection hash, <strong>or</strong>
+'-', <strong>or</strong> '+'</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>3 bytes + length of
+strings</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="chat_message_0x03">Chat Message (0x03)</h3>
+<p>A message from the client to the server, or the server to the client.
+The actual handling of chat messages is variable and depends on the
+server and client; there are no <em>de facto</em> standards yet.</p>
+<p>The Alpha server will check the message to see if it begins with a
+'/'. If it doesn't, the username of the sender is prepended and sent to
+all other clients (including the original sender). If it does, the
+server assumes it to be a command and attempts to process it. A message
+longer than 100 characters will cause the server to kick the client.
+This limits the chat message packet length to 103 bytes. Note that this
+limit does not apply to incoming chat messages as the server may have
+prepended other information, not limited to, but usually including, a
+username.</p>
+<p>A message longer than 119 characters will cause the Beta (≥1.5)
+server and client <s>to crash</s> to print the message
+"Received string length longer than maximum allowed (X &gt; 119)", with
+no side effects.</p>
+<p>For more information, see <a href="Chat"
+title="wikilink">Chat</a>.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0 centeralign"><p>0x03</p></td>
+<td class="col1 centeralign"><p>Message</p></td>
+<td class="col2 centeralign"><p>string16</p></td>
+<td class="col3 centeralign"><p><code>&amp;lt;Bob&amp;gt; Hello
+World!</code></p></td>
+<td class="col4"><p>User input <strong>must</strong> be sanitized
+server-side</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>3 bytes + length of
+strings</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="time_update_0x04">Time Update (0x04)</h3>
+<p><strong>Server to Client only</strong></p>
+<p>Time is based on ticks, where 20 ticks happen every second. There are
+24000 ticks in a day, making Minecraft days exactly 20 minutes long.</p>
+<p>The time of day is based on the timestamp modulo 24000. 0 is sunrise,
+6000 is noon, 12000 is sunset, and 18000 is midnight.</p>
+<p>The default SMP server increments the time by
+<code>20</code> every second.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0 centeralign"><p>0x04</p></td>
+<td class="col1 centeralign"><p>Time</p></td>
+<td class="col2 centeralign"><p>long</p></td>
+<td class="col3 centeralign"><p><code></code></p></td>
+<td class="col4 centeralign"><p>The world (or region) time, in
+ticks</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>9 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="entity_equipment_0x05">Entity Equipment (0x05)</h3>
+<p>After each "Named Entity Spawn", there will be five of these packets
+for the equipped item and armor. If there are changes in visible
+equipment, another one of these is sent.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="4" class="col0 centeralign"><p>0x05</p></td>
+<td class="col1 centeralign"><p>Entity ID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p>0x00010643</p></td>
+<td class="col4"><p>Named Entity ID</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Slot</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p>4</p></td>
+<td class="col3"><p>Equipment slot: 0=held, 1-4=armor slot</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Item ID</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p>-1</p></td>
+<td class="col3"><p>Equipped item (-1 for empty slot)</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Damage</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"></td>
+<td class="col3"></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>11 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="spawn_position_0x06">Spawn Position (0x06)</h3>
+<p><strong>Server to Client only</strong></p>
+<p>Sent by the server after login to specify the coordinates of the
+spawn point (the point at which players spawn at, and which the compass
+points to). It can be sent at any time to update the point compasses
+point at.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="3" class="col0 centeralign"><p>0x06</p></td>
+<td class="col1 centeralign"><p>X</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>117</code></p></td>
+<td class="col4 centeralign"><p>Spawn X in block coordinates</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Y</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>70</code></p></td>
+<td class="col3 centeralign"><p>Spawn Y in block coordinates</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Z</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>-46</code></p></td>
+<td class="col3 centeralign"><p>Spawn Z in block coordinates</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>13 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="use_entity_0x07">Use Entity (0x07)</h3>
+<p><strong>Client to Server only</strong></p>
+<p>This packet is new to version 4 of the protocol, and is believed to
+be Use Entity. This packet is sent from the client to the server when
+the client attacks or right-clicks another entity.</p>
+<p>A Notchian server only accepts this packet if the entity being
+attacked/used is visible without obstruction and within a 4-unit radius
+of the player's position.</p>
+<p>(This packet data values are not fully verified)</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="3" class="col0 centeralign"><p>0x07</p></td>
+<td class="col1 centeralign"><p>User</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>1298</code></p></td>
+<td class="col4"><p>The entity of the player (ignored by the
+server)</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Target</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>1805</code></p></td>
+<td class="col3"><p>The entity the player is interacting with</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Left-click?</p></td>
+<td class="col1 centeralign"><p>bool</p></td>
+<td class="col2 centeralign"><p><code>true</code></p></td>
+<td class="col3"><p>Seems to be <code>true</code> when the
+player is pointing at an entity and left-clicking and
+<code>false</code> when right-clicking.</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>10 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="update_health_0x08">Update Health (0x08)</h3>
+<p><strong>Server to Client only</strong></p>
+<p>Sent by the server to update/set the health of the player it is sent
+to. Added in protocol version 5.</p>
+<p>Food saturation acts as a food "overcharge". Food values will not
+decrease while the saturation is over zero. Players logging in
+automatically get a saturation of 5.0. Eating food increases the
+saturation as well as the food bar.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="3" class="col0 centeralign"><p>0x08</p></td>
+<td class="col1 centeralign"><p>Health</p></td>
+<td class="col2 centeralign"><p>short</p></td>
+<td class="col3 centeralign"><p>20</p></td>
+<td class="col4"><p>0 or less = dead, 20 = full HP</p></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Food</p></td>
+<td class="col2 centeralign"><p>short</p></td>
+<td class="col3 centeralign"><p>20</p></td>
+<td class="col4"><p>0 - 20</p></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>Food Saturation</p></td>
+<td class="col2 centeralign"><p>float</p></td>
+<td class="col3 centeralign"><p>5.0</p></td>
+<td class="col4"><p>Seems to vary from 0.0 to 5.0 in integer
+increments</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>9 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="respawn_0x09">Respawn (0x09)</h3>
+<p>Sent by the client when the player presses the "Respawn" button after
+dying. The server then teleports the user to the spawn point, and sends
+a respawn packet in response. The client will not leave the respawn
+screen until it receives a respawn packet.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="5" class="col0 centeralign"><p>0x09</p></td>
+<td class="col1 centeralign"><p>World</p></td>
+<td class="col2 centeralign"><p>byte</p></td>
+<td class="col3 centeralign"><p><code>1</code></p></td>
+<td class="col4"><p><code>0</code> for standard world,
+<code>-1</code> for nether.</p></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Difficulty</p></td>
+<td class="col2 centeralign"><p>byte</p></td>
+<td class="col3 centeralign"><p><code>1</code></p></td>
+<td class="col4"><p><code>0</code> thru
+<code>3</code> for Peaceful, Easy, Normal, Hard.
+<code>1</code> is always sent c-&gt;s</p></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>Creative mode</p></td>
+<td class="col2 centeralign"><p>byte</p></td>
+<td class="col3 centeralign"><p><code>1</code></p></td>
+<td class="col4"><p><code>0</code> for survival,
+<code>1</code> for creative.</p></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>World height</p></td>
+<td class="col2 centeralign"><p>short</p></td>
+<td class="col3 centeralign"><p><code>128</code></p></td>
+<td class="col4"><p>Defaults to <code>128</code></p></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>Map Seed</p></td>
+<td class="col2 centeralign"><p>long</p></td>
+<td
+class="col3 centeralign"><p><code>-3815848935435401459</code></p></td>
+<td class="col4"></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>14 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="player_0x0a">Player (0x0A)</h3>
+<p><strong>Client to Server only</strong></p>
+<p>This packet is used to indicate whether the player is on ground
+(walking/swimming), or airborne (jumping/falling).</p>
+<p>When dropping from sufficient height, fall damage is applied when
+this state goes from False to True. The amount of damage applied is
+based on the point where it last changed from True to False. Note that
+there are several movement related packets containing this state.</p>
+<p>This packet was previously referred to as Flying</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0 centeralign"><p>0x0A</p></td>
+<td class="col1 centeralign"><p>On Ground</p></td>
+<td class="col2 centeralign"><p>bool</p></td>
+<td class="col3 centeralign"><p><code>1</code></p></td>
+<td class="col4"><p><code>True</code> if the client is on
+the ground, <code>False</code> otherwise</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>2 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="player_position_0x0b">Player Position (0x0B)</h3>
+<p><strong>Client to Server</strong> (player-controlled movement).</p>
+<p>Updates the players XYZ position on the server. If <code>Stance
+- Y</code> is less than <code>0.1</code> or greater
+than <code>1.65</code>, the stance is illegal and the client
+will be kicked with the message “Illegal Stance”. If the distance
+between the last known position of the player on the server and the new
+position set by this packet has a distance greater than 100 units will
+result in the client being kicked for "You moved too quickly :(
+(Hacking?)" Also if the absolute number of X or Z is set greater than
+<code>3.2E7D</code> the client will be kicked for "Illegal
+position"</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="5" class="col0 centeralign"><p>0x0B</p></td>
+<td class="col1 centeralign"><p>X</p></td>
+<td class="col2 centeralign"><p>double</p></td>
+<td class="col3 rightalign"><p><code>102.809</code></p></td>
+<td class="col4"><p>Absolute position</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Y</p></td>
+<td class="col1 centeralign"><p>double</p></td>
+<td class="col2 centeralign"><p><code>70.00</code></p></td>
+<td class="col3"><p>Absolute position</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Stance</p></td>
+<td class="col1 centeralign"><p>double</p></td>
+<td class="col2 centeralign"><p><code>71.62</code></p></td>
+<td class="col3"><p>Used to modify the players bounding box when going
+up stairs, crouching, etc…</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Z</p></td>
+<td class="col1 centeralign"><p>double</p></td>
+<td class="col2 centeralign"><p><code>68.30</code></p></td>
+<td class="col3"><p>Absolute position</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>On Ground</p></td>
+<td class="col1 centeralign"><p>bool</p></td>
+<td class="col2 centeralign"><p><code>1</code></p></td>
+<td class="col3"><p>Derived from packet <a href="#Player_.280x0A.29"
+title="wikilink">0x0A</a></p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>34 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="player_look_0x0c">Player Look (0x0C)</h3>
+<p><strong>Client to Server</strong> (player-controlled movement).</p>
+<figure>
+<img src="Minecraft-trig-yaw.png" title="The unit circle for yaw" />
+<figcaption>The unit circle for yaw</figcaption>
+</figure>
+<p>Updates the direction the player is looking in.</p>
+<p>Yaw is measured in degrees, and does not follow classical
+trigonometry rules. The unit circle of yaw on the xz-plane starts at (0,
+1) and turns backwards towards (-1, 0), or in other words, it turns
+clockwise instead of counterclockwise. Additionally, yaw is not clamped
+to between 0 and 360 degrees; any number is valid, including negative
+numbers and numbers greater than 360.</p>
+<p>Pitch is measured in degrees, where 0 is looking straight ahead, -90
+is looking straight up, and 90 is looking straight down.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="3" class="col0 centeralign"><p>0x0C</p></td>
+<td class="col1 centeralign"><p>Yaw</p></td>
+<td class="col2 centeralign"><p>float</p></td>
+<td class="col3 centeralign"><p><code>0.00</code></p></td>
+<td class="col4"><p>Absolute rotation on the X Axis, in degrees</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Pitch</p></td>
+<td class="col1 centeralign"><p>float</p></td>
+<td class="col2 centeralign"><p><code>0.00</code></p></td>
+<td class="col3"><p>Absolute rotation on the Y Axis, in degrees</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>On Ground</p></td>
+<td class="col1 centeralign"><p>bool</p></td>
+<td class="col2 centeralign"><p><code>1</code></p></td>
+<td class="col3"><p>Derived from packet <a href="#Player_.280x0A.29"
+title="wikilink">0x0A</a></p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>10 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="player_position_amp_look_0x0d">Player Position &amp;amp; Look
+(0x0D)</h3>
+<p>A combination of <a href="#Player_Look_.280x0C.29"
+title="wikilink">Player Look</a> and <a
+href="#Player_Position_.280x0B.29" title="wikilink">Player
+position</a>.</p>
+<h4 id="client_to_server_2">Client to Server</h4>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="7" class="col0 centeralign"><p>0x0D</p></td>
+<td class="col1 centeralign"><p>X</p></td>
+<td class="col2 centeralign"><p>double</p></td>
+<td class="col3 centeralign"><p><code>6.5</code></p></td>
+<td class="col4"><p>Absolute position</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Y</p></td>
+<td class="col1 centeralign"><p>double</p></td>
+<td
+class="col2 centeralign"><p><code>65.620000004768372</code></p></td>
+<td class="col3"><p>Absolute position</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Stance</p></td>
+<td class="col1 centeralign"><p>double</p></td>
+<td
+class="col2 centeralign"><p><code>67.240000009536743</code></p></td>
+<td class="col3"><p>Used to modify the players bounding box when going
+up stairs, crouching, etc…</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Z</p></td>
+<td class="col1 centeralign"><p>double</p></td>
+<td class="col2 centeralign"><p><code>7.5</code></p></td>
+<td class="col3"><p>Absolute position</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Yaw</p></td>
+<td class="col1 centeralign"><p>float</p></td>
+<td class="col2 centeralign"><p><code>0.0</code></p></td>
+<td class="col3"><p>Absolute rotation on the X Axis</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Pitch</p></td>
+<td class="col1 centeralign"><p>float</p></td>
+<td class="col2 centeralign"><p><code>0.0</code></p></td>
+<td class="col3"><p>Absolute rotation on the Y Axis</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>On Ground</p></td>
+<td class="col1 centeralign"><p>bool</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"><p>Derived from packet <a href="#Player_.280x0A.29"
+title="wikilink">0x0A</a></p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>42 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h4 id="server_to_client_2">Server to Client</h4>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="7" class="col0 centeralign"><p>0x0D</p></td>
+<td class="col1 centeralign"><p>X</p></td>
+<td class="col2 centeralign"><p>double</p></td>
+<td class="col3 centeralign"><p><code>6.5</code></p></td>
+<td class="col4"><p>Absolute position</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Stance</p></td>
+<td class="col1 centeralign"><p>double</p></td>
+<td
+class="col2 centeralign"><p><code>67.240000009536743</code></p></td>
+<td class="col3"><p>Used to modify the players bounding box when going
+up stairs, crouching, etc…</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Y</p></td>
+<td class="col1 centeralign"><p>double</p></td>
+<td
+class="col2 centeralign"><p><code>65.620000004768372</code></p></td>
+<td class="col3"><p>Absolute position</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Z</p></td>
+<td class="col1 centeralign"><p>double</p></td>
+<td class="col2 centeralign"><p><code>7.5</code></p></td>
+<td class="col3"><p>Absolute position</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Yaw</p></td>
+<td class="col1 centeralign"><p>float</p></td>
+<td class="col2 centeralign"><p><code>0.0</code></p></td>
+<td class="col3"><p>Absolute rotation on the X Axis</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Pitch</p></td>
+<td class="col1 centeralign"><p>float</p></td>
+<td class="col2 centeralign"><p><code>0.0</code></p></td>
+<td class="col3"><p>Absolute rotation on the Y Axis</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>On Ground</p></td>
+<td class="col1 centeralign"><p>bool</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"><p>Derived from packet <a href="#Player_.280x0A.29"
+title="wikilink">0x0A</a></p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>42 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<p><img src="Icon_exclaim.gif" title=":!:" alt=":!:" /> Note that this
+packet differs from client Player &amp; Position Look packet - the
+Stance and Y are sent in a different order.</p>
+<p><img src="Icon_exclaim.gif" title=":!:" alt=":!:" /> Stance and Y
+seems to be the opposite as in the table (from Client to Server = X, Y,
+Stance, Z, froom Server to client = X, Stance, Y, Z) please confirm !
+[BackBone`:] The opposite stance&lt;-&gt;y confirmed, however the given
+structs had the server and client struct reversed, which I fixed.</p>
+<p><img src="Icon_exclaim.gif" title=":!:" alt=":!:" /> When you connect
+to the official server, it will push a 0x0D packet. If you do not
+immediately respond with a 0x0D (or maybe 0x0A-0x0C) packet with similar
+and valid information, it will have unexpected results, such as map
+chunks not loading and future 0x0A-0x0D packets being ignored.</p>
+<h3 id="player_digging_0x0e">Player Digging (0x0E)</h3>
+<p>Sent when the player mines a block. A Notchian server only accepts
+digging packets with coordinates within a 6-unit radius of the player's
+position.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="5" class="col0 centeralign"><p>0x0E</p></td>
+<td class="col1 centeralign"><p>Status</p></td>
+<td class="col2 centeralign"><p>byte</p></td>
+<td class="col3 centeralign"><p><code>1</code></p></td>
+<td class="col4"><p>The action the player is taking against the block
+(see below)</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>X</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>32</code></p></td>
+<td class="col3"><p>Block position</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Y</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>64</code></p></td>
+<td class="col3"><p>Block position</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Z</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>32</code></p></td>
+<td class="col3 leftalign"><p>Block position</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Face</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>3</code></p></td>
+<td class="col3"><p>The face being hit (see below)</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>12 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<p>Status can (currently) be one of four values:</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Meaning</p></th>
+<th class="col1"><p>Value</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0 leftalign"><p>Started digging</p></td>
+<td class="col1 centeralign"><p><code>0</code></p></td>
+</tr>
+<tr class="even">
+<td class="col0 leftalign"><p>Finished digging</p></td>
+<td class="col1 centeralign"><p><code>2</code></p></td>
+</tr>
+<tr class="odd">
+<td class="col0 leftalign"><p>Drop item</p></td>
+<td class="col1 centeralign"><p><code>4</code></p></td>
+</tr>
+<tr class="even">
+<td class="col0 leftalign"><p>Shoot arrow</p></td>
+<td class="col1 centeralign"><p><code>5</code></p></td>
+</tr>
+</tbody>
+</table>
+<p>Notchian clients send a 0 (started digging) when they start digging
+and a 2 (finished digging) once they think they are finished. If digging
+is aborted, no notice is sent to the server; the client simply does not
+send a 2 (finished digging).</p>
+<p>Status code 4 (drop item) is a special case. In-game, when you use
+the Drop Item command (keypress 'q'), a dig packet with a status of 4,
+and all other values set to 0, is sent from client to server.</p>
+<p>The face can be one of six values, representing the face being
+hit:</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0 leftalign"><p>Value</p></th>
+<th class="col1 centeralign"><p>0</p></th>
+<th class="col2 centeralign"><p>1</p></th>
+<th class="col3 centeralign"><p>2</p></th>
+<th class="col4 centeralign"><p>3</p></th>
+<th class="col5 centeralign"><p>4</p></th>
+<th class="col6 centeralign"><p>5</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0 leftalign"><p>Offset</p></td>
+<td class="col1"><p>-Y</p></td>
+<td class="col2"><p>+Y</p></td>
+<td class="col3"><p>-Z</p></td>
+<td class="col4"><p>+Z</p></td>
+<td class="col5"><p>-X</p></td>
+<td class="col6"><p>+X</p></td>
+</tr>
+</tbody>
+</table>
+<p>In 1.7.3, when a player opens a door with left click the server
+receives Packet 0xE+start digging and opens the door.</p>
+<h3 id="player_block_placement_0x0f">Player Block Placement (0x0F)</h3>
+<p>Sent when the player places a block or (probably) an item. The
+coordinates sent in this packet are actually the block being built
+against, which combined with the direction offset tell you where the
+block should be placed. This is required to correctly position furnaces,
+torches, etc…</p>
+<p>In 1.7.3, when a player opens a door with right click, the server
+receives Packet 0xF (block placement, but opens door).</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="7" class="col0 centeralign"><p>0x0F</p></td>
+<td class="col1 centeralign"><p>X</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>32</code></p></td>
+<td class="col4"><p>Block position</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Y</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>64</code></p></td>
+<td class="col3"><p>Block position</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Z</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>32</code></p></td>
+<td class="col3 leftalign"><p>Block position</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Direction</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>3</code></p></td>
+<td class="col3"><p>The offset to use for block/item placement (see
+below)</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Block <strong>or</strong> Item
+ID</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p><code>1</code></p></td>
+<td class="col3"><p>The block or item to be placed</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Amount (opt)</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>34</code></p></td>
+<td class="col3"><p>The amount of the item in the players hand</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Damage (opt)</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p><code>83</code></p></td>
+<td class="col3"><p>How much damage the item has taken</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>13 bytes or 16 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<p>If the Block/ItemID field is greater than or equal to 0, then the
+last 2 fields (amount and damage) are read. Otherwise, they are not
+read. When 'placing' (Or more accurately, using) your empty hand, the
+client sends -1 as the Block/ItemID</p>
+<p>The direction can be one of six values, representing the face the
+block/item is being placed against:</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0 leftalign"><p>Value</p></th>
+<th class="col1 centeralign"><p>0</p></th>
+<th class="col2 centeralign"><p>1</p></th>
+<th class="col3 centeralign"><p>2</p></th>
+<th class="col4 centeralign"><p>3</p></th>
+<th class="col5 centeralign"><p>4</p></th>
+<th class="col6 centeralign"><p>5</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0 leftalign"><p>Offset</p></td>
+<td class="col1"><p>-Y</p></td>
+<td class="col2"><p>+Y</p></td>
+<td class="col3"><p>-Z</p></td>
+<td class="col4"><p>+Z</p></td>
+<td class="col5"><p>-X</p></td>
+<td class="col6"><p>+X</p></td>
+</tr>
+</tbody>
+</table>
+<p>In normal operation (ie placing a block), this packet is sent once,
+with the values set normally.</p>
+<p>This packet has a special case where X, Y, Z, and Direction are all
+-1. This special packet indicates that the currently held item for the
+player should have its state updated such as eating food, shooting bows,
+using buckets, etc.</p>
+<p>In a Notchian Beta client, the block or item ID corresponds to
+whatever the client is currently holding, and the client sends one of
+these packets any time a right-click is issued on a surface, so no
+assumptions can be made about the safety of the ID. However, with the
+implementation of server-side inventory, a Notchian server seems to
+ignore the item ID, instead operating on server-side inventory
+information and holding selection.</p>
+<p>Special note on using buckets: When using buckets, the Notchian
+client might send two packets: first a normal and then a special case.
+The first normal packet is sent when you're looking at a block (e.g. the
+water you want to scoop up). This normal packet does not appear to do
+anything with a Notchian server. The second, special case packet appears
+to perform the action - based on current position/orientation and with a
+distance check - it appears that buckets can only be used within a
+radius of 6 units.</p>
+<h3 id="holding_change_0x10">Holding Change (0x10)</h3>
+<p>Sent when the player changes the slot selection</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0 centeralign"><p>0x10</p></td>
+<td class="col1 centeralign"><p>Slot ID</p></td>
+<td class="col2 centeralign"><p>short</p></td>
+<td class="col3 centeralign"><p><code>1</code></p></td>
+<td class="col4"><p>The slot which the player has selected
+(0-8)</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>3 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="use_bed_0x11">Use Bed (0x11)</h3>
+<p><strong>Server to Client</strong><br/> Associated with players
+using beds.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="5" class="col0 centeralign"><p>0x11</p></td>
+<td class="col1 centeralign"><p>Entity ID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p>89</p></td>
+<td class="col4"><p>Player ID</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>???In Bed???</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p>0</p></td>
+<td class="col3"><p>0 Appears when players use bed</p></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>X coordinate</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p>-247</p></td>
+<td class="col4"><p>Bed (headboard?) X as block coordinate</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Y coordinate</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p>78</p></td>
+<td class="col3"><p>Bed (headboard?) Y as block coordinate</p></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>Z coordinate</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p>128</p></td>
+<td class="col4"><p>Bed (headboard?) Z as block coordinate</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>15 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<ul>
+<li>NOTE: This Packet seems to be sent when 2 or more players are on a
+server, and at least one player uses a Bed.</li>
+</ul>
+<h3 id="animation_0x12">Animation (0x12)</h3>
+<p>Sent whenever an entity should change animation.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="2" class="col0 centeralign"><p>0x12</p></td>
+<td class="col1 centeralign"><p>EID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>55534</code></p></td>
+<td class="col4"><p>Player ID</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Animate</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>1</code></p></td>
+<td class="col3"><p>Can be <code>0</code> (no animation),
+<code>1</code> (swing arm), <code>2</code>
+(damage animation), <code>3</code> (leave bed),
+<code>104</code> (crouch), or <code>105</code>
+(uncrouch). Getting <code>102</code> somewhat often,
+too.</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>6 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<p>Only <code>1</code> (swing arm) and
+<code>3</code> (leave bed) is sent by notchian clients.
+Crouching is sent via 0x13. Damage is server-side, and so is not sent by
+notchian clients. See also 0x26.</p>
+<h3 id="entity_action_0x13">Entity Action (0x13)</h3>
+<p><strong>Client to Server only</strong></p>
+<p>Sent at least when crouching, leaving a bed, or sprinting. To send
+action animation to client use 0x28.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="2" class="col0 centeralign"><p>0x13</p></td>
+<td class="col1 centeralign"><p>EID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>55534</code></p></td>
+<td class="col4"><p>Player ID</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Action ID</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>1</code></p></td>
+<td class="col3"><p>The ID of the action, see below.</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>6 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<p>Action ID can be one of the following values:</p>
+<table>
+<thead>
+<tr class="header">
+<th><p>ID</p></th>
+<th><p>Action</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><p>1</p></td>
+<td><p>Crounch</p></td>
+</tr>
+<tr class="even">
+<td><p>2</p></td>
+<td><p>Uncrouch</p></td>
+</tr>
+<tr class="odd">
+<td><p>3</p></td>
+<td><p>Leave bed</p></td>
+</tr>
+<tr class="even">
+<td><p>4</p></td>
+<td><p>Start sprinting</p></td>
+</tr>
+<tr class="odd">
+<td><p>5</p></td>
+<td><p>Stop sprinting</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="named_entity_spawn_0x14">Named Entity Spawn (0x14)</h3>
+<p><strong>Server to Client only</strong></p>
+<p>The only named entities (at the moment) are players (either real or
+NPC/Bot). This packet is sent by the server when a player comes into
+visible range, <strong>not</strong> when a player joins.</p>
+<p>Servers can, however, safely spawn player entities for players not in
+visible range. The client appears to handle it correctly.</p>
+<p>The Notchian client is not okay with receiving player entity packets,
+including 0x14, that refer to its own username or EID; it will teleport
+to the absolute origin of the map and fall through the Void any time it
+receives them.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0 centeralign"><p>Packet ID</p></th>
+<th class="col1 rightalign"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="8" class="col0 centeralign"><p>0x14</p></td>
+<td class="col1"><p>EID</p></td>
+<td class="col2"><p>int</p></td>
+<td class="col3"><p><code>94453</code></p></td>
+<td class="col4"><p>Player ID</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Player Name</p></td>
+<td class="col1"><p>string16</p></td>
+<td class="col2"><p><code>Twdtwd</code></p></td>
+<td class="col3"><p>Max length of 16</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>X</p></td>
+<td class="col1"><p>int</p></td>
+<td class="col2"><p><code>784</code></p></td>
+<td class="col3"><p>Player X as Absolute Integer</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Y</p></td>
+<td class="col1"><p>int</p></td>
+<td class="col2"><p><code>2131</code></p></td>
+<td class="col3"><p>Player Y as Absolute Integer</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Z</p></td>
+<td class="col1"><p>int</p></td>
+<td class="col2"><p><code>-752</code></p></td>
+<td class="col3"><p>Player Z as Absolute Integer</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Rotation</p></td>
+<td class="col1"><p>byte</p></td>
+<td class="col2"><p><code>0</code></p></td>
+<td class="col3"><p>Player rotation as a packed byte</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Pitch</p></td>
+<td class="col1"><p>byte</p></td>
+<td class="col2"><p><code>0</code></p></td>
+<td class="col3"><p>Player rotation as a packed byte</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Current Item</p></td>
+<td class="col1"><p>short</p></td>
+<td class="col2"><p><code>0</code></p></td>
+<td class="col3"><p>The item the player is currently holding. Note that
+this should be 0 for "no item", unlike -1 used in other packets. A
+negative value crashes clients.</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>23 bytes + length of
+strings</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="pickup_spawn_0x15">Pickup Spawn (0x15)</h3>
+<p>A pickup spawn is sent by the server whenever an item on the ground
+(say a pickaxe thrown on the ground) comes into range of the player.
+(note: this means range for item vision, not range for pickup!) It used
+to be sent by the client when an item is dropped from a tile (chest or
+furnace) or from inventory, but that is now done with the new packets
+for server-side inventory (see <a href="#Window_click_(0x66)"
+title="wikilink">0x66</a>).</p>
+<p>It is completely acceptable for servers to ignore the EID issued by
+the client in this packet and instead create a new packet with a
+server-controlled EID when sending this packet out to clients.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0 centeralign"><p>Packet ID</p></th>
+<th class="col1 rightalign"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="10" class="col0 centeralign"><p>0x15</p></td>
+<td class="col1"><p>EID</p></td>
+<td class="col2"><p>int</p></td>
+<td class="col3"><p><code>157617</code></p></td>
+<td class="col4"><p>Unique entity ID</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Item</p></td>
+<td class="col1"><p>short</p></td>
+<td class="col2"><p><code>4</code></p></td>
+<td class="col3"><p>The item ID</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Count</p></td>
+<td class="col1"><p>byte</p></td>
+<td class="col2"><p><code>1</code></p></td>
+<td class="col3"><p>The number of items</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Damage/Data</p></td>
+<td class="col1"><p>short</p></td>
+<td class="col2"></td>
+<td class="col3"><p>New field in beta 1.2 update (see below)</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>X</p></td>
+<td class="col1"><p>int</p></td>
+<td class="col2"><p><code>133</code></p></td>
+<td class="col3"><p>Item X as Absolute Integer</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Y</p></td>
+<td class="col1"><p>int</p></td>
+<td class="col2"><p><code>913</code></p></td>
+<td class="col3"><p>Item Y as Absolute Integer</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Z</p></td>
+<td class="col1"><p>int</p></td>
+<td class="col2"><p><code>63552</code></p></td>
+<td class="col3"><p>Item Z as Absolute Integer</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Rotation</p></td>
+<td class="col1"><p>byte</p></td>
+<td class="col2"><p><code>252</code></p></td>
+<td class="col3"><p>Item rotation as a packed byte</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Pitch</p></td>
+<td class="col1"><p>byte</p></td>
+<td class="col2"><p><code>25</code></p></td>
+<td class="col3"><p>Item pitch as a packed byte</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Roll</p></td>
+<td class="col1"><p>byte</p></td>
+<td class="col2"><p><code>12</code></p></td>
+<td class="col3"><p>Item roll as a packed byte</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>25 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>"Damage" field</strong> This field is also used to store item
+metadata. E.g. you mined birch wood(its id is the same as normal wood)
+so you must set damage to the metadata of birch wood(2). The same case
+is wool. Id is the same but data is different.For example: you mined
+blue wool so your damage field should send value 0xB.</p>
+<h3 id="collect_item_0x16">Collect Item (0x16)</h3>
+<p><strong>Server to Client only</strong></p>
+<p>Sent by the server when someone picks up an item lying on the ground
+- its sole purpose appears to be the animation of the item flying
+towards you. It doesn't destroy the entity in the client memory (<a
+href="#Destroy_Entity_.280x1D.29" title="wikilink">0x1D</a> does that),
+and it doesn't add it to your inventory (<a
+href="#Window_items_.280x68.29" title="wikilink">0x67</a> does that).
+The server only checks for items to be picked up after each <a
+href="#Player_Position_.280x0B.29" title="wikilink">Player Position</a>
+and <a href="#Player_Position_.26_Look_.280x0D.29"
+title="wikilink">Player Position &amp; Look</a> packet sent by the
+client.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="2" class="col0 centeralign"><p>0x16</p></td>
+<td class="col1 centeralign"><p>Collected EID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>38</code></p></td>
+<td class="col4 leftalign"></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Collector EID</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>20</code></p></td>
+<td class="col3 leftalign"></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>9 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="add_objectvehicle_0x17">Add Object/Vehicle (0x17)</h3>
+<p><strong>Server to Client only</strong></p>
+<p>Sent by the server when an Object/Vehicle is created.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="9" class="col0 centeralign"><p>0x17</p></td>
+<td class="col1 centeralign"><p>EID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>62</code></p></td>
+<td class="col4"><p>Entity ID of the Object</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Type</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>11</code></p></td>
+<td class="col3"><p>The type of object (see below)</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>X</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>16080</code></p></td>
+<td class="col3"><p>The Absolute Integer X Position of the
+object</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Y</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>2299</code></p></td>
+<td class="col3"><p>The Absolute Integer Y Position of the
+object</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Z</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>592</code></p></td>
+<td class="col3"><p>The Absolute Integer Z Position of the
+object</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Fireball thrower's entity ID</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"><p>It seems that if this is bigger than 0, this is a
+fireball and the next 3 fields are sent.</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Unknown</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"><p>Seems to be used in calculation of the fireball's
+X</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Unknown</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"><p>Seems to be used in calculation of the fireball's
+Y</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Unknown</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"><p>Seems to be used in calculation of the fireball's
+Z</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>22 or 28 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<p>Object Types</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Type ID</p></th>
+<th class="col1"><p>Type Name</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0"><p>1</p></td>
+<td class="col1"><p>Boats</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>10</p></td>
+<td class="col1"><p>Minecart</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>11</p></td>
+<td class="col1"><p>Storage Cart</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>12</p></td>
+<td class="col1"><p>Powered Cart</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>50</p></td>
+<td class="col1"><p>Activated TNT</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>60</p></td>
+<td class="col1"><p>Arrow &lt;!-- Player- and skeleton- fired
+arrows.--&gt;</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>61</p></td>
+<td class="col1"><p>Thrown Snowball</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>62</p></td>
+<td class="col1"><p>Thrown Egg</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>70</p></td>
+<td class="col1"><p>Falling Sand</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>71</p></td>
+<td class="col1"><p>Falling Gravel</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>90</p></td>
+<td class="col1"><p>Fishing Float</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="mob_spawn_0x18">Mob Spawn (0x18)</h3>
+<p><strong>Server to Client only</strong></p>
+<p>Sent by the server when a Mob Entity is Spawned</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="8" class="col0 centeralign"><p>0x18</p></td>
+<td class="col1 centeralign"><p>EID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>446</code></p></td>
+<td class="col4"><p>Entity ID</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Type</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>91</code></p></td>
+<td class="col3"><p>The type of Mob Entity Type</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>X</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>13366</code></p></td>
+<td class="col3"><p>The Absolute Integer X Position of the
+object</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Y</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>2176</code></p></td>
+<td class="col3"><p>The Absolute Integer Y Position of the
+object</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Z</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>1680</code></p></td>
+<td class="col3"><p>The Absolute Integer Z Position of the
+object</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Yaw</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>-27</code></p></td>
+<td class="col3"><p>The X Axis rotation in steps of 2π/256</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Pitch</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"><p>The Y Axis rotation in steps of 2π/256</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Data Stream</p></td>
+<td class="col1 centeralign"><p>Metadata</p></td>
+<td class="col2 centeralign"><p><code>127</code></p></td>
+<td class="col3"><p>Indexed metadata for Mob. Terminated by 0x7F. See
+below, and see <a href="#Metadata" title="wikilink">#Metadata</a> for
+the general format.</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>20 bytes + Metadata (at least
+1)</p></td>
+</tr>
+</tbody>
+</table>
+<p>Mob Types (Incomplete)</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Type ID</p></th>
+<th class="col1"><p>Type Name</p></th>
+<th class="col2"><p>Metadata</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0"><p>50</p></td>
+<td class="col1"><p>Creeper</p></td>
+<td class="col2"><p>Index 16 is byte: status of the creeper (depends on
+the fuse) <br/> Index 17 is byte: 1 if creeper was Struck by
+lightning, 0 otherwise</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>51</p></td>
+<td class="col1"><p>Skeleton</p></td>
+<td class="col2"><p>No metadata</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>52</p></td>
+<td class="col1"><p>Spider</p></td>
+<td class="col2"><p>No metadata</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>53</p></td>
+<td class="col1"><p>Giant Zombie</p></td>
+<td class="col2"><p>No metadata</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>54</p></td>
+<td class="col1"><p>Zombie</p></td>
+<td class="col2"><p>No metadata</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>55</p></td>
+<td class="col1"><p>Slime</p></td>
+<td class="col2"><p>Index 16: Byte containing the size of it: 1 &lt;&lt;
+rand.nextInt(3)</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>56</p></td>
+<td class="col1"><p>Ghast</p></td>
+<td class="col2"><p>Index 16: Byte saying if ghast is attacking (red
+eyes) or not</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>57</p></td>
+<td class="col1"><p>Zombie Pigman</p></td>
+<td class="col2"><p>No metadata</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>58</p></td>
+<td class="col1"><p>Enderman</p></td>
+<td class="col2"><p>Index 16 is byte: item in hand <br/> Index 17
+is byte: 1 if the enderman is aggressive, 0 otherwise</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>59</p></td>
+<td class="col1"><p>Cave Spider</p></td>
+<td class="col2"><p>No metadata</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>60</p></td>
+<td class="col1"><p>Silverfish</p></td>
+<td class="col2"><p>No metadata</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>90</p></td>
+<td class="col1"><p>Pig</p></td>
+<td class="col2"><p>Index 16 - byte - set to 1 if the pig has a saddle,
+0 otherwise.</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>91</p></td>
+<td class="col1"><p>Sheep</p></td>
+<td class="col2"><p>Index 16 - byte - Bit 0x10 indicates shearedness,
+the lower 4 bits indicate wool color.</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>92</p></td>
+<td class="col1"><p>Cow</p></td>
+<td class="col2"><p>No metadata</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>93</p></td>
+<td class="col1"><p>Hen</p></td>
+<td class="col2"><p>No metadata</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>94</p></td>
+<td class="col1"><p>Squid</p></td>
+<td class="col2"><p>No metadata</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>95</p></td>
+<td class="col1"><p>Wolf</p></td>
+<td class="col2"><p>Index 16 - byte - Bitflags (see below)<br/>
+Index 17 - string - Name of the player who tamed the wolf<br/>
+Index 18 - int - Health of the wolf</p></td>
+</tr>
+</tbody>
+</table>
+<p>Sheep Wool Colors</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Index</p></th>
+<th class="col1"><p>Wool Color</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0"><p>0</p></td>
+<td class="col1"><p>White</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>1</p></td>
+<td class="col1"><p>Orange</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>2</p></td>
+<td class="col1"><p>Magenta</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>3</p></td>
+<td class="col1"><p>LightBlue</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>4</p></td>
+<td class="col1"><p>Yellow</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>5</p></td>
+<td class="col1"><p>Lime</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>6</p></td>
+<td class="col1"><p>Pink</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>7</p></td>
+<td class="col1"><p>Gray</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>8</p></td>
+<td class="col1"><p>Silver</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>9</p></td>
+<td class="col1"><p>Cyan</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>10</p></td>
+<td class="col1"><p>Purple</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>11</p></td>
+<td class="col1"><p>Blue</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>12</p></td>
+<td class="col1"><p>Brown</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>13</p></td>
+<td class="col1"><p>Green</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>14</p></td>
+<td class="col1"><p>Red</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>15</p></td>
+<td class="col1"><p>Black</p></td>
+</tr>
+</tbody>
+</table>
+<p>Metadata index 0 is a byte representing a set of 8 boolean flags:</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Bit index</p></th>
+<th class="col1"><p>Bit mask</p></th>
+<th class="col2"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0"><p>0</p></td>
+<td class="col1"><p>0x01</p></td>
+<td class="col2"><p>Entity on fire</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>1</p></td>
+<td class="col1"><p>0x02</p></td>
+<td class="col2"><p>Entity crouched</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>2</p></td>
+<td class="col1"><p>0x04</p></td>
+<td class="col2"><p>Entity riding</p></td>
+</tr>
+</tbody>
+</table>
+<p>Metadata index 16 for wolves:</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Bit index</p></th>
+<th class="col1"><p>Bit mask</p></th>
+<th class="col2"><p>Meaning</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0"><p>0</p></td>
+<td class="col1"><p>0x01</p></td>
+<td class="col2"><p>Sitting down</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>1</p></td>
+<td class="col1"><p>0x02</p></td>
+<td class="col2"><p>Agressive (red eyes)</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>2</p></td>
+<td class="col1"><p>0x04</p></td>
+<td class="col2"><p>Tamed</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="entity_painting_0x19">Entity: Painting (0x19)</h3>
+<p>This packet shows location, name, and type of painting.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="6" class="col0 centeralign"><p>0x19</p></td>
+<td class="col1 centeralign"><p>Entity ID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td
+class="col3 centeralign"><p><code>0x00000326</code></p></td>
+<td class="col4 centeralign"><p>Unique entity ID</p></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Title</p></td>
+<td class="col2 centeralign"><p>String16</p></td>
+<td
+class="col3 centeralign"><p><code>Creepers</code></p></td>
+<td class="col4 centeralign"><p>Name of the painting; max length 13
+(length of "SkullAndRoses")</p></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>X</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>50</code></p></td>
+<td class="col4 centeralign"><p>Center X coordinate</p></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Y</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>66</code></p></td>
+<td class="col4 centeralign"><p>Center Y coordinate</p></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>Z</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>-50</code></p></td>
+<td class="col4 centeralign"><p>Center Z coordinate</p></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Direction</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>0</code></p></td>
+<td class="col4 centeralign"><p>Direction the painting faces (0 -z, 1
+-x, 2 +z, 3 +x)</p></td>
+</tr>
+</tbody>
+</table>
+<p>Calculating the center of an image: given a (width x height) grid of
+cells, with (0, 0) being the top left corner, the center is (max(0,
+width / 2 - 1), height / 2). E.g.</p>
+<p>2x1 (1, 0) 4x4 (1, 2)</p>
+<h3 id="experience_orb_0x1a">Experience Orb (0x1A)</h3>
+<p><strong>Server to Client only</strong></p>
+<p>Spawns a one or more experience orbs. Co-ordinates are in absolute
+units.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="5" class="col0 centeralign"><p>0x1A</p></td>
+<td class="col1 centeralign"><p>Entity ID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p>105668</p></td>
+<td class="col4"></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>x</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p>-1143</p></td>
+<td class="col4"></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>y</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p>1952</p></td>
+<td></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>z</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p>1166</p></td>
+<td></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>count</p></td>
+<td class="col2 centeralign"><p>short</p></td>
+<td class="col3 centeralign"><p>7</p></td>
+<td class="col4"></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>19 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="stance_update_0x1b">Stance update (?) (0x1B)</h3>
+<p>This packet appears used in controlling position, orientation, and
+crouching. It doesn't seem to be used (see <a
+href="Protocol#Player_Position_&amp;amp;_Look_(0x0D)"
+title="wikilink">0x0D</a>).</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="6" class="col0 centeralign"><p>0x1B</p></td>
+<td class="col1 centeralign"><p>???</p></td>
+<td class="col2 centeralign"><p>float</p></td>
+<td class="col3 centeralign"></td>
+<td class="col4 centeralign"></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>???</p></td>
+<td class="col2 centeralign"><p>float</p></td>
+<td class="col3 centeralign"></td>
+<td class="col4 centeralign"></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>???</p></td>
+<td class="col2 centeralign"><p>float</p></td>
+<td class="col3 centeralign"></td>
+<td class="col4 centeralign"></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>???</p></td>
+<td class="col2 centeralign"><p>float</p></td>
+<td class="col3 centeralign"></td>
+<td class="col4 centeralign"></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>???</p></td>
+<td class="col2 centeralign"><p>boolean</p></td>
+<td class="col3 centeralign"></td>
+<td class="col4 centeralign"></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>???</p></td>
+<td class="col2 centeralign"><p>boolean</p></td>
+<td class="col3 centeralign"></td>
+<td class="col4 centeralign"></td>
+</tr>
+</tbody>
+</table>
+<h3 id="entity_velocity_0x1c">Entity Velocity (0x1C)</h3>
+<p>This packet is new to version 4 of the protocol, and is believed to
+be Entity Velocity/Motion.</p>
+<p>Velocity is believed to be in units of 1/32000 of a block per server
+tick (200ms); for example, -1343 would move (-1343 / 32000) =
+-0.04196875 blocks per tick (or -0.20984375 blocks per second).</p>
+<p>Each axis' velocity is capped between -0.9 and 0.9 blocks per tick
+(packet values -28800 to 28800).</p>
+<p>(This packet data values are not fully verified)</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="4" class="col0 centeralign"><p>0x1C</p></td>
+<td class="col1 centeralign"><p>Entity ID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>1805</code></p></td>
+<td class="col4"><p>The entity ID</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Velocity X</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p><code>-1343</code></p></td>
+<td class="col3"><p>Velocity on the X axis</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Velocity Y</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"><p>Velocity on the Y axis</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Velocity Z</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"><p>Velocity on the Z axis</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>11 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="destroy_entity_0x1d">Destroy Entity (0x1D)</h3>
+<p><strong>Server to Client only</strong></p>
+<p>Sent by the server when an Entity is to be destroyed on the
+client.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0 centeralign"><p>0x1D</p></td>
+<td class="col1 centeralign"><p>EID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>446</code></p></td>
+<td class="col4 centeralign"><p>Entity ID</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>5 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="entity_0x1e">Entity (0x1E)</h3>
+<p><strong>Server to Client only</strong></p>
+<p>Most entity-related packets are subclasses of this packet. When sent
+from the server to the client, it may initialize the entry.</p>
+<p>For player entities, either this packet or any move/look packet is
+sent several times per second. So the meaning of this packet is
+basically that the entity did not move/look since the last such
+packet.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0 centeralign"><p>0x1E</p></td>
+<td class="col1 centeralign"><p>EID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>446</code></p></td>
+<td class="col4 centeralign"><p>Entity ID</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>5 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="entity_relative_move_0x1f">Entity Relative Move (0x1F)</h3>
+<p><strong>Server to Client only</strong></p>
+<p>This packet is sent by the server when an entity moves less then 4
+blocks; if an entity moves more then 4 blocks <a
+href="#Entity_Teleport_.280x22.29" title="wikilink">Entity Teleport</a>
+should be sent instead.</p>
+<p>This packet allows at most four blocks movement in any direction,
+because byte range is from -128 to 127. Movement is an offset of
+Absolute Int; to convert relative move to block coordinate offset,
+divide by 32.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="4" class="col0 centeralign"><p>0x1F</p></td>
+<td class="col1 centeralign"><p>EID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>459</code></p></td>
+<td class="col4"><p>Entity ID</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>dX</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>1</code></p></td>
+<td class="col3"><p>X axis Relative movement as an Absolute
+Integer</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>dY</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>-7</code></p></td>
+<td class="col3"><p>Y axis Relative movement as an Absolute
+Integer</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>dZ</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>5</code></p></td>
+<td class="col3"><p>Z axis Relative movement as an Absolute
+Integer</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>8 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="entity_look_0x20">Entity Look (0x20)</h3>
+<p><strong>Server to Client only</strong></p>
+<p>This packet is sent by the server when an entity rotates. Example:
+"Yaw" field 64 means a 90 degree turn.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="3" class="col0 centeralign"><p>0x20</p></td>
+<td class="col1 centeralign"><p>EID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>459</code></p></td>
+<td class="col4"><p>Entity ID</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Yaw</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>126</code></p></td>
+<td class="col3"><p>The X Axis rotation as a fraction of 360</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Pitch</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"><p>The Y Axis rotation as a fraction of 360</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>7 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="entity_look_and_relative_move_0x21">Entity Look and Relative
+Move (0x21)</h3>
+<p><strong>Server to Client only</strong></p>
+<p>This packet is sent by the server when an entity rotates and moves.
+Since a byte range is limited from -128 to 127, and movement is offset
+of Absolute Int, this packet allows at most four blocks movement in any
+direction. (-128/32 == -4)</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="6" class="col0 centeralign"><p>0x21</p></td>
+<td class="col1 centeralign"><p>EID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>459</code></p></td>
+<td class="col4"><p>Entity ID</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>dX</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>1</code></p></td>
+<td class="col3"><p>X axis Relative movement as an Absolute
+Integer</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>dY</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>-7</code></p></td>
+<td class="col3"><p>Y axis Relative movement as an Absolute
+Integer</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>dZ</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>5</code></p></td>
+<td class="col3"><p>Z axis Relative movement as an Absolute
+Integer</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Yaw</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>126</code></p></td>
+<td class="col3"><p>The X Axis rotation as a fraction of 360</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Pitch</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"><p>The Y Axis rotation as a fraction of 360</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>10 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="entity_teleport_0x22">Entity Teleport (0x22)</h3>
+<p><strong>Server to Client only</strong></p>
+<p>This packet is sent by the server when an entity moves more than 4
+blocks.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="6" class="col0 centeralign"><p>0x22</p></td>
+<td class="col1 centeralign"><p>EID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>459</code></p></td>
+<td class="col4"><p>Entity ID</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>X</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>14162</code></p></td>
+<td class="col3"><p>X axis position as an Absolute Integer</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Y</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>2176</code></p></td>
+<td class="col3"><p>Y axis position as an Absolute Integer</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Z</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>1111</code></p></td>
+<td class="col3"><p>Z axis position as an Absolute Integer</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Yaw</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>126</code></p></td>
+<td class="col3"><p>The X Axis rotation as a fraction of 360</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Pitch</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"><p>The Y Axis rotation as a fraction of 360</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>19 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="entity_status_0x26">Entity Status (0x26)</h3>
+<p><strong>Server to Client only</strong></p>
+<p><img src="Icon_exclaim.gif" title=":!:" alt=":!:" /> This command is
+not fully understood.</p>
+<p>This packet is new in version 6 of the protocol, and is believed to
+be indication of entity damage, death and explosion</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="3" class="col0 centeralign"><p>0x26</p></td>
+<td class="col1 centeralign"><p>Entity ID</p></td>
+<td class="col2 centeralign"><p>Int</p></td>
+<td class="col3 centeralign"><p>34353</p></td>
+<td class="col4"></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Entity Status</p></td>
+<td class="col2 centeralign"><p>Byte</p></td>
+<td class="col3 centeralign"><p>0x03</p></td>
+<td class="col4"><p>Possible values: 2 (entity hurt), 3 (entity dead?),
+4, 5</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="3" class="col1 rightalign"><p>6 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="attach_entity_0x27">Attach Entity (0x27)</h3>
+<p>This packet is new to version 4 of the protocol, and is believed to
+be Attach Entity.</p>
+<p>This packet is sent when a player has been attached to an entity
+(e.g. Minecart)</p>
+<p>(This packet data values are not fully verified)</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="2" class="col0 centeralign"><p>0x27</p></td>
+<td class="col1 centeralign"><p>Entity ID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>1298</code></p></td>
+<td class="col4"><p>The player entity ID being attached</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Vehicle ID</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>1805</code></p></td>
+<td class="col3"><p>The vehicle entity ID attached to (-1 for
+unattaching)</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>9 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="entity_metadata_0x28">Entity Metadata (0x28)</h3>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="2" class="col0 centeralign"><p>0x28</p></td>
+<td class="col1 centeralign"><p>Entity ID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td
+class="col3 centeralign"><p><code>0x00000326</code></p></td>
+<td class="col4 centeralign"><p>Unique entity ID to update.</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Entity Metadata</p></td>
+<td class="col1 centeralign"><p>Metadata</p></td>
+<td class="col2 centeralign"><p><code>0x00 0x01
+0x7F</code></p></td>
+<td class="col3 centeralign"><p>Metadata varies by mob... Needs type
+description</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>5 bytes + Metadata</p></td>
+</tr>
+</tbody>
+</table>
+<h4 id="metadata_1">Metadata</h4>
+<p>Metadata has a massively quirky packing format, the details of which
+are not quite all understood. However, successful parsing of metadata is
+possible, according to the following rules.</p>
+<p>A metadata <strong>field</strong> is a byte. The top three bits of
+the byte, when masked off and interpreted as a three-bit number from 0
+to 7, indicate the type of the field. The lower five bits are some sort
+of unknown identifier. The type of the byte indicates the size and type
+of a payload which follows the initial byte of the field.</p>
+<p>The metadata format consists of at least one field, followed by
+either another field or the magic number 0x7F. 0x7F terminates a
+metadata stream.</p>
+<p>Thus, the example metadata stream 0x00 0x01 0x7f is decoded as a
+field of type 0, id 0, with a payload of byte 0x00.</p>
+<table>
+<thead>
+<tr class="header">
+<th><p>Field ID</p></th>
+<th><p>Field Type</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><p>0</p></td>
+<td><p>Byte</p></td>
+</tr>
+<tr class="even">
+<td><p>1</p></td>
+<td><p>Short</p></td>
+</tr>
+<tr class="odd">
+<td><p>2</p></td>
+<td><p>Int</p></td>
+</tr>
+<tr class="even">
+<td><p>3</p></td>
+<td><p>Float</p></td>
+</tr>
+<tr class="odd">
+<td><p>4</p></td>
+<td><p>String</p></td>
+</tr>
+<tr class="even">
+<td><p>5</p></td>
+<td><p>Item: Short id, byte count, short damage</p></td>
+</tr>
+<tr class="odd">
+<td><p>6</p></td>
+<td><p>Vector: Int x, int y, int z</p></td>
+</tr>
+</tbody>
+</table>
+<p>For known extra entity information values, see <a href="Mob_Types"
+title="wikilink">Mob Types</a>.</p>
+<h3 id="entity_effect_0x29">Entity Effect (0x29)</h3>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="4" class="col0 centeralign"><p>0x29</p></td>
+<td class="col1 centeralign"><p>Entity ID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>14</code></p></td>
+<td class="col4"><p>Entity ID of a player</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Effect ID</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>17</code></p></td>
+<td class="col3"><p>See table below</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Amplifier</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Duration</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p><code>64</code></p></td>
+<td class="col3"></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>9 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h4 id="effects">Effects</h4>
+<p>Only noted effects are currently implemented by the 1.8pre2
+client/server</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>ID</p></th>
+<th class="col1"><p>Meaning</p></th>
+<th class="col2"><p>Client implementation</p></th>
+<th class="col3"><p>Server implementation</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0"><p>1</p></td>
+<td class="col1"><p>moveSpeed</p></td>
+<td class="col2"><p>Increases player speed and FOV.</p></td>
+<td class="col3"></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>2</p></td>
+<td class="col1"><p>moveSlowdown</p></td>
+<td class="col2"><p>Decreases player speed and FOV.</p></td>
+<td class="col3"></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>3</p></td>
+<td class="col1"><p>digSpeed</p></td>
+<td class="col2"><p>Increases player dig speed</p></td>
+<td class="col3"></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>4</p></td>
+<td class="col1"><p>digSlowDown</p></td>
+<td class="col2"><p>Decreases player dig speed</p></td>
+<td class="col3"></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>5</p></td>
+<td class="col1"><p>damageBoost</p></td>
+<td class="col2"></td>
+<td class="col3"></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>6</p></td>
+<td class="col1"><p>heal</p></td>
+<td class="col2"></td>
+<td class="col3"></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>7</p></td>
+<td class="col1"><p>harm</p></td>
+<td class="col2"></td>
+<td class="col3"></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>8</p></td>
+<td class="col1"><p>jump</p></td>
+<td class="col2"></td>
+<td class="col3"></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>9</p></td>
+<td class="col1"><p>confusion</p></td>
+<td class="col2"><p>Portal-like effect</p></td>
+<td class="col3"></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>10</p></td>
+<td class="col1"><p>regeneration</p></td>
+<td class="col2"><p>Hearts pulse one-by-one</p></td>
+<td class="col3"><p>Caused by golden apple. Health regenerates over
+600-tick (30s) period.</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>11</p></td>
+<td class="col1"><p>resistance</p></td>
+<td class="col2"></td>
+<td class="col3"></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>12</p></td>
+<td class="col1"><p>fireResistance</p></td>
+<td class="col2"></td>
+<td class="col3"></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>13</p></td>
+<td class="col1"><p>waterBreathing</p></td>
+<td class="col2"><p>Bubbles do not decrease underwater</p></td>
+<td class="col3"></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>14</p></td>
+<td class="col1"><p>invisibility</p></td>
+<td class="col2"></td>
+<td class="col3"></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>15</p></td>
+<td class="col1"><p>blindness</p></td>
+<td class="col2"></td>
+<td class="col3"></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>16</p></td>
+<td class="col1"><p>nightVision</p></td>
+<td class="col2"></td>
+<td class="col3"></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>17</p></td>
+<td class="col1"><p>hunger</p></td>
+<td class="col2"><p>Food bar turns green</p></td>
+<td class="col3"><p>Caused by poisoning from Rotten Flesh or Raw
+Chicken</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>18</p></td>
+<td class="col1"><p>weakness</p></td>
+<td class="col2"></td>
+<td class="col3"></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>19</p></td>
+<td class="col1"><p>poison</p></td>
+<td class="col2"><p>Hearts turn yellow</p></td>
+<td class="col3"><p>Caused by poisoning from cave (blue) spider</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="remove_entity_effect_0x2a">Remove Entity Effect (0x2A)</h3>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="2" class="col0 centeralign"><p>0x2a</p></td>
+<td class="col1 centeralign"><p>Entity ID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"></td>
+<td class="col4"><p>Entity ID of a player</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Effect ID</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>17</code></p></td>
+<td class="col3"><p>See <a href="#Effects" title="wikilink">table
+above</a></p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>6 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="experience_0x2b">Experience (0x2B)</h3>
+<p>Sent by the server when the client should change experience
+levels.</p>
+<p>The amount of experience needed to reach the next level increases by
+10 with each level. At level 0, you need 10 experience to progress to
+level 1. At level 1, the requirement is 20 to progress, and so
+forth.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="3" class="col0 centeralign"><p>0x2B</p></td>
+<td class="col1 centeralign"><p>Current experience</p></td>
+<td class="col2 centeralign"><p>byte</p></td>
+<td class="col3 centeralign"><p><code>15</code></p></td>
+<td class="col4"><p>Experience at current level</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Level</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>2</code></p></td>
+<td class="col4"></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Total experience</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p><code>45</code></p></td>
+<td class="col3"></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>5 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="pre_chunk_0x32">Pre-Chunk (0x32)</h3>
+<p><strong>Server to Client only</strong></p>
+<p>This packet is sent by the server to notify the client to initialize
+(Mode=1) or unload (Mode=0) a chunk. The client is expected to allocate
+space for a full chunk (currently 16 x 128 x 16 blocks). One or more
+0x33 packets will follow, specifying actual data to fill the chunk
+with.</p>
+<p><img src="Icon_exclaim.gif" title=":!:" alt=":!:" /> Whenever you
+send this packet the client will clear any previous chunk at that spot
+if one has previously been sent. Clients don't like being in or next to
+an unloaded chunk, so try not to unload it if players are nearby. If the
+player appears to be twitching and stuck in place after joining the
+world, there is probably an unloaded chunk too close to them.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="3" class="col0 centeralign"><p>0x32</p></td>
+<td class="col1 centeralign"><p>X</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>-9</code></p></td>
+<td class="col4"><p>Chunk X Coordinate</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Z</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>12</code></p></td>
+<td class="col3"><p>Chunk Z Coordinate</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Mode</p></td>
+<td class="col1 centeralign"><p>bool</p></td>
+<td class="col2 centeralign"><p><code>1</code></p></td>
+<td class="col3"><p>If mode is 0 the client will unload the chunk,
+otherwise the client will initialize the chunk</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>10 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="map_chunk_0x33">Map Chunk (0x33)</h3>
+<p><strong>Server to Client only</strong></p>
+<p>The client will overwrite all <strong>or part</strong> of a chunk
+using the region of data contained in this packet. The server specifies
+the region to write using a block position and size in X,Y,Z. Note that
+this region will always be inside a single chunk. (At least using the
+vanilla server. Unknown if the client has this limitation.)</p>
+<p>A server <strong>can</strong> send a 0x32 packet prior, allowing the
+client to initialize the chunk. However this doesn't always happen in
+practice. Thus the client should initialize the chunk on-demand.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="8" class="col0 centeralign"><p>0x33</p></td>
+<td class="col1 centeralign"><p>X</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>128</code></p></td>
+<td class="col4"><p>Block X Coordinate</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Y</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"><p>Block Y Coordinate</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Z</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>-192</code></p></td>
+<td class="col3"><p>Block Z Coordinate</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Size_X</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>15</code></p></td>
+<td class="col3"><p>Size_X is Actual X Size -1</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Size_Y</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>127</code></p></td>
+<td class="col3"><p>Size_Y is Actual Y Size -1</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Size_Z</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>15</code></p></td>
+<td class="col3"><p>Size_Z is Actual Z Size -1</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Compressed size</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>3663</code></p></td>
+<td class="col3"><p>Size of compressed region data</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Compressed data</p></td>
+<td class="col1 centeralign"><p>byte array</p></td>
+<td class="col2 centeralign"><p><code>…</code></p></td>
+<td class="col3"><p>The region data is compressed using ZLib Deflate
+function.</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>18 bytes + Compressed chunk
+size</p></td>
+</tr>
+</tbody>
+</table>
+<h5 id="x_y_z">X, Y, Z</h5>
+<p>This is the start position of the region, in <strong>world</strong>
+block coordinates.</p>
+<p>To find which chunk is affected, in the same coordinates given by
+packet 0x32:</p>
+<p><code> ChunkX = X &gt;&gt; 4 </code><br />
+<code> ChunkY = Y &gt;&gt; 7</code><br />
+<code> ChunkZ = Z &gt;&gt; 4</code></p>
+<p>And conversely, which local block in the chunk to start at:</p>
+<p><code> StartX = X &amp; 15</code><br />
+<code> StartY = Y &amp; 127  (not always 0!)</code><br />
+<code> StartZ = Z &amp; 15</code></p>
+<h5 id="sizex_sizey_sizez">SizeX, SizeY, SizeZ</h5>
+<p>This is the size of the region, in blocks. The server will subtract
+one from the sizes and then cast them to a byte before sending. This is
+so that chunks as large as 256 are possible (the maximum size of a byte
+is 255; 256 - 1 = 255).</p>
+<h5 id="compressed_data">Compressed data</h5>
+<p>The data is compressed using the deflate() function in <a
+href="http://www.zlib.net/">zlib</a>. After uncompressing, the data
+consists of four sequential sections, in order:</p>
+<ul>
+<li><div class="li"> Block type array (1 byte per
+block)</div></li>
+<li><div class="li"> Block metadata array (half byte/nibble per
+block)</div></li>
+<li><div class="li"> Block Light array (half byte/nibble per
+block)</div></li>
+<li><div class="li"> Sky Light array (half byte/nibble per
+block)</div></li>
+</ul>
+<p>The data is exactly <code>(Size_X+1) * (Size_Y+1) * (Size_Z+1)
+* 2.5</code> bytes long. Nibbles are not rounded either direction,
+which means that at least one dimension of the chunk must be even.</p>
+<p>The arrays are not interlaced.</p>
+<p>In other words, there are Size_X number of <strong>x planes</strong>,
+each plane made up of Size_Z number of <strong>z rows</strong>, each row
+made up of Size_Y blocks indexed by y coordinate in order.</p>
+<p>The block type array is indexed with:</p>
+<p><code> index = y + (z * (Size_Y+1)) + (x * (Size_Y+1) * (Size_Z+1))</code></p>
+<p>The other arrays are similar but you need to divide the index by two
+after calculating the above. Then each byte contains data for
+<strong>two</strong> blocks. The low four bits contain the first (lower
+Y) nibble and the high four bits contain the second nibble.</p>
+<p>If you have a FULL map chunk (Size_X = 15, Size_Y = 127, Size_Z = 15,
+you can calculate index coordinates:</p>
+<p><code> x = X + ( index &gt;&gt; 11 )</code><br />
+<code> y = index &amp; 0x7F</code><br />
+<code> z = Z + ( (index &amp; 0x780) &gt;&gt; 7 )</code></p>
+<h3 id="multi_block_change_0x34">Multi Block Change (0x34)</h3>
+<p>Further investigation shows that this is a multiple-block-change
+command; if you take the three arrays, and put together elements with
+the same index, and then decompose the short into coordinates (top 4
+bits is X, next 4 bits is Z, bottom 8 bits is Y), you get things like
+[((8, 7, 4), 11, 0), ((7, 13, 6), 11, 0), ((13, 1, 8), 11, 0), ((7, 6,
+6), 11, 0)].</p>
+<p>See the Block Change command for description of the general format of
+a block change.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="6" class="col0 centeralign"><p>0x34</p></td>
+<td class="col1 centeralign"><p>Chunk X</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>-9</code></p></td>
+<td class="col4"><p>Chunk X Coordinate</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Chunk Z</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>12</code></p></td>
+<td class="col3"><p>Chunk Z Coordinate</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Array size</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p><code>2</code></p></td>
+<td class="col3"><p>The total number of elements per array</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Coordinate array</p></td>
+<td class="col1 centeralign"><p>short array</p></td>
+<td class="col2 centeralign"><p><code>…</code></p></td>
+<td class="col3"><p>The coordinates of the blocks to change</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Type array</p></td>
+<td class="col1 centeralign"><p>byte array</p></td>
+<td class="col2 centeralign"><p><code>…</code></p></td>
+<td class="col3"><p>The type for each block change</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Metadata array</p></td>
+<td class="col1 centeralign"><p>byte array</p></td>
+<td class="col2 centeralign"><p><code>…</code></p></td>
+<td class="col3 leftalign"><p>The Metadata for each block
+changed</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>11 bytes + Arrays</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="block_change_0x35">Block Change (0x35)</h3>
+<p><img src="Icon_exclaim.gif" title=":!:" alt=":!:" /> Block metadata
+varies by block type - it should be <code>0x00</code> for
+most blocks with a few exceptions, shown in the table below.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="5" class="col0 centeralign"><p>0x35</p></td>
+<td class="col1 centeralign"><p>X</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>502</code></p></td>
+<td class="col4"><p>Block X Coordinate</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Y</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>71</code></p></td>
+<td class="col3"><p>Block Y Coordinate</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Z</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>18</code></p></td>
+<td class="col3"><p>Block Z Coordinate</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Block Type</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>78</code></p></td>
+<td class="col3"><p>The new block type for the block</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Block Metadata</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"><p>The new Metadata for the block</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>12 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="block_action_0x36">Block Action (0x36)</h3>
+<p><strong>Server to Client only</strong></p>
+<p>This packet is used for a number of things:</p>
+<ul>
+<li><div class="li">Chests opening and closing</li>
+<li>Pistons pushing and pulling</li>
+<li>Note blocks playing</li>
+</ul>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="5" class="col0 centeralign"><p>0x35</p></td>
+<td class="col1 centeralign"><p>X</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p><code>502</code></p></td>
+<td class="col4"><p>Block X Coordinate</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Y</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p><code>71</code></p></td>
+<td class="col3"><p>Block Y Coordinate</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Z</p></td>
+<td class="col1 centeralign"><p>int</p></td>
+<td class="col2 centeralign"><p><code>18</code></p></td>
+<td class="col3"><p>Block Z Coordinate</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Byte 1</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>3</code></p></td>
+<td class="col3"><p>Varies depending on block - see below</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Byte 2</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>17</code></p></td>
+<td class="col3"><p>Varies depending on block - see below</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>13 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h4 id="note_block">Note Block</h4>
+<p>It shows the note particle being emitted from the block as well as
+playing the tone.</p>
+<h5 id="byte_1">Byte 1</h5>
+<p>Instrument type.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Type ID</p></th>
+<th class="col1"><p>Type Name</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0"><p>0</p></td>
+<td class="col1"><p>Harp</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>1</p></td>
+<td class="col1"><p>Double Bass</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>2</p></td>
+<td class="col1"><p>Snare Drum</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>3</p></td>
+<td class="col1"><p>Clicks/Sticks</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>4</p></td>
+<td class="col1"><p>Bass Drum</p></td>
+</tr>
+</tbody>
+</table>
+<h5 id="byte_2">Byte 2</h5>
+<p>The pitch of the note (between 0-24 inclusive where 0 is the lowest
+and 24 is the highest). More information about how the pitch values
+correspond to notes in real life are available on the <a
+href="http://www.minecraftwiki.net/wiki/Note_Block">official Minecraft
+wiki</a>.</p>
+<h4 id="piston">Piston</h4>
+<h5 id="byte_1_1">Byte 1</h5>
+<p>The state the piston changes to - 0 for pushing, 1 for pulling.</p>
+<h5 id="byte_2_1">Byte 2</h5>
+<p>Direction.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Direction ID</p></th>
+<th class="col1"><p>Direction</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0"><p>0</p></td>
+<td class="col1"><p>Down</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>1</p></td>
+<td class="col1"><p>Up</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>2</p></td>
+<td class="col1"><p>South</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>3</p></td>
+<td class="col1"><p>West</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>4</p></td>
+<td class="col1"><p>North</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>5</p></td>
+<td class="col1"><p>East</p></td>
+</tr>
+</tbody>
+</table>
+<h4 id="chest">Chest</h4>
+<p>Animates the chest's lid opening. Note that the notchian server will
+send this every 3s even if the state hasn't changed.</p>
+<h5 id="byte_1_2">Byte 1</h5>
+<p>Not used - always 1</p>
+<h5 id="byte_2_2">Byte 2</h5>
+<p>State of the chest - 0 for closed, 1 for open.</p>
+<h3 id="explosion_0x3c">Explosion (0x3C)</h3>
+<p><img src="Icon_exclaim.gif" title=":!:" alt=":!:" /> This command is
+not fully understood.</p>
+<p>Seems to be sent when an explosion occurs (both creepers and
+TNT).</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="6" class="col0 centeralign"><p>0x3C</p></td>
+<td class="col1 centeralign"><p>X</p></td>
+<td class="col2 centeralign"><p>double</p></td>
+<td class="col3 centeralign"></td>
+<td class="col4"></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Y</p></td>
+<td class="col2 centeralign"><p>double</p></td>
+<td class="col3 centeralign"></td>
+<td class="col4"></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>Z</p></td>
+<td class="col2 centeralign"><p>double</p></td>
+<td class="col3 centeralign"></td>
+<td class="col4"></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Unknown</p></td>
+<td class="col2 centeralign"><p>float</p></td>
+<td class="col3 centeralign"><p>3.0</p></td>
+<td class="col4"><p>radius?</p></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>Record count</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"></td>
+<td class="col4"><p>This is the count, not the size. The size is 3 times
+this value.</p></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Records</p></td>
+<td class="col2 centeralign"><p>(byte, byte, byte) × count</p></td>
+<td class="col3 centeralign"></td>
+<td class="col4"><p>Each record is 3 bytes, which seem to be XYZ offsets
+of affected blocks.</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>33 bytes + 3*(Record count)
+bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="sound_effect_0x3d">Sound effect (0x3D)</h3>
+<p>Sent when a client is to play a sound effect.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="5" class="col0 centeralign"><p>0x3D</p></td>
+<td class="col1 centeralign"><p>Effect ID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p>1003</p></td>
+<td class="col4"><p>The ID of the sound effect to play, see
+below.</p></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>X</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"></td>
+<td class="col4"><p>The X location of the effect.</p></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>Y</p></td>
+<td class="col2 centeralign"><p>byte</p></td>
+<td class="col3 centeralign"></td>
+<td class="col4"><p>The Y location of the effect.</p></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Z</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"></td>
+<td class="col4"><p>The Z location of the effect.</p></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>Sound data</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p>0</p></td>
+<td class="col4"><p>Extra data about RECORD_PLAY, SMOKE, and
+BLOCK_BREAK</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>18 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<p>Valid sound effects are:</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Effect ID</p></th>
+<th class="col1"><p>Name</p></th>
+<th class="col2"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0"><p>1000</p></td>
+<td class="col1"><p>CLICK2</p></td>
+<td class="col2"></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>1001</p></td>
+<td class="col1"><p>CLICK1</p></td>
+<td class="col2"></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>1002</p></td>
+<td class="col1"><p>BOW_FIRE</p></td>
+<td class="col2"></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>1003</p></td>
+<td class="col1"><p>DOOR_TOGGLE</p></td>
+<td class="col2"></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>1004</p></td>
+<td class="col1"><p>EXTINGUISH</p></td>
+<td class="col2"></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>1005</p></td>
+<td class="col1"><p>RECORD_PLAY</p></td>
+<td class="col2"><p>Has data (presumably record ID)</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>2000</p></td>
+<td class="col1"><p>SMOKE</p></td>
+<td class="col2"><p>Has data (direction, check below)</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>2001</p></td>
+<td class="col1"><p>BLOCK_BREAK</p></td>
+<td class="col2"><p>Has data (Block ID broken)</p></td>
+</tr>
+</tbody>
+</table>
+<p>Smoke is a silent effect with only a visual element.</p>
+<p>Smoke Directions</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Direction ID</p></th>
+<th class="col1"><p>Direction</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0"><p>0</p></td>
+<td class="col1"><p>South - East</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>1</p></td>
+<td class="col1"><p>South</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>2</p></td>
+<td class="col1"><p>South - West</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>3</p></td>
+<td class="col1"><p>East</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>4</p></td>
+<td class="col1"><p>(Up or middle ?)</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>5</p></td>
+<td class="col1"><p>West</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>6</p></td>
+<td class="col1"><p>North - East</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>7</p></td>
+<td class="col1"><p>North</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>8</p></td>
+<td class="col1"><p>North - West</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="newinvalid_state_0x46">New/Invalid State (0x46)</h3>
+<p>This packet appeared with protocol version 10. Currently, it appears
+when a bed can't be used as a spawn point and when the rain state
+changes. it could have additional uses in the future.</p>
+<p>The class has an array of strings linked to reason codes 0, 1, 2, and
+3 but only the codes for 1 and 2 are null.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="2" class="col0 centeralign"><p>0x46</p></td>
+<td class="col1 centeralign"><p>Reason</p></td>
+<td class="col2 centeralign"><p>byte</p></td>
+<td class="col3 centeralign"><p>0</p></td>
+<td class="col4"></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Game mode</p></td>
+<td class="col2 centeralign"><p>byte</p></td>
+<td class="col3 centeralign"><p>0</p></td>
+<td class="col4"><p>Used only when reason = 3. 0 is survival, 1 is
+creative.</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>3 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h4 id="reason_codes">Reason codes</h4>
+<table>
+<thead>
+<tr class="header">
+<th><p>Code</p></th>
+<th><p>Effect</p></th>
+<th><p>Text</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td><p>0</p></td>
+<td><p>Invalid Bed</p></td>
+<td><p>"tile.bed.notValid"</p></td>
+</tr>
+<tr class="even">
+<td><p>1</p></td>
+<td><p>Begin raining</p></td>
+<td><p>null</p></td>
+</tr>
+<tr class="odd">
+<td><p>2</p></td>
+<td><p>End raining</p></td>
+<td><p>null</p></td>
+</tr>
+<tr class="even">
+<td><p>3</p></td>
+<td><p>Change game mode</p></td>
+<td><p>gameMode.changed</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="thunderbolt_0x47">Thunderbolt (0x47)</h3>
+<p><strong>Server to Client only</strong></p>
+<p>With this packet, the server notifies the client of thunderbolts
+striking somewhere (near the player?). The coordinates specify where
+exactly the thunderbolt strikes.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="5" class="col0 centeralign"><p>0x47</p></td>
+<td class="col1 centeralign"><p>Entity ID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p>4</p></td>
+<td class="col4"><p>The entity ID of the thunderbolt</p></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Unknown</p></td>
+<td class="col2 centeralign"><p>boolean</p></td>
+<td class="col3 centeralign"><p>true</p></td>
+<td class="col4"><p>Always true. Might have a meaning in the
+future...</p></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>X</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p>133</p></td>
+<td class="col4"><p>Thunderbolt X as Absolute Integer</p></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Y</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p>913</p></td>
+<td class="col4"><p>Thunderbolt Y as Absolute Integer</p></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>Z</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p>63552</p></td>
+<td class="col4"><p>Thunderbolt Z as Absolute Integer</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>18 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="open_window_0x64">Open window (0x64)</h3>
+<p>This is sent to the client when it should open an inventory, such as
+a chest, workbench, or furnace. This message is not sent anywhere for
+clients opening their own inventory.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="4" class="col0 centeralign"><p>0x64</p></td>
+<td class="col1 centeralign"><p>Window id</p></td>
+<td class="col2 centeralign"><p>byte</p></td>
+<td class="col3 centeralign"><p>123</p></td>
+<td class="col4"><p>The id of the window to display.</p></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Inventory Type</p></td>
+<td class="col2 centeralign"><p>byte</p></td>
+<td class="col3 centeralign"><p>2</p></td>
+<td class="col4"><p>Check below</p></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>Window title</p></td>
+<td class="col2 centeralign"><p>string16</p></td>
+<td class="col3 centeralign"><p><code>Chest</code></p></td>
+<td class="col4"><p>The title of the window.</p></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Number of Slots</p></td>
+<td class="col2 centeralign"><p>byte</p></td>
+<td class="col3 centeralign"><p>3</p></td>
+<td class="col4"><p>Number of slots in the window (excluding the number
+of slots in the player inventory).</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>6 bytes + length of
+string</p></td>
+</tr>
+</tbody>
+</table>
+<p>The window titles sent by the Notchian server are "Chest", "Large
+chest", "Crafting", "Furnace", and "Trap". Notchian clients force window
+titles for some windows, like dispensers and furnaces, but other titles
+are customizable. However, the window title sent by the server is always
+used for chests. See <a href="Inventory#Windows"
+title="wikilink">inventory windows</a> for further information.</p>
+<h3 id="close_window_0x65">Close window (0x65)</h3>
+<p>This packet is sent by the client when closing a window. This packet
+is sent from the server to the client when a window is forcibly closed,
+such as when a chest is destroyed while it's open.</p>
+<p>Note, notchian clients send a close window message with window id 0
+to close their inventory even though there is never an Open Window
+message for inventory.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0 centeralign"><p>0x65</p></td>
+<td class="col1 centeralign"><p>Window id</p></td>
+<td class="col2 centeralign"><p>byte</p></td>
+<td class="col3 centeralign"><p>0</p></td>
+<td class="col4"><p>This is the id of the window that was closed. 0 for
+inventory.</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>2 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="window_click_0x66">Window click (0x66)</h3>
+<p><strong>Client to Server only</strong></p>
+<p><img src="Icon_exclaim.gif" title=":!:" alt=":!:" /> This command is
+not fully understood.</p>
+<p>This packet is sent by the player when it clicks on a slot in a
+window.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="8" class="col0 centeralign"><p>0x66</p></td>
+<td class="col1 centeralign"><p>Window id</p></td>
+<td class="col2 centeralign"><p>byte</p></td>
+<td class="col3 centeralign"><p><code>0</code></p></td>
+<td class="col4"><p>The id of the window which was clicked. 0 for player
+inventory.</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Slot</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p><code>36</code></p></td>
+<td class="col3"><p>The clicked slot. See below.</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Right-click</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>1</code></p></td>
+<td class="col3"><p>1 when right-clicking and otherwise 0.</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Action number</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p><code>12</code></p></td>
+<td class="col3"><p>A unique number for the action, used for transaction
+handling (See the Transaction packet).</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Shift</p></td>
+<td class="col1 centeralign"><p>bool</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"><p>This is true if the user was holding keyboard shift
+when they clicked.</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Item ID</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p><code>3</code></p></td>
+<td class="col3"><p>ID of Item that was in the slot or -1 if no item. If
+-1, this is the last field in the packet.</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Item count</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>64</code></p></td>
+<td class="col3"><p>Number of items that were in the slot</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Item uses</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p><code>10</code></p></td>
+<td class="col3"><p>Number of times the item was used that was in the
+slot</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>10 bytes (+3 for item ID !=
+-1)</p></td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="Inventory#Windows" title="wikilink">inventory
+windows</a> for further information about how slots are indexed.</p>
+<p>When right-clicking on a stack of items, half the stack will be
+picked up and half left in the slot. If the stack is an odd number, the
+half left in the slot will be smaller of the amounts.</p>
+<p>The Action number is actually a counter, starting at 1. This number
+is used by the server as a transaction ID to send back a <a
+href="Protocol#Transaction_.280x6A.29" title="wikilink">Transaction
+packet</a>.</p>
+<p>The Item (short, optional byte,short) is a critical piece of
+information in this packet. The Item that is sent by the client is what
+is in the slot before it is clicked. The server compares that with it's
+notes, and accepts the transaction if items match. Note that the client
+seems to send valid item IDs (rather than -1) even when Item count ==
+0.</p>
+<h3 id="set_slot_0x67">Set slot (0x67)</h3>
+<p><strong>Server to Client only</strong></p>
+<p><img src="Icon_exclaim.gif" title=":!:" alt=":!:" /> This command is
+not fully understood.</p>
+<p>Sent by the server when an item in a slot (in a window) is
+added/removed.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="5" class="col0 centeralign"><p>0x67</p></td>
+<td class="col1 centeralign"><p>Window id</p></td>
+<td class="col2 centeralign"><p>byte</p></td>
+<td class="col3 centeralign"><p><code>0</code></p></td>
+<td class="col4"><p>The window which is being updated. 0 for player
+inventory. Note that all known window types include the player
+inventory. This packet will only be sent for the currently opened window
+while the player is performing actions, even if it affects the player
+inventory. After the window is closed, a number of these packets are
+sent to update the player's inventory window (0).</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Slot</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p><code>36</code></p></td>
+<td class="col3"><p>The slot that should be updated</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Item ID</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p><code>-1</code></p></td>
+<td class="col3"><p>When -1, this is the last value in this packet. -1
+means no item.</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Item Count</p></td>
+<td class="col1 centeralign"><p>byte</p></td>
+<td class="col2 centeralign"><p><code>64</code></p></td>
+<td class="col3"><p>Number of items in a stack. Not sent when Item ID is
+-1.</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Item uses</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p><code>3</code></p></td>
+<td class="col3"><p>Not sent when Item ID is -1.</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>6 bytes (+3 for item ID !=
+-1)</p></td>
+</tr>
+</tbody>
+</table>
+<p>Note that if window ID and slot are both -1, it means the item
+currently attached to the cursor.</p>
+<p>See <a href="Inventory#Windows" title="wikilink">inventory
+windows</a> for further information about how slots are indexed.</p>
+<p>Slots: <a
+href="http://gyazo.com/9d52e1fd4dc14790ec66eab4a9aee00e.png">1</a></p>
+<h3 id="window_items_0x68">Window items (0x68)</h3>
+<p><strong>Server to Client only</strong></p>
+<figure>
+<img src="Inventory-slots.png" title="The inventory slots" />
+<figcaption>The inventory slots</figcaption>
+</figure>
+<p>Sent by the server when an item in a slot (in a window) is
+added/removed. This includes the main inventory, equipped armour and
+crafting slots.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="3" class="col0 centeralign"><p>0x68</p></td>
+<td class="col1 centeralign"><p>Window id</p></td>
+<td class="col2 centeralign"><p>byte</p></td>
+<td class="col3 centeralign"><p><code>1</code></p></td>
+<td class="col4"><p>The id of window which items are being sent for. 0
+for player inventory.</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Count</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p><code>4</code></p></td>
+<td class="col3"><p>The number of items (see below)</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Payload</p></td>
+<td class="col1 centeralign"><p>…</p></td>
+<td class="col2 centeralign"><p><code></code></p></td>
+<td class="col3"><p>The payload (see below)</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>4 bytes + size of
+payload</p></td>
+</tr>
+</tbody>
+</table>
+<p>See <a href="Inventory#Windows" title="wikilink">inventory
+windows</a> for further information about how slots are indexed.</p>
+<p>This packet is a bit trickier to parse than most others because the
+size of its payload is variable. The payload is an array of shorts (item
+ID) optionally followed by a byte-short pair (count and uses) as long as
+the item ID does not equal <code>-1</code>, which signifies
+an empty slot.</p>
+<p>Uses is the number of times an item has been used (the value starts
+at 0 and counts up.) Note that an invalid use of an item may count as 2
+uses.</p>
+<p><syntaxhighlight lang="python"></p>
+<p><code>offset = 0</code><br />
+<br />
+<code>for slot in count:</code><br />
+<code>    item_id = payload[offset] as short</code><br />
+<code>    offset += 2</code><br />
+<code>    if item_id is not equal to -1:</code><br />
+<code>        count = payload[offset] as byte</code><br />
+<code>        offset += 1</code><br />
+<code>        uses = payload[offset] as short</code><br />
+<code>        offset += 2</code><br />
+<code>        inventory[slot] = new item(item_id, count, uses)</code><br />
+<code>    else:</code><br />
+<code>        inventory[slot] = None</code></p>
+<p></syntaxhighlight></p>
+<h3 id="update_progress_bar_0x69">Update progress bar (0x69)</h3>
+<p><strong>Server to Client only</strong></p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="3" class="col0 centeralign"><p>0x69</p></td>
+<td class="col1 centeralign"><p>Window id</p></td>
+<td class="col2 centeralign"><p>byte</p></td>
+<td class="col3 centeralign"><p>2</p></td>
+<td class="col4"><p>The id of the window that the progress bar is
+in.</p></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Progress bar</p></td>
+<td class="col2 centeralign"><p>short</p></td>
+<td class="col3 centeralign"><p>1</p></td>
+<td class="col4"><p>Which of the progress bars that should be updated.
+(For furnaces, 0 = progress arrow, 1 = fire icon)</p></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>Value</p></td>
+<td class="col2 centeralign"><p>short</p></td>
+<td class="col3 centeralign"><p>650</p></td>
+<td class="col4"><p>The value of the progress bar. The maximum values
+vary depending on the progress bar. Presumably the values are specified
+as in-game ticks. Some progress bar values increase, while others
+decrease. For furnaces, 0 is empty, full progress arrow = about 180,
+full fire icon = about 250)</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>6 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="transaction_0x6a">Transaction (0x6A)</h3>
+<p>A packet from the server indicating whether a request from the client
+was accepted, or whether there was a conflict (due to lag). This packet
+is also sent from the client to the server in response to a server
+transaction rejection packet.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="3" class="col0 centeralign"><p>0x6A</p></td>
+<td class="col1 centeralign"><p>Window id</p></td>
+<td class="col2 centeralign"><p>byte</p></td>
+<td class="col3 centeralign"><p>0</p></td>
+<td class="col4"><p>The id of the window that the action occurred
+in.</p></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Action number</p></td>
+<td class="col2 centeralign"><p>short</p></td>
+<td class="col3 centeralign"><p>12</p></td>
+<td class="col4"><p>Every action that is to be accepted has a unique
+number. This field corresponds to that number.</p></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>Accepted?</p></td>
+<td class="col2 centeralign"><p>boolean</p></td>
+<td class="col3 centeralign"><p>true</p></td>
+<td class="col4"><p>Whether the action was accepted.</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>5 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="creative_inventory_action_0x6b">Creative inventory action
+(0x6B)</h3>
+<p>While the user is in the standard inventory (i.e., not a crafting
+bench) on a creative-mode server then the server will send this
+packet:</p>
+<ul>
+<li><div class="li"> If an item is dropped into the quick
+bar</div></li>
+<li>If an item is picked up from the quick bar (special case: item id is
+-1 and quantity/damage are both 0)</li>
+</ul>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="4" class="col0 centeralign"><p>0x6B</p></td>
+<td class="col1 centeralign"><p>Slot</p></td>
+<td class="col2 centeralign"><p>short</p></td>
+<td class="col3 centeralign"><p>36</p></td>
+<td class="col4"><p>Inventory slot</p></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Item id</p></td>
+<td class="col2 centeralign"><p>short</p></td>
+<td class="col3 centeralign"><p>35</p></td>
+<td class="col4"><p>Item ID being placed (or -1)</p></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>Quantity</p></td>
+<td class="col2 centeralign"><p>short</p></td>
+<td class="col3 centeralign"><p>1</p></td>
+<td class="col4"></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Damage</p></td>
+<td class="col2 centeralign"><p>short</p></td>
+<td class="col3 centeralign"><p>9</p></td>
+<td class="col4"><p>Note: also used for block metadata (as with many
+packets)</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>9 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="update_sign_0x82">Update Sign (0x82)</h3>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="7" class="col0 centeralign"><p>0x82</p></td>
+<td class="col1 centeralign"><p>X</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p>128</p></td>
+<td class="col4"><p>Block X Coordinate</p></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Y</p></td>
+<td class="col2 centeralign"><p>short</p></td>
+<td class="col3 centeralign"><p>0</p></td>
+<td class="col4"><p>Block Y Coordinate</p></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>Z</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p>-128</p></td>
+<td class="col4"><p>Block Z Coordinate</p></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Text1</p></td>
+<td class="col2 centeralign"><p>string16</p></td>
+<td class="col3 centeralign"><p><code>First
+line</code></p></td>
+<td class="col4"><p>First line of text in the sign</p></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>Text2</p></td>
+<td class="col2 centeralign"><p>string16</p></td>
+<td class="col3 centeralign"><p><code>Second
+line</code></p></td>
+<td class="col4"><p>Second line of text in the sign</p></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Text3</p></td>
+<td class="col2 centeralign"><p>string16</p></td>
+<td class="col3 centeralign"><p><code>Third
+line</code></p></td>
+<td class="col4"><p>Third line of text in the sign</p></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>Text4</p></td>
+<td class="col2 centeralign"><p>string16</p></td>
+<td class="col3 centeralign"><p><code>Fourth
+line</code></p></td>
+<td class="col4"><p>Fourth line of text in the sign</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>11 bytes + 4 strings</p></td>
+</tr>
+</tbody>
+</table>
+<p>This message is sent from the server to the client whenever a sign is
+discovered or created. This message is sent from the client to the
+server when the "Done" button is pushed after placing a sign. This
+message is NOT sent when a sign is destroyed or unloaded.</p>
+<h3 id="item_data_0x83">Item Data (0x83)</h3>
+<p><strong>Server to Client only</strong></p>
+<p>Sent to specify complex data on an item; currently used only for
+maps.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="5" class="col0 centeralign"><p>0x83</p></td>
+<td class="col1 centeralign"><p>Item Type</p></td>
+<td class="col2 centeralign"><p>short</p></td>
+<td class="col3 centeralign"><p><code>358</code></p></td>
+<td class="col4"><p>Type of item being modified</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Item ID</p></td>
+<td class="col1 centeralign"><p>short</p></td>
+<td class="col2 centeralign"><p><code>0</code></p></td>
+<td class="col3"><p>The ID (damage value) of the item being
+modified</p></td>
+</tr>
+<tr class="odd">
+<td class="col0 centeralign"><p>Text length</p></td>
+<td class="col1 centeralign"><p>unsigned byte</p></td>
+<td class="col2 centeralign"><p><code>35</code></p></td>
+<td class="col3"><p>Length of following byte array</p></td>
+</tr>
+<tr class="even">
+<td class="col0 centeralign"><p>Text</p></td>
+<td class="col1 centeralign"><p>byte array</p></td>
+<td class="col2 centeralign"><p>{0,0,0,20,20,20,20,20}</p></td>
+<td class="col3"><p>ASCII text.</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="3" class="col1 rightalign"><p>6 bytes + Text
+length</p></td>
+</tr>
+</tbody>
+</table>
+<p><strong>Maps</strong> If the first byte of the text is 0, the next
+two bytes are X start and Y start and the rest of the bytes are the
+colors in that column.</p>
+<p>If the first byte of the text is 1, the rest of the bytes are in
+groups of three: (data, x, y). The lower half of the data is the type
+(always 0 under vanilla) and the upper half is the direction.</p>
+<h3 id="increment_statistic_0xc8">Increment Statistic (0xC8)</h3>
+<ul>
+<li>Class: nj</li>
+</ul>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="3" class="col0 centeralign"><p>0xC8</p></td>
+<td class="col1 centeralign"><p>Statistic ID</p></td>
+<td class="col2 centeralign"><p>int</p></td>
+<td class="col3 centeralign"><p>1003</p></td>
+<td class="col4"><p>The ID of the statistic. See <a
+href="http://www.minecraftforum.net/viewtopic.php?f=1020&amp;t=295360">List
+of statistics</a>.</p></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Amount</p></td>
+<td class="col2 centeralign"><p>byte</p></td>
+<td class="col3 centeralign"><p>1</p></td>
+<td class="col4"><p>The amount to increment the statistic.</p></td>
+</tr>
+<tr class="odd">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="3" class="col1 rightalign"><p>6 bytes</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="player_list_item_0xc9">Player List Item (0xC9)</h3>
+<p>Sent by the notchian server to update the user list (&lt;tab&gt; in
+the client). The server sends one packet per user per tick, amounting to
+20 packets/s for 1 online user, 40 for 2, and so forth.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td rowspan="3" class="col0 centeralign"><p>0xC9</p></td>
+<td class="col1 centeralign"><p>Player name</p></td>
+<td class="col2 centeralign"><p>string16</p></td>
+<td class="col3 centeralign"><p>barneygale</p></td>
+<td class="col4"><p>Supports chat colouring, limited to 16
+characters.</p></td>
+</tr>
+<tr class="even">
+<td class="col1 centeralign"><p>Online</p></td>
+<td class="col2 centeralign"><p>bool</p></td>
+<td class="col3 centeralign"><p>true</p></td>
+<td class="col4"><p>If false, the client will remove the user from the
+list.</p></td>
+</tr>
+<tr class="odd">
+<td class="col1 centeralign"><p>Ping</p></td>
+<td class="col2 centeralign"><p>short</p></td>
+<td class="col3 centeralign"><p>193</p></td>
+<td class="col4"><p>Ping, presumably in ms.</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>6 bytes + length of
+string</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="server_list_ping_0xfe">Server List Ping (0xFE)</h3>
+<p>To load server info in the multiplayer menu, the notchian client
+connects to each known server and sends an 0xFE.</p>
+<p>In return, the server sends a kick (0xFF), with its string containing
+data (server description, number of users, number of slots), delimited
+by a §</p>
+<p>Example server pinger:</p>
+<p><a
+href="https://gist.github.com/1209061">https://gist.github.com/1209061</a>
+(Python)</p>
+<p><a
+href="https://gist.github.com/1226084">https://gist.github.com/1226084</a>
+(PHP)</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0 centeralign"><p>0xFE</p></td>
+</tr>
+</tbody>
+</table>
+<h3 id="disconnectkick_0xff">Disconnect/Kick (0xFF)</h3>
+<p>Sent by the server before it disconnects a client, or by the client
+before it disconnects from the server. The receiver of this packet
+assumes that the sender has already closed the connection by the time
+the packet arrives.</p>
+<table>
+<thead>
+<tr class="header">
+<th class="col0"><p>Packet ID</p></th>
+<th class="col1"><p>Field Name</p></th>
+<th class="col2"><p>Field Type</p></th>
+<th class="col3"><p>Example</p></th>
+<th class="col4"><p>Notes</p></th>
+</tr>
+</thead>
+<tbody>
+<tr class="odd">
+<td class="col0 centeralign"><p>0xFF</p></td>
+<td class="col1 centeralign"><p>Reason</p></td>
+<td class="col2 centeralign"><p>string16</p></td>
+<td class="col3 centeralign"><p><code>The server is
+full!</code></p></td>
+<td class="col4"><p>Displayed to the client when the connection
+terminates</p></td>
+</tr>
+<tr class="even">
+<td class="col0"><p>Total Size:</p></td>
+<td colspan="4" class="col1 rightalign"><p>3 bytes + length of
+strings</p></td>
+</tr>
+</tbody>
+</table>
+<h2 id="protocol_history">Protocol History</h2>
+<p>Provided below is a changelog of the server protocol starting on
+2010-08-20. The wiki history feature may also be used to investigate
+changes.</p>
+<h3 id="section">2011-9-14</h3>
+<ul>
+<li><div class="li">Beta 1.8 release.</div></li>
+<li>Protocol version is now 17</li>
+</ul>
+<h3 id="section_1">2011-9-13</h3>
+<ul>
+<li><div class="li">Beta 1.8 pre2-release.</div></li>
+<li>Protocol version is now 16</li>
+<li>Packet 0x01 (<a href="#Login_Request_.280x01.29"
+title="wikilink">Login</a>) changed (added byte, world height now
+unsigned)</li>
+<li>Packet 0x09 (<a href="#Respawn_.280x09.29"
+title="wikilink">Respawn</a>) changed (added byte)</li>
+<li>Packet 0x64 (<a href="#Open_window_.280x64.29" title="wikilink">Open
+Window</a>) changed (Window title changed from string8 to string16)</li>
+<li>New packet 0x1a (<a href="#Experience_Orb_.280x1A.29"
+title="wikilink">Experience Orb</a>) added</li>
+<li>Assumedly 0x17 (<a href="#Add_Object.2FVehicle_.280x17.29"
+title="wikilink">Add Object/Vehicle</a>) is no longer used for exp
+orbs.</li>
+</ul>
+<h3 id="section_2">2011-9-10</h3>
+<ul>
+<li><div class="li">Beta 1.8 pre-release.</div></li>
+<li>Protocol version is now 15</li>
+<li>Packet 0x00 (<a href="#Keep_Alive_.280x00.29" title="wikilink">Keep
+Alive</a>) changed (added keep-alive id)</li>
+<li>Packet 0x01 (<a href="#Login_Request_.280x01.29"
+title="wikilink">Login</a>) changed (added server mode, height limit,
+and an unknown field)</li>
+<li>Packet 0x08 (<a href="#Update_Health_.280x08.29"
+title="wikilink">Health</a>) changed (added food bar and food
+saturation)</li>
+<li>Packet 0x09 (<a href="#Respawn_.280x09.29"
+title="wikilink">Respawn</a>) changed (added map seed, server mode,
+height limit)</li>
+<li>Packet 0x13 (<a href="#Entity_Action_.280x13.29"
+title="wikilink">Entity Action</a>) has new values for starting/stopping
+sprinting.</li>
+<li>Packet 0x46 (<a href="#New.2FInvalid_State_.280x46.29"
+title="wikilink">New/invalid state</a>) changed (added game mode reason,
+and a game mode byte)</li>
+<li>New packet 0x29 (<a href="#Entity_Effect_.280x29.29"
+title="wikilink">Entity Effect</a>) added</li>
+<li>New packet 0x2a (<a href="#Remove_Entity_Effect_.280x2A.29"
+title="wikilink">Remove Entity Effect</a>) added</li>
+<li>New packet 0x2b (<a href="#Experience_.280x2B.29"
+title="wikilink">Experience update</a>) added</li>
+<li>New packet 0x6b (<a href="#Creative_inventory_action_.280x6B.29"
+title="wikilink">Creative item get</a>) added</li>
+<li>New packet 0xc9 (<a href="#Player_List_Item_.280xC9.29"
+title="wikilink">Player list item</a>) added</li>
+<li>New packet 0xfe (<a href="#Server_List_Ping_.280xFE.29"
+title="wikilink">Server list ping</a>) added</li>
+<li>New values for 0x13 (<a href="#Entity_Action_.280x13.29"
+title="wikilink">Entity Action</a>): start sprinting, stop
+sprinting</li>
+<li>New value for 0x17 (<a href="#Add_Object.2FVehicle_.280x17.29"
+title="wikilink">Add Object/Vehicle</a>): experience orb</li>
+</ul>
+<h3 id="section_3">2011-6-30</h3>
+<ul>
+<li><div class="li">Beta 1.7 released.</div></li>
+<li>Protocol version number is now 14</li>
+<li>No new packets</li>
+<li>Packet 0x36 (<a href="#Block_Action_.280x36.29"
+title="wikilink">Block Action</a>) is now used for pistons too.</li>
+</ul>
+<h3 id="section_4">2011-5-26</h3>
+<ul>
+<li><div class="li">Beta 1.6 released.</div></li>
+<li>Protocol increase by 2: 13</li>
+<li>Packet 0x09 (<a href="#Respawn_.280x09.29"
+title="wikilink">Respawn</a>) changed (added world byte)</li>
+<li>Packet 0x17 (<a href="#Add_Object.2FVehicle_.280x17.29"
+title="wikilink">Add Object</a>) changed.</li>
+<li>Packet 0x3d (<a href="#Sound_effect_.280x3D.29"
+title="wikilink">Sound effect</a>) added</li>
+<li>Packet 0x83 (<a href="#Map_Data_.280x83.29" title="wikilink">Map
+Data</a>) added</li>
+</ul>
+<h3 id="section_5">2011-4-19</h3>
+<ul>
+<li><div class="li">Beta 1.5 released.</div></li>
+<li>Some packet info at <a
+href="https://gist.github.com/929803">https://gist.github.com/929803</a></li>
+<li>Packet 0x01 (<a href="#Login_Request_.280x01.29"
+title="wikilink">Login Request</a>) changed (removed second string)</li>
+<li>Packet 0x66 (Window Click) changed (added bool for shift)</li>
+<li>Added two new packets: 0x47 (<a href="#Thunderbolt_.280x47.29"
+title="wikilink">Thunderbolt</a>) and 0xC8 (<a
+href="#Increment_Statistic_.280xC8.29" title="wikilink">Increment
+Statistic</a>) (classes eq and nj, respectively)</li>
+<li>Protocol version number is now 11</li>
+<li>All of the strings are now UCS-2, except for Open window (0x64),
+which is still UTF-8</li>
+</ul>
+<h3 id="section_6">2011-3-31</h3>
+<ul>
+<li><div class="li">Beta 1.4 released.</div></li>
+<li>New packet 0x46.</li>
+<li>Protocol version number is now 10</li>
+<li><strong>TODO:</strong> The protocol itself does not seem to have
+changed much, but what about possible data values and stuff like
+that?</li>
+</ul>
+<h3 id="section_7">2011-2-22</h3>
+<ul>
+<li><div class="li">Beta 1.3 released.</div></li>
+<li>New packets 0x11, 0x1B: Some information at <a
+href="https://gist.github.com/841590">https://gist.github.com/841590</a></li>
+<li>Protocol number is now 9 (updated)</li>
+</ul>
+<h3 id="section_8">2011-1-13</h3>
+<ul>
+<li><div class="li">Beta 1.2 released.</div></li>
+<li>More packet changes (<a
+href="http://pastebin.com/HHW52Awn">pastebin</a>): 0x05, 0x0F, 0x13,
+0x15, 0x18, 0x19, 0x28, 0x36, 0x66, 0x67.</li>
+</ul>
+<h3 id="section_9">2010-12-20</h3>
+<ul>
+<li><div class="li">Notch released Beta on time! Amazing!
+Refactored the page to be slightly smaller and easier to
+navigate.</div></li>
+<li>A whole host of packet changes. 0x05, 0x08, 0x10, 0x64, 0x65, 0x66,
+0x67, 0x68, 0x69, 0x6a, and 0x82. Packets 0x11 and 0x3b removed.</li>
+</ul>
+<h3 id="section_10">2010-12-01</h3>
+<ul>
+<li><div class="li"> Protocol version changed to
+6</div></li>
+<li><div class="li"> Packet 0x12 (<a href="#Animation_.280x12.29"
+title="wikilink">Animation</a>) got a lot more new
+values</div></li>
+<li><div class="li"> Packet 0x26 changed, now indicates entity
+damage, death and explosion (for creepers, TNT not
+tested)</div></li>
+<li><div class="li"> Packet 0x3B now being sent from
+client</div></li>
+<li><div class="li"> Packet 0x3C added</div></li>
+<li>(need info on other changes)</li>
+</ul>
+<h3 id="section_11">2010-11-24</h3>
+<ul>
+<li><div class="li"> Protocol version changed to
+5</div></li>
+<li><div class="li"> Packet 0x07 (<a
+href="#Use_Entity.3F_.280x07.29" title="wikilink">Use Entity</a>) got a
+new field (byte)</div></li>
+<li><div class="li"> Packet 0x08 (<a href="#Update_Health_(0x08)"
+title="wikilink">Update Health</a>) added</div></li>
+<li><div class="li"> Packet 0x09 (<a href="#Respawn_(0x09)"
+title="wikilink">Respawn</a>) added</div></li>
+<li><div class="li"> Packet 0x12 (<a href="#Animation_.280x12.29"
+title="wikilink">Animation</a>) started getting non-boolean values for
+the Animation field</div></li>
+<li><div class="li"> Packet 0x26 (Entity Death)
+added</div></li>
+</ul>
+<h3 id="section_12">2010-11-10</h3>
+<ul>
+<li><div class="li"> Protocol version changed to
+4</div></li>
+<li><div class="li"> Packet 0x01 (<a
+href="#Login_Request_.280x01.29" title="wikilink">login request</a>)
+changed</div></li>
+<li><div class="li"> Packet 0x07 (<a href="#Use_Entity?_(0x07)"
+title="wikilink">Use Entity?</a>) added</div></li>
+<li><div class="li"> Packet 0x1C (<a
+href="#Entity_Velocity?_(0x1C)" title="wikilink">Entity Velocity?</a>)
+added</div></li>
+<li><div class="li"> Packet 0x27 (<a href="#Attach_Entity?_(0x27)"
+title="wikilink">Attach Entity?</a>) added</div></li>
+</ul>
+<h3 id="section_13">2010-10-31</h3>
+<ul>
+<li><div class="li"> Protocol version changed to
+3</div></li>
+<li><div class="li"> Packet 0x01 (<a
+href="#Login_Request_.280x01.29" title="wikilink">login request</a>)
+changed</div></li>
+</ul>
+<h3 id="section_14">2010-09-10</h3>
+<ul>
+<li><div class="li"> Protocol version changed to
+2</div></li>
+<li><div class="li"> Packets 0x05, 0x06, 0x3B
+added</div></li>
+<li><div class="li"> Server-side inventory (no
+verification)</div></li>
+<li><div class="li"> Vanilla adds experimental monsters (only
+damaged by fire)</div></li>
+</ul>
+<h3 id="section_15">2010-08-20</h3>
+<ul>
+<li><div class="li"> Protocol version reset from 14 to
+1</div></li>
+<li><div class="li"> Packet 0x04 (<a
+href="#Time_Update_.280x04.29" title="wikilink">time update</a>)
+added</div></li>
+</ul>
+<p><a href="Category:Protocol_Details"
+title="wikilink">Category:Protocol Details</a> <a
+href="Category:Minecraft_Beta" title="wikilink">Category:Minecraft
+Beta</a></p>
+</body>
+</html>
