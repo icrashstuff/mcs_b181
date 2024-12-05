@@ -1459,7 +1459,7 @@ int main(int argc, char** argv)
                             break;
                         }
 
-                        if (place_x < 0 || place_y < 0 || place_z < 0)
+                        if (place_y < 0)
                             goto loop_end;
 
                         double diff_y = (double)place_y - client->player_y;
