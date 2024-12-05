@@ -67,7 +67,7 @@ void kick(SDLNet_StreamSocket* sock, std::string reason, bool log = true)
 
 bool send_prechunk(SDLNet_StreamSocket* sock, int chunk_x, int chunk_z, bool mode)
 {
-    packet_prechunk_t packet;
+    packet_chunk_cache_t packet;
     packet.chunk_x = chunk_x;
     packet.chunk_z = chunk_z;
     packet.mode = mode;
@@ -826,7 +826,7 @@ struct chunk_coords_t
 struct client_t
 {
     SDLNet_StreamSocket* sock = NULL;
-    packet_buffer_t packet;
+    packet_handler_t packet;
 
     Uint64 time_keep_alive_sent = 0;
     Uint64 time_keep_alive_recv = 0;
@@ -1251,13 +1251,13 @@ int main(int argc, char** argv)
     {                        \
         kick(sock, msg);     \
         client->sock = NULL; \
-        delete pack;         \
         goto loop_end;       \
     } while (0)
 
             Uint64 sdl_tick_last = client->packet.get_last_packet_time();
             Uint64 sdl_tick_cur = SDL_GetTicks();
             packet_t* pack = client->packet.get_next_packet(sock);
+
             if (sdl_tick_last < sdl_tick_cur && (sdl_tick_cur - sdl_tick_last) > 60000)
                 KICK(sock, "Timed out!");
 
@@ -1440,14 +1440,14 @@ int main(int argc, char** argv)
             {
                 switch (pack->id)
                 {
-                case 0x00:
+                case PACKET_ID_KEEP_ALIVE:
                 {
                     CAST_PACK_TO_P(packet_keep_alive_t);
                     if (p->keep_alive_id)
                         client->time_keep_alive_recv = sdl_tick_cur;
                     break;
                 }
-                case 0x01:
+                case PACKET_ID_LOGIN_REQUEST:
                 {
                     CAST_PACK_TO_P(packet_login_request_c2s_t);
                     LOG("Player \"%s\" has protocol version: %d", p->username.c_str(), p->protocol_ver);
@@ -1487,7 +1487,7 @@ int main(int argc, char** argv)
 
                     break;
                 }
-                case 0x02:
+                case PACKET_ID_HANDSHAKE:
                 {
                     CAST_PACK_TO_P(packet_handshake_c2s_t);
 
@@ -1497,7 +1497,7 @@ int main(int argc, char** argv)
                     send_buffer(sock, packet.assemble());
                     break;
                 }
-                case 0x03:
+                case PACKET_ID_CHAT_MSG:
                 {
                     CAST_PACK_TO_P(packet_chat_message_t);
 
@@ -1605,11 +1605,11 @@ int main(int argc, char** argv)
                         send_buffer_to_players(clients, pack_msg.assemble());
                     }
                 }
-                case 0x07:
+                case PACKET_ID_ENT_USE:
                 {
                     break;
                 }
-                case 0x09:
+                case PACKET_ID_RESPAWN:
                 {
                     if (client->health > 0 || client->update_health)
                         break;
@@ -1638,7 +1638,7 @@ int main(int argc, char** argv)
 
                     break;
                 }
-                case 0x0a:
+                case PACKET_ID_PLAYER_ON_GROUND:
                 {
                     CAST_PACK_TO_P(packet_on_ground_t);
 
@@ -1646,7 +1646,7 @@ int main(int argc, char** argv)
 
                     break;
                 }
-                case 0x0b:
+                case PACKET_ID_PLAYER_POS:
                 {
                     CAST_PACK_TO_P(packet_player_pos_t);
 
@@ -1660,7 +1660,7 @@ int main(int argc, char** argv)
 
                     break;
                 }
-                case 0x0c:
+                case PACKET_ID_PLAYER_LOOK:
                 {
                     CAST_PACK_TO_P(packet_player_look_t);
 
@@ -1672,7 +1672,7 @@ int main(int argc, char** argv)
 
                     break;
                 }
-                case 0x0d:
+                case PACKET_ID_PLAYER_POS_LOOK:
                 {
                     CAST_PACK_TO_P(packet_player_pos_look_c2s_t);
 
@@ -1688,7 +1688,7 @@ int main(int argc, char** argv)
 
                     break;
                 }
-                case 0x0e:
+                case PACKET_ID_PLAYER_DIG:
                 {
                     CAST_PACK_TO_P(packet_player_dig_t);
                     double x_diff = p->x - client->player_x;
@@ -1751,7 +1751,7 @@ int main(int argc, char** argv)
 
                     break;
                 }
-                case 0x0f:
+                case PACKET_ID_PLAYER_PLACE:
                 {
                     CAST_PACK_TO_P(packet_player_place_t);
                     double x_diff = p->x - client->player_x;
@@ -1825,23 +1825,23 @@ int main(int argc, char** argv)
 
                     break;
                 }
-                case 0x10:
+                case PACKET_ID_HOLD_CHANGE:
                 {
                     CAST_PACK_TO_P(packet_hold_change_t);
 
                     client->cur_item_idx = SDL_abs(p->slot_id) % 9;
                     break;
                 }
-                case 0x12:
+                case PACKET_ID_ENT_ANIMATION:
                 {
                     send_buffer_to_players_if_coords(clients, pack->assemble(), client->player_x, client->player_z, client->dimension, client);
                     break;
                 }
-                case 0x13:
+                case PACKET_ID_ENT_ACTION:
                     break;
-                case 0x65:
+                case PACKET_ID_WINDOW_CLOSE:
                     break;
-                case 0x6b:
+                case PACKET_ID_INV_CREATIVE_ACTION:
                 {
                     CAST_PACK_TO_P(packet_inventory_action_creative_t);
 
@@ -1856,7 +1856,7 @@ int main(int argc, char** argv)
 
                     break;
                 }
-                case 0xfe:
+                case PACKET_ID_SERVER_LIST_PING:
                 {
                     std::string s = "A mcs_b181 server§";
                     Uint32 playercount = 0;
@@ -1871,7 +1871,7 @@ int main(int argc, char** argv)
                     goto loop_end;
                     break;
                 }
-                case 0xff:
+                case PACKET_ID_KICK:
                 {
                     CAST_PACK_TO_P(packet_kick_t);
                     client->sock = NULL;
@@ -1893,11 +1893,11 @@ int main(int argc, char** argv)
                     break;
                 }
                 }
-                delete pack;
             }
 #undef CAST_PACK_TO_P
 
         loop_end:;
+            delete pack;
         }
     }
 

@@ -43,6 +43,7 @@ enum item_id_t
     /** Not sure if I got this correct */
     BLOCK_ID_LAVA_SOURCE,
 
+    /**/
     BLOCK_ID_SAND,
     BLOCK_ID_GRAVEL,
     BLOCK_ID_ORE_GOLD,

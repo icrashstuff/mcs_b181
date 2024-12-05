@@ -328,14 +328,92 @@ SDL_FORCE_INLINE bool read_string16(std::vector<Uint8>& dat, size_t& pos, std::s
 
 #undef BAIL_READ
 
-packet_buffer_t::packet_buffer_t()
+#define PACK_NAME(x)    \
+    case PACKET_ID_##x: \
+        return #x
+const char* packet_t::get_name()
 {
+    switch (id)
+    {
+        PACK_NAME(KEEP_ALIVE);
+        PACK_NAME(LOGIN_REQUEST);
+        PACK_NAME(HANDSHAKE);
+        PACK_NAME(CHAT_MSG);
+        PACK_NAME(UPDATE_TIME);
+        PACK_NAME(ENT_EQUIPMENT);
+        PACK_NAME(SPAWN_POS);
+        PACK_NAME(ENT_USE);
+        PACK_NAME(UPDATE_HEALTH);
+        PACK_NAME(RESPAWN);
+        PACK_NAME(PLAYER_ON_GROUND);
+        PACK_NAME(PLAYER_POS);
+        PACK_NAME(PLAYER_LOOK);
+        PACK_NAME(PLAYER_POS_LOOK);
+        PACK_NAME(PLAYER_DIG);
+        PACK_NAME(PLAYER_PLACE);
+        PACK_NAME(HOLD_CHANGE);
+        PACK_NAME(USE_BED);
+        PACK_NAME(ENT_ANIMATION);
+        PACK_NAME(ENT_ACTION);
+        PACK_NAME(ENT_SPAWN_NAMED);
+        PACK_NAME(ENT_SPAWN_PICKUP);
+        PACK_NAME(COLLECT_ITEM);
+        PACK_NAME(ADD_OBJ);
+        PACK_NAME(ENT_SPAWN_MOB);
+        PACK_NAME(ENT_SPAWN_PAINTING);
+        PACK_NAME(ENT_SPAWN_XP);
+        PACK_NAME(STANCE_UPDATE);
+        PACK_NAME(ENT_VELOCITY);
+        PACK_NAME(ENT_DESTROY);
+        PACK_NAME(ENT_ENSURE_SPAWN);
+        PACK_NAME(ENT_MOVE_REL);
+        PACK_NAME(ENT_LOOK);
+        PACK_NAME(ENT_LOOK_MOVE_REL);
+        PACK_NAME(ENT_MOVE_TELEPORT);
+        PACK_NAME(ENT_STATUS);
+        PACK_NAME(ENT_ATTACH);
+        PACK_NAME(ENT_METADATA);
+        PACK_NAME(ENT_EFFECT);
+        PACK_NAME(ENT_EFFECT_REMOVE);
+        PACK_NAME(XP_SET);
+        PACK_NAME(CHUNK_CACHE);
+        PACK_NAME(CHUNK_MAP);
+        PACK_NAME(BLOCK_CHANGE_MULTI);
+        PACK_NAME(BLOCK_CHANGE);
+        PACK_NAME(BLOCK_ACTION);
+        PACK_NAME(EXPLOSION);
+        PACK_NAME(SFX);
+        PACK_NAME(NEW_STATE);
+        PACK_NAME(THUNDERBOLT);
+        PACK_NAME(WINDOW_OPEN);
+        PACK_NAME(WINDOW_CLOSE);
+        PACK_NAME(WINDOW_CLICK);
+        PACK_NAME(WINDOW_SET_SLOT);
+        PACK_NAME(WINDOW_SET_ITEMS);
+        PACK_NAME(WINDOW_UPDATE_PROGRESS);
+        PACK_NAME(WINDOW_TRANSACTION);
+        PACK_NAME(INV_CREATIVE_ACTION);
+        PACK_NAME(UPDATE_SIGN);
+        PACK_NAME(ITEM_DATA);
+        PACK_NAME(INCREMENT_STATISTIC);
+        PACK_NAME(PLAYER_LIST_ITEM);
+        PACK_NAME(SERVER_LIST_PING);
+        PACK_NAME(KICK);
+    default:
+        return "Unknown";
+    }
+}
+#undef PACK_NAME
+
+packet_handler_t::packet_handler_t(bool is_server_)
+{
+    is_server = is_server_;
     buf.reserve(1024);
     last_packet_time = SDL_GetTicks();
     buf_size = 0;
 }
 
-packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
+packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
 {
     if (err_str.length() > 0)
         return NULL;
@@ -366,91 +444,70 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
         len = 0;
         var_len = 0;
 
+#define PACK_LENV(ID, LEN, VLEN) \
+    case ID:                     \
+    {                            \
+        len = LEN;               \
+        var_len = VLEN;          \
+        break;                   \
+    }
+#define PACK_LEN(ID, LEN) PACK_LENV(ID, LEN, 0)
         switch (packet_type)
         {
-        case 0x00:
-        {
-            len = 5;
-            break;
-        }
-        case 0x01:
-        {
+            PACK_LEN(PACKET_ID_KEEP_ALIVE, 5);
             /* wiki.vg says that the login packet is 0x01 is >22 bytes long, but someone made a math error */
-            len = 23;
-            var_len = 1;
-            break;
-        }
-        case 0x02:
-        case 0x03:
-        case 0xff:
-        {
-            len = 3;
-            var_len = 1;
-            break;
-        }
-        case 0x07:
-        {
-            len = 10;
-            break;
-        }
-        case 0x09:
-        {
-            len = 14;
-            break;
-        }
-        case 0x10:
-        {
-            len = 3;
-            break;
-        }
-        case 0x12:
-        case 0x13:
-        {
-            len = 6;
-            break;
-        }
-        case 0x0a:
-        case 0x65:
-        {
-            len = 2;
-            break;
-        }
-        case 0x0b:
-        {
-            len = 34;
-            break;
-        }
-        case 0x0c:
-        {
-            len = 10;
-            break;
-        }
-        case 0x0d:
-        {
-            len = 42;
-            break;
-        }
-        case 0x0f:
-        {
-            len = 13;
-            var_len = 1;
-            break;
-        }
-        case 0x0e:
-        {
-            len = 12;
-            break;
-        }
-        case 0x6b:
-        {
-            len = 9;
-            break;
-        }
-        case 0xfe:
-        {
-            len = 1;
-            break;
-        }
+            PACK_LENV(PACKET_ID_LOGIN_REQUEST, 23, 1);
+            PACK_LENV(PACKET_ID_HANDSHAKE, 3, 1);
+            PACK_LENV(PACKET_ID_CHAT_MSG, 3, 1);
+            PACK_LEN(PACKET_ID_ENT_USE, 10);
+            PACK_LEN(PACKET_ID_RESPAWN, 14);
+            PACK_LEN(PACKET_ID_PLAYER_ON_GROUND, 2);
+            PACK_LEN(PACKET_ID_PLAYER_POS, 34);
+            PACK_LEN(PACKET_ID_PLAYER_LOOK, 10);
+            PACK_LEN(PACKET_ID_PLAYER_POS_LOOK, 42);
+            PACK_LEN(PACKET_ID_PLAYER_DIG, 12);
+            PACK_LENV(PACKET_ID_PLAYER_PLACE, 13, 1);
+            PACK_LEN(PACKET_ID_HOLD_CHANGE, 3);
+            PACK_LEN(PACKET_ID_ENT_ANIMATION, 6);
+            PACK_LEN(PACKET_ID_ENT_ACTION, 6);
+            PACK_LEN(PACKET_ID_WINDOW_CLOSE, 2);
+            PACK_LEN(PACKET_ID_INV_CREATIVE_ACTION, 9);
+            PACK_LEN(PACKET_ID_SERVER_LIST_PING, 1);
+            PACK_LENV(PACKET_ID_KICK, 3, 1);
+
+            PACK_LEN(PACKET_ID_ENT_EQUIPMENT, 11);
+            PACK_LEN(PACKET_ID_SPAWN_POS, 13);
+            PACK_LEN(PACKET_ID_USE_BED, 15);
+            PACK_LEN(PACKET_ID_ENT_SPAWN_PICKUP, 25);
+            PACK_LEN(PACKET_ID_COLLECT_ITEM, 9);
+            PACK_LENV(PACKET_ID_ADD_OBJ, 22, 1);
+            PACK_LENV(PACKET_ID_ENT_SPAWN_MOB, 21, 1);
+            PACK_LENV(PACKET_ID_ENT_SPAWN_PAINTING, 22, 1);
+            PACK_LEN(PACKET_ID_ENT_SPAWN_XP, 19)
+
+            PACK_LEN(PACKET_ID_STANCE_UPDATE, 18);
+            PACK_LEN(PACKET_ID_ENT_VELOCITY, 11);
+            PACK_LEN(PACKET_ID_ENT_MOVE_REL, 8);
+            PACK_LEN(PACKET_ID_ENT_LOOK, 7);
+            PACK_LEN(PACKET_ID_ENT_LOOK_MOVE_REL, 10);
+            PACK_LEN(PACKET_ID_ENT_STATUS, 6);
+            PACK_LEN(PACKET_ID_ENT_ATTACH, 9);
+            PACK_LENV(PACKET_ID_ENT_METADATA, 6, 1);
+            PACK_LEN(PACKET_ID_ENT_EFFECT, 9);
+            PACK_LEN(PACKET_ID_ENT_EFFECT_REMOVE, 6);
+            PACK_LEN(PACKET_ID_XP_SET, 5);
+            PACK_LENV(PACKET_ID_BLOCK_CHANGE_MULTI, 11, 1);
+            PACK_LEN(PACKET_ID_BLOCK_ACTION, 13);
+            PACK_LENV(PACKET_ID_EXPLOSION, 33, 1);
+            PACK_LENV(PACKET_ID_WINDOW_OPEN, 6, 1);
+            PACK_LEN(PACKET_ID_WINDOW_CLICK, 2);
+            PACK_LENV(PACKET_ID_WINDOW_SET_SLOT, 6, 1);
+            PACK_LEN(PACKET_ID_WINDOW_UPDATE_PROGRESS, 6);
+            PACK_LEN(PACKET_ID_WINDOW_TRANSACTION, 5);
+            PACK_LENV(PACKET_ID_UPDATE_SIGN, 11, 4);
+            PACK_LENV(PACKET_ID_ITEM_DATA, 6, 1);
+            PACK_LEN(PACKET_ID_INCREMENT_STATISTIC, 6);
+
         default:
         {
             char buffer[32];
@@ -459,6 +516,8 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
             break;
         }
         }
+#undef PACK_LEN
+#undef PACK_LENV
     }
 
     /* This section reads the data and determines any variable length stuff as well */
@@ -502,19 +561,19 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
         {
             switch (packet_type)
             {
-            case 0x01:
+            case PACKET_ID_LOGIN_REQUEST:
             {
                 GET_STR_LEN(1, 5);
                 break;
             }
-            case 0x02:
-            case 0x03:
-            case 0xff:
+            case PACKET_ID_HANDSHAKE:
+            case PACKET_ID_CHAT_MSG:
+            case PACKET_ID_KICK:
             {
                 GET_STR_LEN(1, 1);
                 break;
             }
-            case 0x0f:
+            case PACKET_ID_PLAYER_PLACE:
             {
                 if (var_len == 1 && buf_size >= 13)
                 {
@@ -552,7 +611,7 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
     int err = 0;
     switch (packet_type)
     {
-    case 0x00:
+    case PACKET_ID_KEEP_ALIVE:
     {
         P(packet_keep_alive_t);
 
@@ -560,7 +619,7 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
 
         break;
     }
-    case 0x01:
+    case PACKET_ID_LOGIN_REQUEST:
     {
         P(packet_login_request_c2s_t);
 
@@ -575,7 +634,7 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
 
         break;
     }
-    case 0x02:
+    case PACKET_ID_HANDSHAKE:
     {
         P(packet_handshake_c2s_t);
 
@@ -583,7 +642,7 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
 
         break;
     }
-    case 0x03:
+    case PACKET_ID_CHAT_MSG:
     {
         P(packet_chat_message_t);
 
@@ -591,7 +650,7 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
 
         break;
     }
-    case 0x07:
+    case PACKET_ID_ENT_USE:
     {
         P(packet_ent_use_t);
 
@@ -601,7 +660,7 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
 
         break;
     }
-    case 0x09:
+    case PACKET_ID_RESPAWN:
     {
         P(packet_respawn_t);
 
@@ -613,7 +672,7 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
 
         break;
     }
-    case 0x0a:
+    case PACKET_ID_PLAYER_ON_GROUND:
     {
         P(packet_on_ground_t);
 
@@ -621,7 +680,7 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
 
         break;
     }
-    case 0x0b:
+    case PACKET_ID_PLAYER_POS:
     {
         P(packet_player_pos_t);
 
@@ -633,7 +692,7 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
 
         break;
     }
-    case 0x0c:
+    case PACKET_ID_PLAYER_LOOK:
     {
         P(packet_player_look_t);
 
@@ -643,7 +702,7 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
 
         break;
     }
-    case 0x0d:
+    case PACKET_ID_PLAYER_POS_LOOK:
     {
         P(packet_player_pos_look_c2s_t);
 
@@ -657,7 +716,7 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
 
         break;
     }
-    case 0x0e:
+    case PACKET_ID_PLAYER_DIG:
     {
         P(packet_player_dig_t);
 
@@ -669,7 +728,7 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
 
         break;
     }
-    case 0x0f:
+    case PACKET_ID_PLAYER_PLACE:
     {
         P(packet_player_place_t);
 
@@ -686,7 +745,7 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
 
         break;
     }
-    case 0x10:
+    case PACKET_ID_HOLD_CHANGE:
     {
         P(packet_hold_change_t);
 
@@ -694,7 +753,7 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
 
         break;
     }
-    case 0x12:
+    case PACKET_ID_ENT_ANIMATION:
     {
         P(packet_ent_animation_t);
 
@@ -703,7 +762,7 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
 
         break;
     }
-    case 0x13:
+    case PACKET_ID_ENT_ACTION:
     {
         P(packet_ent_action_t);
 
@@ -712,7 +771,7 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
 
         break;
     }
-    case 0x65:
+    case PACKET_ID_ENT_SPAWN_PICKUP:
     {
         P(packet_window_close_t);
 
@@ -720,7 +779,7 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
 
         break;
     }
-    case 0x6b:
+    case PACKET_ID_INV_CREATIVE_ACTION:
     {
         P(packet_inventory_action_creative_t);
 
@@ -731,12 +790,12 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
 
         break;
     }
-    case 0xfe:
+    case PACKET_ID_SERVER_LIST_PING:
     {
         packet = new packet_server_list_ping_t();
         break;
     }
-    case 0xff:
+    case PACKET_ID_KICK:
     {
         P(packet_kick_t);
 
@@ -755,7 +814,7 @@ packet_t* packet_buffer_t::get_next_packet(SDLNet_StreamSocket* sock)
     TRACE("Packet type(actual): 0x%02x(0x%02x)", packet->id, packet_type);
     assert(pos == buf.size());
     assert(packet->id == packet_type);
-    packet->id = packet_type;
+    packet->id = (packet_id_t)packet_type;
 
     if (err)
     {

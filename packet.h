@@ -79,16 +79,120 @@ bool read_double(SDLNet_StreamSocket* sock, double* out);
 
 bool read_string16(SDLNet_StreamSocket* sock, std::string& out);
 
-#define NO_ASSEMBLE()             \
-    std::vector<Uint8> assemble() \
-    {                             \
-        std::vector<Uint8> dat;   \
-        return dat;               \
-    }
+/**
+ * TODO List
+ * PACKET_ID_ENT_VELOCITY = 0x1c,
+ * PACKET_ID_ENT_MOVE_REL = 0x1f,
+ * PACKET_ID_ENT_LOOK = 0x20,
+ * PACKET_ID_ENT_LOOK_MOVE_REL = 0x21,
+ * PACKET_ID_ENT_STATUS = 0x26,
+ * PACKET_ID_ENT_ATTACH = 0x27,
+ * PACKET_ID_ENT_METADATA = 0x28,
+ * PACKET_ID_ENT_EFFECT = 0x29,
+ * PACKET_ID_ENT_EFFECT_REMOVE = 0x2A,
+ * PACKET_ID_XP_SET = 0x2B,
+ * PACKET_ID_BLOCK_CHANGE_MULTI = 0x34,
+ * PACKET_ID_BLOCK_ACTION = 0x36,
+ * PACKET_ID_EXPLOSION = 0x3C,
+ * PACKET_ID_WINDOW_OPEN = 0x64,
+ * PACKET_ID_WINDOW_CLICK = 0x66,
+ * PACKET_ID_WINDOW_SET_SLOT = 0x67,
+ * PACKET_ID_WINDOW_UPDATE_PROGRESS = 0x69,
+ * PACKET_ID_WINDOW_TRANSACTION = 0x6A,
+ * PACKET_ID_UPDATE_SIGN = 0x82,
+ * PACKET_ID_ITEM_DATA = 0x83,
+ * PACKET_ID_INCREMENT_STATISTIC = 0xC8,
+ *
+ * PACKET_ID_ENT_EQUIPMENT = 0x05,
+ * PACKET_ID_SPAWN_POS = 0x06,
+ * PACKET_ID_USE_BED = 0x11,
+ * PACKET_ID_ENT_SPAWN_PICKUP = 0x15,
+ * PACKET_ID_COLLECT_ITEM = 0x16,
+ * PACKET_ID_ADD_OBJ = 0x17,
+ * PACKET_ID_ENT_SPAWN_MOB = 0x18,
+ * PACKET_ID_ENT_SPAWN_PAINTING = 0x19,
+ * PACKET_ID_ENT_SPAWN_XP = 0x1a,
+ */
+enum packet_id_t : jubyte
+{
+    PACKET_ID_KEEP_ALIVE = 0x00,
+    PACKET_ID_LOGIN_REQUEST = 0x01,
+    PACKET_ID_HANDSHAKE = 0x02,
+    PACKET_ID_CHAT_MSG = 0x03,
+    PACKET_ID_UPDATE_TIME = 0x04,
+    PACKET_ID_ENT_EQUIPMENT = 0x05,
+    PACKET_ID_SPAWN_POS = 0x06,
+    PACKET_ID_ENT_USE = 0x07,
+    PACKET_ID_UPDATE_HEALTH = 0x08,
+    PACKET_ID_RESPAWN = 0x09,
+    PACKET_ID_PLAYER_ON_GROUND = 0x0a,
+    PACKET_ID_PLAYER_POS = 0x0b,
+    PACKET_ID_PLAYER_LOOK = 0x0c,
+    PACKET_ID_PLAYER_POS_LOOK = 0x0d,
+    PACKET_ID_PLAYER_DIG = 0x0e,
+    PACKET_ID_PLAYER_PLACE = 0x0f,
+    PACKET_ID_HOLD_CHANGE = 0x10,
+    PACKET_ID_USE_BED = 0x11,
+    PACKET_ID_ENT_ANIMATION = 0x12,
+    PACKET_ID_ENT_ACTION = 0x13,
+    PACKET_ID_ENT_SPAWN_NAMED = 0x14,
+    PACKET_ID_ENT_SPAWN_PICKUP = 0x15,
+    PACKET_ID_COLLECT_ITEM = 0x16,
+    PACKET_ID_ADD_OBJ = 0x17,
+    PACKET_ID_ENT_SPAWN_MOB = 0x18,
+    PACKET_ID_ENT_SPAWN_PAINTING = 0x19,
+    PACKET_ID_ENT_SPAWN_XP = 0x1a,
+
+    /**
+     * Wiki.vg notes this is unused, and all field names are ???, so...
+     */
+    PACKET_ID_STANCE_UPDATE = 0x1b,
+
+    /**/
+    PACKET_ID_ENT_VELOCITY = 0x1c,
+    PACKET_ID_ENT_DESTROY = 0x1d,
+    PACKET_ID_ENT_ENSURE_SPAWN = 0x1e,
+    PACKET_ID_ENT_MOVE_REL = 0x1f,
+    PACKET_ID_ENT_LOOK = 0x20,
+    PACKET_ID_ENT_LOOK_MOVE_REL = 0x21,
+    PACKET_ID_ENT_MOVE_TELEPORT = 0x22,
+    PACKET_ID_ENT_STATUS = 0x26,
+    PACKET_ID_ENT_ATTACH = 0x27,
+    PACKET_ID_ENT_METADATA = 0x28,
+    PACKET_ID_ENT_EFFECT = 0x29,
+    PACKET_ID_ENT_EFFECT_REMOVE = 0x2A,
+    PACKET_ID_XP_SET = 0x2B,
+    PACKET_ID_CHUNK_CACHE = 0x32,
+    PACKET_ID_CHUNK_MAP = 0x33,
+    PACKET_ID_BLOCK_CHANGE_MULTI = 0x34,
+    PACKET_ID_BLOCK_CHANGE = 0x35,
+    PACKET_ID_BLOCK_ACTION = 0x36,
+    PACKET_ID_EXPLOSION = 0x3C,
+    PACKET_ID_SFX = 0x3D,
+    PACKET_ID_NEW_STATE = 0x46,
+    PACKET_ID_THUNDERBOLT = 0x47,
+    PACKET_ID_WINDOW_OPEN = 0x64,
+    PACKET_ID_WINDOW_CLOSE = 0x65,
+    PACKET_ID_WINDOW_CLICK = 0x66,
+    PACKET_ID_WINDOW_SET_SLOT = 0x67,
+    PACKET_ID_WINDOW_SET_ITEMS = 0x68,
+    PACKET_ID_WINDOW_UPDATE_PROGRESS = 0x69,
+    PACKET_ID_WINDOW_TRANSACTION = 0x6A,
+    PACKET_ID_INV_CREATIVE_ACTION = 0x6B,
+    PACKET_ID_UPDATE_SIGN = 0x82,
+    PACKET_ID_ITEM_DATA = 0x83,
+    PACKET_ID_INCREMENT_STATISTIC = 0xC8,
+    PACKET_ID_PLAYER_LIST_ITEM = 0xC9,
+    PACKET_ID_SERVER_LIST_PING = 0xFE,
+    PACKET_ID_KICK = 0xFF,
+
+};
 
 struct packet_t
 {
-    jubyte id = 0;
+    packet_id_t id = PACKET_ID_KICK;
+
+    const char* get_name();
 
     virtual ~packet_t() {};
 
@@ -97,14 +201,14 @@ struct packet_t
 
 struct packet_keep_alive_t : packet_t
 {
-    packet_keep_alive_t() { id = 0x00; }
+    packet_keep_alive_t() { id = PACKET_ID_KEEP_ALIVE; }
 
     jint keep_alive_id = 0;
 
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x00);
+        assert(id == PACKET_ID_KEEP_ALIVE);
         dat.push_back(id);
         assemble_int(dat, keep_alive_id);
         return dat;
@@ -113,7 +217,7 @@ struct packet_keep_alive_t : packet_t
 
 struct packet_login_request_c2s_t : packet_t
 {
-    packet_login_request_c2s_t() { id = 0x01; }
+    packet_login_request_c2s_t() { id = PACKET_ID_LOGIN_REQUEST; }
 
     jint protocol_ver = 0;
     std::string username;
@@ -124,12 +228,26 @@ struct packet_login_request_c2s_t : packet_t
     jubyte unused4 = 0;
     jubyte unused5 = 0;
 
-    NO_ASSEMBLE();
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == PACKET_ID_LOGIN_REQUEST);
+        dat.push_back(id);
+        assemble_int(dat, protocol_ver);
+        assemble_string16(dat, username);
+        assemble_long(dat, unused0);
+        assemble_int(dat, unused1);
+        assemble_byte(dat, unused2);
+        assemble_byte(dat, unused3);
+        assemble_ubyte(dat, unused4);
+        assemble_ubyte(dat, unused5);
+        return dat;
+    }
 };
 
 struct packet_login_request_s2c_t : packet_t
 {
-    packet_login_request_s2c_t() { id = 0x01; }
+    packet_login_request_s2c_t() { id = PACKET_ID_LOGIN_REQUEST; }
 
     jint player_eid = 0;
     std::string unused;
@@ -143,7 +261,7 @@ struct packet_login_request_s2c_t : packet_t
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x01);
+        assert(id == PACKET_ID_LOGIN_REQUEST);
         dat.push_back(id);
         assemble_int(dat, player_eid);
         assemble_string16(dat, unused);
@@ -160,23 +278,30 @@ struct packet_login_request_s2c_t : packet_t
 
 struct packet_handshake_c2s_t : packet_t
 {
-    packet_handshake_c2s_t() { id = 0x02; }
+    packet_handshake_c2s_t() { id = PACKET_ID_HANDSHAKE; }
 
     std::string username;
 
-    NO_ASSEMBLE();
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == PACKET_ID_HANDSHAKE);
+        dat.push_back(id);
+        assemble_string16(dat, username);
+        return dat;
+    }
 };
 
 struct packet_handshake_s2c_t : packet_t
 {
-    packet_handshake_s2c_t() { id = 0x02; }
+    packet_handshake_s2c_t() { id = PACKET_ID_HANDSHAKE; }
 
     std::string connection_hash;
 
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x02);
+        assert(id == PACKET_ID_HANDSHAKE);
         dat.push_back(id);
         assemble_string16(dat, connection_hash);
         return dat;
@@ -185,14 +310,14 @@ struct packet_handshake_s2c_t : packet_t
 
 struct packet_chat_message_t : packet_t
 {
-    packet_chat_message_t() { id = 0x03; }
+    packet_chat_message_t() { id = PACKET_ID_CHAT_MSG; }
 
     std::string msg;
 
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x03);
+        assert(id == PACKET_ID_CHAT_MSG);
         dat.push_back(id);
         assemble_string16(dat, msg);
         return dat;
@@ -201,14 +326,14 @@ struct packet_chat_message_t : packet_t
 
 struct packet_time_update_t : packet_t
 {
-    packet_time_update_t() { id = 0x04; }
+    packet_time_update_t() { id = PACKET_ID_UPDATE_TIME; }
 
     jlong time = 0;
 
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x04);
+        assert(id == PACKET_ID_UPDATE_TIME);
         dat.push_back(id);
         assemble_long(dat, time);
         return dat;
@@ -217,18 +342,27 @@ struct packet_time_update_t : packet_t
 
 struct packet_ent_use_t : packet_t
 {
-    packet_ent_use_t() { id = 0x07; }
+    packet_ent_use_t() { id = PACKET_ID_ENT_USE; }
 
     jint user;
     jint target;
     jbool left_click;
 
-    NO_ASSEMBLE();
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == PACKET_ID_ENT_USE);
+        dat.push_back(id);
+        assemble_int(dat, user);
+        assemble_int(dat, target);
+        assemble_bool(dat, left_click);
+        return dat;
+    }
 };
 
 struct packet_health_t : packet_t
 {
-    packet_health_t() { id = 0x08; }
+    packet_health_t() { id = PACKET_ID_UPDATE_HEALTH; }
 
     jshort health = 0;
     jshort food = 0;
@@ -237,7 +371,7 @@ struct packet_health_t : packet_t
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x08);
+        assert(id == PACKET_ID_UPDATE_HEALTH);
         dat.push_back(id);
         assemble_short(dat, health);
         assemble_short(dat, food);
@@ -252,7 +386,7 @@ struct packet_health_t : packet_t
  */
 struct packet_respawn_t : packet_t
 {
-    packet_respawn_t() { id = 0x09; }
+    packet_respawn_t() { id = PACKET_ID_UPDATE_HEALTH; }
 
     jbyte dimension = 0;
     jbyte difficulty = 0;
@@ -263,7 +397,7 @@ struct packet_respawn_t : packet_t
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x09);
+        assert(id == PACKET_ID_UPDATE_HEALTH);
         dat.push_back(id);
         assemble_byte(dat, dimension >= 0 ? 0 : -1);
         assemble_byte(dat, difficulty);
@@ -274,18 +408,31 @@ struct packet_respawn_t : packet_t
     }
 };
 
+/**
+ * Client -> Server
+ */
 struct packet_on_ground_t : packet_t
 {
-    packet_on_ground_t() { id = 0x0a; }
+    packet_on_ground_t() { id = PACKET_ID_PLAYER_ON_GROUND; }
 
     jbool on_ground = 0;
 
-    NO_ASSEMBLE();
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == PACKET_ID_PLAYER_ON_GROUND);
+        dat.push_back(id);
+        assemble_bool(dat, on_ground);
+        return dat;
+    }
 };
 
+/**
+ * Client -> Server
+ */
 struct packet_player_pos_t : packet_t
 {
-    packet_player_pos_t() { id = 0x0b; }
+    packet_player_pos_t() { id = PACKET_ID_PLAYER_POS; }
 
     jdouble x = 0;
     jdouble y = 0;
@@ -293,23 +440,46 @@ struct packet_player_pos_t : packet_t
     jdouble z = 0;
     jbool on_ground = 0;
 
-    NO_ASSEMBLE();
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == PACKET_ID_PLAYER_POS);
+        dat.push_back(id);
+        assemble_double(dat, x);
+        assemble_double(dat, y);
+        assemble_double(dat, stance);
+        assemble_double(dat, z);
+        assemble_bool(dat, on_ground);
+        return dat;
+    }
 };
 
+/**
+ * Client -> Server
+ */
 struct packet_player_look_t : packet_t
 {
-    packet_player_look_t() { id = 0x0c; }
+    packet_player_look_t() { id = PACKET_ID_PLAYER_LOOK; }
 
     jfloat yaw = 0;
     jfloat pitch = 0;
     jbool on_ground = 0;
 
-    NO_ASSEMBLE();
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == PACKET_ID_PLAYER_LOOK);
+        dat.push_back(id);
+        assemble_float(dat, yaw);
+        assemble_float(dat, pitch);
+        assemble_bool(dat, on_ground);
+        return dat;
+    }
 };
 
 struct packet_player_pos_look_c2s_t : packet_t
 {
-    packet_player_pos_look_c2s_t() { id = 0x0d; }
+    packet_player_pos_look_c2s_t() { id = PACKET_ID_PLAYER_POS_LOOK; }
 
     jdouble x = 0;
     jdouble y = 0;
@@ -319,12 +489,26 @@ struct packet_player_pos_look_c2s_t : packet_t
     jfloat pitch = 0;
     jbool on_ground = 0;
 
-    NO_ASSEMBLE();
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == PACKET_ID_PLAYER_POS_LOOK);
+        dat.push_back(id);
+        dat.push_back(id);
+        assemble_double(dat, x);
+        assemble_double(dat, y);
+        assemble_double(dat, stance);
+        assemble_double(dat, z);
+        assemble_float(dat, yaw);
+        assemble_float(dat, pitch);
+        assemble_bool(dat, on_ground);
+        return dat;
+    }
 };
 
 struct packet_player_pos_look_s2c_t : packet_t
 {
-    packet_player_pos_look_s2c_t() { id = 0x0d; }
+    packet_player_pos_look_s2c_t() { id = PACKET_ID_PLAYER_POS_LOOK; }
 
     jdouble x = 0;
     jdouble stance = 0;
@@ -337,7 +521,7 @@ struct packet_player_pos_look_s2c_t : packet_t
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x0d);
+        assert(id == PACKET_ID_PLAYER_POS_LOOK);
         dat.push_back(id);
         assemble_double(dat, x);
         assemble_double(dat, stance);
@@ -357,7 +541,7 @@ struct packet_player_pos_look_s2c_t : packet_t
 
 struct packet_player_dig_t : packet_t
 {
-    packet_player_dig_t() { id = 0x0e; }
+    packet_player_dig_t() { id = PACKET_ID_PLAYER_DIG; }
 
     jbyte status = 0;
     jint x = 0;
@@ -368,7 +552,7 @@ struct packet_player_dig_t : packet_t
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x0e);
+        assert(id == PACKET_ID_PLAYER_DIG);
         dat.push_back(id);
         assemble_byte(dat, status);
         assemble_int(dat, x);
@@ -381,7 +565,7 @@ struct packet_player_dig_t : packet_t
 
 struct packet_player_place_t : packet_t
 {
-    packet_player_place_t() { id = 0x0f; }
+    packet_player_place_t() { id = PACKET_ID_PLAYER_PLACE; }
 
     jint x = 0;
     jbyte y = 0;
@@ -394,7 +578,7 @@ struct packet_player_place_t : packet_t
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x0f);
+        assert(id == PACKET_ID_PLAYER_PLACE);
         dat.push_back(id);
         assemble_int(dat, x);
         assemble_byte(dat, y);
@@ -412,14 +596,14 @@ struct packet_player_place_t : packet_t
 
 struct packet_hold_change_t : packet_t
 {
-    packet_hold_change_t() { id = 0x10; }
+    packet_hold_change_t() { id = PACKET_ID_HOLD_CHANGE; }
 
     jshort slot_id;
 
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x10);
+        assert(id == PACKET_ID_HOLD_CHANGE);
         dat.push_back(id);
         assemble_short(dat, slot_id);
         return dat;
@@ -428,7 +612,7 @@ struct packet_hold_change_t : packet_t
 
 struct packet_ent_animation_t : packet_t
 {
-    packet_ent_animation_t() { id = 0x12; }
+    packet_ent_animation_t() { id = PACKET_ID_ENT_ANIMATION; }
 
     jint eid;
     jbyte animate;
@@ -436,7 +620,7 @@ struct packet_ent_animation_t : packet_t
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x12);
+        assert(id == PACKET_ID_ENT_ANIMATION);
         dat.push_back(id);
         assemble_int(dat, eid);
         assemble_byte(dat, animate);
@@ -452,17 +636,25 @@ struct packet_ent_animation_t : packet_t
 
 struct packet_ent_action_t : packet_t
 {
-    packet_ent_action_t() { id = 0x13; }
+    packet_ent_action_t() { id = PACKET_ID_ENT_ACTION; }
 
     jint eid;
     jbyte action_id;
 
-    NO_ASSEMBLE();
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == PACKET_ID_ENT_ACTION);
+        dat.push_back(id);
+        assemble_int(dat, eid);
+        assemble_byte(dat, action_id);
+        return dat;
+    }
 };
 
 struct packet_named_ent_spawn_t : packet_t
 {
-    packet_named_ent_spawn_t() { id = 0x14; }
+    packet_named_ent_spawn_t() { id = PACKET_ID_ENT_SPAWN_NAMED; }
 
     jint eid = 0;
     std::string name;
@@ -476,7 +668,7 @@ struct packet_named_ent_spawn_t : packet_t
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x14);
+        assert(id == PACKET_ID_ENT_SPAWN_NAMED);
         dat.push_back(id);
         assemble_int(dat, eid);
         assemble_string16(dat, name);
@@ -492,14 +684,14 @@ struct packet_named_ent_spawn_t : packet_t
 
 struct packet_ent_create_t : packet_t
 {
-    packet_ent_create_t() { id = 0x1e; }
+    packet_ent_create_t() { id = PACKET_ID_ENT_ENSURE_SPAWN; }
 
     jint eid;
 
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x1e);
+        assert(id == PACKET_ID_ENT_ENSURE_SPAWN);
         dat.push_back(id);
         assemble_int(dat, eid);
         return dat;
@@ -507,14 +699,14 @@ struct packet_ent_create_t : packet_t
 };
 struct packet_ent_destroy_t : packet_t
 {
-    packet_ent_destroy_t() { id = 0x1d; }
+    packet_ent_destroy_t() { id = PACKET_ID_ENT_DESTROY; }
 
     jint eid;
 
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x1d);
+        assert(id == PACKET_ID_ENT_DESTROY);
         dat.push_back(id);
         assemble_int(dat, eid);
         return dat;
@@ -523,7 +715,7 @@ struct packet_ent_destroy_t : packet_t
 
 struct packet_ent_teleport_t : packet_t
 {
-    packet_ent_teleport_t() { id = 0x22; }
+    packet_ent_teleport_t() { id = PACKET_ID_ENT_MOVE_TELEPORT; }
 
     jint eid = 0;
     jint x = 0;
@@ -535,7 +727,7 @@ struct packet_ent_teleport_t : packet_t
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x22);
+        assert(id == PACKET_ID_ENT_MOVE_TELEPORT);
         dat.push_back(id);
         assemble_int(dat, eid);
         assemble_int(dat, x);
@@ -547,9 +739,9 @@ struct packet_ent_teleport_t : packet_t
     }
 };
 
-struct packet_prechunk_t : packet_t
+struct packet_chunk_cache_t : packet_t
 {
-    packet_prechunk_t() { id = 0x32; }
+    packet_chunk_cache_t() { id = PACKET_ID_CHUNK_CACHE; }
 
     jint chunk_x;
     jint chunk_z;
@@ -558,7 +750,7 @@ struct packet_prechunk_t : packet_t
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x32);
+        assert(id == PACKET_ID_CHUNK_CACHE);
         dat.push_back(id);
         assemble_int(dat, chunk_x);
         assemble_int(dat, chunk_z);
@@ -569,7 +761,7 @@ struct packet_prechunk_t : packet_t
 
 struct packet_chunk_t : packet_t
 {
-    packet_chunk_t() { id = 0x33; }
+    packet_chunk_t() { id = PACKET_ID_CHUNK_MAP; }
 
     jint block_x;
     jshort block_y;
@@ -585,11 +777,11 @@ struct packet_chunk_t : packet_t
         std::vector<Uint8> dat;
         if (compressed_data.size() >= SDL_MAX_SINT32)
         {
-            LOG("Error: compressed_data too big!");
+            LOG_ERROR("Wompressed_data too big!");
             return dat;
         }
 
-        assert(id == 0x33);
+        assert(id == PACKET_ID_CHUNK_MAP);
         dat.push_back(id);
         assemble_int(dat, block_x);
         assemble_short(dat, block_y);
@@ -606,7 +798,7 @@ struct packet_chunk_t : packet_t
 
 struct packet_block_change_t : packet_t
 {
-    packet_block_change_t() { id = 0x35; }
+    packet_block_change_t() { id = PACKET_ID_BLOCK_CHANGE; }
 
     jint block_x;
     jbyte block_y;
@@ -617,7 +809,7 @@ struct packet_block_change_t : packet_t
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x35);
+        assert(id == PACKET_ID_BLOCK_CHANGE);
         dat.push_back(id);
         assemble_int(dat, block_x);
         assemble_byte(dat, block_y);
@@ -630,7 +822,7 @@ struct packet_block_change_t : packet_t
 
 struct packet_sound_effect_t : packet_t
 {
-    packet_sound_effect_t() { id = 0x3D; }
+    packet_sound_effect_t() { id = PACKET_ID_SFX; }
 
     jint effect_id;
     jint x;
@@ -641,7 +833,7 @@ struct packet_sound_effect_t : packet_t
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x3D);
+        assert(id == PACKET_ID_SFX);
         dat.push_back(id);
         assemble_int(dat, effect_id);
         assemble_int(dat, x);
@@ -659,7 +851,7 @@ struct packet_sound_effect_t : packet_t
 
 struct packet_new_state_t : packet_t
 {
-    packet_new_state_t() { id = 0x46; }
+    packet_new_state_t() { id = PACKET_ID_NEW_STATE; }
 
     jbyte reason = 0;
     jbyte mode = 0;
@@ -667,7 +859,7 @@ struct packet_new_state_t : packet_t
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x46);
+        assert(id == PACKET_ID_NEW_STATE);
         dat.push_back(id);
         assemble_byte(dat, reason);
         assemble_byte(dat, mode);
@@ -677,7 +869,7 @@ struct packet_new_state_t : packet_t
 
 struct packet_thunder_t : packet_t
 {
-    packet_thunder_t() { id = 0x47; }
+    packet_thunder_t() { id = PACKET_ID_THUNDERBOLT; }
 
     jint eid = 0;
     jbool unknown = 0;
@@ -688,7 +880,7 @@ struct packet_thunder_t : packet_t
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x47);
+        assert(id == PACKET_ID_THUNDERBOLT);
         dat.push_back(id);
         assemble_int(dat, eid);
         assemble_bool(dat, unknown);
@@ -701,14 +893,14 @@ struct packet_thunder_t : packet_t
 
 struct packet_window_close_t : packet_t
 {
-    packet_window_close_t() { id = 0x65; }
+    packet_window_close_t() { id = PACKET_ID_WINDOW_CLOSE; }
 
     jbyte window_id;
 
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x65);
+        assert(id == PACKET_ID_WINDOW_CLOSE);
         dat.push_back(id);
         assemble_byte(dat, window_id);
         return dat;
@@ -724,7 +916,7 @@ struct inventory_item_t
 
 struct packet_window_items_t : packet_t
 {
-    packet_window_items_t() { id = 0x68; }
+    packet_window_items_t() { id = PACKET_ID_WINDOW_SET_ITEMS; }
 
     jbyte window_id = 0;
 
@@ -739,7 +931,7 @@ struct packet_window_items_t : packet_t
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x68);
+        assert(id == PACKET_ID_WINDOW_SET_ITEMS);
         dat.push_back(id);
         assemble_byte(dat, window_id);
         assemble_short(dat, payload.size());
@@ -758,7 +950,7 @@ struct packet_window_items_t : packet_t
 
 struct packet_inventory_action_creative_t : packet_t
 {
-    packet_inventory_action_creative_t() { id = 0x6b; }
+    packet_inventory_action_creative_t() { id = PACKET_ID_INV_CREATIVE_ACTION; }
 
     jshort slot;
     jshort item_id;
@@ -768,7 +960,7 @@ struct packet_inventory_action_creative_t : packet_t
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0x6b);
+        assert(id == PACKET_ID_INV_CREATIVE_ACTION);
         dat.push_back(id);
         assemble_short(dat, slot);
         assemble_short(dat, item_id);
@@ -780,7 +972,7 @@ struct packet_inventory_action_creative_t : packet_t
 
 struct packet_play_list_item_t : packet_t
 {
-    packet_play_list_item_t() { id = 0xc9; }
+    packet_play_list_item_t() { id = PACKET_ID_PLAYER_LIST_ITEM; }
 
     std::string username;
     jbool online;
@@ -789,7 +981,7 @@ struct packet_play_list_item_t : packet_t
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0xc9);
+        assert(id == PACKET_ID_PLAYER_LIST_ITEM);
         dat.push_back(id);
         assemble_string16(dat, username);
         assemble_bool(dat, online);
@@ -800,31 +992,42 @@ struct packet_play_list_item_t : packet_t
 
 struct packet_server_list_ping_t : packet_t
 {
-    packet_server_list_ping_t() { id = 0xfe; }
+    packet_server_list_ping_t() { id = PACKET_ID_SERVER_LIST_PING; }
 
-    NO_ASSEMBLE();
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == PACKET_ID_SERVER_LIST_PING);
+        dat.push_back(id);
+        return dat;
+    }
 };
 
 struct packet_kick_t : packet_t
 {
-    packet_kick_t() { id = 0xff; }
+    packet_kick_t() { id = PACKET_ID_KICK; }
 
     std::string reason;
 
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == 0xff);
+        assert(id == PACKET_ID_KICK);
         dat.push_back(id);
         assemble_string16(dat, reason);
         return dat;
     }
 };
 
-class packet_buffer_t
+class packet_handler_t
 {
 public:
-    packet_buffer_t();
+    /**
+     * Initializes the packet handler
+     *
+     * @param is_server Determines how some packets are parsed (server vs. client)
+     */
+    packet_handler_t(bool is_server = true);
 
     /**
      * Returns NULL if no packet is available or on error
@@ -850,6 +1053,8 @@ private:
     Uint8 packet_type;
     size_t len;
     int var_len;
+
+    bool is_server;
 
     std::string err_str;
 };

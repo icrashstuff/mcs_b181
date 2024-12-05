@@ -31,6 +31,7 @@
 
 #define LOG(fmt, ...) printf("%s:%d %s(): " fmt "\n", __FILE_NAME__, __LINE__, __func__, ##__VA_ARGS__)
 #define LOG_WARN(fmt, ...) printf("[WARN]: %s:%d %s(): " fmt "\n", __FILE_NAME__, __LINE__, __func__, ##__VA_ARGS__)
+#define LOG_ERROR(fmt, ...) printf("[ERR]: %s:%d %s(): " fmt "\n", __FILE_NAME__, __LINE__, __func__, ##__VA_ARGS__)
 #define LOG_TRACE(fmt, ...) printf("[TRACE]: %s:%d %s(): " fmt "\n", __FILE_NAME__, __LINE__, __func__, ##__VA_ARGS__)
 
 #ifdef ENABLE_TRACE
