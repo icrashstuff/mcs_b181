@@ -71,6 +71,8 @@ bool send_prechunk(SDLNet_StreamSocket* sock, int chunk_x, int chunk_z, bool mod
     packet.chunk_x = chunk_x;
     packet.chunk_z = chunk_z;
     packet.mode = mode;
+    if (!mode)
+        send_buffer(sock, packet.assemble());
     return send_buffer(sock, packet.assemble());
 }
 
@@ -223,7 +225,7 @@ public:
             {
                 int cx = (ix + cx_s) % CHUNK_SIZE_X;
                 int cz = (iz + cz_s) % CHUNK_SIZE_Z;
-                LOG("checking %d %d", cx, cz);
+                TRACE("checking %d %d", cx, cz);
                 for (int i = CHUNK_SIZE_Y; i > 0; i--)
                 {
                     int index = i - 1 + (cz * (CHUNK_SIZE_Y)) + (cx * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z));
@@ -446,6 +448,7 @@ public:
      */
     void move_player(int eid, int world_x, int world_y, int world_z)
     {
+        needs_update = true;
         for (size_t i = 0; i < players.size(); i++)
         {
             if (players[i].eid == eid)
@@ -491,10 +494,10 @@ public:
                     chunk_t* c = get_chunk(cx, cz);
                     if (c && c->find_spawn_point(x, y, z))
                     {
-                        LOG("%.1f %.1f %.1f", x, y, z);
+                        TRACE("%.1f %.1f %.1f", x, y, z);
                         x += cx * CHUNK_SIZE_X;
                         z += cz * CHUNK_SIZE_Z;
-                        LOG("%.1f %.1f %.1f", x, y, z);
+                        TRACE("%.1f %.1f %.1f", x, y, z);
                         return true;
                     }
                 }
@@ -566,6 +569,9 @@ public:
             int rx_bounds_[3] = { rx_min, rx_nom, rx_max };
             int rz_bounds_[3] = { rz_min, rz_nom, rz_max };
 
+            TRACE("%d %d %d", rx_bounds_[0], rx_bounds_[1], rx_bounds_[2]);
+            TRACE("%d %d %d", rz_bounds_[0], rz_bounds_[1], rz_bounds_[2]);
+
             std::vector<int> rx_bounds;
             std::vector<int> rz_bounds;
 
@@ -598,11 +604,11 @@ public:
                 for (int k = 0; k < rz_bounds_len; k++)
                 {
                     bool region_found = false;
-                    for (size_t l = 0; l < regions.size(); l++)
+                    for (size_t l = 0; l < regions.size() && !region_found; l++)
                     {
-                        if (regions[l].x == rx_bounds[j] && regions[l].z == rx_bounds[k])
+                        if (regions[l].x == rx_bounds[j] && regions[l].z == rz_bounds[k])
                         {
-                            TRACE("Preserve %d %d", rx, rz);
+                            TRACE("Preserve %d %d", regions[l].x, regions[l].z);
                             regions[l].num_players++;
                             region_found = true;
                         }
@@ -697,6 +703,12 @@ bool send_chunk(SDLNet_StreamSocket* sock, int chunk_x, int chunk_z, int max_y)
     return send_chunk(sock, &c, chunk_x, chunk_z);
 }
 
+struct chunk_coords_t
+{
+    int x = 0;
+    int z = 0;
+};
+
 struct client_t
 {
     SDLNet_StreamSocket* sock = NULL;
@@ -708,6 +720,10 @@ struct client_t
     std::string username;
     int eid = 0;
     int counter = 0;
+
+    double old_x = 0.0;
+    double old_z = 0.0;
+
     double player_x = 0.0;
     double player_y = 0.0;
     double player_stance = 0.0;
@@ -733,7 +749,38 @@ struct client_t
     int update_health = 1;
 
     bool is_raining = 0;
+
+    std::vector<chunk_coords_t> loaded_chunks;
 };
+
+bool is_chunk_loaded(std::vector<chunk_coords_t> loaded_chunks, int chunk_x, int chunk_z)
+{
+    for (size_t i = 0; i < loaded_chunks.size(); i++)
+        if (loaded_chunks[i].x == chunk_x && loaded_chunks[i].z == chunk_z)
+            return true;
+    return false;
+}
+
+void chunk_remove_loaded(client_t* client)
+{
+    int chunk_x_min = ((int)client->player_x >> 4) - VIEW_DISTANCE;
+    int chunk_x_max = ((int)client->player_x >> 4) + VIEW_DISTANCE;
+    int chunk_z_min = ((int)client->player_z >> 4) - VIEW_DISTANCE;
+    int chunk_z_max = ((int)client->player_z >> 4) + VIEW_DISTANCE;
+
+    for (auto it = client->loaded_chunks.begin(); it != client->loaded_chunks.end();)
+    {
+        if ((*it).x < chunk_x_min || (*it).x > chunk_x_max || (*it).z < chunk_z_min || (*it).z > chunk_z_max)
+        {
+            send_prechunk(client->sock, (*it).x, (*it).z, 0);
+            it = client->loaded_chunks.erase(it);
+        }
+        else
+        {
+            it = next(it);
+        }
+    }
+}
 
 void send_buffer_to_players(std::vector<client_t> clients, std::vector<Uint8> buf)
 {
@@ -753,14 +800,6 @@ void spawn_player(std::vector<client_t> clients, client_t* client, dimension_t* 
 
     int off_cx = ((int)client->player_x) >> 4;
     int off_cz = ((int)client->player_z) >> 4;
-
-    for (int x = -2; x < 2; x++)
-    {
-        for (int z = -2; z < 2; z++)
-        {
-            send_chunk(sock, dimensions[client->dimension < 0].get_chunk(x, z), x, z);
-        }
-    }
 
     packet_ent_create_t pack_player_ent;
     packet_named_ent_spawn_t pack_player;
@@ -809,11 +848,15 @@ void spawn_player(std::vector<client_t> clients, client_t* client, dimension_t* 
 
     send_buffer(sock, pack_player_pos.assemble());
 
-    for (int x = -8; x < 8; x++)
+    for (int x = -VIEW_DISTANCE; x < VIEW_DISTANCE; x++)
     {
-        for (int z = -8; z < 8; z++)
+        for (int z = -VIEW_DISTANCE; z < VIEW_DISTANCE; z++)
         {
-            send_chunk(sock, dimensions[client->dimension < 0].get_chunk(x + off_cx, z + off_cz), x + off_cx, z + off_cz);
+            chunk_coords_t coords;
+            coords.x = x + off_cx;
+            coords.z = z + off_cz;
+            if (send_chunk(sock, dimensions[client->dimension < 0].get_chunk(coords.x, coords.z), coords.x, coords.z))
+                client->loaded_chunks.push_back(coords);
         }
     }
 }
@@ -1039,6 +1082,44 @@ int main(int argc, char** argv)
                             send_buffer(clients[i].sock, pack_ext_player_ent.assemble());
                             send_buffer(clients[i].sock, pack_ext_player.assemble());
                         }
+                    }
+
+                    dimensions[client->dimension < 0].move_player(client->eid, client->player_x, client->player_y, client->player_z);
+
+                    int diff_x = client->player_x - client->old_x;
+                    int diff_z = client->player_z - client->old_z;
+
+                    int diff_x_a = SDL_abs(diff_x);
+                    int diff_z_a = SDL_abs(diff_z);
+
+                    if (diff_x_a > 15 || diff_z_a > 15)
+                    {
+                        dimensions[client->dimension < 0].update();
+                        if (diff_x_a > 15)
+                            client->old_x = client->player_x;
+                        if (diff_z_a > 15)
+                            client->old_z = client->player_z;
+
+                        int pos_cx = ((int)client->player_x) >> 4;
+                        int pos_cz = ((int)client->player_z) >> 4;
+
+                        for (int x_ = 1; x_ < VIEW_DISTANCE * 2; x_++)
+                        {
+                            int x = (x_ / 2) * (x_ % 2 == 0 ? 1 : -1);
+                            for (int z_ = 1; z_ < VIEW_DISTANCE * 2; z_++)
+                            {
+                                int z = (z_ / 2) * (z_ % 2 == 0 ? 1 : -1);
+                                chunk_coords_t coords;
+                                coords.x = x + pos_cx;
+                                coords.z = z + pos_cz;
+                                if (is_chunk_loaded(client->loaded_chunks, coords.x, coords.z))
+                                    continue;
+                                if (send_chunk(sock, dimensions[client->dimension < 0].get_chunk(coords.x, coords.z), coords.x, coords.z))
+                                    client->loaded_chunks.push_back(coords);
+                            }
+                        }
+
+                        chunk_remove_loaded(client);
                     }
                 }
 
