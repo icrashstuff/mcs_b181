@@ -41,7 +41,9 @@
 
 #define BLOCK_ID_MAX 110
 
-#define VIEW_DISTANCE 12
+#define CHUNK_VIEW_DISTANCE 12
+
+#define CHUNK_UNLOAD_DISTANCE (CHUNK_VIEW_DISTANCE + 2)
 
 #if (WORLD_HEIGHT > 128)
 #error "World height cannot exceed 128 (Seriously, there are some fields that will rollover with anything bigger)"

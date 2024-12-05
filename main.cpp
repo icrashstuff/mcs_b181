@@ -826,10 +826,10 @@ bool is_chunk_loaded(std::vector<chunk_coords_t> loaded_chunks, int chunk_x, int
 
 void chunk_remove_loaded(client_t* client)
 {
-    int chunk_x_min = ((int)client->player_x >> 4) - VIEW_DISTANCE;
-    int chunk_x_max = ((int)client->player_x >> 4) + VIEW_DISTANCE;
-    int chunk_z_min = ((int)client->player_z >> 4) - VIEW_DISTANCE;
-    int chunk_z_max = ((int)client->player_z >> 4) + VIEW_DISTANCE;
+    int chunk_x_min = ((int)client->player_x >> 4) - CHUNK_UNLOAD_DISTANCE;
+    int chunk_x_max = ((int)client->player_x >> 4) + CHUNK_UNLOAD_DISTANCE;
+    int chunk_z_min = ((int)client->player_z >> 4) - CHUNK_UNLOAD_DISTANCE;
+    int chunk_z_max = ((int)client->player_z >> 4) + CHUNK_UNLOAD_DISTANCE;
 
     for (auto it = client->loaded_chunks.begin(); it != client->loaded_chunks.end();)
     {
@@ -954,7 +954,7 @@ void spawn_player(std::vector<client_t> clients, client_t* client, dimension_t* 
         }
     }
 
-    send_circle_chunks(client, dimensions, VIEW_DISTANCE / 2);
+    send_circle_chunks(client, dimensions, CHUNK_VIEW_DISTANCE / 2);
 
     packet_player_pos_look_s2c_t pack_player_pos;
     pack_player_pos.x = client->player_x;
@@ -965,7 +965,7 @@ void spawn_player(std::vector<client_t> clients, client_t* client, dimension_t* 
     pack_player_pos.pitch = client->player_pitch;
     pack_player_pos.on_ground = client->player_on_ground;
 
-    send_square_chunks(client, dimensions, VIEW_DISTANCE);
+    send_square_chunks(client, dimensions, CHUNK_VIEW_DISTANCE);
 
     send_buffer(sock, pack_player_pos.assemble());
 }
@@ -1229,7 +1229,7 @@ int main(int argc, char** argv)
                         if (diff_z_a > 15)
                             client->old_z = client->player_z;
 
-                        send_square_chunks(client, dimensions, VIEW_DISTANCE);
+                        send_square_chunks(client, dimensions, CHUNK_VIEW_DISTANCE);
                         chunk_remove_loaded(client);
                     }
                 }
