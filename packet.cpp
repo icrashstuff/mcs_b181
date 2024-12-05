@@ -331,9 +331,9 @@ SDL_FORCE_INLINE bool read_string16(std::vector<Uint8>& dat, size_t& pos, std::s
 #define PACK_NAME(x)    \
     case PACKET_ID_##x: \
         return #x
-const char* packet_t::get_name()
+const char* packet_t::get_name_for_id(Uint8 _id)
 {
-    switch (id)
+    switch (_id)
     {
         PACK_NAME(KEEP_ALIVE);
         PACK_NAME(LOGIN_REQUEST);
@@ -404,6 +404,8 @@ const char* packet_t::get_name()
     }
 }
 #undef PACK_NAME
+
+const char* packet_t::get_name() { return get_name_for_id(id); }
 
 packet_handler_t::packet_handler_t(bool is_server_)
 {
@@ -510,8 +512,8 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
 
         default:
         {
-            char buffer[32];
-            snprintf(buffer, ARR_SIZE(buffer), "Unknown Packet ID: 0x%02x", packet_type);
+            char buffer[64];
+            snprintf(buffer, ARR_SIZE(buffer), "Unknown Packet ID: 0x%02x(%s)", packet_type, packet_t::get_name_for_id(packet_type));
             err_str = buffer;
             break;
         }
@@ -585,7 +587,10 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
                 break;
             }
             default:
-                err_str = "var_len set when packet does not support var_len";
+                char buffer[128];
+                snprintf(
+                    buffer, ARR_SIZE(buffer), "Packet ID: 0x%02x(%s): var_len set but no handler found", packet_type, packet_t::get_name_for_id(packet_type));
+                err_str = buffer;
                 break;
             }
         }
@@ -594,7 +599,7 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
     if (buf_size != len || var_len)
         return NULL;
 
-    TRACE("Packet 0x%02x has size: %zu(%zu) bytes", packet_type, len, buf_size);
+    TRACE("Packet 0x%02x(%s) has size: %zu(%zu) bytes", packet_type, len, buf_size, packet_t::get_name_for_id(packet_type));
 
     /* This section handles the actual packet parsing*/
     buf.resize(buf_size);
@@ -771,7 +776,7 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
 
         break;
     }
-    case PACKET_ID_ENT_SPAWN_PICKUP:
+    case PACKET_ID_WINDOW_CLOSE:
     {
         P(packet_window_close_t);
 
@@ -805,7 +810,9 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
     }
 
     default:
-        err_str = "Packet missing final parse";
+        char buffer[128];
+        snprintf(buffer, ARR_SIZE(buffer), "Packet ID: 0x%02x(%s): missing final parse", packet_type, packet_t::get_name_for_id(packet_type));
+        err_str = buffer;
         return NULL;
         break;
     }
@@ -820,8 +827,8 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
     {
         delete packet;
         packet = NULL;
-        char buffer[64];
-        snprintf(buffer, ARR_SIZE(buffer), "Error parsing packet with ID: 0x%02x", packet_type);
+        char buffer[128];
+        snprintf(buffer, ARR_SIZE(buffer), "Error parsing packet with ID: 0x%02x(%s)", packet_type, packet_t::get_name_for_id(packet_type));
         err_str = buffer;
     }
 

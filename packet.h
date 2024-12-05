@@ -194,6 +194,8 @@ struct packet_t
 
     const char* get_name();
 
+    static const char* get_name_for_id(Uint8 pack_id);
+
     virtual ~packet_t() {};
 
     virtual std::vector<Uint8> assemble() = 0;
