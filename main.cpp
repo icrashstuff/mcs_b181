@@ -429,6 +429,30 @@ int generate_chunk_thread_func(void* data)
     return 1;
 }
 
+struct dim_reg_gen_data_t
+{
+    region_t** r;
+    long seed;
+    int generator;
+    int x;
+    int z;
+};
+
+int dim_reg_gen_func(void* data)
+{
+    if (!data)
+        return 0;
+
+    dim_reg_gen_data_t* d = (dim_reg_gen_data_t*)data;
+
+    TRACE("Generating region %d %d", (*it).x, (*it).z);
+    (*d->r) = new region_t();
+    if ((*d->r))
+        (*d->r)->generate_from_seed(d->seed, d->generator, d->x, d->z);
+
+    return 1;
+}
+
 class dimension_t
 {
 public:
@@ -643,18 +667,30 @@ public:
             }
             else
             {
-                if (!(*it).region)
-                {
-                    TRACE("Generating region %d %d", (*it).x, (*it).z);
-                    (*it).region = new region_t();
-                    if ((*it).region)
-                        (*it).region->generate_from_seed(seed, generator, (*it).x, (*it).z);
-                }
-                else
-                    TRACE("Skipping region %d %d", (*it).x, (*it).z);
                 it = next(it);
             }
         }
+
+        std::vector<SDL_Thread*> threads;
+        std::vector<dim_reg_gen_data_t> gen_data;
+        gen_data.resize(regions.size());
+
+        for (size_t i = 0; i < regions.size(); i++)
+        {
+            if (regions[i].region)
+                continue;
+            dim_reg_gen_data_t* d = &gen_data.data()[i];
+            d->r = &regions[i].region;
+            d->seed = seed;
+            d->generator = generator;
+            d->x = regions[i].x;
+            d->z = regions[i].z;
+
+            threads.push_back(SDL_CreateThread(dim_reg_gen_func, "Region gen thread", d));
+        }
+
+        for (size_t i = 0; i < threads.size(); i++)
+            SDL_WaitThread(threads[i], NULL);
 
         TRACE("Dimension Update done");
     }
