@@ -317,6 +317,23 @@ public:
             data[index / 2] = (metadata & 0x0F) | (data[index / 2] & 0xF0);
     }
 
+    inline Uint8 get_light_block(int x, int y, int z)
+    {
+        if (x < 0)
+            x += 16;
+        if (y < 0)
+            y += 16;
+        if (z < 0)
+            z += 16;
+
+        int index = (y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z))) + CHUNK_SIZE_Y * CHUNK_SIZE_Z * CHUNK_SIZE_X * 3;
+
+        if (index % 2 == 1)
+            return (data[index / 2] >> 4) & 0x0F;
+        else
+            return data[index / 2] & 0x0F;
+    }
+
     inline void set_light_block(int x, int y, int z, Uint8 level)
     {
         if (x < 0)
@@ -332,6 +349,23 @@ public:
             data[index / 2] = ((level & 0x0F) << 4) | (data[index / 2] & 0x0F);
         else
             data[index / 2] = (level & 0x0F) | (data[index / 2] & 0xF0);
+    }
+
+    inline Uint8 get_light_sky(int x, int y, int z)
+    {
+        if (x < 0)
+            x += 16;
+        if (y < 0)
+            y += 16;
+        if (z < 0)
+            z += 16;
+
+        int index = (y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z))) + CHUNK_SIZE_Y * CHUNK_SIZE_Z * CHUNK_SIZE_X * 4;
+
+        if (index % 2 == 1)
+            return (data[index / 2] >> 4) & 0x0F;
+        else
+            return data[index / 2] & 0x0F;
     }
 
     inline void set_light_sky(int x, int y, int z, Uint8 level)
