@@ -55,7 +55,15 @@
 #define CHUNK_SIZE_Y WORLD_HEIGHT
 #define CHUNK_SIZE_Z 16
 
+#if (CHUNK_SIZE_X != 16) && (CHUNK_SIZE_Z != 16)
+#error "Really? You think that things will continue to work?"
+#endif
+
 #define REGION_SIZE_X 32
 #define REGION_SIZE_Z 32
+
+#if (REGION_SIZE_X != 32) && (REGION_SIZE_Z != 32)
+#error "Really? You think that things will continue to work?"
+#endif
 
 #endif

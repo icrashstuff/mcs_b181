@@ -789,6 +789,63 @@ void send_buffer_to_players(std::vector<client_t> clients, std::vector<Uint8> bu
             send_buffer(clients[i].sock, buf);
 }
 
+/**
+ * Send chunks in a square roughly starting from the center in each axis
+ */
+void send_square_chunks(client_t* client, dimension_t* dimensions, int radius)
+{
+    int pos_cx = ((int)client->player_x) >> 4;
+    int pos_cz = ((int)client->player_z) >> 4;
+
+    for (int x_ = 1; x_ < radius * 2; x_++)
+    {
+        int x = (x_ / 2) * (x_ % 2 == 0 ? 1 : -1);
+        for (int z_ = 1; z_ < radius * 2; z_++)
+        {
+            int z = (z_ / 2) * (z_ % 2 == 0 ? 1 : -1);
+            chunk_coords_t coords;
+            coords.x = x + pos_cx;
+            coords.z = z + pos_cz;
+            if (is_chunk_loaded(client->loaded_chunks, coords.x, coords.z))
+                continue;
+            if (send_chunk(client->sock, dimensions[client->dimension < 0].get_chunk(coords.x, coords.z), coords.x, coords.z))
+                client->loaded_chunks.push_back(coords);
+        }
+    }
+}
+
+/**
+ * Send chunks in progressively larger vaguely circular rings
+ *
+ * The idea for this came from a server I saw once
+ * The implementation however is my own (I imagine the other server has a higher quality implementation)
+ */
+void send_circle_chunks(client_t* client, dimension_t* dimensions, int radius)
+{
+    int off_cx = ((int)client->player_x) >> 4;
+    int off_cz = ((int)client->player_z) >> 4;
+
+    chunk_coords_t prev_coords;
+    prev_coords.x = radius * 2 + off_cx;
+    prev_coords.z = radius * 2 + off_cz;
+    for (int i = 0; i < radius; i++)
+    {
+        for (float deg = 0; deg < 360; deg += 2)
+        {
+            float theta = (deg + client->player_yaw) * SDL_PI_F / 180.0f;
+            chunk_coords_t coords;
+            coords.x = ((int)(SDL_cosf(theta) * i)) + off_cx;
+            coords.z = ((int)(SDL_sinf(theta) * i)) + off_cz;
+            if (coords.x == prev_coords.x && coords.z == prev_coords.z)
+                continue;
+            if (is_chunk_loaded(client->loaded_chunks, coords.x, coords.z))
+                continue;
+            if (send_chunk(client->sock, dimensions[client->dimension < 0].get_chunk(coords.x, coords.z), coords.x, coords.z))
+                client->loaded_chunks.push_back(coords);
+        }
+    }
+}
+
 void spawn_player(std::vector<client_t> clients, client_t* client, dimension_t* dimensions)
 {
     SDLNet_StreamSocket* sock = client->sock;
@@ -797,9 +854,6 @@ void spawn_player(std::vector<client_t> clients, client_t* client, dimension_t* 
     client->y_last_ground = client->player_y;
     client->player_stance = client->player_y + 0.2;
     client->player_on_ground = 1;
-
-    int off_cx = ((int)client->player_x) >> 4;
-    int off_cz = ((int)client->player_z) >> 4;
 
     packet_ent_create_t pack_player_ent;
     packet_named_ent_spawn_t pack_player;
@@ -837,6 +891,8 @@ void spawn_player(std::vector<client_t> clients, client_t* client, dimension_t* 
         }
     }
 
+    send_circle_chunks(client, dimensions, VIEW_DISTANCE / 2);
+
     packet_player_pos_look_s2c_t pack_player_pos;
     pack_player_pos.x = client->player_x;
     pack_player_pos.y = client->player_y;
@@ -846,19 +902,9 @@ void spawn_player(std::vector<client_t> clients, client_t* client, dimension_t* 
     pack_player_pos.pitch = client->player_pitch;
     pack_player_pos.on_ground = client->player_on_ground;
 
-    send_buffer(sock, pack_player_pos.assemble());
+    send_square_chunks(client, dimensions, VIEW_DISTANCE);
 
-    for (int x = -VIEW_DISTANCE; x < VIEW_DISTANCE; x++)
-    {
-        for (int z = -VIEW_DISTANCE; z < VIEW_DISTANCE; z++)
-        {
-            chunk_coords_t coords;
-            coords.x = x + off_cx;
-            coords.z = z + off_cz;
-            if (send_chunk(sock, dimensions[client->dimension < 0].get_chunk(coords.x, coords.z), coords.x, coords.z))
-                client->loaded_chunks.push_back(coords);
-        }
-    }
+    send_buffer(sock, pack_player_pos.assemble());
 }
 
 int eid_counter = 0;
@@ -1100,25 +1146,7 @@ int main(int argc, char** argv)
                         if (diff_z_a > 15)
                             client->old_z = client->player_z;
 
-                        int pos_cx = ((int)client->player_x) >> 4;
-                        int pos_cz = ((int)client->player_z) >> 4;
-
-                        for (int x_ = 1; x_ < VIEW_DISTANCE * 2; x_++)
-                        {
-                            int x = (x_ / 2) * (x_ % 2 == 0 ? 1 : -1);
-                            for (int z_ = 1; z_ < VIEW_DISTANCE * 2; z_++)
-                            {
-                                int z = (z_ / 2) * (z_ % 2 == 0 ? 1 : -1);
-                                chunk_coords_t coords;
-                                coords.x = x + pos_cx;
-                                coords.z = z + pos_cz;
-                                if (is_chunk_loaded(client->loaded_chunks, coords.x, coords.z))
-                                    continue;
-                                if (send_chunk(sock, dimensions[client->dimension < 0].get_chunk(coords.x, coords.z), coords.x, coords.z))
-                                    client->loaded_chunks.push_back(coords);
-                            }
-                        }
-
+                        send_square_chunks(client, dimensions, VIEW_DISTANCE);
                         chunk_remove_loaded(client);
                     }
                 }
@@ -1467,7 +1495,7 @@ int main(int argc, char** argv)
                         {
                             if (p->status == PLAYER_DIG_STATUS_FINISH_DIG || client->player_mode > 0)
                             {
-                                LOG("%d %d %d %d", p->x, p->y, p->z, c->get_type(p->x % 16, p->y, p->z % 16));
+                                TRACE("%d %d %d %d", p->x, p->y, p->z, c->get_type(p->x % 16, p->y, p->z % 16));
                                 packet_sound_effect_t pack_break_sfx;
                                 pack_break_sfx.effect_id = 2001;
                                 pack_break_sfx.x = p->x;
