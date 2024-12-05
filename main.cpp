@@ -252,6 +252,13 @@ public:
 
     inline Uint8 get_type(int x, int y, int z)
     {
+        if (x < 0)
+            x += 16;
+        if (y < 0)
+            y += 16;
+        if (z < 0)
+            z += 16;
+
         int index = y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z));
 
         return data[index];
@@ -259,6 +266,13 @@ public:
 
     inline void set_type(int x, int y, int z, Uint8 type)
     {
+        if (x < 0)
+            x += 16;
+        if (y < 0)
+            y += 16;
+        if (z < 0)
+            z += 16;
+
         int index = y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z));
 
         if (type <= BLOCK_ID_MAX)
@@ -269,6 +283,13 @@ public:
 
     inline void set_metadata(int x, int y, int z, Uint8 metadata)
     {
+        if (x < 0)
+            x += 16;
+        if (y < 0)
+            y += 16;
+        if (z < 0)
+            z += 16;
+
         int index = (y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z))) + CHUNK_SIZE_Y * CHUNK_SIZE_Z * CHUNK_SIZE_X * 2;
 
         if (index % 2 == 1)
@@ -279,6 +300,13 @@ public:
 
     inline void set_light_block(int x, int y, int z, Uint8 level)
     {
+        if (x < 0)
+            x += 16;
+        if (y < 0)
+            y += 16;
+        if (z < 0)
+            z += 16;
+
         int index = (y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z))) + CHUNK_SIZE_Y * CHUNK_SIZE_Z * CHUNK_SIZE_X * 3;
 
         if (index % 2 == 1)
@@ -289,6 +317,13 @@ public:
 
     inline void set_light_sky(int x, int y, int z, Uint8 level)
     {
+        if (x < 0)
+            x += 16;
+        if (y < 0)
+            y += 16;
+        if (z < 0)
+            z += 16;
+
         int index = (y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z))) + CHUNK_SIZE_Y * CHUNK_SIZE_Z * CHUNK_SIZE_X * 4;
 
         if (index % 2 == 1)
@@ -337,8 +372,6 @@ int generate_chunk_thread_func(void* data)
     return 1;
 }
 
-#define REGION_MULTITHREAD_GEN 1
-
 class region_t
 {
 public:
@@ -385,8 +418,258 @@ private:
     chunk_t chunks[REGION_SIZE_X][REGION_SIZE_Z];
 };
 
+class dimension_t
+{
+public:
+    dimension_t(int terrain_generator, long seed_dim)
+    {
+        generator = terrain_generator;
+        seed = seed_dim;
+
+        r_state = seed + generator;
+
+        /* Load spawn regions */
+        regions.push_back({ 0, 0, NULL, 0 });
+        regions.push_back({ -1, 0, NULL, 0 });
+        regions.push_back({ 0, -1, NULL, 0 });
+        regions.push_back({ -1, -1, NULL, 0 });
+
+        needs_update = true;
+
+        update();
+    }
+
+    /**
+     * Move internal player position that is used for determining region loading
+     *
+     * Call update() to perform the region loading/unloading
+     */
+    void move_player(int eid, int world_x, int world_y, int world_z)
+    {
+        for (size_t i = 0; i < players.size(); i++)
+        {
+            if (players[i].eid == eid)
+            {
+                players[i].x = world_x;
+                players[i].z = world_z;
+                return;
+            }
+        }
+
+        players.push_back({ .eid = eid, .x = world_x, .z = world_z });
+    }
+
+    /**
+     * Attempts to find a suitable place to put a player in the spawn regions
+     *
+     * Returns true if a suitable location was found, false if a fallback location at world height was selected
+     */
+    inline bool find_spawn_point(double& x, double& y, double& z)
+    {
+        Uint32 pos = ((int)(x * 3) << 24) + ((int)(y * 3) << 12) + (int)(z * 3);
+        pos += SDL_rand_bits_r(&r_state);
+
+        int plim[2] = { 0, 0 };
+        for (int l = REGION_SIZE_X / 4; l > 0; l >>= 1)
+        {
+            int lim[2] = { REGION_SIZE_X / l - 1, REGION_SIZE_Z / l - 1 };
+
+            int cx_s = (pos >> 16) % lim[0];
+            int cz_s = pos % lim[1];
+
+            for (int ix = 0; ix < lim[0] * 2; ix++)
+            {
+                if (ix == plim[0])
+                    ix = plim[0] * 2;
+                for (int iz = 0; iz < lim[1] * 2; iz++)
+                {
+                    if (iz == plim[1])
+                        iz = plim[1] * 2;
+                    int cx = SDL_abs((ix + cx_s) % (lim[0] * 2)) - lim[0];
+                    int cz = SDL_abs((iz + cz_s) % (lim[1] * 2)) - lim[1];
+                    LOG("Checking chunk %d %d", cx, cz);
+                    chunk_t* c = get_chunk(cx, cz);
+                    if (c && c->find_spawn_point(x, y, z))
+                    {
+                        LOG("%.1f %.1f %.1f", x, y, z);
+                        x += cx * CHUNK_SIZE_X;
+                        z += cz * CHUNK_SIZE_Z;
+                        LOG("%.1f %.1f %.1f", x, y, z);
+                        return true;
+                    }
+                }
+            }
+            LOG("Expanding search\n");
+            plim[0] = lim[0];
+            plim[1] = lim[1];
+        }
+
+        x = 0.5;
+        y = CHUNK_SIZE_Y + 1.8;
+        z = 0.5;
+        return false;
+    }
+
+    chunk_t* get_chunk(int chunk_x, int chunk_z)
+    {
+        int rx = chunk_x >> 5;
+        int rz = chunk_z >> 5;
+        for (size_t i = 0; i < regions.size(); i++)
+        {
+            if (regions[i].x == rx && regions[i].z == rz)
+            {
+                if (regions[i].region)
+                {
+                    int cx = chunk_x % REGION_SIZE_X;
+                    int cz = chunk_z % REGION_SIZE_Z;
+                    if (cx < 0)
+                        cx += REGION_SIZE_X;
+                    if (cz < 0)
+                        cz += REGION_SIZE_Z;
+                    return regions[i].region->get_chunk(cx, cz);
+                }
+                return NULL;
+            }
+        }
+
+        return NULL;
+    }
+
+    /**
+     * Loads/unloads regions
+     *
+     * Note: this is a somewhat expensive function, be careful
+     */
+    void update()
+    {
+        if (!needs_update)
+            return;
+
+        needs_update = 0;
+
+        for (size_t i = 0; i < regions.size(); i++)
+        {
+            regions[i].num_players = 0;
+            if (regions[i].x == 0 || regions[i].x == -1)
+                if (regions[i].z == 0 || regions[i].z == -1)
+                    regions[i].num_players++;
+        }
+        for (size_t i = 0; i < players.size(); i++)
+        {
+            int rx_nom = ((players[i].x >> 4) + 0) >> 5;
+            int rx_min = ((players[i].x >> 4) - 15) >> 5;
+            int rx_max = ((players[i].x >> 4) + 15) >> 5;
+            int rz_nom = ((players[i].z >> 4) + 0) >> 5;
+            int rz_min = ((players[i].z >> 4) - 15) >> 5;
+            int rz_max = ((players[i].z >> 4) + 15) >> 5;
+
+            int rx_bounds_[3] = { rx_min, rx_nom, rx_max };
+            int rz_bounds_[3] = { rz_min, rz_nom, rz_max };
+
+            std::vector<int> rx_bounds;
+            std::vector<int> rz_bounds;
+
+            for (int j = 0; j < 3; j++)
+            {
+                bool dup = false;
+                for (size_t k = 0; k < rx_bounds.size(); k++)
+                    if (rx_bounds[k] == rx_bounds_[j])
+                        dup = true;
+                if (!dup)
+                    rx_bounds.push_back(rx_bounds_[j]);
+            }
+
+            for (int j = 0; j < 3; j++)
+            {
+                bool dup = false;
+                for (size_t k = 0; k < rz_bounds.size(); k++)
+                    if (rz_bounds[k] == rz_bounds_[j])
+                        dup = true;
+                if (!dup)
+                    rz_bounds.push_back(rz_bounds_[j]);
+            }
+
+            int rx_bounds_len = rx_bounds.size();
+            int rz_bounds_len = rz_bounds.size();
+
+            /* This is inefficient */
+            for (int j = 0; j < rx_bounds_len; j++)
+            {
+                for (int k = 0; k < rz_bounds_len; k++)
+                {
+                    bool region_found = false;
+                    for (size_t l = 0; l < regions.size(); l++)
+                    {
+                        if (regions[l].x == rx_bounds[j] && regions[l].z == rx_bounds[k])
+                        {
+                            TRACE("Preserve %d %d", rx, rz);
+                            regions[l].num_players++;
+                            region_found = true;
+                        }
+                    }
+                    if (!region_found)
+                    {
+                        TRACE("Create %d %d", rx_bounds[j], rz_bounds[k]);
+                        regions.push_back({ rx_bounds[j], rz_bounds[k], NULL, 1 });
+                    }
+                }
+            }
+        }
+
+        for (auto it = regions.begin(); it != regions.end();)
+        {
+            if ((*it).num_players == 0)
+            {
+                TRACE("Unloading region %d %d", (*it).x, (*it).z);
+                if ((*it).region)
+                    delete (*it).region;
+                it = regions.erase(it);
+            }
+            else
+            {
+                if (!(*it).region)
+                {
+                    TRACE("Generating region %d %d", (*it).x, (*it).z);
+                    (*it).region = new region_t();
+                    if ((*it).region)
+                        (*it).region->generate_from_seed(seed, generator, (*it).x, (*it).z);
+                }
+                else
+                    TRACE("Skipping region %d %d", (*it).x, (*it).z);
+                it = next(it);
+            }
+        }
+
+        TRACE("Dimension Update done");
+    }
+
+private:
+    struct dimension_reg_dat_t
+    {
+        int x;
+        int z;
+        region_t* region;
+        Uint32 num_players;
+    };
+    struct dimension_player_dat_t
+    {
+        int eid;
+        int x;
+        int z;
+    };
+    int generator;
+    long seed;
+    bool needs_update;
+    Uint64 r_state;
+    std::vector<dimension_player_dat_t> players;
+    std::vector<dimension_reg_dat_t> regions;
+};
+
 bool send_chunk(SDLNet_StreamSocket* sock, chunk_t* chunk, int chunk_x, int chunk_z)
 {
+    if (chunk == NULL)
+        return 0;
+
     packet_chunk_t packet;
     packet.block_x = chunk_x * CHUNK_SIZE_X;
     packet.block_y = 0;
@@ -394,9 +677,6 @@ bool send_chunk(SDLNet_StreamSocket* sock, chunk_t* chunk, int chunk_x, int chun
     packet.size_x = CHUNK_SIZE_X - 1;
     packet.size_y = CHUNK_SIZE_Y - 1;
     packet.size_z = CHUNK_SIZE_Z - 1;
-
-    if (chunk == NULL)
-        return 0;
 
     chunk->compress_to_buf(packet.compressed_data);
 
@@ -407,18 +687,6 @@ bool send_chunk(SDLNet_StreamSocket* sock, chunk_t* chunk, int chunk_x, int chun
 
 bool send_chunk(SDLNet_StreamSocket* sock, int chunk_x, int chunk_z, int max_y)
 {
-    packet_chunk_t packet;
-    packet.block_x = chunk_x * CHUNK_SIZE_X;
-    packet.block_y = 0;
-    packet.block_z = chunk_z * CHUNK_SIZE_Z;
-    packet.size_x = CHUNK_SIZE_X - 1;
-    packet.size_y = CHUNK_SIZE_Y - 1;
-    packet.size_z = CHUNK_SIZE_Z - 1;
-
-    int h = packet.size_y + 1;
-    int sx = packet.size_x + 1;
-    int sz = packet.size_z + 1;
-
     chunk_t c;
 
     if (max_y >= BLOCK_ID_MAX)
@@ -426,11 +694,7 @@ bool send_chunk(SDLNet_StreamSocket* sock, int chunk_x, int chunk_z, int max_y)
     else
         c.generate_special_ascending_type(max_y);
 
-    c.compress_to_buf(packet.compressed_data);
-
-    send_prechunk(sock, chunk_x, chunk_z, 1);
-
-    return send_buffer(sock, packet.assemble());
+    return send_chunk(sock, &c, chunk_x, chunk_z);
 }
 
 struct client_t
@@ -478,21 +742,25 @@ void send_buffer_to_players(std::vector<client_t> clients, std::vector<Uint8> bu
             send_buffer(clients[i].sock, buf);
 }
 
-void spawn_player(std::vector<client_t> clients, client_t* client, region_t* regions)
+void spawn_player(std::vector<client_t> clients, client_t* client, dimension_t* dimensions)
 {
     SDLNet_StreamSocket* sock = client->sock;
+
+    dimensions[client->dimension < 0].find_spawn_point(client->player_x, client->player_y, client->player_z);
+    client->y_last_ground = client->player_y;
+    client->player_stance = client->player_y + 0.2;
+    client->player_on_ground = 1;
+
+    int off_cx = ((int)client->player_x) >> 4;
+    int off_cz = ((int)client->player_z) >> 4;
+
     for (int x = -2; x < 2; x++)
     {
         for (int z = -2; z < 2; z++)
         {
-            send_chunk(sock, regions[client->dimension < 0].get_chunk(x, z), x, z);
+            send_chunk(sock, dimensions[client->dimension < 0].get_chunk(x, z), x, z);
         }
     }
-
-    regions[client->dimension < 0].get_chunk(0, 0)->find_spawn_point(client->player_x, client->player_y, client->player_z);
-    client->y_last_ground = client->player_y;
-    client->player_stance = client->player_y + 0.2;
-    client->player_on_ground = 1;
 
     packet_ent_create_t pack_player_ent;
     packet_named_ent_spawn_t pack_player;
@@ -541,11 +809,11 @@ void spawn_player(std::vector<client_t> clients, client_t* client, region_t* reg
 
     send_buffer(sock, pack_player_pos.assemble());
 
-    for (int x = 0; x < 32; x++)
+    for (int x = -8; x < 8; x++)
     {
-        for (int z = 0; z < 32; z++)
+        for (int z = -8; z < 8; z++)
         {
-            send_chunk(sock, regions[client->dimension < 0].get_chunk(x, z), x, z);
+            send_chunk(sock, dimensions[client->dimension < 0].get_chunk(x + off_cx, z + off_cz), x + off_cx, z + off_cz);
         }
     }
 }
@@ -592,10 +860,7 @@ int main(int argc, char** argv)
 
     LOG("Generating regions");
     Uint64 tick_region_start = SDL_GetTicks();
-    region_t region[2];
-    /* Setting region_x or region_z to values like 1000000 introduces generator errors */
-    region[0].generate_from_seed(world_seed, 0, 0, 0);
-    region[1].generate_from_seed(world_seed, -1, 1, 0);
+    dimension_t dimensions[2] = { dimension_t(0, world_seed), dimension_t(-1, world_seed) };
     Uint64 tick_region_time = SDL_GetTicks() - tick_region_start;
     LOG("Regions generated in %lu ms", tick_region_time);
 
@@ -893,7 +1158,7 @@ int main(int argc, char** argv)
                     pack_join_msg.msg += client->username;
                     pack_join_msg.msg += " joined the game.";
 
-                    spawn_player(clients, client, region);
+                    spawn_player(clients, client, dimensions);
 
                     send_buffer_to_players(clients, pack_join_msg.assemble());
 
@@ -973,7 +1238,7 @@ int main(int argc, char** argv)
                             pack_time.time = sdl_tick_cur / 50;
                             send_buffer(sock, pack_time.assemble());
 
-                            spawn_player(clients, client, region);
+                            spawn_player(clients, client, dimensions);
                         }
                         else if (p->msg == "/c" || p->msg == "/s")
                         {
@@ -1108,20 +1373,20 @@ int main(int argc, char** argv)
 
                     if (p->status == PLAYER_DIG_STATUS_FINISH_DIG || p->status == PLAYER_DIG_STATUS_START_DIG)
                     {
-                        if (radius > 6.0)
-                        {
+                        if (radius > 7.0)
                             LOG("Player \"%s\" sent dig with invalid radius of %.3f", client->username.c_str(), radius);
-                            continue;
-                        }
+                        if (radius > 6.0)
+                            goto loop_end;
 
                         int cx = p->x >> 4;
                         int cz = p->z >> 4;
 
-                        chunk_t* c = region[client->dimension < 0].get_chunk(cx, cz);
+                        chunk_t* c = dimensions[client->dimension < 0].get_chunk(cx, cz);
                         if (c)
                         {
                             if (p->status == PLAYER_DIG_STATUS_FINISH_DIG || client->player_mode > 0)
                             {
+                                LOG("%d %d %d %d", p->x, p->y, p->z, c->get_type(p->x % 16, p->y, p->z % 16));
                                 packet_sound_effect_t pack_break_sfx;
                                 pack_break_sfx.effect_id = 2001;
                                 pack_break_sfx.x = p->x;
@@ -1148,7 +1413,7 @@ int main(int argc, char** argv)
                     else
                     {
                         LOG("Player \"%s\" sent dig with unsupported status of %d", client->username.c_str(), p->status);
-                        continue;
+                        goto loop_end;
                     }
 
                     break;
@@ -1208,7 +1473,7 @@ int main(int argc, char** argv)
                         int cx = place_x >> 4;
                         int cz = place_z >> 4;
 
-                        chunk_t* c = region[client->dimension < 0].get_chunk(cx, cz);
+                        chunk_t* c = dimensions[client->dimension < 0].get_chunk(cx, cz);
                         if (c)
                         {
                             packet_block_change_t pack_block_change;

@@ -55,13 +55,13 @@ void assemble_bytes(std::vector<Uint8>& dat, Uint8* in, size_t len)
 
 void assemble_bool(std::vector<Uint8>& dat, bool in) { dat.push_back(in ? 1 : 0); }
 
-void assemble_ubyte(std::vector<Uint8>& dat, Uint8 in) { dat.push_back(in); }
+void assemble_ubyte(std::vector<Uint8>& dat, Uint8 in) { dat.push_back(*(Uint8*)&in); }
 
-void assemble_byte(std::vector<Uint8>& dat, Sint8 in) { dat.push_back(in); }
+void assemble_byte(std::vector<Uint8>& dat, Sint8 in) { dat.push_back(*(Uint8*)&in); }
 
 void assemble_short(std::vector<Uint8>& dat, Sint16 in)
 {
-    Sint16 temp = SDL_Swap16BE(in);
+    Uint16 temp = SDL_Swap16BE(*(Uint16*)&in);
     size_t loc = dat.size();
     dat.resize(dat.size() + sizeof(temp));
     memcpy(dat.data() + loc, &temp, sizeof(temp));
@@ -69,7 +69,7 @@ void assemble_short(std::vector<Uint8>& dat, Sint16 in)
 
 void assemble_int(std::vector<Uint8>& dat, Sint32 in)
 {
-    Sint32 temp = SDL_Swap32BE(in);
+    Uint32 temp = SDL_Swap32BE(*(Uint32*)&in);
     size_t loc = dat.size();
     dat.resize(dat.size() + sizeof(temp));
     memcpy(dat.data() + loc, &temp, sizeof(temp));
@@ -77,7 +77,7 @@ void assemble_int(std::vector<Uint8>& dat, Sint32 in)
 
 void assemble_long(std::vector<Uint8>& dat, Sint64 in)
 {
-    Sint64 temp = SDL_Swap64BE(in);
+    Uint64 temp = SDL_Swap64BE(*(Uint64*)&in);
     size_t loc = dat.size();
     dat.resize(dat.size() + sizeof(temp));
     memcpy(dat.data() + loc, &temp, sizeof(temp));
@@ -99,7 +99,12 @@ void assemble_double(std::vector<Uint8>& dat, double in)
     memcpy(dat.data() + loc, &temp, sizeof(temp));
 }
 
-bool send_buffer(SDLNet_StreamSocket* sock, std::vector<Uint8> dat) { return SDLNet_WriteToStreamSocket(sock, dat.data(), dat.size()); }
+bool send_buffer(SDLNet_StreamSocket* sock, std::vector<Uint8> dat)
+{
+    if (dat.size())
+        TRACE("Packet 0x%02x", dat[0]);
+    return SDLNet_WriteToStreamSocket(sock, dat.data(), dat.size());
+}
 
 bool consume_bytes(SDLNet_StreamSocket* sock, int len)
 {
