@@ -283,6 +283,23 @@ public:
             data[index] = 0;
     }
 
+    inline Uint8 get_metadata(int x, int y, int z)
+    {
+        if (x < 0)
+            x += 16;
+        if (y < 0)
+            y += 16;
+        if (z < 0)
+            z += 16;
+
+        int index = (y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z))) + CHUNK_SIZE_Y * CHUNK_SIZE_Z * CHUNK_SIZE_X * 2;
+
+        if (index % 2 == 1)
+            return (data[index / 2] >> 4) & 0x0F;
+        else
+            return data[index / 2] & 0x0F;
+    }
+
     inline void set_metadata(int x, int y, int z, Uint8 metadata)
     {
         if (x < 0)
@@ -1668,7 +1685,9 @@ int main(int argc, char** argv)
                                 pack_break_sfx.x = p->x;
                                 pack_break_sfx.y = p->y;
                                 pack_break_sfx.z = p->z;
-                                pack_break_sfx.sound_data = c->get_type(p->x % 16, p->y, p->z % 16);
+                                Uint8 old_type = c->get_type(p->x % 16, p->y, p->z % 16);
+                                Uint8 old_metadata = c->get_metadata(p->x % 16, p->y, p->z % 16);
+                                pack_break_sfx.sound_data = old_type | (old_metadata << 8);
 
                                 for (size_t i = 0; i < clients.size(); i++)
                                     if (clients[i].sock && clients[i].username.length() > 0)
