@@ -388,7 +388,7 @@ struct packet_health_t : packet_t
  */
 struct packet_respawn_t : packet_t
 {
-    packet_respawn_t() { id = PACKET_ID_UPDATE_HEALTH; }
+    packet_respawn_t() { id = PACKET_ID_RESPAWN; }
 
     jbyte dimension = 0;
     jbyte difficulty = 0;
@@ -399,7 +399,7 @@ struct packet_respawn_t : packet_t
     std::vector<Uint8> assemble()
     {
         std::vector<Uint8> dat;
-        assert(id == PACKET_ID_UPDATE_HEALTH);
+        assert(id == PACKET_ID_RESPAWN);
         dat.push_back(id);
         assemble_byte(dat, dimension >= 0 ? 0 : -1);
         assemble_byte(dat, difficulty);
