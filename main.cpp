@@ -382,10 +382,14 @@ public:
             d[cx].cx = cx;
             d[cx].cx_off = cx + region_x * REGION_SIZE_X;
             d[cx].cz_off = region_z * REGION_SIZE_Z;
-
-            threads[cx] = SDL_CreateThread(generate_chunk_thread_func, "Chunk Thread", &d[cx]);
         }
-        for (size_t i = 0; i < ARR_SIZE(threads); i++)
+
+        for (int cx = 1; cx < REGION_SIZE_X; cx++)
+            threads[cx] = SDL_CreateThread(generate_chunk_thread_func, "Chunk Thread", &d[cx]);
+
+        generate_chunk_thread_func(&d[0]);
+
+        for (size_t i = 1; i < ARR_SIZE(threads); i++)
         {
             int b;
             SDL_WaitThread(threads[i], &b);
@@ -685,8 +689,21 @@ public:
             d->generator = generator;
             d->x = regions[i].x;
             d->z = regions[i].z;
+        }
 
+        for (size_t i = 1; i < regions.size(); i++)
+        {
+            if (regions[i].region)
+                continue;
+
+            dim_reg_gen_data_t* d = &gen_data.data()[i];
             threads.push_back(SDL_CreateThread(dim_reg_gen_func, "Region gen thread", d));
+        }
+
+        if (regions.size() && !regions[0].region)
+        {
+            dim_reg_gen_data_t* d = &gen_data.data()[0];
+            dim_reg_gen_func(d);
         }
 
         for (size_t i = 0; i < threads.size(); i++)
@@ -1010,9 +1027,10 @@ int main(int argc, char** argv)
     dimension_t dimensions[2] = { dimension_t(0, world_seed, false), dimension_t(-1, world_seed, false) };
 
     SDL_Thread* dim_gen_threads[ARR_SIZE(dimensions)];
-    for (size_t i = 0; i < ARR_SIZE(dim_gen_threads); i++)
+    for (size_t i = 1; i < ARR_SIZE(dim_gen_threads); i++)
         dim_gen_threads[i] = SDL_CreateThread(dim_gen_thread_func, "Dim gen thread", &dimensions[i]);
-    for (size_t i = 0; i < ARR_SIZE(dim_gen_threads); i++)
+    dim_gen_thread_func(&dimensions[0]);
+    for (size_t i = 1; i < ARR_SIZE(dim_gen_threads); i++)
         SDL_WaitThread(dim_gen_threads[i], NULL);
 
     Uint64 tick_region_time = SDL_GetTicks() - tick_region_start;
