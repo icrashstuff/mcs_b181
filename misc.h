@@ -25,6 +25,10 @@
 
 #define ARR_SIZE(x) (sizeof(x) / sizeof(x[0]))
 
+#define ARR_SIZE_I(x) ((int)ARR_SIZE(x))
+
+#define ARR_SIZE_S(x) ((short)ARR_SIZE(x))
+
 #define LOG(fmt, ...) printf("%s:%d %s(): " fmt "\n", __FILE_NAME__, __LINE__, __func__, ##__VA_ARGS__)
 #define LOG_WARN(fmt, ...) printf("[WARN]: %s:%d %s(): " fmt "\n", __FILE_NAME__, __LINE__, __func__, ##__VA_ARGS__)
 #define LOG_TRACE(fmt, ...) printf("[TRACE]: %s:%d %s(): " fmt "\n", __FILE_NAME__, __LINE__, __func__, ##__VA_ARGS__)

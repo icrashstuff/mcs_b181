@@ -715,6 +715,47 @@ struct packet_window_close_t : packet_t
     }
 };
 
+struct inventory_item_t
+{
+    short id = -1;
+    short damage = 0;
+    jbyte quantity = 0;
+};
+
+struct packet_window_items_t : packet_t
+{
+    packet_window_items_t() { id = 0x68; }
+
+    jbyte window_id = 0;
+
+    std::vector<inventory_item_t> payload;
+
+    void payload_from_array(inventory_item_t* arr, Uint32 len)
+    {
+        payload.resize(len);
+        memcpy(payload.data(), arr, len * sizeof(inventory_item_t));
+    }
+
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == 0x68);
+        dat.push_back(id);
+        assemble_byte(dat, window_id);
+        assemble_short(dat, payload.size());
+        for (size_t i = 0; i < payload.size(); i++)
+        {
+            assemble_short(dat, payload[i].id);
+            if (payload[i].id > -1)
+            {
+                assemble_byte(dat, payload[i].quantity);
+                assemble_short(dat, payload[i].damage);
+            }
+        }
+        return dat;
+    }
+};
+
 struct packet_inventory_action_creative_t : packet_t
 {
     packet_inventory_action_creative_t() { id = 0x6b; }

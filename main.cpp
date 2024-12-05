@@ -814,6 +814,27 @@ struct client_t
 
     bool is_raining = 0;
 
+    /**
+     * Inventory layout
+     *
+     * +---+-------+ +-----+    +---+
+     * | 5 |   o   | | 1 2 | -> | 0 |
+     * | 6 |  ---  | | 3 4 | -> | 0 |
+     * | 7 |   |   | +-----+    +---+
+     * | 8 |  / \  +----------------+
+     * +---+-------+ 45 (1.9+ only) |
+     * +-----------+----------------+
+     * |  9 10 11 12 13 14 15 16 17 |
+     * | 18 19 20 21 22 23 24 25 26 |
+     * | 27 28 29 30 31 32 33 34 35 |
+     * +----------------------------+
+     * | 36 37 38 39 40 41 42 43 44 |
+     * +----------------------------+
+     */
+    inventory_item_t inventory[45];
+
+    int cur_item_idx = 0;
+
     std::vector<chunk_coords_t> loaded_chunks;
 };
 
@@ -939,7 +960,7 @@ void spawn_player(std::vector<client_t> clients, client_t* client, dimension_t* 
     pack_player.z = client->player_z * 32;
     pack_player.rotation = ((int)client->player_yaw) * 255 / 360;
     pack_player.pitch = client->player_pitch * 64 / 90;
-    ;
+    pack_player.cur_item = client->cur_item_idx;
 
     for (size_t i = 0; i < clients.size(); i++)
     {
@@ -974,6 +995,12 @@ void spawn_player(std::vector<client_t> clients, client_t* client, dimension_t* 
             send_buffer(clients[i].sock, pack_player.assemble());
         }
     }
+
+    packet_window_items_t pack_inv;
+    pack_inv.window_id = 0;
+    pack_inv.payload_from_array(client->inventory, ARR_SIZE(client->inventory));
+
+    send_buffer(sock, pack_inv.assemble());
 
     send_circle_chunks(client, dimensions, CHUNK_VIEW_DISTANCE / 2);
 
@@ -1119,6 +1146,28 @@ int main(int argc, char** argv)
             SDLNet_UnrefAddress(client_addr);
 
             new_client.time_keep_alive_recv = SDL_GetTicks();
+
+            new_client.inventory[36].id = BLOCK_ID_DIAMOND;
+            new_client.inventory[36].quantity = 1;
+
+            int wool_bits = SDL_rand_bits() & 0xFF;
+
+            for (int i = 1; i < 9; i++)
+            {
+                new_client.inventory[i + 36].id = BLOCK_ID_WOOL;
+                new_client.inventory[i + 36].quantity = -1;
+                new_client.inventory[i + 36].damage = ((i + wool_bits) * (1 + (wool_bits > 127))) % 16;
+            }
+
+            new_client.inventory[5].id = ITEM_ID_CHAIN_CAP;
+            new_client.inventory[6].quantity = 1;
+            new_client.inventory[6].id = ITEM_ID_IRON_TUNIC;
+            new_client.inventory[7].quantity = 1;
+            new_client.inventory[7].id = ITEM_ID_DIAMOND_PANTS;
+            new_client.inventory[7].quantity = 1;
+            new_client.inventory[8].id = ITEM_ID_GOLD_BOOTS;
+            new_client.inventory[8].quantity = 1;
+            new_client.inventory[8].damage = 5000;
 
             clients.push_back(new_client);
         }
@@ -1724,7 +1773,12 @@ int main(int argc, char** argv)
                     break;
                 }
                 case 0x10:
+                {
+                    CAST_PACK_TO_P(packet_hold_change_t);
+
+                    client->cur_item_idx = SDL_abs(p->slot_id) % 9;
                     break;
+                }
                 case 0x12:
                 {
                     send_buffer_to_players_if_coords(clients, pack->assemble(), client->player_x, client->player_z, client->dimension, client);
@@ -1735,7 +1789,20 @@ int main(int argc, char** argv)
                 case 0x65:
                     break;
                 case 0x6b:
+                {
+                    CAST_PACK_TO_P(packet_inventory_action_creative_t);
+
+                    if (p->slot < 0 || p->slot >= ARR_SIZE_S(client->inventory) || client->player_mode != 1)
+                        goto loop_end;
+
+                    LOG("%s %d %d %d %d", client->username.c_str(), p->slot, p->item_id, p->quantity, p->damage);
+
+                    client->inventory[p->slot].id = p->item_id;
+                    client->inventory[p->slot].quantity = p->quantity;
+                    client->inventory[p->slot].damage = p->damage;
+
                     break;
+                }
                 case 0xfe:
                 {
                     std::string s = "A mcs_b181 server§";
