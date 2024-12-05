@@ -350,29 +350,19 @@ private:
     std::vector<Uint8> data;
 };
 
+class region_t;
+
 struct chunk_thread_data_t
 {
-    chunk_t* c;
+    region_t* r;
     long seed;
     int dimension;
     int cx;
-    int cz;
+    int cx_off;
+    int cz_off;
 };
 
-int generate_chunk_thread_func(void* data)
-{
-    if (!data)
-        return 0;
-
-    chunk_thread_data_t* d = (chunk_thread_data_t*)data;
-
-    assert(d->c);
-    if (d->dimension < 0)
-        d->c->generate_from_seed_nether(d->seed, d->cx, d->cz);
-    else
-        d->c->generate_from_seed_over(d->seed, d->cx, d->cz);
-    return 1;
-}
+int generate_chunk_thread_func(void* data);
 
 class region_t
 {
@@ -381,29 +371,27 @@ public:
 
     void generate_from_seed(long seed, int dimension, int region_x, int region_z)
     {
+        Uint64 start_tick = SDL_GetTicks();
+        SDL_Thread* threads[REGION_SIZE_X];
+        chunk_thread_data_t d[REGION_SIZE_X];
         for (int cx = 0; cx < REGION_SIZE_X; cx++)
         {
-            SDL_Thread* threads[REGION_SIZE_Z];
-            chunk_thread_data_t d[REGION_SIZE_Z];
-            for (int cz = 0; cz < REGION_SIZE_Z; cz++)
-            {
-                chunk_t* c = get_chunk(cx, cz);
-                assert(c);
-                d[cz].c = c;
-                d[cz].seed = seed;
-                d[cz].dimension = dimension;
-                d[cz].cx = cx + region_x * REGION_SIZE_X;
-                d[cz].cz = cz + region_z * REGION_SIZE_Z;
+            d[cx].r = this;
+            d[cx].seed = seed;
+            d[cx].dimension = dimension;
+            d[cx].cx = cx;
+            d[cx].cx_off = cx + region_x * REGION_SIZE_X;
+            d[cx].cz_off = region_z * REGION_SIZE_Z;
 
-                threads[cz] = SDL_CreateThread(generate_chunk_thread_func, "Chunk Thread", &d[cz]);
-            }
-            for (size_t i = 0; i < ARR_SIZE(threads); i++)
-            {
-                int b;
-                SDL_WaitThread(threads[i], &b);
-                assert(b == 1);
-            }
+            threads[cx] = SDL_CreateThread(generate_chunk_thread_func, "Chunk Thread", &d[cx]);
         }
+        for (size_t i = 0; i < ARR_SIZE(threads); i++)
+        {
+            int b;
+            SDL_WaitThread(threads[i], &b);
+            assert(b == 1);
+        }
+        LOG("Generated region %d %d dim[%d] in %ld ms", dimension, region_x, region_z, SDL_GetTicks() - start_tick);
     }
 
     chunk_t* get_chunk(int cx, int cz)
@@ -420,10 +408,31 @@ private:
     chunk_t chunks[REGION_SIZE_X][REGION_SIZE_Z];
 };
 
+int generate_chunk_thread_func(void* data)
+{
+    if (!data)
+        return 0;
+
+    chunk_thread_data_t* d = (chunk_thread_data_t*)data;
+
+    for (int cz = 0; cz < REGION_SIZE_Z; cz++)
+    {
+        chunk_t* c = d->r->get_chunk(d->cx, cz);
+        if (!c)
+            LOG("Failed to get chunk: %d %d %d", d->cx_off, d->cz_off, cz);
+        assert(c);
+        if (d->dimension < 0)
+            c->generate_from_seed_nether(d->seed, d->cx_off, d->cz_off + cz);
+        else
+            c->generate_from_seed_over(d->seed, d->cx_off, d->cz_off + cz);
+    }
+    return 1;
+}
+
 class dimension_t
 {
 public:
-    dimension_t(int terrain_generator, long seed_dim)
+    dimension_t(int terrain_generator, long seed_dim, bool update_on_init = true)
     {
         generator = terrain_generator;
         seed = seed_dim;
@@ -438,7 +447,8 @@ public:
 
         needs_update = true;
 
-        update();
+        if (update_on_init)
+            update();
     }
 
     /**
@@ -909,6 +919,18 @@ void spawn_player(std::vector<client_t> clients, client_t* client, dimension_t* 
 
 int eid_counter = 0;
 
+int dim_gen_thread_func(void* data)
+{
+    if (!data)
+        return 0;
+
+    dimension_t* d = (dimension_t*)data;
+
+    d->update();
+
+    return 1;
+}
+
 int main(int argc, char** argv)
 {
     /* KDevelop fully buffers the output and will not display anything */
@@ -949,7 +971,14 @@ int main(int argc, char** argv)
 
     LOG("Generating regions");
     Uint64 tick_region_start = SDL_GetTicks();
-    dimension_t dimensions[2] = { dimension_t(0, world_seed), dimension_t(-1, world_seed) };
+    dimension_t dimensions[2] = { dimension_t(0, world_seed, false), dimension_t(-1, world_seed, false) };
+
+    SDL_Thread* dim_gen_threads[ARR_SIZE(dimensions)];
+    for (size_t i = 0; i < ARR_SIZE(dim_gen_threads); i++)
+        dim_gen_threads[i] = SDL_CreateThread(dim_gen_thread_func, "Dim gen thread", &dimensions[i]);
+    for (size_t i = 0; i < ARR_SIZE(dim_gen_threads); i++)
+        SDL_WaitThread(dim_gen_threads[i], NULL);
+
     Uint64 tick_region_time = SDL_GetTicks() - tick_region_start;
     LOG("Regions generated in %lu ms", tick_region_time);
 
