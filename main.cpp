@@ -796,6 +796,7 @@ struct client_t
     float player_pitch = 0.0;
     Uint8 player_on_ground = 0;
     int dimension = 0;
+    int old_dimension = 0;
     int player_mode = 1;
 
     short health = 20;
@@ -845,11 +846,19 @@ void chunk_remove_loaded(client_t* client)
     }
 }
 
-void send_buffer_to_players(std::vector<client_t> clients, std::vector<Uint8> buf)
+void send_buffer_to_players(std::vector<client_t> clients, std::vector<Uint8> buf, client_t* exclude = NULL)
 {
     for (size_t i = 0; i < clients.size(); i++)
-        if (clients[i].sock && clients[i].username.length() > 0)
+        if (clients[i].sock && clients[i].username.length() > 0 && (exclude == NULL || exclude->sock != clients[i].sock))
             send_buffer(clients[i].sock, buf);
+}
+
+void send_buffer_to_players_if_coords(std::vector<client_t> clients, std::vector<Uint8> buf, int world_x, int world_z, int dimension, client_t* exclude = NULL)
+{
+    for (size_t i = 0; i < clients.size(); i++)
+        if (clients[i].sock && clients[i].username.length() > 0 && (exclude == NULL || exclude->sock != clients[i].sock))
+            if (is_chunk_loaded(clients[i].loaded_chunks, world_x >> 4, world_z >> 4) && clients[i].dimension == dimension)
+                send_buffer(clients[i].sock, buf);
 }
 
 /**
@@ -917,6 +926,7 @@ void spawn_player(std::vector<client_t> clients, client_t* client, dimension_t* 
     client->y_last_ground = client->player_y;
     client->player_stance = client->player_y + 0.2;
     client->player_on_ground = 1;
+    client->pos_updated = 1;
 
     packet_ent_create_t pack_player_ent;
     packet_named_ent_spawn_t pack_player;
@@ -940,9 +950,18 @@ void spawn_player(std::vector<client_t> clients, client_t* client, dimension_t* 
             pack_ext_player_ent.eid = clients[i].eid;
             pack_ext_player.eid = clients[i].eid;
             pack_ext_player.name = clients[i].username;
-            pack_ext_player.x = clients[i].player_x * 32;
-            pack_ext_player.y = clients[i].player_y * 32;
-            pack_ext_player.z = clients[i].player_z * 32;
+            if (client[i].dimension == client->dimension)
+            {
+                pack_ext_player.x = -1;
+                pack_ext_player.y = -CHUNK_SIZE_Y * CHUNK_SIZE_Y;
+                pack_ext_player.z = -1;
+            }
+            else
+            {
+                pack_ext_player.x = clients[i].player_x * 32;
+                pack_ext_player.y = clients[i].player_y * 32;
+                pack_ext_player.z = clients[i].player_z * 32;
+            }
             pack_ext_player.rotation = ((int)clients[i].player_yaw) * 255 / 360;
             pack_ext_player.pitch = clients[i].player_pitch;
 
@@ -1204,13 +1223,23 @@ int main(int argc, char** argv)
                     pack_ext_player.z = client->player_z * 32;
                     pack_ext_player.rotation = ((int)client->player_yaw) * 255 / 360;
                     pack_ext_player.pitch = client->player_pitch;
-                    for (size_t i = 0; i < clients.size(); i++)
+
+                    send_buffer_to_players_if_coords(clients, pack_ext_player_ent.assemble(), client->player_x, client->player_z, client->dimension, client);
+                    send_buffer_to_players_if_coords(clients, pack_ext_player.assemble(), client->player_x, client->player_z, client->dimension, client);
+
+                    if (client->old_dimension != client->dimension)
                     {
-                        if (clients[i].sock && clients[i].username.length() > 0 && clients[i].sock != sock)
-                        {
-                            send_buffer(clients[i].sock, pack_ext_player_ent.assemble());
-                            send_buffer(clients[i].sock, pack_ext_player.assemble());
-                        }
+                        pack_ext_player.x = -1;
+                        pack_ext_player.y = -CHUNK_SIZE_Y * CHUNK_SIZE_Y;
+                        ;
+                        pack_ext_player.z = -1;
+
+                        send_buffer_to_players_if_coords(
+                            clients, pack_ext_player.assemble(), client->player_x, client->player_z, client->dimension < 0 ? 0 : -1, client);
+                        send_buffer_to_players_if_coords(
+                            clients, pack_ext_player.assemble(), client->player_x, client->player_z, client->dimension < 0 ? 0 : -1, client);
+
+                        client->old_dimension = client->dimension;
                     }
 
                     dimensions[client->dimension < 0].move_player(client->eid, client->player_x, client->player_y, client->player_z);
@@ -1397,12 +1426,12 @@ int main(int argc, char** argv)
                         else if (p->msg == "/smite")
                         {
                             packet_thunder_t pack_thunder;
-                            pack_thunder.eid = 2;
+                            pack_thunder.eid = eid_counter++;
                             pack_thunder.unknown = true;
                             pack_thunder.x = client->player_x;
                             pack_thunder.y = client->player_y;
                             pack_thunder.z = client->player_z;
-                            send_buffer(sock, pack_thunder.assemble());
+                            send_buffer_to_players_if_coords(clients, pack_thunder.assemble(), client->player_x, client->player_z, client->dimension);
                         }
                         else if (p->msg == "/unload")
                         {
@@ -1419,16 +1448,20 @@ int main(int argc, char** argv)
                         else if (p->msg == "/nether" || p->msg == "/overworld")
                         {
                             packet_respawn_t pack_dim_change;
-                            client->dimension = p->msg == "/overworld" ? 0 : -1;
                             pack_dim_change.seed = world_seed;
-                            pack_dim_change.dimension = client->dimension;
+                            pack_dim_change.dimension = p->msg == "/overworld" ? 0 : -1;
                             pack_dim_change.mode = client->player_mode;
                             pack_dim_change.world_height = WORLD_HEIGHT;
+                            if (client->dimension != pack_dim_change.dimension)
+                                client->loaded_chunks.clear();
+                            client->dimension = pack_dim_change.dimension;
                             send_buffer(sock, pack_dim_change.assemble());
 
                             packet_time_update_t pack_time;
                             pack_time.time = sdl_tick_cur / 50;
                             send_buffer(sock, pack_time.assemble());
+
+                            client->pos_updated = true;
 
                             spawn_player(clients, client, dimensions);
                         }
@@ -1585,7 +1618,11 @@ int main(int argc, char** argv)
                                 pack_break_sfx.y = p->y;
                                 pack_break_sfx.z = p->z;
                                 pack_break_sfx.sound_data = c->get_type(p->x % 16, p->y, p->z % 16);
-                                send_buffer_to_players(clients, pack_break_sfx.assemble());
+
+                                for (size_t i = 0; i < clients.size(); i++)
+                                    if (clients[i].sock && clients[i].username.length() > 0)
+                                        send_buffer_to_players_if_coords(
+                                            clients, pack_break_sfx.assemble(), pack_break_sfx.x, pack_break_sfx.z, client->dimension);
 
                                 packet_block_change_t pack_block_change;
                                 pack_block_change.block_x = p->x;
@@ -1596,7 +1633,7 @@ int main(int argc, char** argv)
                                 c->set_type(p->x % 16, p->y, p->z % 16, 0);
                                 c->set_metadata(p->x % 16, p->y, p->z % 16, 0);
                                 c->set_light_sky(p->x % 16, p->y, p->z % 16, 15);
-                                send_buffer_to_players(clients, pack_block_change.assemble());
+                                send_buffer_to_players_if_coords(clients, pack_block_change.assemble(), pack_break_sfx.x, pack_break_sfx.z, client->dimension);
                             }
                         }
                         else
@@ -1676,7 +1713,7 @@ int main(int argc, char** argv)
                             pack_block_change.metadata = p->damage;
                             c->set_type(place_x % 16, place_y, place_z % 16, p->block_item_id);
                             c->set_metadata(place_x % 16, place_y, place_z % 16, p->damage);
-                            send_buffer_to_players(clients, pack_block_change.assemble());
+                            send_buffer_to_players_if_coords(clients, pack_block_change.assemble(), place_x, place_z, client->dimension);
                         }
                         else
                             LOG("Unable to place block");
@@ -1688,9 +1725,7 @@ int main(int argc, char** argv)
                     break;
                 case 0x12:
                 {
-                    for (size_t i = 0; i < clients.size(); i++)
-                        if (clients[i].sock && clients[i].username.length() > 0 && clients[i].sock != sock)
-                            send_buffer(clients[i].sock, pack->assemble());
+                    send_buffer_to_players_if_coords(clients, pack->assemble(), client->player_x, client->player_z, client->dimension, client);
                     break;
                 }
                 case 0x13:
