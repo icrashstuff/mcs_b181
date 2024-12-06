@@ -37,7 +37,7 @@
 #ifdef ENABLE_TRACE
 #define TRACE(fmt, ...) LOG_TRACE(fmt, ##__VA_ARGS__)
 #else
-#define TRACE(fmt, ...) (0)
+#define TRACE(fmt, ...) void(0)
 #endif
 
 #define MAX_PLAYERS 20
