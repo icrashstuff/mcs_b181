@@ -47,6 +47,30 @@
 
 long world_seed = 0;
 
+struct dying_socket_t
+{
+    SDLNet_StreamSocket* sock;
+    Uint64 start_tick;
+};
+
+std::vector<dying_socket_t> dying_sockets;
+
+void cull_dying_sockets(bool force_all = false)
+{
+    Uint64 cur_tick = SDL_GetTicks();
+    for (auto it = dying_sockets.begin(); it != dying_sockets.end();)
+    {
+        int remaining = SDLNet_GetStreamSocketPendingWrites((*it).sock);
+        if (remaining < 1 || cur_tick - (*it).start_tick > 60000 || force_all)
+        {
+            SDLNet_DestroyStreamSocket((*it).sock);
+            it = dying_sockets.erase(it);
+        }
+        else
+            it = next(it);
+    }
+}
+
 void kick(SDLNet_StreamSocket* sock, std::string reason, bool log = true)
 {
     packet_kick_t packet;
@@ -58,11 +82,8 @@ void kick(SDLNet_StreamSocket* sock, std::string reason, bool log = true)
         LOG("Kicked: %s:%u, \"%s\"", SDLNet_GetAddressString(client_addr), SDLNet_GetStreamSocketPort(sock), reason.c_str());
     SDLNet_UnrefAddress(client_addr);
 
-    /* TODO: Move socket destruction to a separate place*/
-    int remaining = SDLNet_WaitUntilStreamSocketDrained(sock, 100);
-    if (remaining)
-        LOG_WARN("Socket about to be destroyed has %d remaining bytes to be sent", remaining);
-    SDLNet_DestroyStreamSocket(sock);
+    dying_sockets.push_back({ sock, SDL_GetTicks() });
+    cull_dying_sockets();
 }
 
 bool send_prechunk(SDLNet_StreamSocket* sock, int chunk_x, int chunk_z, bool mode)
@@ -1266,6 +1287,8 @@ int main(int argc, char** argv)
             clients.push_back(new_client);
         }
 
+        cull_dying_sockets();
+
         std::vector<std::string> players_kicked;
         std::vector<jint> entities_kicked;
 
@@ -1985,6 +2008,9 @@ int main(int argc, char** argv)
         if (clients[i].sock)
             SDLNet_DestroyStreamSocket(clients[i].sock);
     }
+
+    cull_dying_sockets(true);
+
     SDLNet_DestroyServer(server);
 
     SDLNet_Quit();
