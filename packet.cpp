@@ -505,7 +505,7 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
             PACK_LEN(PACKET_ID_BLOCK_ACTION, 13);
             PACK_LENV(PACKET_ID_EXPLOSION, 33, 1);
             PACK_LENV(PACKET_ID_WINDOW_OPEN, 6, 1);
-            PACK_LEN(PACKET_ID_WINDOW_CLICK, 2);
+            PACK_LENV(PACKET_ID_WINDOW_CLICK, 2, 1);
             PACK_LENV(PACKET_ID_WINDOW_SET_SLOT, 6, 1);
             PACK_LEN(PACKET_ID_WINDOW_UPDATE_PROGRESS, 6);
             PACK_LEN(PACKET_ID_WINDOW_TRANSACTION, 5);

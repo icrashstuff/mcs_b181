@@ -357,6 +357,10 @@ struct block_return_t
     Uint8 quantity_max;
 };
 
+bool is_transparent(short block_id);
+
+Uint8 get_light_level(short block_id);
+
 /**
  * Get the corresponding return data for a block id
  */

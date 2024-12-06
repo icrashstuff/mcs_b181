@@ -510,3 +510,51 @@ Uint8 mc_id::get_max_quantity_for_id(short item_id)
         return 64;
     }
 }
+
+bool mc_id::is_transparent(short block_id)
+{
+    switch (block_id)
+    {
+        ADD_NAME(BLOCK_ID_AIR, 1);
+        ADD_NAME(BLOCK_ID_GLASS, 1);
+        ADD_NAME(BLOCK_ID_GLASS_PANE, 1);
+        ADD_NAME(BLOCK_ID_IRON_BARS, 1);
+        ADD_NAME(BLOCK_ID_BED, 1);
+        ADD_NAME(BLOCK_ID_DOOR_IRON, 1);
+        ADD_NAME(BLOCK_ID_DOOR_WOOD, 1);
+        ADD_NAME(BLOCK_ID_TORCH, 1);
+        ADD_NAME(BLOCK_ID_TORCH_REDSTONE_OFF, 1);
+        ADD_NAME(BLOCK_ID_TORCH_REDSTONE_ON, 1);
+        ADD_NAME(BLOCK_ID_RAIL, 1);
+        ADD_NAME(BLOCK_ID_RAIL_DETECTOR, 1);
+        ADD_NAME(BLOCK_ID_RAIL_POWERED, 1);
+        ADD_NAME(BLOCK_ID_FENCE_WOOD, 1);
+        ADD_NAME(BLOCK_ID_LADDER, 1);
+        ADD_NAME(BLOCK_ID_CHEST, 1);
+        ADD_NAME(BLOCK_ID_SUGAR_CANE, 1);
+        ADD_NAME(BLOCK_ID_FIRE, 1);
+        ADD_NAME(BLOCK_ID_GATE, 1);
+    default:
+        return 0;
+    }
+}
+
+Uint8 mc_id::get_light_level(short block_id)
+{
+
+    switch (block_id)
+    {
+        ADD_NAME(BLOCK_ID_TORCH, 15);
+        ADD_NAME(BLOCK_ID_TORCH_REDSTONE_OFF, 7);
+        ADD_NAME(BLOCK_ID_TORCH_REDSTONE_ON, 7);
+        ADD_NAME(BLOCK_ID_FURNACE_ON, 15);
+        ADD_NAME(BLOCK_ID_FIRE, 15);
+        ADD_NAME(BLOCK_ID_GLOWSTONE, 15);
+        ADD_NAME(BLOCK_ID_PUMPKIN_GLOWING, 15);
+        ADD_NAME(BLOCK_ID_LAVA_SOURCE, 15);
+        ADD_NAME(BLOCK_ID_LAVA_FLOWING, 15);
+        ADD_NAME(BLOCK_ID_ORE_REDSTONE_ON, 7);
+    default:
+        return 0;
+    }
+}

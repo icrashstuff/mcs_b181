@@ -109,6 +109,32 @@ public:
         r_state = *(Uint64*)&ptr;
     }
 
+    /**
+     * Goes through and sets the appropriate light levels for each block,
+     *
+     * Lighting is something I don't really understand nor something I feel
+     * like currently putting in the effort to understand right now
+     */
+    void correct_lighting(int generator)
+    {
+        if (!changed)
+            return;
+
+        for (int x = 0; x < CHUNK_SIZE_X; x++)
+        {
+            for (int z = 0; z < CHUNK_SIZE_Z; z++)
+            {
+                for (int y = CHUNK_SIZE_Y - 1; y >= 0; y--)
+                {
+                    set_light_sky(x, y, z, 15);
+                    Uint8 level = mc_id::get_light_level(get_type(x, y, z));
+                    set_light_block(x, y, z, level);
+                }
+            }
+        }
+        changed = false;
+    }
+
     void generate_from_seed_over(long seed, int cx, int cz)
     {
         SimplexNoise noise;
@@ -143,6 +169,8 @@ public:
                 set_type(x, 0, z, BLOCK_ID_BEDROCK);
             }
         }
+
+        correct_lighting(0);
     }
 
     void generate_from_seed_nether(long seed, int cx, int cz)
@@ -168,7 +196,7 @@ public:
                     if (i < 63)
                     {
                         set_type(x, i, z, BLOCK_ID_LAVA_FLOWING);
-                        set_light_block(x, i, z, 15);
+                        set_light_block(x, i, z, mc_id::get_light_level(BLOCK_ID_LAVA_FLOWING));
                     }
                     else
                         set_light_sky(x, i, z, 15);
@@ -178,8 +206,12 @@ public:
                 set_type(x, 0, z, BLOCK_ID_BEDROCK);
                 set_type(x, CHUNK_SIZE_Y - 1, z, BLOCK_ID_BEDROCK);
                 set_light_sky(x, CHUNK_SIZE_Y - 1, z, 15);
+                for (int i = 0; i < CHUNK_SIZE_Y; i++)
+                    set_light_block(x, i, z, 15);
             }
         }
+
+        correct_lighting(-1);
     }
 
     void generate_special_ascending_type(int max_y)
@@ -289,6 +321,7 @@ public:
 
     inline void set_type(int x, int y, int z, Uint8 type)
     {
+        changed = true;
         if (x < 0)
             x += 16;
         if (y < 0)
@@ -323,6 +356,7 @@ public:
 
     inline void set_metadata(int x, int y, int z, Uint8 metadata)
     {
+        changed = true;
         if (x < 0)
             x += 16;
         if (y < 0)
@@ -357,6 +391,7 @@ public:
 
     inline void set_light_block(int x, int y, int z, Uint8 level)
     {
+        changed = true;
         if (x < 0)
             x += 16;
         if (y < 0)
@@ -391,6 +426,7 @@ public:
 
     inline void set_light_sky(int x, int y, int z, Uint8 level)
     {
+        changed = true;
         if (x < 0)
             x += 16;
         if (y < 0)
@@ -417,9 +453,19 @@ public:
         return result == Z_OK;
     }
 
+    bool changed = false;
+
 private:
     Uint64 r_state;
     std::vector<Uint8> data;
+};
+
+struct light_data_t
+{
+    int x;
+    int z;
+    Uint8 y;
+    Uint8 intensity;
 };
 
 class region_t;
@@ -1020,7 +1066,11 @@ void send_square_chunks(client_t* client, dimension_t* dimensions, int radius)
             coords.z = z + pos_cz;
             if (is_chunk_loaded(client->loaded_chunks, coords.x, coords.z))
                 continue;
-            if (send_chunk(client->sock, dimensions[client->dimension < 0].get_chunk(coords.x, coords.z), coords.x, coords.z))
+            chunk_t* c = dimensions[client->dimension < 0].get_chunk(coords.x, coords.z);
+            if (!c)
+                continue;
+            c->correct_lighting(client->dimension);
+            if (send_chunk(client->sock, c, coords.x, coords.z))
                 client->loaded_chunks.push_back(coords);
         }
     }
@@ -1052,7 +1102,11 @@ void send_circle_chunks(client_t* client, dimension_t* dimensions, int radius)
                 continue;
             if (is_chunk_loaded(client->loaded_chunks, coords.x, coords.z))
                 continue;
-            if (send_chunk(client->sock, dimensions[client->dimension < 0].get_chunk(coords.x, coords.z), coords.x, coords.z))
+            chunk_t* c = dimensions[client->dimension < 0].get_chunk(coords.x, coords.z);
+            if (!c)
+                continue;
+            c->correct_lighting(client->dimension);
+            if (send_chunk(client->sock, c, coords.x, coords.z))
                 client->loaded_chunks.push_back(coords);
         }
     }
