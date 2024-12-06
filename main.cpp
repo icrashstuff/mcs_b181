@@ -856,6 +856,7 @@ struct client_t
 
     bool pos_updated = 1;
 
+    Uint32 time_invulnerable_fall_damage = 0;
     Uint64 time_last_health_update = 0;
 
     Uint64 time_last_food_update = 0;
@@ -1045,6 +1046,7 @@ void spawn_player(std::vector<client_t> clients, client_t* client, dimension_t* 
     client->player_stance = client->player_y + 0.2;
     client->player_on_ground = 1;
     client->pos_updated = 1;
+    client->time_invulnerable_fall_damage = 20;
 
     packet_ent_create_t pack_player_ent;
     packet_ent_spawn_named_t pack_player;
@@ -1071,9 +1073,9 @@ void spawn_player(std::vector<client_t> clients, client_t* client, dimension_t* 
             pack_ext_player.name = clients[i].username;
             if (client[i].dimension == client->dimension)
             {
-                pack_ext_player.x = -1;
-                pack_ext_player.y = -CHUNK_SIZE_Y * CHUNK_SIZE_Y;
-                pack_ext_player.z = -1;
+                pack_ext_player.x = 0;
+                pack_ext_player.y = SDL_MIN_SINT32 / 2;
+                pack_ext_player.z = 0;
             }
             else
             {
@@ -1446,7 +1448,10 @@ int main(int argc, char** argv)
                     client->update_health = 1;
                 }
 
-                if (client->player_on_ground && client->player_mode == 0)
+                if (client->time_invulnerable_fall_damage)
+                    client->time_invulnerable_fall_damage--;
+
+                if (client->player_on_ground && client->player_mode == 0 && !client->time_invulnerable_fall_damage)
                 {
                     if (client->y_last_ground - client->player_y > 4)
                     {
