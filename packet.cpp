@@ -222,14 +222,14 @@ bool read_string16(SDLNet_StreamSocket* sock, std::string& out)
     return 1;
 }
 
-#define BAIL_READ(width)                                     \
-    do                                                       \
-    {                                                        \
-        if (dat.size() < (width) + pos)                      \
-        {                                                    \
-            LOG_TRACE("%zu %zu", dat.size(), (width) + pos); \
-            return 0;                                        \
-        }                                                    \
+#define BAIL_READ(width)                                                            \
+    do                                                                              \
+    {                                                                               \
+        if (dat.size() < (width) + pos)                                             \
+        {                                                                           \
+            LOG_TRACE("dat.size(): %zu, expected: %zu", dat.size(), (width) + pos); \
+            return 0;                                                               \
+        }                                                                           \
     } while (0)
 
 SDL_FORCE_INLINE bool read_ubyte(std::vector<Uint8>& dat, size_t& pos, Uint8* out)
@@ -327,6 +327,9 @@ SDL_FORCE_INLINE bool read_string16(std::vector<Uint8>& dat, size_t& pos, std::s
 }
 
 #undef BAIL_READ
+
+#define MCS_B181_PACKET_GEN_IMPL
+#include "packet_gen_def.h"
 
 #define PACK_NAME(x)    \
     case PACKET_ID_##x: \
@@ -506,7 +509,7 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
             PACK_LENV(PACKET_ID_WINDOW_SET_SLOT, 6, 1);
             PACK_LEN(PACKET_ID_WINDOW_UPDATE_PROGRESS, 6);
             PACK_LEN(PACKET_ID_WINDOW_TRANSACTION, 5);
-            PACK_LENV(PACKET_ID_UPDATE_SIGN, 11, 4);
+            PACK_LENV(PACKET_ID_UPDATE_SIGN, 13, 4);
             PACK_LENV(PACKET_ID_ITEM_DATA, 6, 1);
             PACK_LEN(PACKET_ID_INCREMENT_STATISTIC, 6);
 
@@ -548,50 +551,56 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
 
         // LOG("0x%02x %zu %zu %zu %d", packet_type, buf_inc, len, buf_size, var_len);
 
-#define GET_STR_LEN(var_len_val, off)                                  \
-    do                                                                 \
-    {                                                                  \
-        if (var_len == var_len_val && buf_size >= ((off) + 2))         \
-        {                                                              \
-            len += (SDL_Swap16BE(*(Uint16*)(buf.data() + (off))) * 2); \
-            var_len--;                                                 \
-            change_happened++;                                         \
-        }                                                              \
+#define GET_STR_LEN(var_len_val, off, add)                                   \
+    do                                                                       \
+    {                                                                        \
+        if (var_len == var_len_val && buf_size >= ((off) + 2))               \
+        {                                                                    \
+            len += (SDL_Swap16BE(*(Uint16*)(buf.data() + (off))) * 2) + add; \
+            var_len--;                                                       \
+            change_happened++;                                               \
+        }                                                                    \
     } while (0)
 
         if (var_len > 0)
         {
-            switch (packet_type)
+            bool vlen_gen_result = 0;
+
+            if (is_server)
+                vlen_gen_result = vlen_gen_server(packet_type, buf, buf_size, change_happened, var_len, len);
+            else
+                vlen_gen_result = vlen_gen_client(packet_type, buf, buf_size, change_happened, var_len, len);
+
+            if (!vlen_gen_result)
             {
-            case PACKET_ID_LOGIN_REQUEST:
-            {
-                GET_STR_LEN(1, 5);
-                break;
-            }
-            case PACKET_ID_HANDSHAKE:
-            case PACKET_ID_CHAT_MSG:
-            case PACKET_ID_KICK:
-            {
-                GET_STR_LEN(1, 1);
-                break;
-            }
-            case PACKET_ID_PLAYER_PLACE:
-            {
-                if (var_len == 1 && buf_size >= 13)
+                switch (packet_type)
                 {
-                    Uint16 temp = SDL_Swap16BE(*(Uint16*)(buf.data() + 11));
-                    len += ((*(Sint16*)&temp) >= 0) ? 3 : 0;
-                    var_len--;
-                    change_happened++;
+                case PACKET_ID_UPDATE_SIGN:
+                {
+                    GET_STR_LEN(1, len - 2, 0);
+                    GET_STR_LEN(2, len - 2, 2);
+                    GET_STR_LEN(3, len - 2, 2);
+                    GET_STR_LEN(4, len - 2, 2);
+                    break;
                 }
-                break;
-            }
-            default:
-                char buffer[128];
-                snprintf(
-                    buffer, ARR_SIZE(buffer), "Packet ID: 0x%02x(%s): var_len set but no handler found", packet_type, packet_t::get_name_for_id(packet_type));
-                err_str = buffer;
-                break;
+                case PACKET_ID_PLAYER_PLACE:
+                {
+                    if (var_len == 1 && buf_size >= 13)
+                    {
+                        Uint16 temp = SDL_Swap16BE(*(Uint16*)(buf.data() + 11));
+                        len += ((*(Sint16*)&temp) >= 0) ? 3 : 0;
+                        var_len--;
+                        change_happened++;
+                    }
+                    break;
+                }
+                default:
+                    char buffer[128];
+                    snprintf(buffer, ARR_SIZE(buffer), "Packet ID: 0x%02x(%s): var_len set but no handler found", packet_type,
+                        packet_t::get_name_for_id(packet_type));
+                    err_str = buffer;
+                    break;
+                }
             }
         }
     } while (change_happened && (var_len || buf_size != len));
@@ -614,207 +623,43 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
 
     size_t pos = 1;
     int err = 0;
-    switch (packet_type)
+
+    bool parse_gen_result = 0;
+
+    if (is_server)
+        parse_gen_result = parse_gen_packets_server(packet_type, buf, err, pos, packet);
+    else
+        parse_gen_result = parse_gen_packets_client(packet_type, buf, err, pos, packet);
+
+    if (!parse_gen_result)
     {
-    case PACKET_ID_KEEP_ALIVE:
-    {
-        P(packet_keep_alive_t);
-
-        err += !read_int(buf, pos, &p->keep_alive_id);
-
-        break;
-    }
-    case PACKET_ID_LOGIN_REQUEST:
-    {
-        P(packet_login_request_c2s_t);
-
-        err += !read_int(buf, pos, &p->protocol_ver);
-        err += !read_string16(buf, pos, p->username);
-        err += !read_long(buf, pos, &p->unused0);
-        err += !read_int(buf, pos, &p->unused1);
-        err += !read_byte(buf, pos, &p->unused2);
-        err += !read_byte(buf, pos, &p->unused3);
-        err += !read_ubyte(buf, pos, &p->unused4);
-        err += !read_ubyte(buf, pos, &p->unused5);
-
-        break;
-    }
-    case PACKET_ID_HANDSHAKE:
-    {
-        P(packet_handshake_c2s_t);
-
-        err += !read_string16(buf, pos, p->username);
-
-        break;
-    }
-    case PACKET_ID_CHAT_MSG:
-    {
-        P(packet_chat_message_t);
-
-        err += !read_string16(buf, pos, p->msg);
-
-        break;
-    }
-    case PACKET_ID_ENT_USE:
-    {
-        P(packet_ent_use_t);
-
-        err += !read_int(buf, pos, &p->user);
-        err += !read_int(buf, pos, &p->target);
-        err += !read_ubyte(buf, pos, &p->left_click);
-
-        break;
-    }
-    case PACKET_ID_RESPAWN:
-    {
-        P(packet_respawn_t);
-
-        err += !read_byte(buf, pos, &p->dimension);
-        err += !read_byte(buf, pos, &p->difficulty);
-        err += !read_byte(buf, pos, &p->mode);
-        err += !read_short(buf, pos, &p->world_height);
-        err += !read_long(buf, pos, &p->seed);
-
-        break;
-    }
-    case PACKET_ID_PLAYER_ON_GROUND:
-    {
-        P(packet_on_ground_t);
-
-        err += !read_ubyte(buf, pos, &p->on_ground);
-
-        break;
-    }
-    case PACKET_ID_PLAYER_POS:
-    {
-        P(packet_player_pos_t);
-
-        err += !read_double(buf, pos, &p->x);
-        err += !read_double(buf, pos, &p->y);
-        err += !read_double(buf, pos, &p->stance);
-        err += !read_double(buf, pos, &p->z);
-        err += !read_ubyte(buf, pos, &p->on_ground);
-
-        break;
-    }
-    case PACKET_ID_PLAYER_LOOK:
-    {
-        P(packet_player_look_t);
-
-        err += !read_float(buf, pos, &p->yaw);
-        err += !read_float(buf, pos, &p->pitch);
-        err += !read_ubyte(buf, pos, &p->on_ground);
-
-        break;
-    }
-    case PACKET_ID_PLAYER_POS_LOOK:
-    {
-        P(packet_player_pos_look_c2s_t);
-
-        err += !read_double(buf, pos, &p->x);
-        err += !read_double(buf, pos, &p->y);
-        err += !read_double(buf, pos, &p->stance);
-        err += !read_double(buf, pos, &p->z);
-        err += !read_float(buf, pos, &p->yaw);
-        err += !read_float(buf, pos, &p->pitch);
-        err += !read_ubyte(buf, pos, &p->on_ground);
-
-        break;
-    }
-    case PACKET_ID_PLAYER_DIG:
-    {
-        P(packet_player_dig_t);
-
-        err += !read_byte(buf, pos, &p->status);
-        err += !read_int(buf, pos, &p->x);
-        err += !read_byte(buf, pos, &p->y);
-        err += !read_int(buf, pos, &p->z);
-        err += !read_byte(buf, pos, &p->face);
-
-        break;
-    }
-    case PACKET_ID_PLAYER_PLACE:
-    {
-        P(packet_player_place_t);
-
-        err += !read_int(buf, pos, &p->x);
-        err += !read_byte(buf, pos, &p->y);
-        err += !read_int(buf, pos, &p->z);
-        err += !read_byte(buf, pos, &p->direction);
-        err += !read_short(buf, pos, &p->block_item_id);
-        if (p->block_item_id >= 0)
+        switch (packet_type)
         {
-            err += !read_byte(buf, pos, &p->amount);
-            err += !read_short(buf, pos, &p->damage);
+        case PACKET_ID_PLAYER_PLACE:
+        {
+            P(packet_player_place_t);
+
+            err += !read_int(buf, pos, &p->x);
+            err += !read_byte(buf, pos, &p->y);
+            err += !read_int(buf, pos, &p->z);
+            err += !read_byte(buf, pos, &p->direction);
+            err += !read_short(buf, pos, &p->block_item_id);
+            if (p->block_item_id >= 0)
+            {
+                err += !read_byte(buf, pos, &p->amount);
+                err += !read_short(buf, pos, &p->damage);
+            }
+
+            break;
         }
 
-        break;
-    }
-    case PACKET_ID_HOLD_CHANGE:
-    {
-        P(packet_hold_change_t);
-
-        err += !read_short(buf, pos, &p->slot_id);
-
-        break;
-    }
-    case PACKET_ID_ENT_ANIMATION:
-    {
-        P(packet_ent_animation_t);
-
-        err += !read_int(buf, pos, &p->eid);
-        err += !read_byte(buf, pos, &p->animate);
-
-        break;
-    }
-    case PACKET_ID_ENT_ACTION:
-    {
-        P(packet_ent_action_t);
-
-        err += !read_int(buf, pos, &p->eid);
-        err += !read_byte(buf, pos, &p->action_id);
-
-        break;
-    }
-    case PACKET_ID_WINDOW_CLOSE:
-    {
-        P(packet_window_close_t);
-
-        err += !read_byte(buf, pos, &p->window_id);
-
-        break;
-    }
-    case PACKET_ID_INV_CREATIVE_ACTION:
-    {
-        P(packet_inventory_action_creative_t);
-
-        err += !read_short(buf, pos, &p->slot);
-        err += !read_short(buf, pos, &p->item_id);
-        err += !read_short(buf, pos, &p->quantity);
-        err += !read_short(buf, pos, &p->damage);
-
-        break;
-    }
-    case PACKET_ID_SERVER_LIST_PING:
-    {
-        packet = new packet_server_list_ping_t();
-        break;
-    }
-    case PACKET_ID_KICK:
-    {
-        P(packet_kick_t);
-
-        err += !read_string16(buf, pos, p->reason);
-
-        break;
-    }
-
-    default:
-        char buffer[128];
-        snprintf(buffer, ARR_SIZE(buffer), "Packet ID: 0x%02x(%s): missing final parse", packet_type, packet_t::get_name_for_id(packet_type));
-        err_str = buffer;
-        return NULL;
-        break;
+        default:
+            char buffer[128];
+            snprintf(buffer, ARR_SIZE(buffer), "Packet ID: 0x%02x(%s): missing final parse", packet_type, packet_t::get_name_for_id(packet_type));
+            err_str = buffer;
+            return NULL;
+            break;
+        }
     }
 
     TRACE("Packet buffer read: %zu/%zu", pos, buf.size());

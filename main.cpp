@@ -1001,7 +1001,7 @@ void spawn_player(std::vector<client_t> clients, client_t* client, dimension_t* 
     client->pos_updated = 1;
 
     packet_ent_create_t pack_player_ent;
-    packet_named_ent_spawn_t pack_player;
+    packet_ent_spawn_named_t pack_player;
 
     pack_player_ent.eid = client->eid;
     pack_player.eid = client->eid;
@@ -1018,7 +1018,7 @@ void spawn_player(std::vector<client_t> clients, client_t* client, dimension_t* 
         if (clients[i].sock && clients[i].username.length() > 0 && clients[i].sock != sock)
         {
             packet_ent_create_t pack_ext_player_ent;
-            packet_named_ent_spawn_t pack_ext_player;
+            packet_ent_spawn_named_t pack_ext_player;
 
             pack_ext_player_ent.eid = clients[i].eid;
             pack_ext_player.eid = clients[i].eid;
@@ -1201,9 +1201,12 @@ int main(int argc, char** argv)
             new_client.inventory[36].id = BLOCK_ID_DIAMOND;
             new_client.inventory[36].quantity = 1;
 
+            new_client.inventory[37].id = 323;
+            new_client.inventory[37].quantity = 1;
+
             int wool_bits = SDL_rand_bits() & 0xFF;
 
-            for (int i = 1; i < 9; i++)
+            for (int i = 2; i < 9; i++)
             {
                 new_client.inventory[i + 36].id = BLOCK_ID_WOOL;
                 new_client.inventory[i + 36].quantity = -1;
@@ -1853,6 +1856,21 @@ int main(int argc, char** argv)
                     client->inventory[p->slot].id = p->item_id;
                     client->inventory[p->slot].quantity = p->quantity;
                     client->inventory[p->slot].damage = p->damage;
+
+                    break;
+                }
+                case PACKET_ID_UPDATE_SIGN:
+                {
+                    CAST_PACK_TO_P(packet_update_sign_t);
+
+                    if (p->text0.length())
+                        LOG("%s Sign[0]: \"%s\"", client->username.c_str(), p->text0.c_str());
+                    if (p->text1.length())
+                        LOG("%s Sign[1]: \"%s\"", client->username.c_str(), p->text1.c_str());
+                    if (p->text2.length())
+                        LOG("%s Sign[2]: \"%s\"", client->username.c_str(), p->text2.c_str());
+                    if (p->text3.length())
+                        LOG("%s Sign[3]: \"%s\"", client->username.c_str(), p->text3.c_str());
 
                     break;
                 }
