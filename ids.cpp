@@ -1,0 +1,439 @@
+/* SPDX-License-Identifier: MIT
+ *
+ * SPDX-FileCopyrightText: Copyright (c) 2024 Ian Hangartner <icrashstuff at outlook dot com>
+ *
+ * Permission is hereby granted, free of charge, to any person obtaining a
+ * copy of this software and associated documentation files (the "Software"),
+ * to deal in the Software without restriction, including without limitation
+ * the rights to use, copy, modify, merge, publish, distribute, sublicense,
+ * and/or sell copies of the Software, and to permit persons to whom the
+ * Software is furnished to do so, subject to the following conditions:
+ *
+ * The above copyright notice and this permission notice shall be included in
+ * all copies or substantial portions of the Software.
+ *
+ * THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+ * IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+ * AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+ * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+ * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
+ * DEALINGS IN THE SOFTWARE.
+ */
+
+#include "ids.h"
+
+#define ADD_NAME(id, name) \
+    case id:               \
+        return name
+
+const char* get_name_from_item_id(short item_id, short damage)
+{
+    switch (item_id)
+    {
+        ADD_NAME(BLOCK_ID_NONE, "No item");
+        ADD_NAME(BLOCK_ID_AIR, "Air");
+        ADD_NAME(BLOCK_ID_STONE, "Stone");
+        ADD_NAME(BLOCK_ID_GRASS, "Grass");
+        ADD_NAME(BLOCK_ID_DIRT, "Dirt");
+        ADD_NAME(BLOCK_ID_COBBLESTONE, "Cobblestone");
+        ADD_NAME(BLOCK_ID_WOOD_PLANKS, "Wooden Planks");
+    case BLOCK_ID_SAPLING:
+    {
+        switch (damage)
+        {
+            ADD_NAME(WOOD_ID_OAK, "Oak Sapling");
+            ADD_NAME(WOOD_ID_SPRUCE, "Spruce Sapling");
+            ADD_NAME(WOOD_ID_BIRCH, "Birch Sapling");
+        default:
+            return "Unknown Sapling";
+        }
+    }
+        ADD_NAME(BLOCK_ID_BEDROCK, "Bedrock");
+
+        ADD_NAME(BLOCK_ID_WATER_FLOWING, "Water Flowing");
+
+        ADD_NAME(BLOCK_ID_WATER_SOURCE, "Water Source");
+
+        ADD_NAME(BLOCK_ID_LAVA_FLOWING, "Lava Flowing");
+
+        ADD_NAME(BLOCK_ID_LAVA_SOURCE, "Lava Source");
+
+        ADD_NAME(BLOCK_ID_SAND, "Sand");
+        ADD_NAME(BLOCK_ID_GRAVEL, "Gravel");
+        ADD_NAME(BLOCK_ID_ORE_GOLD, "Gold Ore");
+        ADD_NAME(BLOCK_ID_ORE_IRON, "Iron Ore");
+        ADD_NAME(BLOCK_ID_ORE_COAL, "Coal Ore");
+    case BLOCK_ID_LOG:
+    {
+        switch (damage)
+        {
+            ADD_NAME(WOOD_ID_OAK, "Oak Log");
+            ADD_NAME(WOOD_ID_SPRUCE, "Spruce Log");
+            ADD_NAME(WOOD_ID_BIRCH, "Birch Log");
+        default:
+            return "Unknown Log";
+        }
+    }
+        ADD_NAME(BLOCK_ID_LEAVES, "Leaves");
+        ADD_NAME(BLOCK_ID_SPONGE, "Sponge");
+        ADD_NAME(BLOCK_ID_GLASS, "Glass");
+        ADD_NAME(BLOCK_ID_ORE_LAPIS, "Lapis Lazuli Ore");
+
+        ADD_NAME(BLOCK_ID_LAPIS, "Lapis Lazuli Block");
+        ADD_NAME(BLOCK_ID_DISPENSER, "Dispenser");
+        ADD_NAME(BLOCK_ID_SANDSTONE, "Sandstone");
+        ADD_NAME(BLOCK_ID_NOTE_BLOCK, "Note block");
+        ADD_NAME(BLOCK_ID_BED, "Bed block");
+        ADD_NAME(BLOCK_ID_RAIL_POWERED, "Powered Rail");
+        ADD_NAME(BLOCK_ID_RAIL_DETECTOR, "Detector Rail");
+        ADD_NAME(BLOCK_ID_PISTON_STICKY, "Stick Piston");
+        ADD_NAME(BLOCK_ID_COBWEB, "Cobweb");
+        ADD_NAME(BLOCK_ID_FOLIAGE, "Grass");
+        ADD_NAME(BLOCK_ID_DEAD_BUSH, "Dead Bush");
+        ADD_NAME(BLOCK_ID_PISTON, "Piston");
+        ADD_NAME(BLOCK_ID_PISTON_HEAD, "Piston Head");
+    case BLOCK_ID_WOOL:
+    {
+        switch (damage)
+        {
+            ADD_NAME(WOOL_ID_WHITE, "Wool");
+            ADD_NAME(WOOL_ID_ORANGE, "Orange Wool");
+            ADD_NAME(WOOL_ID_MAGENTA, "Magenta Wool");
+            ADD_NAME(WOOL_ID_LIGHT_BLUE, "Light Blue Wool");
+            ADD_NAME(WOOL_ID_YELLOW, "Yellow Wool");
+            ADD_NAME(WOOL_ID_LIME, "Lime Wool");
+            ADD_NAME(WOOL_ID_PINK, "Pink Wool");
+            ADD_NAME(WOOL_ID_GRAY, "Gray Wool");
+            ADD_NAME(WOOL_ID_LIGHT_GRAY, "Light Gray Wool");
+            ADD_NAME(WOOL_ID_CYAN, "Cyan Wool");
+            ADD_NAME(WOOL_ID_PURPLE, "Purple Wool");
+            ADD_NAME(WOOL_ID_BLUE, "Blue Wool");
+            ADD_NAME(WOOL_ID_BROWN, "Brown Wool");
+            ADD_NAME(WOOL_ID_GREEN, "Green Wool");
+            ADD_NAME(WOOL_ID_RED, "Red Wool");
+            ADD_NAME(WOOL_ID_BLACK, "Black Wool");
+        default:
+            return "Unknown Wool";
+        }
+    }
+
+        ADD_NAME(BLOCK_ID_UNKNOWN, "BLOCK_ID_UNKNOWN");
+        ADD_NAME(BLOCK_ID_FLOWER_YELLOW, "Dandelion");
+        ADD_NAME(BLOCK_ID_FLOWER_RED, "Rose");
+        ADD_NAME(BLOCK_ID_MUSHROOM_BLAND, "Mushroom");
+        ADD_NAME(BLOCK_ID_MUSHROOM_RED, "Red Mushroom");
+
+        ADD_NAME(BLOCK_ID_GOLD, "Gold Block");
+        ADD_NAME(BLOCK_ID_IRON, "Iron Block");
+
+    case BLOCK_ID_SLAB_DOUBLE:
+    {
+        switch (damage)
+        {
+            ADD_NAME(SLAB_ID_SMOOTH, "Smooth Stone Double Slab");
+            ADD_NAME(SLAB_ID_SANDSTONE, "Sandstone Double Slab");
+            ADD_NAME(SLAB_ID_WOOD, "Wood Double Slab");
+            ADD_NAME(SLAB_ID_COBBLESTONE, "Cobblestone Double Slab");
+            ADD_NAME(SLAB_ID_BRICKS, "Brick Double Slab");
+            ADD_NAME(SLAB_ID_BRICKS_STONE, "Stone Brick Double Slab");
+        default:
+            return "Unknown Double Slab";
+        }
+    }
+
+    case BLOCK_ID_SLAB_SINGLE:
+    {
+        switch (damage)
+        {
+            ADD_NAME(SLAB_ID_SMOOTH, "Smooth Stone Slab");
+            ADD_NAME(SLAB_ID_SANDSTONE, "Sandstone Slab");
+            ADD_NAME(SLAB_ID_WOOD, "Wood Slab");
+            ADD_NAME(SLAB_ID_COBBLESTONE, "Cobblestone Slab");
+            ADD_NAME(SLAB_ID_BRICKS, "Brick Slab");
+            ADD_NAME(SLAB_ID_BRICKS_STONE, "Stone Brick Slab");
+        default:
+            return "Unknown Single Slab";
+        }
+    }
+
+        ADD_NAME(BLOCK_ID_BRICKS, "Bricks");
+        ADD_NAME(BLOCK_ID_TNT, "TNT");
+        ADD_NAME(BLOCK_ID_BOOKSHELF, "Bookshelf");
+        ADD_NAME(BLOCK_ID_COBBLESTONE_MOSSY, "Mossy Cobblestone");
+        ADD_NAME(BLOCK_ID_OBSIDIAN, "Obsidian");
+
+        ADD_NAME(BLOCK_ID_TORCH, "Torch");
+        ADD_NAME(BLOCK_ID_FIRE, "Fire");
+        ADD_NAME(BLOCK_ID_SPAWNER, "Mob Spawner");
+
+        ADD_NAME(BLOCK_ID_STAIRS_WOOD, "Wood Stairs");
+        ADD_NAME(BLOCK_ID_CHEST, "Chest");
+        ADD_NAME(BLOCK_ID_REDSTONE, "Redstone Wire");
+        ADD_NAME(BLOCK_ID_ORE_DIAMOND, "Diamond Ore");
+        ADD_NAME(BLOCK_ID_DIAMOND, "Diamond Block");
+
+        ADD_NAME(BLOCK_ID_CRAFTING_TABLE, "Crafting Table");
+        ADD_NAME(BLOCK_ID_PLANT_FOOD, "BLOCK_ID_PLANT_FOOD");
+        ADD_NAME(BLOCK_ID_DIRT_TILLED, "Tilled Dirt");
+        ADD_NAME(BLOCK_ID_FURNACE_OFF, "Furnace Off");
+        ADD_NAME(BLOCK_ID_FURNACE_ON, "Furnace On");
+        ADD_NAME(BLOCK_ID_SIGN_STANDING, "Sign");
+        ADD_NAME(BLOCK_ID_DOOR_WOOD, "Wooden Door");
+        ADD_NAME(BLOCK_ID_LADDER, "Ladder");
+        ADD_NAME(BLOCK_ID_RAIL, "Rail");
+        ADD_NAME(BLOCK_ID_STAIRS_COBBLESTONE, "Cobblestone Stairs");
+        ADD_NAME(BLOCK_ID_SIGN_WALL, "Sign");
+        ADD_NAME(BLOCK_ID_LEVER, "Lever");
+        ADD_NAME(BLOCK_ID_PRESSURE_PLATE_STONE, "Stone Pressure Plate");
+        ADD_NAME(BLOCK_ID_DOOR_IRON, "Iron Door");
+        ADD_NAME(BLOCK_ID_PRESSURE_PLATE_WOOD, "Wooden Pressure Plate");
+        ADD_NAME(BLOCK_ID_ORE_REDSTONE_OFF, "Redstone Ore On");
+        ADD_NAME(BLOCK_ID_ORE_REDSTONE_ON, "Redstone Ore Off");
+        ADD_NAME(BLOCK_ID_TORCH_REDSTONE_OFF, "Redstone Torch Off");
+        ADD_NAME(BLOCK_ID_TORCH_REDSTONE_ON, "Redstone Torch On");
+        ADD_NAME(BLOCK_ID_BUTTON_STONE, "Stone Button");
+        ADD_NAME(BLOCK_ID_SNOW, "Snow");
+        ADD_NAME(BLOCK_ID_ICE, "Ice");
+        ADD_NAME(BLOCK_ID_SNOW_BLOCK, "Snow");
+        ADD_NAME(BLOCK_ID_CACTUS, "Cactus");
+        ADD_NAME(BLOCK_ID_CLAY, "Clay");
+        ADD_NAME(BLOCK_ID_SUGAR_CANE, "Sugar Cane");
+        ADD_NAME(BLOCK_ID_JUKEBOX, "Jukebox");
+        ADD_NAME(BLOCK_ID_FENCE_WOOD, "Wooden Fence");
+        ADD_NAME(BLOCK_ID_PUMPKIN, "Pumpkin");
+        ADD_NAME(BLOCK_ID_NETHERRACK, "Netherrack");
+        ADD_NAME(BLOCK_ID_SOULSAND, "Soul Sand");
+        ADD_NAME(BLOCK_ID_GLOWSTONE, "Glowstone");
+        ADD_NAME(BLOCK_ID_NETHER_PORTAL, "Nether Portal");
+        ADD_NAME(BLOCK_ID_PUMPKIN_GLOWING, "Jack 'o' Lantern");
+        ADD_NAME(BLOCK_ID_CAKE, "Cake");
+        ADD_NAME(BLOCK_ID_REPEATER_OFF, "Redstone Repeater Off");
+        ADD_NAME(BLOCK_ID_REPEATER_ON, "Redstone Repeater On");
+        ADD_NAME(BLOCK_ID_CHEST_LOCKED, "Locked Chest");
+        ADD_NAME(BLOCK_ID_TRAPDOOR, "Trapdoor");
+        ADD_NAME(BLOCK_ID_UNKNOWN_STONE, "Unknown Stone");
+
+    case BLOCK_ID_BRICKS_STONE:
+    {
+        switch (damage)
+        {
+            ADD_NAME(STONE_BRICK_ID_REGULAR, "Stone Bricks");
+            ADD_NAME(STONE_BRICK_ID_MOSSY, "Mossy Stone Bricks");
+            ADD_NAME(STONE_BRICK_ID_CRACKED, "Cracked Stone Bricks");
+        default:
+            return "Unknown Stone Bricks";
+        }
+    }
+        ADD_NAME(BLOCK_ID_MUSHROOM_BLOCK_BLAND, "Mushroom Block");
+        ADD_NAME(BLOCK_ID_MUSHROOM_BLOCK_RED, "Red Mushroom Block");
+        ADD_NAME(BLOCK_ID_IRON_BARS, "Iron Bars");
+        ADD_NAME(BLOCK_ID_GLASS_PANE, "Glass Pane");
+        ADD_NAME(BLOCK_ID_MELON, "Melon");
+        ADD_NAME(BLOCK_ID_STEM_UNKNOWN0, "BLOCK_ID_STEM_UNKNOWN0");
+        ADD_NAME(BLOCK_ID_STEM_UNKNOWN1, "BLOCK_ID_STEM_UNKNOWN1");
+        ADD_NAME(BLOCK_ID_MOSS, "Vines");
+        ADD_NAME(BLOCK_ID_GATE, "Wooden Fence Gate");
+        ADD_NAME(BLOCK_ID_STAIRS_BRICK, "Brick Stairs");
+        ADD_NAME(BLOCK_ID_STAIRS_BRICK_STONE, "Stone Brick Stairs");
+
+        ADD_NAME(ITEM_ID_IRON_SHOVEL, "Iron Shovel");
+        ADD_NAME(ITEM_ID_IRON_PICK, "Iron Pickaxe");
+        ADD_NAME(ITEM_ID_IRON_AXE, "Iron Axe");
+
+        ADD_NAME(ITEM_ID_FLINT_STEEL, "Flint and Steel");
+        ADD_NAME(ITEM_ID_APPLE, "Apple");
+        ADD_NAME(ITEM_ID_BOW, "Bow");
+        ADD_NAME(ITEM_ID_ARROW, "Arrow");
+        ADD_NAME(ITEM_ID_COAL, "Coal");
+        ADD_NAME(ITEM_ID_DIAMOND, "Diamond");
+        ADD_NAME(ITEM_ID_INGOT_IRON, "Iron Ingot");
+        ADD_NAME(ITEM_ID_INGOT_GOLD, "Gold Ingot");
+
+        ADD_NAME(ITEM_ID_IRON_SWORD, "Iron Sword");
+
+        ADD_NAME(ITEM_ID_WOOD_SWORD, "Wood Sword");
+        ADD_NAME(ITEM_ID_WOOD_SHOVEL, "Wood Shovel");
+        ADD_NAME(ITEM_ID_WOOD_PICK, "Wood Pickaxe");
+        ADD_NAME(ITEM_ID_WOOD_AXE, "Wood Axe");
+
+        ADD_NAME(ITEM_ID_STONE_SWORD, "Stone Sword");
+        ADD_NAME(ITEM_ID_STONE_SHOVEL, "Stone Shovel");
+        ADD_NAME(ITEM_ID_STONE_PICK, "Stone Pickaxe");
+        ADD_NAME(ITEM_ID_STONE_AXE, "Stone Axe");
+
+        ADD_NAME(ITEM_ID_DIAMOND_SWORD, "Diamond Sword");
+        ADD_NAME(ITEM_ID_DIAMOND_SHOVEL, "Diamond Shovel");
+        ADD_NAME(ITEM_ID_DIAMOND_PICK, "Diamond Pickaxe");
+        ADD_NAME(ITEM_ID_DIAMOND_AXE, "Diamond Axe");
+
+        ADD_NAME(ITEM_ID_STICK, "Stick");
+        ADD_NAME(ITEM_ID_BOWL, "Bowl");
+        ADD_NAME(ITEM_ID_BOWL_STEW_MUSHROOM, "Mushroom Stew");
+
+        ADD_NAME(ITEM_ID_GOLD_SWORD, "Golden Sword");
+        ADD_NAME(ITEM_ID_GOLD_SHOVEL, "Golden Shovel");
+        ADD_NAME(ITEM_ID_GOLD_PICK, "Golden Pickaxe");
+        ADD_NAME(ITEM_ID_GOLD_AXE, "Golden Axe");
+
+        ADD_NAME(ITEM_ID_STRING, "String");
+        ADD_NAME(ITEM_ID_FEATHER, "Feather");
+        ADD_NAME(ITEM_ID_GUNPOWDER, "Gunpowder");
+
+        ADD_NAME(ITEM_ID_WOOD_HOE, "Wood Hoe");
+        ADD_NAME(ITEM_ID_STONE_HOE, "Stone Hoe");
+        ADD_NAME(ITEM_ID_IRON_HOE, "Iron Hoe");
+        ADD_NAME(ITEM_ID_DIAMOND_HOE, "Diamond Hoe");
+        ADD_NAME(ITEM_ID_GOLD_HOE, "Golden Hoe");
+
+        ADD_NAME(ITEM_ID_SEEDS, "Seeds");
+        ADD_NAME(ITEM_ID_WHEAT, "Wheat");
+        ADD_NAME(ITEM_ID_BREAD, "Bread");
+
+        ADD_NAME(ITEM_ID_LEATHER_CAP, "Leather Cap");
+        ADD_NAME(ITEM_ID_LEATHER_TUNIC, "Leather Tunic");
+        ADD_NAME(ITEM_ID_LEATHER_PANTS, "Leather Pants");
+        ADD_NAME(ITEM_ID_LEATHER_BOOTS, "Leather Boots");
+        ADD_NAME(ITEM_ID_CHAIN_CAP, "Chain Helmet");
+        ADD_NAME(ITEM_ID_CHAIN_TUNIC, "Chain Chestplate");
+        ADD_NAME(ITEM_ID_CHAIN_PANTS, "Chain Leggings");
+        ADD_NAME(ITEM_ID_CHAIN_BOOTS, "Chain Boots");
+        ADD_NAME(ITEM_ID_IRON_CAP, "Iron Helmet");
+        ADD_NAME(ITEM_ID_IRON_TUNIC, "Iron Chestplate");
+        ADD_NAME(ITEM_ID_IRON_PANTS, "Iron Leggings");
+        ADD_NAME(ITEM_ID_IRON_BOOTS, "Iron Boots");
+        ADD_NAME(ITEM_ID_DIAMOND_CAP, "Diamond Helmet");
+        ADD_NAME(ITEM_ID_DIAMOND_TUNIC, "Diamond Chestplate");
+        ADD_NAME(ITEM_ID_DIAMOND_PANTS, "Diamond Leggings");
+        ADD_NAME(ITEM_ID_DIAMOND_BOOTS, "Diamond Boots");
+        ADD_NAME(ITEM_ID_GOLD_CAP, "Golden Helmet");
+        ADD_NAME(ITEM_ID_GOLD_TUNIC, "Golden Chestplate");
+        ADD_NAME(ITEM_ID_GOLD_PANTS, "Golden Leggings");
+        ADD_NAME(ITEM_ID_GOLD_BOOTS, "Golden Boots");
+
+        ADD_NAME(ITEM_ID_FLINT, "Flint");
+        ADD_NAME(ITEM_ID_PORK, "Raw Porkchop");
+        ADD_NAME(ITEM_ID_PORK_COOKED, "Cooked Porkchop");
+        ADD_NAME(ITEM_ID_PAINTING, "Painting");
+        ADD_NAME(ITEM_ID_APPLE_GOLDEN, "Golden Apple");
+        ADD_NAME(ITEM_ID_SIGN, "Sign");
+        ADD_NAME(ITEM_ID_DOOR_WOOD, "Wooden Door");
+        ADD_NAME(ITEM_ID_BUCKET, "Bucket");
+        ADD_NAME(ITEM_ID_BUCKET_WATER, "Water Bucket");
+        ADD_NAME(ITEM_ID_BUCKET_LAVA, "Lava Bucket");
+        ADD_NAME(ITEM_ID_MINECART, "Minecart");
+        ADD_NAME(ITEM_ID_SADDLE, "Saddle");
+        ADD_NAME(ITEM_ID_DOOR_IRON, "Iron Door");
+        ADD_NAME(ITEM_ID_REDSTONE, "Redstone");
+        ADD_NAME(ITEM_ID_SNOWBALL, "Snowball");
+        ADD_NAME(ITEM_ID_BOAT, "Boat");
+        ADD_NAME(ITEM_ID_LEATHER, "Leather");
+        ADD_NAME(ITEM_ID_BUCKET_MILK, "Milk");
+        ADD_NAME(ITEM_ID_INGOT_CLAY, "Brick");
+        ADD_NAME(ITEM_ID_CLAY, "Clay");
+        ADD_NAME(ITEM_ID_SUGAR_CANE, "Sugar Canes");
+        ADD_NAME(ITEM_ID_PAPER, "Paper");
+        ADD_NAME(ITEM_ID_BOOK, "Book");
+        ADD_NAME(ITEM_ID_SLIMEBALL, "Slimeball");
+        ADD_NAME(ITEM_ID_MINECART_CHEST, "Minecart with Chest");
+        ADD_NAME(ITEM_ID_MINECART_FURNACE, "Minecart with Furnace");
+        ADD_NAME(ITEM_ID_EGG, "Egg");
+        ADD_NAME(ITEM_ID_COMPASS, "Compass");
+        ADD_NAME(ITEM_ID_FISHING_ROD, "Fishing Rod");
+        ADD_NAME(ITEM_ID_CLOCK, "Clock");
+        ADD_NAME(ITEM_ID_GLOWSTONE, "Glowstone Dust");
+        ADD_NAME(ITEM_ID_FISH, "Raw Fish");
+        ADD_NAME(ITEM_ID_FISH_COOKED, "Cooked Fish");
+    case ITEM_ID_DYE:
+    {
+        switch (damage)
+        {
+            ADD_NAME(DYE_ID_BLACK, "Ink Sac");
+            ADD_NAME(DYE_ID_RED, "Rose Red");
+            ADD_NAME(DYE_ID_GREEN, "Cactus Green");
+            ADD_NAME(DYE_ID_BROWN, "Cocoa Beans");
+            ADD_NAME(DYE_ID_BLUE, "Lapis Lazuli");
+            ADD_NAME(DYE_ID_PURPLE, "Purple Dye");
+            ADD_NAME(DYE_ID_CYAN, "Cyan Dye");
+            ADD_NAME(DYE_ID_LIGHT_GRAY, "Light Gray Dye");
+            ADD_NAME(DYE_ID_GRAY, "Gray Dye");
+            ADD_NAME(DYE_ID_PINK, "Pink Dye");
+            ADD_NAME(DYE_ID_LIME, "Lime Dye");
+            ADD_NAME(DYE_ID_YELLOW, "Dandelion Yellow");
+            ADD_NAME(DYE_ID_LIGHT_BLUE, "Light Blue Dye");
+            ADD_NAME(DYE_ID_MAGENTA, "Magenta Dye");
+            ADD_NAME(DYE_ID_ORANGE, "Orange Dye");
+            ADD_NAME(DYE_ID_WHITE, "Bone Meal");
+        default:
+            return "Unknown dye";
+        }
+    }
+        ADD_NAME(ITEM_ID_BONE, "Bone");
+        ADD_NAME(ITEM_ID_SUGAR, "Sugar");
+        ADD_NAME(ITEM_ID_CAKE, "Cake");
+        ADD_NAME(ITEM_ID_BED, "Bed");
+        ADD_NAME(ITEM_ID_REPEATER, "Redstone Repeater");
+        ADD_NAME(ITEM_ID_COOKIE, "Cookie");
+        ADD_NAME(ITEM_ID_MAP, "Map");
+        ADD_NAME(ITEM_ID_SHEARS, "Shears");
+        ADD_NAME(ITEM_ID_MELON, "Melon");
+        ADD_NAME(ITEM_ID_SEEDS_PUMPKIN, "Pumpkin Seeds");
+        ADD_NAME(ITEM_ID_SEEDS_MELON, "Melon Seeds");
+        ADD_NAME(ITEM_ID_BEEF, "Raw Beef");
+        ADD_NAME(ITEM_ID_BEEF_COOKED, "Steak");
+        ADD_NAME(ITEM_ID_CHICKEN, "Raw Chicken");
+        ADD_NAME(ITEM_ID_CHICKEN_COOKED, "Cooked Chicken");
+        ADD_NAME(ITEM_ID_FLESH, "Rotten Flesh");
+        ADD_NAME(ITEM_ID_ENDER_PEARL, "Ender Pearl");
+
+        ADD_NAME(ITEM_ID_MUSIC_DISC_13, "Music Disc - 13");
+        ADD_NAME(ITEM_ID_MUSIC_DISC_CAT, "Music Disc - Cat");
+    default:
+        return "Unknown item";
+    }
+}
+
+#define MAP_RETURNQ(BLOCK, ITEM, DMG, QTY_MIN, QTY_MAX) \
+    case BLOCK:                                         \
+        return { ITEM, DMG, QTY_MIN, QTY_MAX }
+#define MAP_RETURN(BLOCK, ITEM) MAP_RETURNQ(BLOCK, ITEM, 0, 1, 1)
+
+block_return_t get_item_id_from_block(short item_id, short damage, bool silk)
+{
+    if (silk)
+    {
+        switch (item_id)
+        {
+            MAP_RETURN(BLOCK_ID_GLASS, BLOCK_ID_GLASS);
+            MAP_RETURN(BLOCK_ID_GLASS_PANE, BLOCK_ID_GLASS_PANE);
+            MAP_RETURN(BLOCK_ID_LEAVES, BLOCK_ID_LEAVES);
+            MAP_RETURN(BLOCK_ID_ORE_DIAMOND, BLOCK_ID_ORE_DIAMOND);
+            MAP_RETURN(BLOCK_ID_ORE_COAL, BLOCK_ID_ORE_COAL);
+            MAP_RETURN(BLOCK_ID_ORE_LAPIS, BLOCK_ID_ORE_LAPIS);
+            MAP_RETURN(BLOCK_ID_ORE_REDSTONE_ON, BLOCK_ID_ORE_REDSTONE_ON);
+            MAP_RETURN(BLOCK_ID_ORE_REDSTONE_OFF, BLOCK_ID_ORE_REDSTONE_ON);
+        default:
+            break;
+        }
+    }
+    switch (item_id)
+    {
+        MAP_RETURN(BLOCK_ID_REDSTONE, ITEM_ID_REDSTONE);
+        MAP_RETURN(BLOCK_ID_REPEATER_ON, ITEM_ID_REPEATER);
+        MAP_RETURN(BLOCK_ID_REPEATER_OFF, ITEM_ID_REPEATER);
+        MAP_RETURN(BLOCK_ID_TORCH_REDSTONE_OFF, BLOCK_ID_TORCH_REDSTONE_ON);
+        MAP_RETURN(BLOCK_ID_SUGAR_CANE, ITEM_ID_SUGAR_CANE);
+        MAP_RETURN(BLOCK_ID_CAKE, BLOCK_ID_NONE);
+        MAP_RETURN(BLOCK_ID_GLASS, BLOCK_ID_NONE);
+        MAP_RETURN(BLOCK_ID_GLASS_PANE, BLOCK_ID_NONE);
+        MAP_RETURNQ(BLOCK_ID_LAPIS, ITEM_ID_DYE, DYE_ID_LAPIS, 1, 6);
+        MAP_RETURNQ(BLOCK_ID_ORE_REDSTONE_ON, ITEM_ID_REDSTONE, 0, 1, 6);
+        MAP_RETURNQ(BLOCK_ID_ORE_REDSTONE_OFF, ITEM_ID_REDSTONE, 0, 1, 6);
+        MAP_RETURNQ(BLOCK_ID_ORE_DIAMOND, ITEM_ID_DIAMOND, 0, 1, 3);
+        MAP_RETURNQ(BLOCK_ID_ORE_COAL, ITEM_ID_COAL, 0, 1, 3);
+        MAP_RETURN(BLOCK_ID_DOOR_WOOD, ITEM_ID_DOOR_WOOD);
+        MAP_RETURN(BLOCK_ID_DOOR_IRON, ITEM_ID_DOOR_IRON);
+    default:
+        return { (item_id_t)item_id, damage, 1, 1 };
+    }
+}

@@ -13,6 +13,7 @@ find_package(PkgConfig)
 pkg_check_modules(zlib REQUIRED zlib)
 
 set(mcs_b181_server_SRC
+   ids.cpp
    main.cpp
    packet.cpp
    java_strings.cpp

@@ -141,7 +141,7 @@ public:
 
                 int height2 = CHUNK_SIZE_Y - noise2;
                 for (int i = 1; i < height; i++)
-                    set_type(x, i, z, BLOCK_ID_NETHERACK);
+                    set_type(x, i, z, BLOCK_ID_NETHERRACK);
                 for (int i = height - 2; i < height2; i++)
                 {
                     if (i < 63)
@@ -153,7 +153,7 @@ public:
                         set_light_sky(x, i, z, 15);
                 }
                 for (int i = height2; i < CHUNK_SIZE_Y; i++)
-                    set_type(x, i, z, BLOCK_ID_NETHERACK);
+                    set_type(x, i, z, BLOCK_ID_NETHERRACK);
                 set_type(x, 0, z, BLOCK_ID_BEDROCK);
                 set_type(x, CHUNK_SIZE_Y - 1, z, BLOCK_ID_BEDROCK);
                 set_light_sky(x, CHUNK_SIZE_Y - 1, z, 15);
@@ -1201,7 +1201,7 @@ int main(int argc, char** argv)
             new_client.inventory[36].id = BLOCK_ID_DIAMOND;
             new_client.inventory[36].quantity = 1;
 
-            new_client.inventory[37].id = 323;
+            new_client.inventory[37].id = ITEM_ID_SIGN;
             new_client.inventory[37].quantity = 1;
 
             int wool_bits = SDL_rand_bits() & 0xFF;
@@ -1851,7 +1851,8 @@ int main(int argc, char** argv)
                     if (p->slot < 0 || p->slot >= ARR_SIZE_S(client->inventory) || client->player_mode != 1)
                         goto loop_end;
 
-                    LOG("%s %d %d %d %d", client->username.c_str(), p->slot, p->item_id, p->quantity, p->damage);
+                    const char* name = get_name_from_item_id(p->item_id, p->damage);
+                    LOG("%s %d %d (%s) %d %d", client->username.c_str(), p->slot, p->item_id, name, p->quantity, p->damage);
 
                     client->inventory[p->slot].id = p->item_id;
                     client->inventory[p->slot].quantity = p->quantity;
