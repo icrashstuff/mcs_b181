@@ -27,7 +27,7 @@
     case id:               \
         return name
 
-const char* get_name_from_item_id(short item_id, short damage)
+const char* mc_id::get_name_from_item_id(short item_id, short damage)
 {
     switch (item_id)
     {
@@ -398,12 +398,13 @@ const char* get_name_from_item_id(short item_id, short damage)
         return { ITEM, DMG, QTY_MIN, QTY_MAX }
 #define MAP_RETURN(BLOCK, ITEM) MAP_RETURNQ(BLOCK, ITEM, 0, 1, 1)
 
-block_return_t get_item_id_from_block(short item_id, short damage, bool silk)
+mc_id::block_return_t mc_id::get_return_from_block(short item_id, short damage, bool silk)
 {
     if (silk)
     {
         switch (item_id)
         {
+            MAP_RETURN(BLOCK_ID_GRASS, BLOCK_ID_GRASS);
             MAP_RETURN(BLOCK_ID_GLASS, BLOCK_ID_GLASS);
             MAP_RETURN(BLOCK_ID_GLASS_PANE, BLOCK_ID_GLASS_PANE);
             MAP_RETURN(BLOCK_ID_LEAVES, BLOCK_ID_LEAVES);
@@ -418,6 +419,8 @@ block_return_t get_item_id_from_block(short item_id, short damage, bool silk)
     }
     switch (item_id)
     {
+        MAP_RETURN(BLOCK_ID_GRASS, BLOCK_ID_DIRT);
+        MAP_RETURN(BLOCK_ID_DIRT_TILLED, BLOCK_ID_DIRT);
         MAP_RETURN(BLOCK_ID_REDSTONE, ITEM_ID_REDSTONE);
         MAP_RETURN(BLOCK_ID_REPEATER_ON, ITEM_ID_REPEATER);
         MAP_RETURN(BLOCK_ID_REPEATER_OFF, ITEM_ID_REPEATER);
@@ -426,7 +429,7 @@ block_return_t get_item_id_from_block(short item_id, short damage, bool silk)
         MAP_RETURN(BLOCK_ID_CAKE, BLOCK_ID_NONE);
         MAP_RETURN(BLOCK_ID_GLASS, BLOCK_ID_NONE);
         MAP_RETURN(BLOCK_ID_GLASS_PANE, BLOCK_ID_NONE);
-        MAP_RETURNQ(BLOCK_ID_LAPIS, ITEM_ID_DYE, DYE_ID_LAPIS, 1, 6);
+        MAP_RETURNQ(BLOCK_ID_ORE_LAPIS, ITEM_ID_DYE, DYE_ID_LAPIS, 1, 6);
         MAP_RETURNQ(BLOCK_ID_ORE_REDSTONE_ON, ITEM_ID_REDSTONE, 0, 1, 6);
         MAP_RETURNQ(BLOCK_ID_ORE_REDSTONE_OFF, ITEM_ID_REDSTONE, 0, 1, 6);
         MAP_RETURNQ(BLOCK_ID_ORE_DIAMOND, ITEM_ID_DIAMOND, 0, 1, 3);
@@ -435,5 +438,75 @@ block_return_t get_item_id_from_block(short item_id, short damage, bool silk)
         MAP_RETURN(BLOCK_ID_DOOR_IRON, ITEM_ID_DOOR_IRON);
     default:
         return { (item_id_t)item_id, damage, 1, 1 };
+    }
+}
+
+#define ADD_IS_ARMOR(is_name, NAME)              \
+    int mc_id::is_name(short item_id)            \
+    {                                            \
+        switch (item_id)                         \
+        {                                        \
+            ADD_NAME(ITEM_ID_LEATHER_##NAME, 1); \
+            ADD_NAME(ITEM_ID_CHAIN_##NAME, 2);   \
+            ADD_NAME(ITEM_ID_IRON_##NAME, 3);    \
+            ADD_NAME(ITEM_ID_GOLD_##NAME, 4);    \
+            ADD_NAME(ITEM_ID_DIAMOND_##NAME, 5); \
+        default:                                 \
+            return 0;                            \
+        }                                        \
+    }
+
+ADD_IS_ARMOR(is_armor_helmet, CAP);
+ADD_IS_ARMOR(is_armor_chestplate, TUNIC);
+ADD_IS_ARMOR(is_armor_leggings, PANTS);
+ADD_IS_ARMOR(is_armor_boots, BOOTS);
+
+#define ADD_IS_TOOLS(is_name, NAME)              \
+    int mc_id::is_name(short item_id)            \
+    {                                            \
+        switch (item_id)                         \
+        {                                        \
+            ADD_NAME(ITEM_ID_WOOD_##NAME, 1);    \
+            ADD_NAME(ITEM_ID_STONE_##NAME, 2);   \
+            ADD_NAME(ITEM_ID_IRON_##NAME, 3);    \
+            ADD_NAME(ITEM_ID_GOLD_##NAME, 4);    \
+            ADD_NAME(ITEM_ID_DIAMOND_##NAME, 5); \
+        default:                                 \
+            return 0;                            \
+        }                                        \
+    }
+
+ADD_IS_TOOLS(is_shovel, SHOVEL);
+ADD_IS_TOOLS(is_axe, AXE);
+ADD_IS_TOOLS(is_pickaxe, PICK);
+ADD_IS_TOOLS(is_sword, SWORD);
+ADD_IS_TOOLS(is_hoe, HOE);
+
+int mc_id::is_misc_tool(short item_id)
+{
+    switch (item_id)
+    {
+        ADD_NAME(ITEM_ID_BOW, 1);
+        ADD_NAME(ITEM_ID_FLINT_STEEL, 1);
+        ADD_NAME(ITEM_ID_FISHING_ROD, 1);
+    default:
+        return 0;
+    }
+}
+
+Uint8 mc_id::get_max_quantity_for_id(short item_id)
+{
+    if (is_tool(item_id) || is_armor(item_id))
+        return 1;
+    switch (item_id)
+    {
+        ADD_NAME(ITEM_ID_ENDER_PEARL, 16);
+        ADD_NAME(ITEM_ID_SNOWBALL, 16);
+        ADD_NAME(ITEM_ID_EGG, 16);
+        ADD_NAME(ITEM_ID_BUCKET, 1);
+        ADD_NAME(ITEM_ID_BUCKET_WATER, 1);
+        ADD_NAME(ITEM_ID_BUCKET_LAVA, 1);
+    default:
+        return 64;
     }
 }

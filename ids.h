@@ -341,6 +341,8 @@ enum item_id_t : short
     ITEM_ID_MUSIC_DISC_13 = 2256,
     ITEM_ID_MUSIC_DISC_CAT,
 };
+namespace mc_id
+{
 
 /**
  * Returns the name of the item with any changes applied by damage (eg. wool or dye)
@@ -359,4 +361,40 @@ struct block_return_t
  * Get the corresponding return data for a block id
  */
 block_return_t get_return_from_block(short item_id, short damage, bool silk_touch = false);
+
+int is_shovel(short item_id);
+
+int is_sword(short item_id);
+
+int is_axe(short item_id);
+
+int is_pickaxe(short item_id);
+
+int is_hoe(short item_id);
+
+int is_misc_tool(short item_id);
+
+SDL_FORCE_INLINE int is_tool(short item_id)
+{
+    return is_shovel(item_id) || is_sword(item_id) || is_axe(item_id) || is_pickaxe(item_id) || is_hoe(item_id) || is_misc_tool(item_id);
+}
+
+int is_armor_helmet(short item_id);
+
+int is_armor_chestplate(short item_id);
+
+int is_armor_leggings(short item_id);
+
+int is_armor_boots(short item_id);
+
+SDL_FORCE_INLINE int is_armor(short item_id)
+{
+    return is_armor_helmet(item_id) || is_armor_chestplate(item_id) || is_armor_leggings(item_id) || is_armor_boots(item_id);
+}
+
+/**
+ * Get max stack size for a given id
+ */
+Uint8 get_max_quantity_for_id(short item_id);
+}
 #endif

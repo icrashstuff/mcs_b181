@@ -884,10 +884,56 @@ struct client_t
      */
     inventory_item_t inventory[45];
 
-    int cur_item_idx = 0;
+    int cur_item_idx = 36;
 
     std::vector<chunk_coords_t> loaded_chunks;
 };
+
+bool add_to_inventory(item_id_t id, short damage, int quantity, inventory_item_t inventory[45])
+{
+    int max_qty = mc_id::get_max_quantity_for_id(id);
+    for (int i_ = 0; i_ < 36; i_++)
+    {
+        int i = (i_ + 27) % 36 + 9;
+        if (inventory[i].id == id && inventory[i].damage == damage && inventory[i].quantity <= max_qty)
+        {
+            int diff = max_qty - inventory[i].quantity;
+            if (quantity < diff)
+                diff = quantity;
+            inventory[i].quantity += diff;
+            quantity -= diff;
+        }
+        if (quantity == 0)
+            return 1;
+    }
+
+    for (int i_ = 0; i_ < 36; i_++)
+    {
+        int i = (i_ + 27) % 36 + 9;
+        if (inventory[i].id == -1)
+        {
+            int diff = max_qty - inventory[i].quantity;
+            if (quantity < diff)
+                diff = quantity;
+            inventory[i].id = id;
+            inventory[i].damage = damage;
+            inventory[i].quantity += diff;
+            quantity -= diff;
+        }
+        if (quantity == 0)
+            return 1;
+    }
+    return quantity == 0;
+}
+
+void send_inventory(client_t* client)
+{
+    packet_window_items_t pack_inv;
+    pack_inv.window_id = 0;
+    pack_inv.payload_from_array(client->inventory, ARR_SIZE(client->inventory));
+
+    send_buffer(client->sock, pack_inv.assemble());
+}
 
 bool is_chunk_loaded(std::vector<chunk_coords_t> loaded_chunks, int chunk_x, int chunk_z)
 {
@@ -1047,11 +1093,7 @@ void spawn_player(std::vector<client_t> clients, client_t* client, dimension_t* 
         }
     }
 
-    packet_window_items_t pack_inv;
-    pack_inv.window_id = 0;
-    pack_inv.payload_from_array(client->inventory, ARR_SIZE(client->inventory));
-
-    send_buffer(sock, pack_inv.assemble());
+    send_inventory(client);
 
     send_circle_chunks(client, dimensions, CHUNK_VIEW_DISTANCE / 2);
 
@@ -1198,19 +1240,15 @@ int main(int argc, char** argv)
 
             new_client.time_keep_alive_recv = SDL_GetTicks();
 
-            new_client.inventory[36].id = BLOCK_ID_DIAMOND;
-            new_client.inventory[36].quantity = 1;
-
-            new_client.inventory[37].id = ITEM_ID_SIGN;
-            new_client.inventory[37].quantity = 1;
+            add_to_inventory(BLOCK_ID_DIAMOND, 0, 1, new_client.inventory);
+            add_to_inventory(BLOCK_ID_DIAMOND, 0, 1, new_client.inventory);
+            add_to_inventory(ITEM_ID_SIGN, 0, 1, new_client.inventory);
 
             int wool_bits = SDL_rand_bits() & 0xFF;
 
             for (int i = 2; i < 9; i++)
             {
-                new_client.inventory[i + 36].id = BLOCK_ID_WOOL;
-                new_client.inventory[i + 36].quantity = -1;
-                new_client.inventory[i + 36].damage = ((i + wool_bits) * (1 + (wool_bits > 127))) % 16;
+                add_to_inventory(BLOCK_ID_WOOL, ((i + wool_bits) * (1 + (wool_bits > 127))) % 16, -1, new_client.inventory);
             }
 
             new_client.inventory[5].id = ITEM_ID_CHAIN_CAP;
@@ -1726,6 +1764,16 @@ int main(int argc, char** argv)
                                 Uint8 old_metadata = c->get_metadata(p->x % 16, p->y, p->z % 16);
                                 pack_break_sfx.sound_data = old_type | (old_metadata << 8);
 
+                                mc_id::block_return_t ret = mc_id::get_return_from_block(old_type, old_metadata);
+                                int quant = ret.quantity_min;
+                                if (quant != ret.quantity_max)
+                                    quant = (SDL_rand_bits() % (ret.quantity_max - ret.quantity_min)) + ret.quantity_min;
+                                if (client->player_mode == 0)
+                                {
+                                    add_to_inventory(ret.id, ret.damage, quant, client->inventory);
+                                    send_inventory(client);
+                                }
+
                                 for (size_t i = 0; i < clients.size(); i++)
                                     if (clients[i].sock && clients[i].username.length() > 0)
                                         send_buffer_to_players_if_coords(
@@ -1821,6 +1869,12 @@ int main(int argc, char** argv)
                             c->set_type(place_x % 16, place_y, place_z % 16, p->block_item_id);
                             c->set_metadata(place_x % 16, place_y, place_z % 16, p->damage);
                             send_buffer_to_players_if_coords(clients, pack_block_change.assemble(), place_x, place_z, client->dimension);
+                            if (client->player_mode == 0)
+                            {
+                                client->inventory[client->cur_item_idx].quantity--;
+                                if (client->inventory[client->cur_item_idx].quantity < 1)
+                                    client->inventory[client->cur_item_idx] = {};
+                            }
                         }
                         else
                             LOG("Unable to place block");
@@ -1832,7 +1886,7 @@ int main(int argc, char** argv)
                 {
                     CAST_PACK_TO_P(packet_hold_change_t);
 
-                    client->cur_item_idx = SDL_abs(p->slot_id) % 9;
+                    client->cur_item_idx = SDL_abs(p->slot_id) % 9 + 36;
                     break;
                 }
                 case PACKET_ID_ENT_ANIMATION:
@@ -1851,7 +1905,7 @@ int main(int argc, char** argv)
                     if (p->slot < 0 || p->slot >= ARR_SIZE_S(client->inventory) || client->player_mode != 1)
                         goto loop_end;
 
-                    const char* name = get_name_from_item_id(p->item_id, p->damage);
+                    const char* name = mc_id::get_name_from_item_id(p->item_id, p->damage);
                     LOG("%s %d %d (%s) %d %d", client->username.c_str(), p->slot, p->item_id, name, p->quantity, p->damage);
 
                     client->inventory[p->slot].id = p->item_id;
