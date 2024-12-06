@@ -1822,6 +1822,13 @@ int main(int argc, char** argv)
                         else
                             LOG("Unable to place block");
                     }
+                    else if (p->status == PLAYER_DIG_STATUS_DROP_ITEM)
+                    {
+                        client->inventory[client->cur_item_idx].quantity--;
+                        if (client->inventory[client->cur_item_idx].quantity < 1)
+                            client->inventory[client->cur_item_idx] = {};
+                        send_inventory(client);
+                    }
                     else
                     {
                         LOG("Player \"%s\" sent dig with unsupported status of %d", client->username.c_str(), p->status);
