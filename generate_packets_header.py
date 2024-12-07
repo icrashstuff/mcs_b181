@@ -174,6 +174,42 @@ def print_vlen_packet(pack, is_server):
     return s.replace("\t", " " * 4)
 
 
+def print_length_packet(pack, is_server):
+    if (is_server and pack[3] == SERVER_TO_CLIENT):
+        return ""
+    elif (not is_server and pack[3] == CLIENT_TO_SERVER):
+        return ""
+
+    var_len = 0
+    pos = 1
+
+    s = ""
+
+    for i in pack[2].keys():
+        t = pack[2][i]
+        if (t == JBOOL or t == JBYTE or t == JUBYTE):
+            pos += 1
+        elif (t == JSHORT):
+            pos += 2
+        elif (t == JINT or t == JFLOAT):
+            pos += 4
+        elif (t == JLONG or t == JDOUBLE):
+            pos += 8
+        elif (t == JSTRING16):
+            pos += 2
+            var_len += 1
+        else:
+            print("Unknown type: \"%s\", exiting!" % t)
+            exit(1)
+
+    if (var_len == 0):
+        s = "\t\tPACK_LEN(PACKET_ID_%s, %d)" % (pack[1], pos)
+    else:
+        s = "\t\tPACK_LENV(PACKET_ID_%s, %d, %d)" % (pack[1], pos, var_len)
+
+    return s.replace("\t", " " * 4)
+
+
 def print_parse_packet(pack, is_server):
     if (is_server and pack[3] == SERVER_TO_CLIENT):
         return ""
@@ -495,6 +531,7 @@ header_header = """/* SPDX-License-Identifier: MIT
 header_mid = """
 #endif
 #ifdef MCS_B181_PACKET_GEN_IMPL
+
 #define P(type)          \\
     packet = new type(); \\
     type* p = (type*)packet;
@@ -509,11 +546,23 @@ header_mid = """
             change_happened++;                                         \\
         }                                                              \\
     } while (0)
+
+#define PACK_LENV(ID, LEN, VLEN) \\
+    case ID:                     \\
+    {                            \\
+        len = LEN;               \\
+        var_len = VLEN;          \\
+        break;                   \\
+    }
+
+#define PACK_LEN(ID, LEN) PACK_LENV(ID, LEN, 0)
 """
 
 header_footer = """
 #undef P
 #undef GET_STR_LEN
+#undef PACK_LEN
+#undef PACK_LENV
 #endif
 """
 
@@ -544,6 +593,19 @@ if __name__ == "__main__":
         print("    switch (packet_type)\n    {")
         for i in packet_defs:
             s = print_parse_packet(i, j[1])
+            if (len(s)):
+                print(s)
+        print("    default:")
+        print("        return 0;")
+        print("    }")
+        print("    return 1;")
+        print("}\n")
+
+        print(
+            "static bool gen_lengths_%s(Uint8 packet_type, size_t& len, int& var_len)\n{" % j[0])
+        print("    switch (packet_type)\n    {")
+        for i in packet_defs:
+            s = print_length_packet(i, j[1])
             if (len(s)):
                 print(s)
         print("    default:")

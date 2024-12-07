@@ -23,6 +23,8 @@
 #ifndef MCS_B181_MISC_H
 #define MCS_B181_MISC_H
 
+#include <assert.h>
+
 #define ARR_SIZE(x) (sizeof(x) / sizeof(x[0]))
 
 #define ARR_SIZE_I(x) ((int)ARR_SIZE(x))
@@ -38,6 +40,20 @@
 #define TRACE(fmt, ...) LOG_TRACE(fmt, ##__VA_ARGS__)
 #else
 #define TRACE(fmt, ...) void(0)
+#endif
+
+#ifndef NDEBUG
+#define helpful_assert(x, fmt, ...)                     \
+    do                                                  \
+    {                                                   \
+        if (!(x))                                       \
+        {                                               \
+            LOG_ERROR("[ASSERT]: " fmt, ##__VA_ARGS__); \
+            assert(x);                                  \
+        }                                               \
+    } while (0)
+#else
+#define helpful_assert(x, fmt, ...) void(0)
 #endif
 
 #define MAX_PLAYERS 20

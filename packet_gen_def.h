@@ -1184,6 +1184,7 @@ struct packet_kick_t : packet_t
 
 #endif
 #ifdef MCS_B181_PACKET_GEN_IMPL
+
 #define P(type)          \
     packet = new type(); \
     type* p = (type*)packet;
@@ -1198,6 +1199,16 @@ struct packet_kick_t : packet_t
             change_happened++;                                         \
         }                                                              \
     } while (0)
+
+#define PACK_LENV(ID, LEN, VLEN) \
+    case ID:                     \
+    {                            \
+        len = LEN;               \
+        var_len = VLEN;          \
+        break;                   \
+    }
+
+#define PACK_LEN(ID, LEN) PACK_LENV(ID, LEN, 0)
 
 static bool vlen_gen_server(Uint8 packet_type, std::vector<Uint8>& buf, size_t& buf_size, int& change_happened, int& var_len, size_t& len)
 {
@@ -1846,6 +1857,66 @@ static bool parse_gen_packets_server(Uint8 packet_type, std::vector<Uint8>& buf,
     return 1;
 }
 
+static bool gen_lengths_server(Uint8 packet_type, size_t& len, int& var_len)
+{
+    switch (packet_type)
+    {
+        PACK_LEN(PACKET_ID_KEEP_ALIVE, 5)
+        PACK_LENV(PACKET_ID_LOGIN_REQUEST, 23, 1)
+        PACK_LENV(PACKET_ID_HANDSHAKE, 3, 1)
+        PACK_LENV(PACKET_ID_CHAT_MSG, 3, 1)
+        PACK_LEN(PACKET_ID_UPDATE_TIME, 9)
+        PACK_LEN(PACKET_ID_ENT_EQUIPMENT, 11)
+        PACK_LEN(PACKET_ID_ENT_USE, 10)
+        PACK_LEN(PACKET_ID_UPDATE_HEALTH, 9)
+        PACK_LEN(PACKET_ID_RESPAWN, 14)
+        PACK_LEN(PACKET_ID_PLAYER_ON_GROUND, 2)
+        PACK_LEN(PACKET_ID_PLAYER_POS, 34)
+        PACK_LEN(PACKET_ID_PLAYER_LOOK, 10)
+        PACK_LEN(PACKET_ID_PLAYER_POS_LOOK, 42)
+        PACK_LEN(PACKET_ID_PLAYER_DIG, 12)
+        PACK_LEN(PACKET_ID_HOLD_CHANGE, 3)
+        PACK_LEN(PACKET_ID_USE_BED, 15)
+        PACK_LEN(PACKET_ID_ENT_ANIMATION, 6)
+        PACK_LEN(PACKET_ID_ENT_ACTION, 6)
+        PACK_LENV(PACKET_ID_ENT_SPAWN_NAMED, 23, 1)
+        PACK_LEN(PACKET_ID_ENT_SPAWN_PICKUP, 25)
+        PACK_LEN(PACKET_ID_COLLECT_ITEM, 9)
+        PACK_LENV(PACKET_ID_ENT_SPAWN_PAINTING, 23, 1)
+        PACK_LEN(PACKET_ID_ENT_SPAWN_XP, 19)
+        PACK_LEN(PACKET_ID_STANCE_UPDATE, 19)
+        PACK_LEN(PACKET_ID_ENT_VELOCITY, 17)
+        PACK_LEN(PACKET_ID_ENT_DESTROY, 5)
+        PACK_LEN(PACKET_ID_ENT_ENSURE_SPAWN, 5)
+        PACK_LEN(PACKET_ID_ENT_MOVE_REL, 8)
+        PACK_LEN(PACKET_ID_ENT_LOOK, 7)
+        PACK_LEN(PACKET_ID_ENT_LOOK_MOVE_REL, 10)
+        PACK_LEN(PACKET_ID_ENT_MOVE_TELEPORT, 19)
+        PACK_LEN(PACKET_ID_ENT_STATUS, 6)
+        PACK_LEN(PACKET_ID_ENT_ATTACH, 9)
+        PACK_LEN(PACKET_ID_ENT_EFFECT, 9)
+        PACK_LEN(PACKET_ID_ENT_EFFECT_REMOVE, 6)
+        PACK_LEN(PACKET_ID_XP_SET, 5)
+        PACK_LEN(PACKET_ID_CHUNK_CACHE, 10)
+        PACK_LEN(PACKET_ID_BLOCK_CHANGE, 12)
+        PACK_LEN(PACKET_ID_SFX, 18)
+        PACK_LEN(PACKET_ID_NEW_STATE, 3)
+        PACK_LEN(PACKET_ID_THUNDERBOLT, 18)
+        PACK_LENV(PACKET_ID_WINDOW_OPEN, 6, 1)
+        PACK_LEN(PACKET_ID_WINDOW_CLOSE, 2)
+        PACK_LEN(PACKET_ID_WINDOW_TRANSACTION, 5)
+        PACK_LEN(PACKET_ID_INV_CREATIVE_ACTION, 9)
+        PACK_LENV(PACKET_ID_UPDATE_SIGN, 19, 4)
+        PACK_LEN(PACKET_ID_INCREMENT_STATISTIC, 6)
+        PACK_LENV(PACKET_ID_PLAYER_LIST_ITEM, 6, 1)
+        PACK_LEN(PACKET_ID_SERVER_LIST_PING, 1)
+        PACK_LENV(PACKET_ID_KICK, 3, 1)
+    default:
+        return 0;
+    }
+    return 1;
+}
+
 static bool vlen_gen_client(Uint8 packet_type, std::vector<Uint8>& buf, size_t& buf_size, int& change_happened, int& var_len, size_t& len)
 {
     switch (packet_type)
@@ -2482,6 +2553,67 @@ static bool parse_gen_packets_client(Uint8 packet_type, std::vector<Uint8>& buf,
     return 1;
 }
 
+static bool gen_lengths_client(Uint8 packet_type, size_t& len, int& var_len)
+{
+    switch (packet_type)
+    {
+        PACK_LEN(PACKET_ID_KEEP_ALIVE, 5)
+        PACK_LENV(PACKET_ID_LOGIN_REQUEST, 23, 1)
+        PACK_LENV(PACKET_ID_HANDSHAKE, 3, 1)
+        PACK_LENV(PACKET_ID_CHAT_MSG, 3, 1)
+        PACK_LEN(PACKET_ID_UPDATE_TIME, 9)
+        PACK_LEN(PACKET_ID_ENT_EQUIPMENT, 11)
+        PACK_LEN(PACKET_ID_SPAWN_POS, 13)
+        PACK_LEN(PACKET_ID_ENT_USE, 10)
+        PACK_LEN(PACKET_ID_UPDATE_HEALTH, 9)
+        PACK_LEN(PACKET_ID_RESPAWN, 14)
+        PACK_LEN(PACKET_ID_PLAYER_POS_LOOK, 42)
+        PACK_LEN(PACKET_ID_PLAYER_DIG, 12)
+        PACK_LEN(PACKET_ID_HOLD_CHANGE, 3)
+        PACK_LEN(PACKET_ID_USE_BED, 15)
+        PACK_LEN(PACKET_ID_ENT_ANIMATION, 6)
+        PACK_LEN(PACKET_ID_ENT_ACTION, 6)
+        PACK_LENV(PACKET_ID_ENT_SPAWN_NAMED, 23, 1)
+        PACK_LEN(PACKET_ID_ENT_SPAWN_PICKUP, 25)
+        PACK_LEN(PACKET_ID_COLLECT_ITEM, 9)
+        PACK_LENV(PACKET_ID_ENT_SPAWN_PAINTING, 23, 1)
+        PACK_LEN(PACKET_ID_ENT_SPAWN_XP, 19)
+        PACK_LEN(PACKET_ID_STANCE_UPDATE, 19)
+        PACK_LEN(PACKET_ID_ENT_VELOCITY, 17)
+        PACK_LEN(PACKET_ID_ENT_DESTROY, 5)
+        PACK_LEN(PACKET_ID_ENT_ENSURE_SPAWN, 5)
+        PACK_LEN(PACKET_ID_ENT_MOVE_REL, 8)
+        PACK_LEN(PACKET_ID_ENT_LOOK, 7)
+        PACK_LEN(PACKET_ID_ENT_LOOK_MOVE_REL, 10)
+        PACK_LEN(PACKET_ID_ENT_MOVE_TELEPORT, 19)
+        PACK_LEN(PACKET_ID_ENT_STATUS, 6)
+        PACK_LEN(PACKET_ID_ENT_ATTACH, 9)
+        PACK_LEN(PACKET_ID_ENT_EFFECT, 9)
+        PACK_LEN(PACKET_ID_ENT_EFFECT_REMOVE, 6)
+        PACK_LEN(PACKET_ID_XP_SET, 5)
+        PACK_LEN(PACKET_ID_CHUNK_CACHE, 10)
+        PACK_LEN(PACKET_ID_BLOCK_CHANGE, 12)
+        PACK_LEN(PACKET_ID_SFX, 18)
+        PACK_LEN(PACKET_ID_NEW_STATE, 3)
+        PACK_LEN(PACKET_ID_THUNDERBOLT, 18)
+        PACK_LENV(PACKET_ID_WINDOW_OPEN, 6, 1)
+        PACK_LEN(PACKET_ID_WINDOW_CLOSE, 2)
+        PACK_LEN(PACKET_ID_WINDOW_UPDATE_PROGRESS, 6)
+        PACK_LEN(PACKET_ID_WINDOW_TRANSACTION, 5)
+        PACK_LEN(PACKET_ID_INV_CREATIVE_ACTION, 9)
+        PACK_LENV(PACKET_ID_UPDATE_SIGN, 19, 4)
+        PACK_LEN(PACKET_ID_INCREMENT_STATISTIC, 6)
+        PACK_LENV(PACKET_ID_PLAYER_LIST_ITEM, 6, 1)
+        PACK_LEN(PACKET_ID_SERVER_LIST_PING, 1)
+        PACK_LENV(PACKET_ID_KICK, 3, 1)
+    default:
+        return 0;
+    }
+    return 1;
+}
+
 #undef P
 #undef GET_STR_LEN
+#undef PACK_LEN
+#undef PACK_LENV
 #endif

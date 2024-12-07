@@ -326,6 +326,16 @@ SDL_FORCE_INLINE bool read_string16(std::vector<Uint8>& dat, size_t& pos, std::s
     return 1;
 }
 
+SDL_FORCE_INLINE bool read_bytes(std::vector<Uint8>& dat, size_t& pos, size_t len, Uint8* out)
+{
+    BAIL_READ(len);
+
+    memcpy(out, dat.data() + pos, len);
+
+    pos = pos + len;
+    return 1;
+}
+
 #undef BAIL_READ
 
 #define MCS_B181_PACKET_GEN_IMPL
@@ -448,6 +458,7 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
         packet_type = buf[0];
         len = 0;
         var_len = 0;
+        var_len_pos = 0;
 
 #define PACK_LENV(ID, LEN, VLEN) \
     case ID:                     \
@@ -457,69 +468,30 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
         break;                   \
     }
 #define PACK_LEN(ID, LEN) PACK_LENV(ID, LEN, 0)
-        switch (packet_type)
+        bool length_gen_result = 0;
+
+        if (is_server)
+            length_gen_result = gen_lengths_server(packet_type, len, var_len);
+        else
+            length_gen_result = gen_lengths_client(packet_type, len, var_len);
+
+        if (!length_gen_result)
         {
-            PACK_LEN(PACKET_ID_KEEP_ALIVE, 5);
-            /* wiki.vg says that the login packet is 0x01 is >22 bytes long, but someone made a math error */
-            PACK_LENV(PACKET_ID_LOGIN_REQUEST, 23, 1);
-            PACK_LENV(PACKET_ID_HANDSHAKE, 3, 1);
-            PACK_LENV(PACKET_ID_CHAT_MSG, 3, 1);
-            PACK_LEN(PACKET_ID_ENT_USE, 10);
-            PACK_LEN(PACKET_ID_RESPAWN, 14);
-            PACK_LEN(PACKET_ID_PLAYER_ON_GROUND, 2);
-            PACK_LEN(PACKET_ID_PLAYER_POS, 34);
-            PACK_LEN(PACKET_ID_PLAYER_LOOK, 10);
-            PACK_LEN(PACKET_ID_PLAYER_POS_LOOK, 42);
-            PACK_LEN(PACKET_ID_PLAYER_DIG, 12);
-            PACK_LENV(PACKET_ID_PLAYER_PLACE, 13, 1);
-            PACK_LEN(PACKET_ID_HOLD_CHANGE, 3);
-            PACK_LEN(PACKET_ID_ENT_ANIMATION, 6);
-            PACK_LEN(PACKET_ID_ENT_ACTION, 6);
-            PACK_LEN(PACKET_ID_WINDOW_CLOSE, 2);
-            PACK_LEN(PACKET_ID_INV_CREATIVE_ACTION, 9);
-            PACK_LEN(PACKET_ID_SERVER_LIST_PING, 1);
-            PACK_LENV(PACKET_ID_KICK, 3, 1);
+            switch (packet_type)
+            {
+                PACK_LENV(PACKET_ID_PLAYER_PLACE, 13, 1);
+                PACK_LENV(PACKET_ID_CHUNK_MAP, 18, 1)
+                PACK_LENV(PACKET_ID_WINDOW_SET_ITEMS, 4, (1 << 18));
+                PACK_LENV(PACKET_ID_UPDATE_SIGN, 13, 4);
 
-            PACK_LEN(PACKET_ID_ENT_EQUIPMENT, 11);
-            PACK_LEN(PACKET_ID_SPAWN_POS, 13);
-            PACK_LEN(PACKET_ID_USE_BED, 15);
-            PACK_LEN(PACKET_ID_ENT_SPAWN_PICKUP, 25);
-            PACK_LEN(PACKET_ID_COLLECT_ITEM, 9);
-            PACK_LENV(PACKET_ID_ADD_OBJ, 22, 1);
-            PACK_LENV(PACKET_ID_ENT_SPAWN_MOB, 21, 1);
-            PACK_LENV(PACKET_ID_ENT_SPAWN_PAINTING, 22, 1);
-            PACK_LEN(PACKET_ID_ENT_SPAWN_XP, 19)
-
-            PACK_LEN(PACKET_ID_STANCE_UPDATE, 18);
-            PACK_LEN(PACKET_ID_ENT_VELOCITY, 11);
-            PACK_LEN(PACKET_ID_ENT_MOVE_REL, 8);
-            PACK_LEN(PACKET_ID_ENT_LOOK, 7);
-            PACK_LEN(PACKET_ID_ENT_LOOK_MOVE_REL, 10);
-            PACK_LEN(PACKET_ID_ENT_STATUS, 6);
-            PACK_LEN(PACKET_ID_ENT_ATTACH, 9);
-            PACK_LENV(PACKET_ID_ENT_METADATA, 6, 1);
-            PACK_LEN(PACKET_ID_ENT_EFFECT, 9);
-            PACK_LEN(PACKET_ID_ENT_EFFECT_REMOVE, 6);
-            PACK_LEN(PACKET_ID_XP_SET, 5);
-            PACK_LENV(PACKET_ID_BLOCK_CHANGE_MULTI, 11, 1);
-            PACK_LEN(PACKET_ID_BLOCK_ACTION, 13);
-            PACK_LENV(PACKET_ID_EXPLOSION, 33, 1);
-            PACK_LENV(PACKET_ID_WINDOW_OPEN, 6, 1);
-            PACK_LENV(PACKET_ID_WINDOW_CLICK, 2, 1);
-            PACK_LENV(PACKET_ID_WINDOW_SET_SLOT, 6, 1);
-            PACK_LEN(PACKET_ID_WINDOW_UPDATE_PROGRESS, 6);
-            PACK_LEN(PACKET_ID_WINDOW_TRANSACTION, 5);
-            PACK_LENV(PACKET_ID_UPDATE_SIGN, 13, 4);
-            PACK_LENV(PACKET_ID_ITEM_DATA, 6, 1);
-            PACK_LEN(PACKET_ID_INCREMENT_STATISTIC, 6);
-
-        default:
-        {
-            char buffer[64];
-            snprintf(buffer, ARR_SIZE(buffer), "Unknown Packet ID: 0x%02x(%s)", packet_type, packet_t::get_name_for_id(packet_type));
-            err_str = buffer;
-            break;
-        }
+            default:
+            {
+                char buffer[64];
+                snprintf(buffer, ARR_SIZE(buffer), "Unknown Packet ID: 0x%02x(%s)", packet_type, packet_t::get_name_for_id(packet_type));
+                err_str = buffer;
+                break;
+            }
+            }
         }
 #undef PACK_LEN
 #undef PACK_LENV
@@ -575,6 +547,41 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
             {
                 switch (packet_type)
                 {
+                case PACKET_ID_CHUNK_MAP:
+                {
+                    if (var_len == 1 && buf_size >= 18)
+                    {
+                        Uint32 temp = SDL_Swap32BE(*(Uint32*)(buf.data() + 14));
+                        len += (*(Sint32*)&temp);
+                        var_len--;
+                        change_happened++;
+                    }
+                    break;
+                }
+                case PACKET_ID_WINDOW_SET_ITEMS:
+                {
+                    if (var_len == (1 << 18) && buf_size >= 4)
+                    {
+                        Uint16 temp = SDL_Swap16BE(*(Uint16*)(buf.data() + 2));
+                        len += (*(Sint16*)&temp) * 2;
+                        var_len = (*(Sint16*)&temp);
+                        var_len_pos = 4;
+                        change_happened++;
+                    }
+                    if (var_len > 0 && var_len < (1 << 18) && buf_size >= var_len_pos + 2)
+                    {
+                        Uint16 temp = SDL_Swap16BE(*(Uint16*)(buf.data() + var_len_pos));
+                        var_len_pos += 2;
+                        if ((*(Sint16*)&temp) != -1)
+                        {
+                            len += 3;
+                            var_len_pos += 3;
+                        }
+                        var_len--;
+                        change_happened++;
+                    }
+                    break;
+                }
                 case PACKET_ID_UPDATE_SIGN:
                 {
                     GET_STR_LEN(1, len - 2, 0);
@@ -603,9 +610,9 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
                 }
             }
         }
-    } while (change_happened && (var_len || buf_size != len));
+    } while (change_happened && (var_len > 0 || buf_size != len));
 
-    if (buf_size != len || var_len)
+    if (buf_size != len || var_len > 0)
         return NULL;
 
     TRACE("Packet 0x%02x(%s) has size: %zu(%zu) bytes", packet_type, len, buf_size, packet_t::get_name_for_id(packet_type));
@@ -635,6 +642,32 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
     {
         switch (packet_type)
         {
+        case PACKET_ID_CHUNK_MAP:
+        {
+            P(packet_chunk_t);
+
+            err += !read_int(buf, pos, &p->block_x);
+            err += !read_short(buf, pos, &p->block_y);
+            err += !read_int(buf, pos, &p->block_z);
+
+            err += !read_byte(buf, pos, &p->size_x);
+            err += !read_byte(buf, pos, &p->size_y);
+            err += !read_byte(buf, pos, &p->size_z);
+
+            int compressed_size;
+
+            err += !read_int(buf, pos, &compressed_size);
+
+            if (compressed_size < 0)
+                err++;
+            else
+            {
+                p->compressed_data.resize(compressed_size);
+                err += !read_bytes(buf, pos, compressed_size, p->compressed_data.data());
+            }
+
+            break;
+        }
         case PACKET_ID_PLAYER_PLACE:
         {
             P(packet_player_place_t);
@@ -652,6 +685,37 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
 
             break;
         }
+        case PACKET_ID_WINDOW_SET_ITEMS:
+        {
+            P(packet_window_items_t);
+
+            err += !read_byte(buf, pos, &p->window_id);
+
+            short payload_size;
+
+            err += !read_short(buf, pos, &payload_size);
+
+            if (payload_size < 0)
+                err++;
+
+            if (!err)
+            {
+                p->payload.reserve(payload_size);
+                LOG("Payload size: %d", payload_size);
+                for (short i = 0; i < payload_size; i++)
+                {
+                    inventory_item_t t;
+                    err += !read_short(buf, pos, &t.id);
+                    if (t.id != -1)
+                    {
+                        err += !read_byte(buf, pos, &t.quantity);
+                        err += !read_short(buf, pos, &t.damage);
+                    }
+                    p->payload.push_back(t);
+                }
+            }
+            break;
+        }
 
         default:
             char buffer[128];
@@ -664,8 +728,8 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
 
     TRACE("Packet buffer read: %zu/%zu", pos, buf.size());
     TRACE("Packet type(actual): 0x%02x(0x%02x)", packet->id, packet_type);
-    assert(pos == buf.size());
-    assert(packet->id == packet_type);
+    helpful_assert(pos == buf.size(), "Packet buffer read: %zu/%zu%s", pos, buf.size(), err ? " (err)" : " (err not set)");
+    helpful_assert(packet->id == packet_type, "Packet type(actual): 0x%02x(0x%02x)%s", packet->id, packet_type, err ? " (err)" : " (err not set)");
     packet->id = (packet_id_t)packet_type;
 
     if (err)

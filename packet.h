@@ -288,7 +288,7 @@ struct packet_chunk_t : packet_t
         std::vector<Uint8> dat;
         if (compressed_data.size() >= SDL_MAX_SINT32)
         {
-            LOG_ERROR("Wompressed_data too big!");
+            LOG_ERROR("Compressed_data too big!");
             return dat;
         }
 
@@ -388,6 +388,7 @@ private:
     size_t buf_size;
     Uint8 packet_type;
     size_t len;
+    size_t var_len_pos;
     int var_len;
 
     bool is_server;
