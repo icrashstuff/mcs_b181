@@ -227,7 +227,7 @@ bool read_string16(SDLNet_StreamSocket* sock, std::string& out)
     {                                                                               \
         if (dat.size() < (width) + pos)                                             \
         {                                                                           \
-            assert(false);                                                          \
+            assert(true);                                                           \
             LOG_TRACE("dat.size(): %zu, expected: %zu", dat.size(), (width) + pos); \
             return 0;                                                               \
         }                                                                           \
@@ -599,7 +599,9 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
         {
             switch (packet_type)
             {
+                PACK_LENV(PACKET_ID_ADD_OBJ, 22, 1);
                 PACK_LENV(PACKET_ID_BLOCK_CHANGE_MULTI, 11, 1);
+                PACK_LENV(PACKET_ID_EXPLOSION, 33, 1);
                 PACK_LENV(PACKET_ID_ENT_METADATA, 6, 1);
                 PACK_LENV(PACKET_ID_ENT_SPAWN_MOB, 21, 1);
                 PACK_LENV(PACKET_ID_PLAYER_PLACE, 13, 1);
@@ -815,12 +817,34 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
                     }
                     break;
                 }
+                case PACKET_ID_EXPLOSION:
+                {
+                    if (var_len == 1 && buf_size >= 33)
+                    {
+                        Uint32 temp = SDL_Swap32BE(*(Uint32*)(buf.data() + 29));
+                        len += (*(Sint32*)&temp) * 3;
+                        var_len--;
+                        change_happened++;
+                    }
+                    break;
+                }
                 case PACKET_ID_WINDOW_CLICK:
                 {
                     if (var_len == 1 && buf_size >= 10)
                     {
                         Uint16 temp = SDL_Swap16BE(*(Uint16*)(buf.data() + 8));
                         len += ((*(Sint16*)&temp) >= 0) ? 3 : 0;
+                        var_len--;
+                        change_happened++;
+                    }
+                    break;
+                }
+                case PACKET_ID_ADD_OBJ:
+                {
+                    if (var_len == 1 && buf_size >= 22)
+                    {
+                        Uint16 temp = SDL_Swap16BE(*(Uint16*)(buf.data() + 20));
+                        len += ((*(Sint16*)&temp) > 0) ? 6 : 0;
                         var_len--;
                         change_happened++;
                     }
@@ -913,6 +937,26 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
 
             break;
         }
+        case PACKET_ID_ADD_OBJ:
+        {
+            P(packet_add_obj_t);
+
+            err += !read_int(buf, pos, &p->eid);
+            err += !read_byte(buf, pos, &p->type);
+            err += !read_int(buf, pos, &p->x);
+            err += !read_int(buf, pos, &p->y);
+            err += !read_int(buf, pos, &p->z);
+            err += !read_int(buf, pos, &p->fire_ball_thrower_id);
+
+            if (p->fire_ball_thrower_id > 0)
+            {
+                err += !read_short(buf, pos, &p->unknown0);
+                err += !read_short(buf, pos, &p->unknown1);
+                err += !read_short(buf, pos, &p->unknown2);
+            }
+
+            break;
+        }
         case PACKET_ID_CHUNK_MAP:
         {
             P(packet_chunk_t);
@@ -975,6 +1019,36 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
                 for (short i = 0; i < payload_size; i++)
                 {
                     err += !read_byte(buf, pos, &p->payload[i].metadata);
+                }
+            }
+
+            break;
+        }
+        case PACKET_ID_EXPLOSION:
+        {
+            P(packet_explosion_t);
+
+            err += !read_double(buf, pos, &p->x);
+            err += !read_double(buf, pos, &p->y);
+            err += !read_double(buf, pos, &p->z);
+            err += !read_float(buf, pos, &p->radius);
+
+            int record_count;
+
+            err += !read_int(buf, pos, &record_count);
+
+            if (record_count < 0)
+                err++;
+
+            if (!err)
+            {
+                p->records.resize(record_count);
+
+                for (int i = 0; i < record_count; i++)
+                {
+                    err += !read_byte(buf, pos, &p->records[i].off_x);
+                    err += !read_byte(buf, pos, &p->records[i].off_y);
+                    err += !read_byte(buf, pos, &p->records[i].off_z);
                 }
             }
 

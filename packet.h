@@ -83,7 +83,6 @@ bool read_string16(SDLNet_StreamSocket* sock, std::string& out);
  * TODO List
  *
  * PACKET_ID_ITEM_DATA = 0x83,
- * PACKET_ID_EXPLOSION = 0x3C,
  */
 enum packet_id_t : jubyte
 {
@@ -405,6 +404,47 @@ struct packet_block_change_multi_t : packet_t
             assemble_byte(dat, payload[i].metadata);
         }
         assert(dat.size() == 11 + payload.size() * 4);
+        return dat;
+    }
+};
+
+struct explosion_record_t
+{
+    jbyte off_x;
+    jbyte off_y;
+    jbyte off_z;
+};
+
+struct packet_explosion_t : packet_t
+{
+    packet_explosion_t() { id = PACKET_ID_EXPLOSION; }
+
+    jdouble x;
+    jdouble y;
+    jdouble z;
+
+    jfloat radius;
+
+    std::vector<explosion_record_t> records;
+
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == PACKET_ID_EXPLOSION);
+        dat.push_back(id);
+        assemble_double(dat, x);
+        assemble_double(dat, y);
+        assemble_double(dat, z);
+        assemble_float(dat, radius);
+        assemble_int(dat, records.size());
+
+        for (size_t i = 0; i < records.size(); i++)
+        {
+            assemble_byte(dat, records[i].off_x);
+            assemble_byte(dat, records[i].off_y);
+            assemble_byte(dat, records[i].off_z);
+        }
+        assert(dat.size() == 33 + records.size() * 3);
         return dat;
     }
 };
