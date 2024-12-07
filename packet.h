@@ -82,13 +82,8 @@ bool read_string16(SDLNet_StreamSocket* sock, std::string& out);
 /**
  * TODO List
  *
- * PACKET_ID_ENT_SPAWN_MOB = 0x18,
- * PACKET_ID_ADD_OBJ = 0x17,
- * PACKET_ID_ENT_METADATA = 0x28,
- * PACKET_ID_BLOCK_CHANGE_MULTI = 0x34,
- * PACKET_ID_WINDOW_OPEN = 0x64,
- * PACKET_ID_WINDOW_CLICK = 0x66,
  * PACKET_ID_ITEM_DATA = 0x83,
+ * PACKET_ID_EXPLOSION = 0x3C,
  */
 enum packet_id_t : jubyte
 {
@@ -210,6 +205,7 @@ struct packet_player_place_t : packet_t
             assemble_byte(dat, amount);
             assemble_short(dat, damage);
         }
+        assert(dat.size() == 13 || dat.size() == 16);
         return dat;
     }
 };
@@ -266,6 +262,7 @@ struct packet_add_obj_t : packet_t
             assemble_short(dat, unknown1);
             assemble_short(dat, unknown2);
         }
+        assert(dat.size() == (fire_ball_thrower_id > 0 ? 28 : 22));
         return dat;
     }
 };
@@ -300,6 +297,8 @@ struct packet_ent_spawn_mob_t : packet_t
         assemble_byte(dat, yaw);
         assemble_byte(dat, pitch);
         assemble_bytes(dat, metadata.data(), metadata.size());
+
+        assert(dat.size() == 20 + metadata.size());
         return dat;
     }
 };
@@ -319,6 +318,7 @@ struct packet_ent_metadata_t : packet_t
         dat.push_back(id);
         assemble_int(dat, eid);
         assemble_bytes(dat, metadata.data(), metadata.size());
+        assert(dat.size() == 5 + metadata.size());
         return dat;
     }
 };
@@ -383,8 +383,8 @@ struct packet_block_change_multi_t : packet_t
         std::vector<Uint8> dat;
         assert(id == PACKET_ID_BLOCK_CHANGE_MULTI);
         dat.push_back(id);
-        assemble_byte(dat, chunk_x);
-        assemble_byte(dat, chunk_z);
+        assemble_int(dat, chunk_x);
+        assemble_int(dat, chunk_z);
         assemble_short(dat, payload.size());
 
         for (size_t i = 0; i < payload.size(); i++)
@@ -404,6 +404,7 @@ struct packet_block_change_multi_t : packet_t
         {
             assemble_byte(dat, payload[i].metadata);
         }
+        assert(dat.size() == 11 + payload.size() * 4);
         return dat;
     }
 };
@@ -454,6 +455,39 @@ struct packet_window_items_t : packet_t
     }
 };
 
+struct packet_window_click_t : packet_t
+{
+    packet_window_click_t() { id = PACKET_ID_WINDOW_CLICK; }
+
+    jbyte window_id = 0;
+    jshort slot = 0;
+    jbool right_click = 0;
+    jshort action_num = 0;
+    jbool shift = 0;
+
+    inventory_item_t item;
+
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == PACKET_ID_WINDOW_CLICK);
+        dat.push_back(id);
+        assemble_byte(dat, window_id);
+        assemble_short(dat, slot);
+        assemble_bool(dat, right_click);
+        assemble_short(dat, action_num);
+        assemble_bool(dat, shift);
+        assemble_short(dat, item.id);
+        if (item.id != -1)
+        {
+            assemble_byte(dat, item.quantity);
+            assemble_short(dat, item.damage);
+        }
+        assert(dat.size() == (item.id != -1 ? 13 : 10));
+        return dat;
+    }
+};
+
 struct packet_window_set_slot_t : packet_t
 {
     packet_window_set_slot_t() { id = PACKET_ID_WINDOW_SET_SLOT; }
@@ -475,6 +509,7 @@ struct packet_window_set_slot_t : packet_t
             assemble_byte(dat, item.quantity);
             assemble_short(dat, item.damage);
         }
+        assert(dat.size() == (item.id != -1 ? 9 : 6));
         return dat;
     }
 };

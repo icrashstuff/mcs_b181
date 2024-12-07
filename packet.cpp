@@ -449,6 +449,8 @@ SDL_FORCE_INLINE bool read_metadata(std::vector<Uint8>& dat, size_t& pos, std::v
             return 0;
     }
 
+    assert(dat[dat.size() - 1] == 0x7f);
+
     return 1;
 }
 
@@ -602,6 +604,7 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
                 PACK_LENV(PACKET_ID_ENT_SPAWN_MOB, 21, 1);
                 PACK_LENV(PACKET_ID_PLAYER_PLACE, 13, 1);
                 PACK_LENV(PACKET_ID_CHUNK_MAP, 18, 1);
+                PACK_LENV(PACKET_ID_WINDOW_CLICK, 10, 1);
                 PACK_LENV(PACKET_ID_WINDOW_SET_ITEMS, 4, (1 << 18));
                 PACK_LENV(PACKET_ID_WINDOW_SET_SLOT, 6, 1);
                 PACK_LENV(PACKET_ID_UPDATE_SIGN, 13, 4);
@@ -693,10 +696,12 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
                             if (buf_size >= var_len_pos)
                             {
                                 Uint16 temp = SDL_Swap16BE(*(Uint16*)(buf.data() + var_len_pos - 2));
-                                LOG("Read stream");
+                                LOG("Read stream %d", (*(Sint16*)&temp));
                                 len += (*(Sint16*)&temp) * 2;
                                 var_len_pos += (*(Sint16*)&temp) * 2;
                                 last_metadata_cmd = 2048;
+                                len++;
+                                var_len_pos++;
                                 change_happened++;
                             }
                         }
@@ -746,7 +751,7 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
                                 break;
                             default:
                                 char buffer[128];
-                                snprintf(buffer, ARR_SIZE(buffer), "Unknown command %d in metadata stream", last_metadata_cmd);
+                                snprintf(buffer, ARR_SIZE(buffer), "Unknown command %d(%d) in metadata stream", last_metadata_cmd, last_metadata_cmd >> 5);
                                 err_str = buffer;
                                 break;
                             }
@@ -805,6 +810,17 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
                     {
                         Uint16 temp = SDL_Swap16BE(*(Uint16*)(buf.data() + 9));
                         len += (*(Sint16*)&temp) * 4;
+                        var_len--;
+                        change_happened++;
+                    }
+                    break;
+                }
+                case PACKET_ID_WINDOW_CLICK:
+                {
+                    if (var_len == 1 && buf_size >= 10)
+                    {
+                        Uint16 temp = SDL_Swap16BE(*(Uint16*)(buf.data() + 8));
+                        len += ((*(Sint16*)&temp) >= 0) ? 3 : 0;
                         var_len--;
                         change_happened++;
                     }
@@ -977,6 +993,25 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
             {
                 err += !read_byte(buf, pos, &p->amount);
                 err += !read_short(buf, pos, &p->damage);
+            }
+
+            break;
+        }
+        case PACKET_ID_WINDOW_CLICK:
+        {
+            P(packet_window_click_t);
+
+            err += !read_byte(buf, pos, &p->window_id);
+            err += !read_short(buf, pos, &p->slot);
+            err += !read_ubyte(buf, pos, &p->right_click);
+            err += !read_short(buf, pos, &p->action_num);
+            err += !read_ubyte(buf, pos, &p->shift);
+
+            err += !read_short(buf, pos, &p->item.id);
+            if (p->item.id != -1)
+            {
+                err += !read_byte(buf, pos, &p->item.quantity);
+                err += !read_short(buf, pos, &p->item.damage);
             }
 
             break;

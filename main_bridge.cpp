@@ -89,7 +89,7 @@ SDLNet_Address* resolve_addr(const char* addr)
     return t;
 }
 
-int main()
+int main(int argc, char** argv)
 {
     /* KDevelop fully buffers the output and will not display anything */
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -115,7 +115,7 @@ int main()
 
     LOG("Resolving hosts");
     SDLNet_Address* addr = resolve_addr("127.0.0.3");
-    SDLNet_Address* addr_real_server = resolve_addr("127.0.0.1");
+    SDLNet_Address* addr_real_server = resolve_addr(argc > 1 ? argv[1] : "127.0.0.1");
 
     if (SDLNet_WaitUntilResolved(addr, 5000) != 1)
     {
@@ -162,7 +162,6 @@ int main()
                 continue;
             }
 
-            /* Set this to a value other than 0 to break things */
             SDLNet_SimulateStreamPacketLoss(new_client.sock_server, 0);
 
             SDLNet_Address* client_addr = SDLNet_GetStreamSocketAddress(new_client.sock_server);
@@ -176,14 +175,14 @@ int main()
             clients.push_back(new_client);
         }
 
-        for (size_t i = 0; i < clients.size() * 2; i++)
+        for (size_t i = 0; i < clients.size() * 3; i++)
         {
             int sdl_tick_cur = SDL_GetTicks();
-            client_t* c = &clients.data()[i / 2];
+            client_t* c = &clients.data()[i % clients.size()];
             if (c->skip)
                 continue;
             c->change_happened = true;
-            for (size_t j = 0; j < 20; j++)
+            for (size_t j = 0; j < 25; j++)
             {
                 if (c->skip || !c->change_happened)
                     continue;
