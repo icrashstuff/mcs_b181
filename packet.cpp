@@ -610,6 +610,7 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
                 PACK_LENV(PACKET_ID_WINDOW_SET_ITEMS, 4, (1 << 18));
                 PACK_LENV(PACKET_ID_WINDOW_SET_SLOT, 6, 1);
                 PACK_LENV(PACKET_ID_UPDATE_SIGN, 13, 4);
+                PACK_LENV(PACKET_ID_ITEM_DATA, 6, 1);
 
             default:
             {
@@ -867,6 +868,17 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
                     {
                         Uint16 temp = SDL_Swap16BE(*(Uint16*)(buf.data() + 11));
                         len += ((*(Sint16*)&temp) >= 0) ? 3 : 0;
+                        var_len--;
+                        change_happened++;
+                    }
+                    break;
+                }
+                case PACKET_ID_ITEM_DATA:
+                {
+                    if (var_len == 1 && buf_size >= 6)
+                    {
+                        Uint8 temp = *(buf.data() + 5);
+                        len += temp;
                         var_len--;
                         change_happened++;
                     }
@@ -1135,6 +1147,26 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
                     p->payload.push_back(t);
                 }
             }
+            break;
+        }
+        case PACKET_ID_ITEM_DATA:
+        {
+            P(packet_item_data_t);
+
+            err += !read_short(buf, pos, &p->item_type);
+            err += !read_short(buf, pos, &p->item_id);
+
+            jubyte text_len;
+
+            err += !read_ubyte(buf, pos, &text_len);
+
+            if (!err)
+            {
+                p->text.resize(text_len);
+
+                err += !read_bytes(buf, pos, text_len, p->text.data());
+            }
+
             break;
         }
 

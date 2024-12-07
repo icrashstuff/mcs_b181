@@ -79,11 +79,6 @@ bool read_double(SDLNet_StreamSocket* sock, double* out);
 
 bool read_string16(SDLNet_StreamSocket* sock, std::string& out);
 
-/**
- * TODO List
- *
- * PACKET_ID_ITEM_DATA = 0x83,
- */
 enum packet_id_t : jubyte
 {
     PACKET_ID_KEEP_ALIVE = 0x00,
@@ -550,6 +545,38 @@ struct packet_window_set_slot_t : packet_t
             assemble_short(dat, item.damage);
         }
         assert(dat.size() == (item.id != -1 ? 9 : 6));
+        return dat;
+    }
+};
+
+struct packet_item_data_t : packet_t
+{
+    packet_item_data_t() { id = PACKET_ID_ITEM_DATA; }
+
+    jshort item_type = 0;
+    jshort item_id = 0;
+
+    std::vector<Uint8> text;
+
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == PACKET_ID_ITEM_DATA);
+
+        if (text.size() > 255)
+        {
+            LOG_ERROR("Text data too big!");
+            return dat;
+        }
+
+        dat.push_back(id);
+        assemble_short(dat, item_type);
+        assemble_short(dat, item_id);
+
+        assemble_ubyte(dat, text.size());
+        assemble_bytes(dat, text.data(), text.size());
+
+        assert(dat.size() == 6 + text.size());
         return dat;
     }
 };
