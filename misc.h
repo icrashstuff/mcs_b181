@@ -31,10 +31,17 @@
 
 #define ARR_SIZE_S(x) ((short)ARR_SIZE(x))
 
+#ifdef dc_log
+#define LOG(fmt, ...) dc_log(fmt, ##__VA_ARGS__)
+#define LOG_WARN(fmt, ...) dc_log_warn(fmt, ##__VA_ARGS__)
+#define LOG_ERROR(fmt, ...) dc_log_trace(fmt, ##__VA_ARGS__)
+#define LOG_TRACE(fmt, ...) dc_log_error(fmt, ##__VA_ARGS__)
+#else
 #define LOG(fmt, ...) printf("%s:%d %s(): " fmt "\n", __FILE_NAME__, __LINE__, __func__, ##__VA_ARGS__)
 #define LOG_WARN(fmt, ...) printf("[WARN]: %s:%d %s(): " fmt "\n", __FILE_NAME__, __LINE__, __func__, ##__VA_ARGS__)
 #define LOG_ERROR(fmt, ...) printf("[ERR]: %s:%d %s(): " fmt "\n", __FILE_NAME__, __LINE__, __func__, ##__VA_ARGS__)
 #define LOG_TRACE(fmt, ...) printf("[TRACE]: %s:%d %s(): " fmt "\n", __FILE_NAME__, __LINE__, __func__, ##__VA_ARGS__)
+#endif
 
 #ifdef ENABLE_TRACE
 #define TRACE(fmt, ...) LOG_TRACE(fmt, ##__VA_ARGS__)

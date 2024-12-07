@@ -536,6 +536,83 @@ const char* packet_t::get_name_for_id(Uint8 _id)
 }
 #undef PACK_NAME
 
+#define PACK_VALID(x)   \
+    case PACKET_ID_##x: \
+        return true
+bool packet_t::is_valid_id(Uint8 _id)
+{
+    switch (_id)
+    {
+        PACK_VALID(KEEP_ALIVE);
+        PACK_VALID(LOGIN_REQUEST);
+        PACK_VALID(HANDSHAKE);
+        PACK_VALID(CHAT_MSG);
+        PACK_VALID(UPDATE_TIME);
+        PACK_VALID(ENT_EQUIPMENT);
+        PACK_VALID(SPAWN_POS);
+        PACK_VALID(ENT_USE);
+        PACK_VALID(UPDATE_HEALTH);
+        PACK_VALID(RESPAWN);
+        PACK_VALID(PLAYER_ON_GROUND);
+        PACK_VALID(PLAYER_POS);
+        PACK_VALID(PLAYER_LOOK);
+        PACK_VALID(PLAYER_POS_LOOK);
+        PACK_VALID(PLAYER_DIG);
+        PACK_VALID(PLAYER_PLACE);
+        PACK_VALID(HOLD_CHANGE);
+        PACK_VALID(USE_BED);
+        PACK_VALID(ENT_ANIMATION);
+        PACK_VALID(ENT_ACTION);
+        PACK_VALID(ENT_SPAWN_NAMED);
+        PACK_VALID(ENT_SPAWN_PICKUP);
+        PACK_VALID(COLLECT_ITEM);
+        PACK_VALID(ADD_OBJ);
+        PACK_VALID(ENT_SPAWN_MOB);
+        PACK_VALID(ENT_SPAWN_PAINTING);
+        PACK_VALID(ENT_SPAWN_XP);
+        PACK_VALID(STANCE_UPDATE);
+        PACK_VALID(ENT_VELOCITY);
+        PACK_VALID(ENT_DESTROY);
+        PACK_VALID(ENT_ENSURE_SPAWN);
+        PACK_VALID(ENT_MOVE_REL);
+        PACK_VALID(ENT_LOOK);
+        PACK_VALID(ENT_LOOK_MOVE_REL);
+        PACK_VALID(ENT_MOVE_TELEPORT);
+        PACK_VALID(ENT_STATUS);
+        PACK_VALID(ENT_ATTACH);
+        PACK_VALID(ENT_METADATA);
+        PACK_VALID(ENT_EFFECT);
+        PACK_VALID(ENT_EFFECT_REMOVE);
+        PACK_VALID(XP_SET);
+        PACK_VALID(CHUNK_CACHE);
+        PACK_VALID(CHUNK_MAP);
+        PACK_VALID(BLOCK_CHANGE_MULTI);
+        PACK_VALID(BLOCK_CHANGE);
+        PACK_VALID(BLOCK_ACTION);
+        PACK_VALID(EXPLOSION);
+        PACK_VALID(SFX);
+        PACK_VALID(NEW_STATE);
+        PACK_VALID(THUNDERBOLT);
+        PACK_VALID(WINDOW_OPEN);
+        PACK_VALID(WINDOW_CLOSE);
+        PACK_VALID(WINDOW_CLICK);
+        PACK_VALID(WINDOW_SET_SLOT);
+        PACK_VALID(WINDOW_SET_ITEMS);
+        PACK_VALID(WINDOW_UPDATE_PROGRESS);
+        PACK_VALID(WINDOW_TRANSACTION);
+        PACK_VALID(INV_CREATIVE_ACTION);
+        PACK_VALID(UPDATE_SIGN);
+        PACK_VALID(ITEM_DATA);
+        PACK_VALID(INCREMENT_STATISTIC);
+        PACK_VALID(PLAYER_LIST_ITEM);
+        PACK_VALID(SERVER_LIST_PING);
+        PACK_VALID(KICK);
+    default:
+        return false;
+    }
+}
+#undef PACK_VALID
+
 const char* packet_t::get_name() { return get_name_for_id(id); }
 
 packet_handler_t::packet_handler_t(bool is_server_)

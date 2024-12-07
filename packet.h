@@ -158,9 +158,22 @@ struct packet_t
 {
     packet_id_t id = PACKET_ID_KICK;
 
+    /**
+     * Gets the name for the packet
+     *
+     * Wrapper around packet_t::get_name_for_id()
+     */
     const char* get_name();
 
+    /**
+     * Get the name for the corresponding packet id
+     */
     static const char* get_name_for_id(Uint8 pack_id);
+
+    /**
+     * Returns true if the id is a valid, false otherwise
+     */
+    static bool is_valid_id(Uint8 pack_id);
 
     virtual ~packet_t() {};
 

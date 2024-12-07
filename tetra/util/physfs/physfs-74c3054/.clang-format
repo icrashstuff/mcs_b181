@@ -1,0 +1,2 @@
+# No need to format physfs
+DisableFormat: true
