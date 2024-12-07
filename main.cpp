@@ -106,7 +106,8 @@ public:
         data.resize(CHUNK_SIZE_X * CHUNK_SIZE_Y * CHUNK_SIZE_Z * 5 / 2, 0);
         assert(data.size());
         Uint8* ptr = data.data();
-        r_state = *(Uint64*)&ptr;
+        Uint64* rptr = (Uint64*)this;
+        r_state = *(Uint64*)&ptr + *(Uint32*)this + *(Uint64*)&rptr;
     }
 
     /**
@@ -583,7 +584,9 @@ public:
         generator = terrain_generator;
         seed = seed_dim;
 
-        r_state = seed + generator;
+        Uint64* rptr = (Uint64*)this;
+        r_state = seed + generator + *(Uint32*)this + *(Uint64*)&rptr;
+        ;
 
         /* Load spawn regions */
         regions.push_back({ 0, 0, NULL, 0 });
@@ -1114,6 +1117,8 @@ void send_circle_chunks(client_t* client, dimension_t* dimensions, int radius)
 
 void spawn_player(std::vector<client_t> clients, client_t* client, dimension_t* dimensions)
 {
+    LOG("Spawning \"%s\" with eid: %d in dimension: %d", client->username.c_str(), client->eid, client->dimension);
+
     SDLNet_StreamSocket* sock = client->sock;
 
     dimensions[client->dimension < 0].find_spawn_point(client->player_x, client->player_y, client->player_z);
@@ -1754,6 +1759,8 @@ int main(int argc, char** argv)
                     pack_respawn.mode = client->player_mode;
                     pack_respawn.world_height = WORLD_HEIGHT;
                     send_buffer(sock, pack_respawn.assemble());
+
+                    spawn_player(clients, client, dimensions);
 
                     packet_time_update_t pack_time;
                     pack_time.time = sdl_tick_cur / 50;
