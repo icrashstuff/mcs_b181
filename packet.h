@@ -270,6 +270,59 @@ struct packet_add_obj_t : packet_t
     }
 };
 
+/**
+ * Server -> Client
+ */
+struct packet_ent_spawn_mob_t : packet_t
+{
+    packet_ent_spawn_mob_t() { id = PACKET_ID_ENT_SPAWN_MOB; }
+
+    jint eid = 0;
+    jbyte type = 0;
+    jint x = 0;
+    jint y = 0;
+    jint z = 0;
+    jbyte yaw = 0;
+    jbyte pitch = 0;
+
+    std::vector<Uint8> metadata;
+
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == PACKET_ID_ENT_SPAWN_MOB);
+        dat.push_back(id);
+        assemble_int(dat, eid);
+        assemble_byte(dat, type);
+        assemble_int(dat, x);
+        assemble_int(dat, y);
+        assemble_int(dat, z);
+        assemble_byte(dat, yaw);
+        assemble_byte(dat, pitch);
+        assemble_bytes(dat, metadata.data(), metadata.size());
+        return dat;
+    }
+};
+
+struct packet_ent_metadata_t : packet_t
+{
+    packet_ent_metadata_t() { id = PACKET_ID_ENT_METADATA; }
+
+    jint eid = 0;
+
+    std::vector<Uint8> metadata;
+
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == PACKET_ID_ENT_METADATA);
+        dat.push_back(id);
+        assemble_int(dat, eid);
+        assemble_bytes(dat, metadata.data(), metadata.size());
+        return dat;
+    }
+};
+
 struct packet_chunk_t : packet_t
 {
     packet_chunk_t() { id = PACKET_ID_CHUNK_MAP; }
@@ -303,6 +356,54 @@ struct packet_chunk_t : packet_t
 
         assemble_int(dat, compressed_data.size());
         assemble_bytes(dat, compressed_data.data(), compressed_data.size());
+        return dat;
+    }
+};
+
+struct block_change_dat_t
+{
+    jbyte x;
+    jbyte y;
+    jbyte z;
+    jbyte type;
+    jbyte metadata;
+};
+
+struct packet_block_change_multi_t : packet_t
+{
+    packet_block_change_multi_t() { id = PACKET_ID_BLOCK_CHANGE_MULTI; }
+
+    jint chunk_x;
+    jint chunk_z;
+
+    std::vector<block_change_dat_t> payload;
+
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == PACKET_ID_BLOCK_CHANGE_MULTI);
+        dat.push_back(id);
+        assemble_byte(dat, chunk_x);
+        assemble_byte(dat, chunk_z);
+        assemble_short(dat, payload.size());
+
+        for (size_t i = 0; i < payload.size(); i++)
+        {
+            jshort type = payload[i].x & 0x08 << 12;
+            type += payload[i].z & 0x08 << 8;
+            type += payload[i].y & 0x0F;
+            assemble_short(dat, type);
+        }
+
+        for (size_t i = 0; i < payload.size(); i++)
+        {
+            assemble_byte(dat, payload[i].type);
+        }
+
+        for (size_t i = 0; i < payload.size(); i++)
+        {
+            assemble_byte(dat, payload[i].metadata);
+        }
         return dat;
     }
 };
@@ -353,6 +454,31 @@ struct packet_window_items_t : packet_t
     }
 };
 
+struct packet_window_set_slot_t : packet_t
+{
+    packet_window_set_slot_t() { id = PACKET_ID_WINDOW_SET_SLOT; }
+
+    jbyte window_id = 0;
+    jshort slot = 0;
+    inventory_item_t item;
+
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == PACKET_ID_WINDOW_SET_SLOT);
+        dat.push_back(id);
+        assemble_byte(dat, window_id);
+        assemble_short(dat, slot);
+        assemble_short(dat, item.id);
+        if (item.id != -1)
+        {
+            assemble_byte(dat, item.quantity);
+            assemble_short(dat, item.damage);
+        }
+        return dat;
+    }
+};
+
 #include "packet_gen_def.h"
 
 class packet_handler_t
@@ -386,10 +512,12 @@ private:
     std::vector<Uint8> buf;
 
     size_t buf_size;
-    Uint8 packet_type;
+    Uint16 packet_type;
     size_t len;
     size_t var_len_pos;
     int var_len;
+
+    Uint16 last_metadata_cmd;
 
     bool is_server;
 

@@ -661,9 +661,9 @@ struct packet_ent_velocity_t : packet_t
     packet_ent_velocity_t() { id = PACKET_ID_ENT_VELOCITY; }
 
     jint eid = 0;
-    jint vel_x = 0;
-    jint vel_y = 0;
-    jint vel_z = 0;
+    jshort vel_x = 0;
+    jshort vel_y = 0;
+    jshort vel_z = 0;
 
     std::vector<Uint8> assemble()
     {
@@ -671,9 +671,9 @@ struct packet_ent_velocity_t : packet_t
         assert(id == PACKET_ID_ENT_VELOCITY);
         dat.push_back(id);
         assemble_int(dat, eid);
-        assemble_int(dat, vel_x);
-        assemble_int(dat, vel_y);
-        assemble_int(dat, vel_z);
+        assemble_short(dat, vel_x);
+        assemble_short(dat, vel_y);
+        assemble_short(dat, vel_z);
         return dat;
     }
 };
@@ -927,6 +927,29 @@ struct packet_block_change_t : packet_t
         assemble_int(dat, block_z);
         assemble_byte(dat, type);
         assemble_byte(dat, metadata);
+        return dat;
+    }
+};
+struct packet_block_action_t : packet_t
+{
+    packet_block_action_t() { id = PACKET_ID_BLOCK_ACTION; }
+
+    jint block_x = 0;
+    jshort block_y = 0;
+    jint block_z = 0;
+    jbyte byte0 = 0;
+    jbyte byte1 = 0;
+
+    std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        assert(id == PACKET_ID_BLOCK_ACTION);
+        dat.push_back(id);
+        assemble_int(dat, block_x);
+        assemble_short(dat, block_y);
+        assemble_int(dat, block_z);
+        assemble_byte(dat, byte0);
+        assemble_byte(dat, byte1);
         return dat;
     }
 };
@@ -1566,9 +1589,9 @@ static bool parse_gen_packets_server(Uint8 packet_type, std::vector<Uint8>& buf,
         P(packet_ent_velocity_t)
 
         err += !read_int(buf, pos, &p->eid);
-        err += !read_int(buf, pos, &p->vel_x);
-        err += !read_int(buf, pos, &p->vel_y);
-        err += !read_int(buf, pos, &p->vel_z);
+        err += !read_short(buf, pos, &p->vel_x);
+        err += !read_short(buf, pos, &p->vel_y);
+        err += !read_short(buf, pos, &p->vel_z);
 
         break;
     }
@@ -1715,6 +1738,19 @@ static bool parse_gen_packets_server(Uint8 packet_type, std::vector<Uint8>& buf,
         err += !read_int(buf, pos, &p->block_z);
         err += !read_byte(buf, pos, &p->type);
         err += !read_byte(buf, pos, &p->metadata);
+
+        break;
+    }
+
+    case PACKET_ID_BLOCK_ACTION:
+    {
+        P(packet_block_action_t)
+
+        err += !read_int(buf, pos, &p->block_x);
+        err += !read_short(buf, pos, &p->block_y);
+        err += !read_int(buf, pos, &p->block_z);
+        err += !read_byte(buf, pos, &p->byte0);
+        err += !read_byte(buf, pos, &p->byte1);
 
         break;
     }
@@ -1885,7 +1921,7 @@ static bool gen_lengths_server(Uint8 packet_type, size_t& len, int& var_len)
         PACK_LENV(PACKET_ID_ENT_SPAWN_PAINTING, 23, 1)
         PACK_LEN(PACKET_ID_ENT_SPAWN_XP, 19)
         PACK_LEN(PACKET_ID_STANCE_UPDATE, 19)
-        PACK_LEN(PACKET_ID_ENT_VELOCITY, 17)
+        PACK_LEN(PACKET_ID_ENT_VELOCITY, 11)
         PACK_LEN(PACKET_ID_ENT_DESTROY, 5)
         PACK_LEN(PACKET_ID_ENT_ENSURE_SPAWN, 5)
         PACK_LEN(PACKET_ID_ENT_MOVE_REL, 8)
@@ -1899,6 +1935,7 @@ static bool gen_lengths_server(Uint8 packet_type, size_t& len, int& var_len)
         PACK_LEN(PACKET_ID_XP_SET, 5)
         PACK_LEN(PACKET_ID_CHUNK_CACHE, 10)
         PACK_LEN(PACKET_ID_BLOCK_CHANGE, 12)
+        PACK_LEN(PACKET_ID_BLOCK_ACTION, 13)
         PACK_LEN(PACKET_ID_SFX, 18)
         PACK_LEN(PACKET_ID_NEW_STATE, 3)
         PACK_LEN(PACKET_ID_THUNDERBOLT, 18)
@@ -2251,9 +2288,9 @@ static bool parse_gen_packets_client(Uint8 packet_type, std::vector<Uint8>& buf,
         P(packet_ent_velocity_t)
 
         err += !read_int(buf, pos, &p->eid);
-        err += !read_int(buf, pos, &p->vel_x);
-        err += !read_int(buf, pos, &p->vel_y);
-        err += !read_int(buf, pos, &p->vel_z);
+        err += !read_short(buf, pos, &p->vel_x);
+        err += !read_short(buf, pos, &p->vel_y);
+        err += !read_short(buf, pos, &p->vel_z);
 
         break;
     }
@@ -2400,6 +2437,19 @@ static bool parse_gen_packets_client(Uint8 packet_type, std::vector<Uint8>& buf,
         err += !read_int(buf, pos, &p->block_z);
         err += !read_byte(buf, pos, &p->type);
         err += !read_byte(buf, pos, &p->metadata);
+
+        break;
+    }
+
+    case PACKET_ID_BLOCK_ACTION:
+    {
+        P(packet_block_action_t)
+
+        err += !read_int(buf, pos, &p->block_x);
+        err += !read_short(buf, pos, &p->block_y);
+        err += !read_int(buf, pos, &p->block_z);
+        err += !read_byte(buf, pos, &p->byte0);
+        err += !read_byte(buf, pos, &p->byte1);
 
         break;
     }
@@ -2579,7 +2629,7 @@ static bool gen_lengths_client(Uint8 packet_type, size_t& len, int& var_len)
         PACK_LENV(PACKET_ID_ENT_SPAWN_PAINTING, 23, 1)
         PACK_LEN(PACKET_ID_ENT_SPAWN_XP, 19)
         PACK_LEN(PACKET_ID_STANCE_UPDATE, 19)
-        PACK_LEN(PACKET_ID_ENT_VELOCITY, 17)
+        PACK_LEN(PACKET_ID_ENT_VELOCITY, 11)
         PACK_LEN(PACKET_ID_ENT_DESTROY, 5)
         PACK_LEN(PACKET_ID_ENT_ENSURE_SPAWN, 5)
         PACK_LEN(PACKET_ID_ENT_MOVE_REL, 8)
@@ -2593,6 +2643,7 @@ static bool gen_lengths_client(Uint8 packet_type, size_t& len, int& var_len)
         PACK_LEN(PACKET_ID_XP_SET, 5)
         PACK_LEN(PACKET_ID_CHUNK_CACHE, 10)
         PACK_LEN(PACKET_ID_BLOCK_CHANGE, 12)
+        PACK_LEN(PACKET_ID_BLOCK_ACTION, 13)
         PACK_LEN(PACKET_ID_SFX, 18)
         PACK_LEN(PACKET_ID_NEW_STATE, 3)
         PACK_LEN(PACKET_ID_THUNDERBOLT, 18)

@@ -383,9 +383,9 @@ add_packet("stance_update", "STANCE_UPDATE", {"unknown0": jfloat,
                                               "unknown5": jbool,
                                               })
 add_packet("ent_velocity", "ENT_VELOCITY", {"eid": jint,
-                                            "vel_x": jint,
-                                            "vel_y": jint,
-                                            "vel_z": jint, })
+                                            "vel_x": jshort,
+                                            "vel_y": jshort,
+                                            "vel_z": jshort, })
 
 add_packet("ent_destroy", "ENT_DESTROY", {"eid": jint})
 add_packet("ent_create", "ENT_ENSURE_SPAWN", {"eid": jint})
@@ -441,6 +441,13 @@ add_packet("block_change", "BLOCK_CHANGE", {"block_x":  jint,
                                             "block_z":  jint,
                                             "type":     jbyte,
                                             "metadata": jbyte, })
+
+add_packet("block_action", "BLOCK_ACTION", {"block_x": jint,
+                                            "block_y": jshort,
+                                            "block_z": jint,
+                                            "byte0":   jbyte,
+                                            "byte1":   jbyte, })
+
 add_packet("sound_effect", "SFX", {"effect_id":  jint,
                                    "x":          jint,
                                    "y":          jbyte,

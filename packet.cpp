@@ -227,6 +227,7 @@ bool read_string16(SDLNet_StreamSocket* sock, std::string& out)
     {                                                                               \
         if (dat.size() < (width) + pos)                                             \
         {                                                                           \
+            assert(false);                                                          \
             LOG_TRACE("dat.size(): %zu, expected: %zu", dat.size(), (width) + pos); \
             return 0;                                                               \
         }                                                                           \
@@ -336,6 +337,121 @@ SDL_FORCE_INLINE bool read_bytes(std::vector<Uint8>& dat, size_t& pos, size_t le
     return 1;
 }
 
+static void dump_buffer(std::vector<Uint8>& buf)
+{
+    printf("\n\n\n=== %zu ===\n", buf.size());
+    for (size_t i = 0; i < buf.size(); i++)
+    {
+        if (i % 8 == 0)
+            printf("\n");
+        printf("0x%02x ", buf.data()[i]);
+    }
+    printf("\n");
+    for (size_t i = 0; i < buf.size(); i++)
+    {
+        if (i % 8 == 0)
+            printf("\n");
+        printf("%03d ", buf.data()[i]);
+    }
+    printf("\n");
+}
+
+SDL_FORCE_INLINE bool read_metadata(std::vector<Uint8>& dat, size_t& pos, std::vector<Uint8>& out)
+{
+    BAIL_READ(1);
+
+    jubyte x;
+    if (!read_ubyte(dat, pos, &x))
+        return 0;
+
+    assemble_ubyte(out, x);
+
+    while (x != 127)
+    {
+        int err = 0;
+        switch (x >> 5)
+        {
+        case 0:
+        {
+            jbyte r;
+            err += !read_byte(dat, pos, &r);
+            assemble_byte(out, r);
+            break;
+        }
+        case 1:
+        {
+            jshort r;
+            err += !read_short(dat, pos, &r);
+            assemble_short(out, r);
+            break;
+        }
+        case 2:
+        {
+            jint r;
+            err += !read_int(dat, pos, &r);
+            assemble_int(out, r);
+            break;
+        }
+        case 3:
+        {
+            jfloat r;
+            err += !read_float(dat, pos, &r);
+            assemble_float(out, r);
+            break;
+        }
+        case 4:
+        {
+            std::string r;
+            err += !read_string16(dat, pos, r);
+            assemble_string16(out, r);
+            break;
+        }
+        case 5:
+        {
+            jshort r0;
+            jbyte r1;
+            jshort r2;
+            err += !read_short(dat, pos, &r0);
+            err += !read_byte(dat, pos, &r1);
+            err += !read_short(dat, pos, &r2);
+            if (err)
+                return 0;
+            assemble_short(out, r0);
+            assemble_byte(out, r1);
+            assemble_short(out, r2);
+            break;
+        }
+        case 6:
+        {
+            jint r0;
+            jint r1;
+            jint r2;
+            err += !read_int(dat, pos, &r0);
+            err += !read_int(dat, pos, &r1);
+            err += !read_int(dat, pos, &r2);
+            if (err)
+                return 0;
+            assemble_int(out, r0);
+            assemble_int(out, r1);
+            assemble_int(out, r2);
+            break;
+        }
+        default:
+            return 0;
+        }
+
+        if (err)
+            return 0;
+
+        if (read_ubyte(dat, pos, &x))
+            assemble_ubyte(out, x);
+        else
+            return 0;
+    }
+
+    return 1;
+}
+
 #undef BAIL_READ
 
 #define MCS_B181_PACKET_GEN_IMPL
@@ -426,6 +542,7 @@ packet_handler_t::packet_handler_t(bool is_server_)
     buf.reserve(1024);
     last_packet_time = SDL_GetTicks();
     buf_size = 0;
+    packet_type = 16384;
 }
 
 packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
@@ -459,6 +576,7 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
         len = 0;
         var_len = 0;
         var_len_pos = 0;
+        last_metadata_cmd = 2048;
 
 #define PACK_LENV(ID, LEN, VLEN) \
     case ID:                     \
@@ -479,9 +597,13 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
         {
             switch (packet_type)
             {
+                PACK_LENV(PACKET_ID_BLOCK_CHANGE_MULTI, 11, 1);
+                PACK_LENV(PACKET_ID_ENT_METADATA, 6, 1);
+                PACK_LENV(PACKET_ID_ENT_SPAWN_MOB, 21, 1);
                 PACK_LENV(PACKET_ID_PLAYER_PLACE, 13, 1);
-                PACK_LENV(PACKET_ID_CHUNK_MAP, 18, 1)
+                PACK_LENV(PACKET_ID_CHUNK_MAP, 18, 1);
                 PACK_LENV(PACKET_ID_WINDOW_SET_ITEMS, 4, (1 << 18));
+                PACK_LENV(PACKET_ID_WINDOW_SET_SLOT, 6, 1);
                 PACK_LENV(PACKET_ID_UPDATE_SIGN, 13, 4);
 
             default:
@@ -547,6 +669,93 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
             {
                 switch (packet_type)
                 {
+                case PACKET_ID_ENT_METADATA:
+                case PACKET_ID_ENT_SPAWN_MOB:
+                {
+                    if (!var_len_pos && packet_type == PACKET_ID_ENT_SPAWN_MOB)
+                        var_len_pos = 20;
+                    if (!var_len_pos && packet_type == PACKET_ID_ENT_METADATA)
+                        var_len_pos = 5;
+                    if (var_len == 1 && buf_size >= var_len_pos)
+                    {
+                        if (last_metadata_cmd == 2048)
+                        {
+                            last_metadata_cmd = buf[var_len_pos];
+                        }
+                        if (last_metadata_cmd == 127)
+                        {
+                            var_len--;
+                            last_metadata_cmd = 1024;
+                            change_happened++;
+                        }
+                        else if (last_metadata_cmd == 512)
+                        {
+                            if (buf_size >= var_len_pos)
+                            {
+                                Uint16 temp = SDL_Swap16BE(*(Uint16*)(buf.data() + var_len_pos - 2));
+                                LOG("Read stream");
+                                len += (*(Sint16*)&temp) * 2;
+                                var_len_pos += (*(Sint16*)&temp) * 2;
+                                last_metadata_cmd = 2048;
+                                change_happened++;
+                            }
+                        }
+                        else
+                        {
+                            switch (last_metadata_cmd >> 5)
+                            {
+                            case 0:
+                                len++;
+                                var_len_pos++;
+                                last_metadata_cmd = 2048;
+                                change_happened++;
+                                break;
+                            case 1:
+                                len += 2;
+                                var_len_pos += 2;
+                                last_metadata_cmd = 2048;
+                                change_happened++;
+                                break;
+                            case 2:
+                            case 3:
+                                len += 4;
+                                var_len_pos += 4;
+                                last_metadata_cmd = 2048;
+                                change_happened++;
+                                break;
+                            case 4:
+                            {
+                                LOG_WARN("String in metadata, things may break!");
+                                len += 2;
+                                var_len_pos += 2;
+                                last_metadata_cmd = 512;
+                                change_happened++;
+                                break;
+                            }
+                            case 5:
+                                len += 5;
+                                var_len_pos += 5;
+                                last_metadata_cmd = 2048;
+                                change_happened++;
+                                break;
+                            case 6:
+                                len += 12;
+                                var_len_pos += 12;
+                                last_metadata_cmd = 2048;
+                                change_happened++;
+                                break;
+                            default:
+                                char buffer[128];
+                                snprintf(buffer, ARR_SIZE(buffer), "Unknown command %d in metadata stream", last_metadata_cmd);
+                                err_str = buffer;
+                                break;
+                            }
+                            len++;
+                            var_len_pos++;
+                        }
+                    }
+                    break;
+                }
                 case PACKET_ID_CHUNK_MAP:
                 {
                     if (var_len == 1 && buf_size >= 18)
@@ -588,6 +797,28 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
                     GET_STR_LEN(2, len - 2, 2);
                     GET_STR_LEN(3, len - 2, 2);
                     GET_STR_LEN(4, len - 2, 2);
+                    break;
+                }
+                case PACKET_ID_BLOCK_CHANGE_MULTI:
+                {
+                    if (var_len == 1 && buf_size >= 11)
+                    {
+                        Uint16 temp = SDL_Swap16BE(*(Uint16*)(buf.data() + 9));
+                        len += (*(Sint16*)&temp) * 4;
+                        var_len--;
+                        change_happened++;
+                    }
+                    break;
+                }
+                case PACKET_ID_WINDOW_SET_SLOT:
+                {
+                    if (var_len == 1 && buf_size >= 6)
+                    {
+                        Uint16 temp = SDL_Swap16BE(*(Uint16*)(buf.data() + 4));
+                        len += ((*(Sint16*)&temp) >= 0) ? 3 : 0;
+                        var_len--;
+                        change_happened++;
+                    }
                     break;
                 }
                 case PACKET_ID_PLAYER_PLACE:
@@ -642,6 +873,30 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
     {
         switch (packet_type)
         {
+        case PACKET_ID_ENT_METADATA:
+        {
+            P(packet_ent_metadata_t);
+
+            err += !read_int(buf, pos, &p->eid);
+            err += !read_metadata(buf, pos, p->metadata);
+
+            break;
+        }
+        case PACKET_ID_ENT_SPAWN_MOB:
+        {
+            P(packet_ent_spawn_mob_t);
+
+            err += !read_int(buf, pos, &p->eid);
+            err += !read_byte(buf, pos, &p->type);
+            err += !read_int(buf, pos, &p->x);
+            err += !read_int(buf, pos, &p->y);
+            err += !read_int(buf, pos, &p->z);
+            err += !read_byte(buf, pos, &p->yaw);
+            err += !read_byte(buf, pos, &p->pitch);
+            err += !read_metadata(buf, pos, p->metadata);
+
+            break;
+        }
         case PACKET_ID_CHUNK_MAP:
         {
             P(packet_chunk_t);
@@ -668,6 +923,47 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
 
             break;
         }
+        case PACKET_ID_BLOCK_CHANGE_MULTI:
+        {
+            P(packet_block_change_multi_t);
+
+            err += !read_int(buf, pos, &p->chunk_x);
+            err += !read_int(buf, pos, &p->chunk_z);
+
+            short payload_size;
+
+            err += !read_short(buf, pos, &payload_size);
+
+            if (payload_size < 0)
+                err++;
+
+            if (!err)
+            {
+                p->payload.resize(payload_size);
+
+                for (short i = 0; i < payload_size; i++)
+                {
+                    short coord;
+                    err += !read_short(buf, pos, &coord);
+
+                    p->payload[i].x = (coord >> 12) & 0x08;
+                    p->payload[i].z = (coord >> 8) & 0x08;
+                    p->payload[i].y = coord & 0x0F;
+                }
+
+                for (short i = 0; i < payload_size; i++)
+                {
+                    err += !read_byte(buf, pos, &p->payload[i].type);
+                }
+
+                for (short i = 0; i < payload_size; i++)
+                {
+                    err += !read_byte(buf, pos, &p->payload[i].metadata);
+                }
+            }
+
+            break;
+        }
         case PACKET_ID_PLAYER_PLACE:
         {
             P(packet_player_place_t);
@@ -681,6 +977,22 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
             {
                 err += !read_byte(buf, pos, &p->amount);
                 err += !read_short(buf, pos, &p->damage);
+            }
+
+            break;
+        }
+        case PACKET_ID_WINDOW_SET_SLOT:
+        {
+            P(packet_window_set_slot_t);
+
+            err += !read_byte(buf, pos, &p->window_id);
+            err += !read_short(buf, pos, &p->slot);
+
+            err += !read_short(buf, pos, &p->item.id);
+            if (p->item.id != -1)
+            {
+                err += !read_byte(buf, pos, &p->item.quantity);
+                err += !read_short(buf, pos, &p->item.damage);
             }
 
             break;
@@ -728,7 +1040,7 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
 
     TRACE("Packet buffer read: %zu/%zu", pos, buf.size());
     TRACE("Packet type(actual): 0x%02x(0x%02x)", packet->id, packet_type);
-    helpful_assert(pos == buf.size(), "Packet buffer read: %zu/%zu%s", pos, buf.size(), err ? " (err)" : " (err not set)");
+    helpful_assert(pos == buf.size(), "Packet 0x%02x buffer read: %zu/%zu%s", packet_type, pos, buf.size(), err ? " (err)" : " (err not set)");
     helpful_assert(packet->id == packet_type, "Packet type(actual): 0x%02x(0x%02x)%s", packet->id, packet_type, err ? " (err)" : " (err not set)");
     packet->id = (packet_id_t)packet_type;
 

@@ -41,20 +41,39 @@
 #include "misc.h"
 #include "packet.h"
 
+void kick(SDLNet_StreamSocket* sock, std::string reason, bool log = true)
+{
+    packet_kick_t packet;
+    packet.reason = reason;
+    send_buffer(sock, packet.assemble());
+
+    SDLNet_Address* client_addr = SDLNet_GetStreamSocketAddress(sock);
+    if (log)
+        LOG("Kicked: %s:%u, \"%s\"", SDLNet_GetAddressString(client_addr), SDLNet_GetStreamSocketPort(sock), reason.c_str());
+    SDLNet_UnrefAddress(client_addr);
+}
+
 struct client_t
 {
     /**
      * Socket obtained from the server component of the bridge
      */
     SDLNet_StreamSocket* sock_server = NULL;
+
     /**
      * Socket created to connect to the real server
      */
     SDLNet_StreamSocket* sock_client = NULL;
 
+    packet_handler_t pack_handler_server = packet_handler_t(true);
+
+    packet_handler_t pack_handler_client = packet_handler_t(false);
+
     Uint64 time_last_read = 0;
 
     bool skip = 0;
+
+    int change_happened = 0;
 };
 
 SDLNet_Address* resolve_addr(const char* addr)
@@ -127,7 +146,7 @@ int main()
 
     while (!done)
     {
-        SDL_Delay(10);
+        SDL_Delay(5);
         int done_client_searching = false;
         while (!done_client_searching)
         {
@@ -157,45 +176,65 @@ int main()
             clients.push_back(new_client);
         }
 
-        for (size_t i = 0; i < clients.size(); i++)
+        for (size_t i = 0; i < clients.size() * 2; i++)
         {
             int sdl_tick_cur = SDL_GetTicks();
-            client_t* c = &clients.data()[i];
+            client_t* c = &clients.data()[i / 2];
             if (c->skip)
                 continue;
-            if (sdl_tick_cur - c->time_last_read > 60000)
+            c->change_happened = true;
+            for (size_t j = 0; j < 20; j++)
             {
-                c->skip = true;
-                continue;
+                if (c->skip || !c->change_happened)
+                    continue;
+
+                if (sdl_tick_cur - c->time_last_read > 60000)
+                {
+                    c->skip = true;
+                    continue;
+                }
+
+                c->change_happened = false;
+
+                packet_t* pack_server = c->pack_handler_server.get_next_packet(c->sock_server);
+                packet_t* pack_client = c->pack_handler_client.get_next_packet(c->sock_client);
+
+                if (pack_server)
+                {
+                    c->change_happened++;
+                    c->time_last_read = sdl_tick_cur;
+                    TRACE("Got packet from client[%zu]: 0x%02x", i, pack_server->id);
+                    send_buffer(c->sock_client, pack_server->assemble());
+                    delete pack_server;
+                }
+                else if (c->pack_handler_server.get_error().length())
+                {
+                    c->skip = true;
+                    char buf[100];
+                    snprintf(buf, ARR_SIZE(buf), "Error parsing packet from client[%zu]: %s", i, c->pack_handler_server.get_error().c_str());
+                    kick(c->sock_server, buf);
+                    kick(c->sock_client, buf);
+                }
+
+                if (pack_client)
+                {
+                    c->change_happened++;
+                    c->time_last_read = sdl_tick_cur;
+                    TRACE("Got packet from server: 0x%02x", pack_client->id);
+                    send_buffer(c->sock_server, pack_client->assemble());
+                    delete pack_client;
+                }
+                else if (c->pack_handler_client.get_error().length())
+                {
+                    c->skip = true;
+                    char buf[100];
+                    snprintf(buf, ARR_SIZE(buf), "Error parsing packet from server: %s", c->pack_handler_client.get_error().c_str());
+                    kick(c->sock_server, buf);
+                    kick(c->sock_client, buf);
+                }
+
+                /* In the future when the bridge understands packets, kick sockets here */
             }
-            int client_status = SDLNet_GetConnectionStatus(c->sock_client);
-
-            char buf_server[4096];
-            char buf_client[4096];
-            int buf_len_server;
-            int buf_len_client;
-
-            assert(client_status != -1);
-
-            if (client_status == 0)
-                continue;
-
-            buf_len_server = SDLNet_ReadFromStreamSocket(c->sock_server, buf_server, ARR_SIZE(buf_server));
-            buf_len_client = SDLNet_ReadFromStreamSocket(c->sock_client, buf_client, ARR_SIZE(buf_client));
-
-            if (buf_len_client > 0)
-            {
-                c->time_last_read = sdl_tick_cur;
-                SDLNet_WriteToStreamSocket(c->sock_server, buf_client, buf_len_client);
-            }
-
-            if (buf_len_server > 0)
-            {
-                c->time_last_read = sdl_tick_cur;
-                SDLNet_WriteToStreamSocket(c->sock_client, buf_server, buf_len_server);
-            }
-
-            /* In the future when the bridge understands packets, kick sockets here */
         }
     }
 
