@@ -156,15 +156,18 @@ enum packet_id_t : jubyte
 
 };
 
-#define PACKET_NEW_TABLE(NAME)                                                                          \
+#define PACKET_NEW_TABLE_CHOICE_IF(NAME, ACTION)                                                        \
     do                                                                                                  \
     {                                                                                                   \
         if (!ImGui::BeginTable(NAME " info table", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders)) \
-            return;                                                                                     \
+            ACTION;                                                                                     \
         ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFontSize() * 16);  \
         ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFontSize() * 10);   \
         ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);                           \
+        ImGui::TableHeadersRow();                                                                       \
     } while (0)
+
+#define PACKET_NEW_TABLE(NAME) PACKET_NEW_TABLE_CHOICE_IF(NAME, return;)
 
 #define PACKET_TABLE_FIELD_TYPE(field_type, field_text, fmt, ...) \
     do                                                            \

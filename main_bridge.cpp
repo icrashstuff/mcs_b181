@@ -80,13 +80,11 @@ void kick_sock(SDLNet_StreamSocket* sock, std::string reason, bool log = true)
 
 struct packet_viewer_dat_t
 {
-    packet_viewer_dat_t()
-        : force_scroll(true)
-    {
-        default_filters();
-    }
-    bool force_scroll;
+    packet_viewer_dat_t() { default_filters(); }
+    size_t sel = -1;
     bool filters[256];
+    bool force_scroll = true;
+    bool select_recent = false;
 
     void default_filters()
     {
@@ -156,6 +154,10 @@ struct client_t
 
         ImGui::SameLine();
 
+        ImGui::Checkbox("Select Most Recent Packet", &dat.select_recent);
+
+        ImGui::SameLine();
+
         if (ImGui::Button("Clear Filters"))
             memset(dat.filters, 0, ARR_SIZE(dat.filters));
 
@@ -200,54 +202,71 @@ struct client_t
 
         float child_height = ImGui::GetMainViewport()->WorkSize.y / 3;
 
-        if (!ImGui::BeginChild("Packet List", ImVec2(-1, child_height), ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_AlwaysVerticalScrollbar))
+        if (ImGui::BeginListBox("##Packet Listbox", ImVec2(ImGui::CalcTextSize("x").x * 88, child_height)))
+        {
+            if (dat.select_recent)
+            {
+                for (size_t i = 0; i < packs.size(); i++)
+                {
+                    if (!dat.filters[packs[i]->id])
+                        continue;
+                    dat.sel = i;
+                }
+            }
+
+            float text_spacing = ImGui::GetTextLineHeightWithSpacing();
+
+            for (size_t i = 0; i < packs.size(); i++)
+            {
+                if (!dat.filters[packs[i]->id])
+                    continue;
+                ImGui::PushID(i);
+                char buf[56];
+                char buf2[80];
+                if (!ImGui::IsRectVisible(ImVec2(20, text_spacing)))
+                {
+                    buf2[0] = 0;
+                    ImGui::Spacing();
+                }
+                else
+                {
+                    snprintf(buf, ARR_SIZE(buf), "Packet[%zu]: 0x%02x (%s)", i, packs[i]->id, packs[i]->get_name());
+                    int buf_len = strlen(buf);
+                    memset(buf + buf_len, ' ', ARR_SIZE(buf) - buf_len);
+                    buf[ARR_SIZE(buf) - 1] = '\0';
+
+                    snprintf(buf2, ARR_SIZE(buf2), "%s %s", buf, timestamp_from_tick(packs[i]->assemble_tick).c_str());
+
+                    if (ImGui::Selectable(buf2, dat.sel == i))
+                        dat.sel = i;
+                }
+
+                ImGui::PopID();
+            }
+
+            if (dat.force_scroll)
+                ImGui::SetScrollHereY(1.0f);
+
+            ImGui::EndListBox();
+        }
+
+        ImGui::SameLine();
+
+        if (!ImGui::BeginChild("Packet Table", ImVec2(-1, child_height), 0, ImGuiWindowFlags_AlwaysVerticalScrollbar))
         {
             ImGui::EndChild();
             ImGui::TreePop();
             return;
         }
 
-        int start = ImGui::GetScrollY() / ImGui::GetTextLineHeightWithSpacing();
-
-        start -= 10;
-
-        if (start < 0)
-            start = 0;
-
-        for (size_t i = 0; i < packs.size(); i++)
+        if (dat.sel < packs.size())
+            packs[dat.sel]->draw_imgui();
+        else
         {
-            if (!dat.filters[packs[i]->id])
-                continue;
-            ImGui::PushID(i);
-            char buf[64];
-            snprintf(buf, ARR_SIZE(buf), "Packet[%zu]: 0x%02x (%s)", i, packs[i]->id, packs[i]->get_name());
-            int buf_len = strlen(buf);
-            memset(buf + buf_len, ' ', ARR_SIZE(buf) - buf_len);
-            buf[ARR_SIZE(buf) - 1] = '\0';
-
-            /* Poor mans clipper, slows down the rate at which the list slows the application */
-            /* TODO: Make the list out of selectables, and put the information off to the side */
-            if (i < (size_t)start)
-            {
-                if (ImGui::TreeNode("Packet"))
-                {
-                    packs[i]->draw_imgui();
-                    ImGui::TreePop();
-                }
-            }
-            else
-            {
-                if (ImGui::TreeNode("Packet", "%s %s", buf, timestamp_from_tick(packs[i]->assemble_tick).c_str()))
-                {
-                    packs[i]->draw_imgui();
-                    ImGui::TreePop();
-                }
-            }
-            ImGui::PopID();
+            PACKET_NEW_TABLE_CHOICE_IF("blank_table", goto skip_end_table;);
+            ImGui::EndTable();
+        skip_end_table:;
         }
-
-        if (dat.force_scroll)
-            ImGui::SetScrollHereY(1.0f);
 
         ImGui::EndChild();
         ImGui::TreePop();
@@ -292,7 +311,9 @@ struct client_t
         TABLE_FIELD("Num packets from server: ", "%zu", packets_client.size());
         TABLE_FIELD("Num packets: ", "%zu", packets_client.size() + packets_server.size());
 
-        draw_memory_field("Est. Packet memory footprint: ", packets_mem_footprint, false);
+        size_t mem_foot = packets_mem_footprint + (packets.capacity() + packets_server.capacity() + packets_client.capacity()) * sizeof(packets[0]);
+
+        draw_memory_field("Est. Packet memory footprint: ", mem_foot, false);
         draw_memory_field("Client data transfer: ", pack_handler_server.get_bytes_received(), false);
         draw_memory_field("Server data transfer: ", pack_handler_client.get_bytes_received(), false);
 
@@ -303,7 +324,7 @@ struct client_t
             TABLE_FIELD("AVG Server packets/s: ", "%zu", packets_client.size() * 1000 / tdiff);
             TABLE_FIELD("AVG Packets/s: ", "%zu", (packets_client.size() + packets_server.size()) * 1000 / tdiff);
 
-            draw_memory_field("AVG Est. Memory footprint rate: ", packets_mem_footprint * 1000 / tdiff, true);
+            draw_memory_field("AVG Est. Memory footprint rate: ", mem_foot * 1000 / tdiff, true);
             draw_memory_field("AVG Client data rate: ", pack_handler_server.get_bytes_received() * 1000 / tdiff, true);
             draw_memory_field("AVG Server data rate: ", pack_handler_client.get_bytes_received() * 1000 / tdiff, true);
         }
@@ -512,41 +533,15 @@ int main(int argc, const char** argv)
         Uint32 window_flags = ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize;
         if (ImGui::Begin("Client Inspector Window", NULL, window_flags))
         {
-
-            if (ImGui::TreeNode("All clients", "All clients (%zu)", clients.size()))
-            {
-                for (size_t i = 0; i < clients.size(); i++)
-                {
-                    ImGui::PushID(i);
-                    if (ImGui::TreeNode("client", "Clients[%zu]", i))
-                    {
-                        clients[i].draw_imgui();
-                        ImGui::TreePop();
-                    }
-                    ImGui::PopID();
-                }
-                ImGui::TreePop();
-            }
-
-            size_t active_clients_num = 0;
             for (size_t i = 0; i < clients.size(); i++)
-                active_clients_num += !clients[i].skip;
-
-            if (ImGui::TreeNode("Active clients", "Active clients (%zu)", active_clients_num))
             {
-                for (size_t i = 0; i < clients.size(); i++)
+                ImGui::PushID(i);
+                if (ImGui::TreeNode("client", "Clients[%zu] %s", i, clients[i].skip ? "" : "(Active)"))
                 {
-                    if (clients[i].skip)
-                        continue;
-                    ImGui::PushID(i);
-                    if (ImGui::TreeNode("client", "Clients[%zu]", i))
-                    {
-                        clients[i].draw_imgui();
-                        ImGui::TreePop();
-                    }
-                    ImGui::PopID();
+                    clients[i].draw_imgui();
+                    ImGui::TreePop();
                 }
-                ImGui::TreePop();
+                ImGui::PopID();
             }
         }
         ImGui::End();
