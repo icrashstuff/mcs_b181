@@ -70,10 +70,14 @@ static convar_int_t gui_vsync("gui_vsync", 1, 0, 1, "Enable/Disable vsync", CONV
 static convar_int_t gui_adapative_vsync("gui_adapative_vsync", 1, 0, 1, "Enable disable adaptive vsync", CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_SAVE);
 static convar_int_t gui_show_demo_window("gui_show_demo_window", 0, 0, 1, "Show Dear ImGui demo window", CONVAR_FLAG_INT_IS_BOOL);
 
-void tetra::init(int argc, const char** argv)
+void tetra::init(const char* organization, const char* appname, int argc, const char** argv)
 {
     if (was_init)
         return;
+
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, appname);
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING, __DATE__);
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_CREATOR_STRING, organization);
 
     dc_log("Init main");
 
@@ -101,7 +105,7 @@ void tetra::init(int argc, const char** argv)
     }
 
     assert(PHYSFS_init(argv[0]));
-    assert(PHYSFS_setSaneConfig("icrashstuff", "mcs_b181", NULL, 0, 0));
+    assert(PHYSFS_setSaneConfig(organization, appname, NULL, 0, 0));
 
     /* Set convars from config */
     convar_file_parser::read();

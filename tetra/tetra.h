@@ -29,7 +29,7 @@ namespace tetra
 /**
  * Should be called immediately, Can only be called once
  */
-void init(int argc, const char** argv);
+void init(const char* organization, const char* appname, int argc, const char** argv);
 
 /**
  * Returns 0 on successful init, some non-zero value on failure
