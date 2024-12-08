@@ -924,8 +924,8 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
                 {
                     if (var_len == 1 && buf_size >= 22)
                     {
-                        Uint16 temp = SDL_Swap16BE(*(Uint16*)(buf.data() + 20));
-                        len += ((*(Sint16*)&temp) > 0) ? 6 : 0;
+                        Uint32 temp = SDL_Swap32BE(*(Uint32*)(buf.data() + 18));
+                        len += ((*(Sint32*)&temp) > 0) ? 6 : 0;
                         var_len--;
                         change_happened++;
                     }
@@ -1264,6 +1264,9 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
     helpful_assert(packet->id == packet_type, "Packet type(actual): 0x%02x(0x%02x)%s", packet->id, packet_type, err ? " (err)" : " (err not set)");
     packet->id = (packet_id_t)packet_type;
 
+    last_packet_time = SDL_GetTicks();
+    packet->assemble_tick = last_packet_time;
+
     if (err)
     {
         delete packet;
@@ -1272,9 +1275,6 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
         snprintf(buffer, ARR_SIZE(buffer), "Error parsing packet with ID: 0x%02x(%s)", packet_type, packet_t::get_name_for_id(packet_type));
         err_str = buffer;
     }
-
-    last_packet_time = SDL_GetTicks();
-    packet->assemble_tick = last_packet_time;
 
     return packet;
 }
