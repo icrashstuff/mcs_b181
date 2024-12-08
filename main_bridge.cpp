@@ -44,24 +44,49 @@
 #include "misc.h"
 #include "packet.h"
 
+/**
+ * We use this in timestamp_from_tick() to ensure it's output is stable
+ */
+static struct timestamp_dat_t
+{
+    SDL_Time time = 0;
+    Uint64 tick = 0;
+    bool initialized = 0;
+} timestamp_dat;
+
 std::string timestamp_from_tick(Uint64 sdl_tick)
 {
-    SDL_Time cur_time_tick;
-    Uint64 cur_sdl_tick = SDL_GetTicks();
-
-    if (!SDL_GetCurrentTime(&cur_time_tick))
+    if (!timestamp_dat.initialized && !SDL_GetCurrentTime(&timestamp_dat.time))
         return "Error creating timestamp! (SDL_GetCurrentTime)";
+    if (!timestamp_dat.initialized)
+    {
+        timestamp_dat.tick = SDL_GetTicks();
+        timestamp_dat.initialized = 1;
+    }
 
-    SDL_Time timestamp_tick = cur_time_tick - ((cur_sdl_tick - sdl_tick) * 1000000);
+    SDL_Time timestamp_tick = timestamp_dat.time + ((sdl_tick - timestamp_dat.tick) * 1000000);
 
     SDL_DateTime dt;
 
-    if (!SDL_TimeToDateTime(timestamp_tick, &dt, 0))
+    if (!SDL_TimeToDateTime(timestamp_tick, &dt, 1))
         return "Error creating timestamp! (SDL_TimeToDateTime)";
 
     char buf[128];
 
-    snprintf(buf, ARR_SIZE(buf), "%04d-%02d-%02d %02d:%02d:%02d.%02d", dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, dt.nanosecond / 10000000);
+    char sign = '+';
+    int off_hour = dt.utc_offset / 3600;
+    if (off_hour < 0)
+    {
+        sign = '-';
+        off_hour = SDL_abs(off_hour);
+    }
+
+    int off_min = dt.utc_offset % 60;
+    if (off_min < 0)
+        off_min += 60;
+
+    snprintf(buf, ARR_SIZE(buf), "%04d-%02d-%02d %02d:%02d:%02d.%02d (%c%02d:%02d)", dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second,
+        dt.nanosecond / 10000000, sign, off_hour, off_min);
 
     return buf;
 }
@@ -135,6 +160,31 @@ struct client_t
 
     std::string kick_reason;
 
+    void destroy()
+    {
+        for (size_t j = 0; j < packets_client.size(); j++)
+            if (packets_client[j])
+                delete packets_client[j];
+        packets_client.resize(0);
+
+        for (size_t j = 0; j < packets_server.size(); j++)
+            if (packets_server[j])
+                delete packets_server[j];
+        packets_server.resize(0);
+
+        if (sock_server)
+        {
+            SDLNet_DestroyStreamSocket(sock_server);
+            sock_server = NULL;
+        }
+
+        if (sock_client)
+        {
+            SDLNet_DestroyStreamSocket(sock_client);
+            sock_client = NULL;
+        }
+    }
+
     void kick(std::string reason)
     {
         kick_reason = reason;
@@ -202,7 +252,12 @@ struct client_t
 
         float child_height = ImGui::GetMainViewport()->WorkSize.y / 3;
 
-        if (ImGui::BeginListBox("##Packet Listbox", ImVec2(ImGui::CalcTextSize("x").x * 88, child_height)))
+        float list_width = ImGui::CalcTextSize("x").x * 90 + ImGui::GetStyle().ScrollbarSize;
+
+        if (list_width < ImGui::GetContentRegionAvail().x / 2)
+            list_width = ImGui::GetContentRegionAvail().x / 2;
+
+        if (ImGui::BeginListBox("##Packet Listbox", ImVec2(list_width, child_height)))
         {
             if (dat.select_recent)
             {
@@ -222,7 +277,7 @@ struct client_t
                     continue;
                 ImGui::PushID(i);
                 char buf[56];
-                char buf2[80];
+                char buf2[88];
                 if (!ImGui::IsRectVisible(ImVec2(20, text_spacing)))
                 {
                     buf2[0] = 0;
@@ -245,7 +300,7 @@ struct client_t
             }
 
             if (dat.force_scroll)
-                ImGui::SetScrollHereY(1.0f);
+                ImGui::SetScrollHereY(0.0f);
 
             ImGui::EndListBox();
         }
@@ -551,18 +606,7 @@ int main(int argc, const char** argv)
     LOG("Destroying server");
 
     for (size_t i = 0; i < clients.size(); i++)
-    {
-        if (clients[i].sock_server)
-            SDLNet_DestroyStreamSocket(clients[i].sock_server);
-        if (clients[i].sock_client)
-            SDLNet_DestroyStreamSocket(clients[i].sock_client);
-        for (size_t j = 0; j < clients[i].packets_client.size(); j++)
-            if (clients[i].packets_client[j])
-                delete clients[i].packets_client[j];
-        for (size_t j = 0; j < clients[i].packets_server.size(); j++)
-            if (clients[i].packets_server[j])
-                delete clients[i].packets_server[j];
-    }
+        clients[i].destroy();
 
     SDLNet_DestroyServer(server);
 
