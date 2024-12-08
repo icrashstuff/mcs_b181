@@ -621,6 +621,7 @@ packet_handler_t::packet_handler_t(bool is_server_)
     buf.reserve(1024);
     last_packet_time = SDL_GetTicks();
     buf_size = 0;
+    bytes_received = 0;
     packet_type = 16384;
 }
 
@@ -646,6 +647,7 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
             return NULL;
         }
 
+        bytes_received += buf_inc;
         buf_size += buf_inc;
 
         if (buf_size == 0)
@@ -724,6 +726,7 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
         if (buf_inc)
             change_happened++;
 
+        bytes_received += buf_inc;
         buf_size += buf_inc;
 
         // LOG("0x%02x %zu %zu %zu %d", packet_type, buf_inc, len, buf_size, var_len);
@@ -979,7 +982,6 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
 
     /* This section handles the actual packet parsing*/
     buf.resize(buf_size);
-    last_packet_time = SDL_GetTicks();
     buf_size = 0;
 
     packet_t* packet = NULL;
@@ -1270,6 +1272,9 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
         snprintf(buffer, ARR_SIZE(buffer), "Error parsing packet with ID: 0x%02x(%s)", packet_type, packet_t::get_name_for_id(packet_type));
         err_str = buffer;
     }
+
+    last_packet_time = SDL_GetTicks();
+    packet->assemble_tick = last_packet_time;
 
     return packet;
 }

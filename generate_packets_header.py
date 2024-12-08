@@ -130,7 +130,49 @@ def print_packet(pack):
             print("Unknown type: \"%s\", exiting!" % t)
             exit(1)
 
-    s += "\t\treturn dat;\n\t}\n"
+    s += "\t\treturn dat;\n\t}\n\n"
+
+    mem_size = "0"
+
+    for i in pack[2].keys():
+        t = pack[2][i]
+        if (t == JSTRING16):
+            mem_size += " + %s.capacity()" % i
+
+    s += "\tPACKET_DEFINE_MEM_SIZE(%s);\n\n" % mem_size
+
+    s += """\tvoid draw_imgui()
+\t{
+\t\tPACKET_NEW_TABLE("packet_%s_t");
+
+\t\tPACKET_TABLE_FIELD_ID();
+""" % pack[0]
+
+    for i in pack[2].keys():
+        t = pack[2][i]
+        if (t == JBOOL):
+            s += "\t\tPACKET_TABLE_FIELD_%s(%s);\n" % ("JBOOL", i)
+        elif (t == JBYTE):
+            s += "\t\tPACKET_TABLE_FIELD_%s(%s);\n" % ("JBYTE", i)
+        elif (t == JUBYTE):
+            s += "\t\tPACKET_TABLE_FIELD_%s(%s);\n" % ("JUBYTE", i)
+        elif (t == JSHORT):
+            s += "\t\tPACKET_TABLE_FIELD_%s(%s);\n" % ("JSHORT", i)
+        elif (t == JINT):
+            s += "\t\tPACKET_TABLE_FIELD_%s(%s);\n" % ("JINT", i)
+        elif (t == JLONG):
+            s += "\t\tPACKET_TABLE_FIELD_%s(%s);\n" % ("JLONG", i)
+        elif (t == JFLOAT):
+            s += "\t\tPACKET_TABLE_FIELD_%s(%s);\n" % ("JFLOAT", i)
+        elif (t == JDOUBLE):
+            s += "\t\tPACKET_TABLE_FIELD_%s(%s);\n" % ("JDOUBLE", i)
+        elif (t == JSTRING16):
+            s += "\t\tPACKET_TABLE_FIELD_%s(%s);\n" % ("JSTRING16", i)
+        else:
+            print("Unknown type: \"%s\", exiting!" % t)
+            exit(1)
+
+    s += "\n\t\tImGui::EndTable();\n\t}\n"
 
     s += "\n};"
     return s.replace("\t", " " * 4)

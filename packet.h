@@ -29,6 +29,7 @@
 #include <vector>
 
 #include "misc.h"
+#include "tetra/gui/imgui.h"
 
 typedef Uint8 jubyte;
 typedef Uint8 jbool;
@@ -149,14 +150,60 @@ enum packet_id_t : jubyte
     PACKET_ID_ITEM_DATA = 0x83,
     PACKET_ID_INCREMENT_STATISTIC = 0xC8,
     PACKET_ID_PLAYER_LIST_ITEM = 0xC9,
+    PACKET_ID_INVALID = 0xF0,
     PACKET_ID_SERVER_LIST_PING = 0xFE,
     PACKET_ID_KICK = 0xFF,
 
 };
 
+#define PACKET_NEW_TABLE(NAME)                                                                          \
+    do                                                                                                  \
+    {                                                                                                   \
+        if (!ImGui::BeginTable(NAME " info table", 3, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders)) \
+            return;                                                                                     \
+        ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFontSize() * 16);  \
+        ImGui::TableSetupColumn("Type", ImGuiTableColumnFlags_WidthFixed, ImGui::GetFontSize() * 10);   \
+        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);                           \
+    } while (0)
+
+#define PACKET_TABLE_FIELD_TYPE(field_type, field_text, fmt, ...) \
+    do                                                            \
+    {                                                             \
+        ImGui::TableNextRow();                                    \
+        ImGui::TableNextColumn();                                 \
+        ImGui::TextUnformatted(field_text);                       \
+        ImGui::TableNextColumn();                                 \
+        ImGui::TextUnformatted(field_type);                       \
+        ImGui::TableNextColumn();                                 \
+        ImGui::Text(fmt, ##__VA_ARGS__);                          \
+    } while (0)
+
+#define PACKET_DEFINE_MEM_SIZE(additional) \
+    size_t mem_size() { return sizeof(*this) + (additional); }
+
+#define PACKET_TABLE_FIELD(field_text, fmt, ...) PACKET_TABLE_FIELD_TYPE("", field_text, fmt, ##__VA_ARGS__)
+
+#define PACKET_TABLE_FIELD_ID() PACKET_TABLE_FIELD_TYPE("ubyte", "Packet ID: ", "0x%02x (%s)", id, get_name())
+#define PACKET_TABLE_FIELD_JBOOL(var) PACKET_TABLE_FIELD_TYPE("bool", #var ": ", "%u", var)
+#define PACKET_TABLE_FIELD_JUBYTE(var) PACKET_TABLE_FIELD_TYPE("ubyte", #var ": ", "%u", var)
+#define PACKET_TABLE_FIELD_JBYTE(var) PACKET_TABLE_FIELD_TYPE("byte", #var ": ", "%d", var)
+#define PACKET_TABLE_FIELD_JSHORT(var) PACKET_TABLE_FIELD_TYPE("short", #var ": ", "%d", var)
+#define PACKET_TABLE_FIELD_JINT(var) PACKET_TABLE_FIELD_TYPE("int", #var ": ", "%d", var)
+#define PACKET_TABLE_FIELD_JLONG(var) PACKET_TABLE_FIELD_TYPE("long", #var ": ", "%ld", var)
+#define PACKET_TABLE_FIELD_JFLOAT(var) PACKET_TABLE_FIELD_TYPE("float", #var ": ", "%.3f", var)
+#define PACKET_TABLE_FIELD_JDOUBLE(var) PACKET_TABLE_FIELD_TYPE("double", #var ": ", "%.3f", var)
+#define PACKET_TABLE_FIELD_JSTRING16(var) PACKET_TABLE_FIELD_TYPE("string16", #var ": ", "\"%s\"", var.c_str())
+#define PACKET_TABLE_FIELD_METADATA(var) PACKET_TABLE_FIELD_TYPE("metadata", #var " length: ", "%zu", var.size())
+#define PACKET_TABLE_FIELD_SIZE_T(var) PACKET_TABLE_FIELD_TYPE("size_t", #var ": ", "%zu", var)
+
 struct packet_t
 {
-    packet_id_t id = PACKET_ID_KICK;
+    packet_id_t id = PACKET_ID_INVALID;
+
+    /**
+     * If non-zero, then this is the SDL tick (0.001s) when the packet was full assembled
+     */
+    Uint64 assemble_tick = 0;
 
     /**
      * Gets the name for the packet
@@ -175,9 +222,29 @@ struct packet_t
      */
     static bool is_valid_id(Uint8 pack_id);
 
+    /**
+     * Returns the size of the packet_t struct, not the actual packet when sent
+     */
+    virtual PACKET_DEFINE_MEM_SIZE(0);
+
+    virtual void draw_imgui()
+    {
+        if (!ImGui::BeginTable("Default Packet Info Table", 2, ImGuiTableFlags_RowBg | ImGuiTableFlags_Borders))
+            return;
+
+        PACKET_TABLE_FIELD("Packet ID: ", "0x%02x (%s)", id, get_name());
+        PACKET_TABLE_FIELD("Note: ", "draw_imgui() was not overridden for this packet");
+
+        ImGui::EndTable();
+    }
+
     virtual ~packet_t() {};
 
-    virtual std::vector<Uint8> assemble() = 0;
+    virtual std::vector<Uint8> assemble()
+    {
+        std::vector<Uint8> dat;
+        return dat;
+    };
 };
 
 #define PLAYER_DIG_STATUS_START_DIG 0
@@ -214,6 +281,24 @@ struct packet_player_place_t : packet_t
         }
         assert(dat.size() == 13 || dat.size() == 16);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_player_place_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(x);
+        PACKET_TABLE_FIELD_JBYTE(y);
+        PACKET_TABLE_FIELD_JINT(z);
+        PACKET_TABLE_FIELD_JBYTE(direction);
+        PACKET_TABLE_FIELD_JSHORT(block_item_id);
+        PACKET_TABLE_FIELD_JBYTE(amount);
+        PACKET_TABLE_FIELD_JSHORT(damage);
+
+        ImGui::EndTable();
     }
 };
 
@@ -272,6 +357,26 @@ struct packet_add_obj_t : packet_t
         assert(dat.size() == (fire_ball_thrower_id > 0 ? 28 : 22));
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_add_obj_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(eid);
+        PACKET_TABLE_FIELD_JBYTE(type);
+        PACKET_TABLE_FIELD_JINT(x);
+        PACKET_TABLE_FIELD_JINT(y);
+        PACKET_TABLE_FIELD_JINT(z);
+        PACKET_TABLE_FIELD_JINT(fire_ball_thrower_id);
+        PACKET_TABLE_FIELD_JSHORT(unknown0);
+        PACKET_TABLE_FIELD_JSHORT(unknown1);
+        PACKET_TABLE_FIELD_JSHORT(unknown2);
+
+        ImGui::EndTable();
+    }
 };
 
 /**
@@ -308,6 +413,26 @@ struct packet_ent_spawn_mob_t : packet_t
         assert(dat.size() == 20 + metadata.size());
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(metadata.capacity());
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_ent_spawn_mob_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(eid);
+        PACKET_TABLE_FIELD_JBYTE(type);
+        PACKET_TABLE_FIELD_JINT(x);
+        PACKET_TABLE_FIELD_JINT(y);
+        PACKET_TABLE_FIELD_JINT(z);
+        PACKET_TABLE_FIELD_JBYTE(yaw);
+        PACKET_TABLE_FIELD_JBYTE(pitch);
+
+        PACKET_TABLE_FIELD_METADATA(metadata);
+
+        ImGui::EndTable();
+    }
 };
 
 struct packet_ent_metadata_t : packet_t
@@ -327,6 +452,19 @@ struct packet_ent_metadata_t : packet_t
         assemble_bytes(dat, metadata.data(), metadata.size());
         assert(dat.size() == 5 + metadata.size());
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(metadata.capacity());
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_ent_metadata_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(eid);
+        PACKET_TABLE_FIELD_METADATA(metadata);
+
+        ImGui::EndTable();
     }
 };
 
@@ -364,6 +502,24 @@ struct packet_chunk_t : packet_t
         assemble_int(dat, compressed_data.size());
         assemble_bytes(dat, compressed_data.data(), compressed_data.size());
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(compressed_data.capacity());
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_chunk_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(block_x);
+        PACKET_TABLE_FIELD_JSHORT(block_y);
+        PACKET_TABLE_FIELD_JINT(block_z);
+        PACKET_TABLE_FIELD_JBYTE(size_x);
+        PACKET_TABLE_FIELD_JBYTE(size_y);
+        PACKET_TABLE_FIELD_JBYTE(size_z);
+        PACKET_TABLE_FIELD_SIZE_T(compressed_data.size());
+
+        ImGui::EndTable();
     }
 };
 
@@ -414,6 +570,20 @@ struct packet_block_change_multi_t : packet_t
         assert(dat.size() == 11 + payload.size() * 4);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(payload.capacity() * sizeof(payload[0]));
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_block_change_multi_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(chunk_x);
+        PACKET_TABLE_FIELD_JINT(chunk_z);
+        PACKET_TABLE_FIELD_SIZE_T(payload.size());
+
+        ImGui::EndTable();
+    }
 };
 
 struct explosion_record_t
@@ -454,6 +624,24 @@ struct packet_explosion_t : packet_t
         }
         assert(dat.size() == 33 + records.size() * 3);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(records.capacity() * sizeof(records[0]));
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_explosion_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JDOUBLE(x);
+        PACKET_TABLE_FIELD_JDOUBLE(y);
+        PACKET_TABLE_FIELD_JDOUBLE(z);
+
+        PACKET_TABLE_FIELD_JFLOAT(radius);
+
+        PACKET_TABLE_FIELD_SIZE_T(records.size());
+
+        ImGui::EndTable();
     }
 };
 
@@ -501,6 +689,20 @@ struct packet_window_items_t : packet_t
         }
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(payload.capacity() * sizeof(payload[0]));
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_window_items_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JBYTE(window_id);
+
+        PACKET_TABLE_FIELD_SIZE_T(payload.size());
+
+        ImGui::EndTable();
+    }
 };
 
 struct packet_window_click_t : packet_t
@@ -534,6 +736,26 @@ struct packet_window_click_t : packet_t
         assert(dat.size() == (item.id != -1 ? 13 : 10));
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_window_click_t");
+
+        PACKET_TABLE_FIELD_ID();
+
+        PACKET_TABLE_FIELD_JBYTE(window_id);
+        PACKET_TABLE_FIELD_JSHORT(slot);
+        PACKET_TABLE_FIELD_JBOOL(right_click);
+        PACKET_TABLE_FIELD_JSHORT(action_num);
+        PACKET_TABLE_FIELD_JBOOL(shift);
+        PACKET_TABLE_FIELD_JSHORT(item.id);
+        PACKET_TABLE_FIELD_JBYTE(item.quantity);
+        PACKET_TABLE_FIELD_JSHORT(item.damage);
+
+        ImGui::EndTable();
+    }
 };
 
 struct packet_window_set_slot_t : packet_t
@@ -559,6 +781,22 @@ struct packet_window_set_slot_t : packet_t
         }
         assert(dat.size() == (item.id != -1 ? 9 : 6));
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_window_set_slot_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JBYTE(window_id);
+        PACKET_TABLE_FIELD_JSHORT(slot);
+        PACKET_TABLE_FIELD_JSHORT(item.id);
+        PACKET_TABLE_FIELD_JBYTE(item.quantity);
+        PACKET_TABLE_FIELD_JSHORT(item.damage);
+
+        ImGui::EndTable();
     }
 };
 
@@ -592,9 +830,40 @@ struct packet_item_data_t : packet_t
         assert(dat.size() == 6 + text.size());
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(text.capacity() * sizeof(text[0]));
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_item_data_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JSHORT(item_type);
+        PACKET_TABLE_FIELD_JSHORT(item_id);
+        PACKET_TABLE_FIELD_SIZE_T(text.size());
+
+        ImGui::EndTable();
+    }
 };
 
 #include "packet_gen_def.h"
+
+#undef PACKET_DEFINE_MEM_SIZE
+#undef PACKET_NEW_TABLE
+#undef PACKET_TABLE_FIELD
+#undef PACKET_TABLE_FIELD_TYPE
+#undef PACKET_TABLE_FIELD_ID
+#undef PACKET_TABLE_FIELD_JBOOL
+#undef PACKET_TABLE_FIELD_JUBYTE
+#undef PACKET_TABLE_FIELD_JBYTE
+#undef PACKET_TABLE_FIELD_JSHORT
+#undef PACKET_TABLE_FIELD_JINT
+#undef PACKET_TABLE_FIELD_JLONG
+#undef PACKET_TABLE_FIELD_JFLOAT
+#undef PACKET_TABLE_FIELD_JDOUBLE
+#undef PACKET_TABLE_FIELD_JSTRING16
+#undef PACKET_TABLE_FIELD_METADATA
+#undef PACKET_TABLE_FIELD_SIZE_T
 
 class packet_handler_t
 {
@@ -621,8 +890,15 @@ public:
      */
     inline Uint64 get_last_packet_time() { return last_packet_time; }
 
+    /**
+     * Returns how many bytes the packet handler has read from the socket
+     */
+    inline size_t get_bytes_received() { return bytes_received; }
+
 private:
     Uint64 last_packet_time;
+
+    size_t bytes_received;
 
     std::vector<Uint8> buf;
 
@@ -638,5 +914,4 @@ private:
 
     std::string err_str;
 };
-
 #endif

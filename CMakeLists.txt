@@ -54,6 +54,8 @@ set(mcs_b181_server_SRC
     packet.cpp
     java_strings.cpp
     simplex_noise/SimplexNoise.cpp
+
+    ${tetra_SRC}
 )
 
 set(mcs_b181_bridge_SRC
@@ -61,7 +63,7 @@ set(mcs_b181_bridge_SRC
     packet.cpp
     java_strings.cpp
     main_bridge.cpp
-    
+
     ${tetra_SRC}
 )
 
@@ -98,10 +100,11 @@ function(add_bin_common name)
 
     target_link_libraries(${name} SDL3::SDL3)
     target_link_libraries(${name} SDL3_net::SDL3_net-static)
+
+    target_link_libraries(${name} ${OPENGL_LIBRARIES})
+    target_link_libraries(${name} PhysFS::PhysFS-static)
 endfunction()
 
 add_bin_common(mcs_b181_server)
 add_bin_common(mcs_b181_bridge)
 
-target_link_libraries(mcs_b181_bridge ${OPENGL_LIBRARIES})
-target_link_libraries(mcs_b181_bridge PhysFS::PhysFS-static)

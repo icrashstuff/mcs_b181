@@ -44,6 +44,18 @@ struct packet_keep_alive_t : packet_t
         assemble_int(dat, keep_alive_id);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_keep_alive_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(keep_alive_id);
+
+        ImGui::EndTable();
+    }
 };
 /**
  * Client -> Server
@@ -75,6 +87,25 @@ struct packet_login_request_c2s_t : packet_t
         assemble_ubyte(dat, unused4);
         assemble_ubyte(dat, unused5);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0 + username.capacity());
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_login_request_c2s_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(protocol_ver);
+        PACKET_TABLE_FIELD_JSTRING16(username);
+        PACKET_TABLE_FIELD_JLONG(unused0);
+        PACKET_TABLE_FIELD_JINT(unused1);
+        PACKET_TABLE_FIELD_JBYTE(unused2);
+        PACKET_TABLE_FIELD_JBYTE(unused3);
+        PACKET_TABLE_FIELD_JUBYTE(unused4);
+        PACKET_TABLE_FIELD_JUBYTE(unused5);
+
+        ImGui::EndTable();
     }
 };
 /**
@@ -108,6 +139,25 @@ struct packet_login_request_s2c_t : packet_t
         assemble_ubyte(dat, max_players);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0 + unused.capacity());
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_login_request_s2c_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(player_eid);
+        PACKET_TABLE_FIELD_JSTRING16(unused);
+        PACKET_TABLE_FIELD_JLONG(seed);
+        PACKET_TABLE_FIELD_JINT(mode);
+        PACKET_TABLE_FIELD_JBYTE(dimension);
+        PACKET_TABLE_FIELD_JBYTE(difficulty);
+        PACKET_TABLE_FIELD_JUBYTE(world_height);
+        PACKET_TABLE_FIELD_JUBYTE(max_players);
+
+        ImGui::EndTable();
+    }
 };
 /**
  * Client -> Server
@@ -125,6 +175,18 @@ struct packet_handshake_c2s_t : packet_t
         dat.push_back(id);
         assemble_string16(dat, username);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0 + username.capacity());
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_handshake_c2s_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JSTRING16(username);
+
+        ImGui::EndTable();
     }
 };
 /**
@@ -144,6 +206,18 @@ struct packet_handshake_s2c_t : packet_t
         assemble_string16(dat, connection_hash);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0 + connection_hash.capacity());
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_handshake_s2c_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JSTRING16(connection_hash);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_chat_message_t : packet_t
 {
@@ -159,6 +233,18 @@ struct packet_chat_message_t : packet_t
         assemble_string16(dat, msg);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0 + msg.capacity());
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_chat_message_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JSTRING16(msg);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_time_update_t : packet_t
 {
@@ -173,6 +259,18 @@ struct packet_time_update_t : packet_t
         dat.push_back(id);
         assemble_long(dat, time);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_time_update_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JLONG(time);
+
+        ImGui::EndTable();
     }
 };
 struct packet_ent_equipment_t : packet_t
@@ -194,6 +292,21 @@ struct packet_ent_equipment_t : packet_t
         assemble_short(dat, item_id);
         assemble_short(dat, damage);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_ent_equipment_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(eid);
+        PACKET_TABLE_FIELD_JSHORT(slot);
+        PACKET_TABLE_FIELD_JSHORT(item_id);
+        PACKET_TABLE_FIELD_JSHORT(damage);
+
+        ImGui::EndTable();
     }
 };
 /**
@@ -217,6 +330,20 @@ struct packet_spawn_pos_t : packet_t
         assemble_int(dat, z);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_spawn_pos_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(x);
+        PACKET_TABLE_FIELD_JINT(y);
+        PACKET_TABLE_FIELD_JINT(z);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_ent_use_t : packet_t
 {
@@ -236,6 +363,20 @@ struct packet_ent_use_t : packet_t
         assemble_bool(dat, left_click);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_ent_use_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(user);
+        PACKET_TABLE_FIELD_JINT(target);
+        PACKET_TABLE_FIELD_JBOOL(left_click);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_health_t : packet_t
 {
@@ -254,6 +395,20 @@ struct packet_health_t : packet_t
         assemble_short(dat, food);
         assemble_float(dat, food_saturation);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_health_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JSHORT(health);
+        PACKET_TABLE_FIELD_JSHORT(food);
+        PACKET_TABLE_FIELD_JFLOAT(food_saturation);
+
+        ImGui::EndTable();
     }
 };
 /**
@@ -282,6 +437,22 @@ struct packet_respawn_t : packet_t
         assemble_long(dat, seed);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_respawn_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JBYTE(dimension);
+        PACKET_TABLE_FIELD_JBYTE(difficulty);
+        PACKET_TABLE_FIELD_JBYTE(mode);
+        PACKET_TABLE_FIELD_JSHORT(world_height);
+        PACKET_TABLE_FIELD_JLONG(seed);
+
+        ImGui::EndTable();
+    }
 };
 /**
  * Client -> Server
@@ -299,6 +470,18 @@ struct packet_on_ground_t : packet_t
         dat.push_back(id);
         assemble_bool(dat, on_ground);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_on_ground_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JBOOL(on_ground);
+
+        ImGui::EndTable();
     }
 };
 /**
@@ -326,6 +509,22 @@ struct packet_player_pos_t : packet_t
         assemble_bool(dat, on_ground);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_player_pos_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JDOUBLE(x);
+        PACKET_TABLE_FIELD_JDOUBLE(y);
+        PACKET_TABLE_FIELD_JDOUBLE(stance);
+        PACKET_TABLE_FIELD_JDOUBLE(z);
+        PACKET_TABLE_FIELD_JBOOL(on_ground);
+
+        ImGui::EndTable();
+    }
 };
 /**
  * Client -> Server
@@ -347,6 +546,20 @@ struct packet_player_look_t : packet_t
         assemble_float(dat, pitch);
         assemble_bool(dat, on_ground);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_player_look_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JFLOAT(yaw);
+        PACKET_TABLE_FIELD_JFLOAT(pitch);
+        PACKET_TABLE_FIELD_JBOOL(on_ground);
+
+        ImGui::EndTable();
     }
 };
 /**
@@ -378,6 +591,24 @@ struct packet_player_pos_look_c2s_t : packet_t
         assemble_bool(dat, on_ground);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_player_pos_look_c2s_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JDOUBLE(x);
+        PACKET_TABLE_FIELD_JDOUBLE(y);
+        PACKET_TABLE_FIELD_JDOUBLE(stance);
+        PACKET_TABLE_FIELD_JDOUBLE(z);
+        PACKET_TABLE_FIELD_JFLOAT(yaw);
+        PACKET_TABLE_FIELD_JFLOAT(pitch);
+        PACKET_TABLE_FIELD_JBOOL(on_ground);
+
+        ImGui::EndTable();
+    }
 };
 /**
  * Server -> Client
@@ -408,6 +639,24 @@ struct packet_player_pos_look_s2c_t : packet_t
         assemble_bool(dat, on_ground);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_player_pos_look_s2c_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JDOUBLE(x);
+        PACKET_TABLE_FIELD_JDOUBLE(stance);
+        PACKET_TABLE_FIELD_JDOUBLE(y);
+        PACKET_TABLE_FIELD_JDOUBLE(z);
+        PACKET_TABLE_FIELD_JFLOAT(yaw);
+        PACKET_TABLE_FIELD_JFLOAT(pitch);
+        PACKET_TABLE_FIELD_JBOOL(on_ground);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_player_dig_t : packet_t
 {
@@ -431,6 +680,22 @@ struct packet_player_dig_t : packet_t
         assemble_byte(dat, face);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_player_dig_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JBYTE(status);
+        PACKET_TABLE_FIELD_JINT(x);
+        PACKET_TABLE_FIELD_JBYTE(y);
+        PACKET_TABLE_FIELD_JINT(z);
+        PACKET_TABLE_FIELD_JBYTE(face);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_hold_change_t : packet_t
 {
@@ -445,6 +710,18 @@ struct packet_hold_change_t : packet_t
         dat.push_back(id);
         assemble_short(dat, slot_id);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_hold_change_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JSHORT(slot_id);
+
+        ImGui::EndTable();
     }
 };
 struct packet_use_bed_t : packet_t
@@ -469,6 +746,22 @@ struct packet_use_bed_t : packet_t
         assemble_int(dat, headboard_z);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_use_bed_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(eid);
+        PACKET_TABLE_FIELD_JBYTE(unknown_probably_in_bed);
+        PACKET_TABLE_FIELD_JINT(headboard_x);
+        PACKET_TABLE_FIELD_JBYTE(headboard_y);
+        PACKET_TABLE_FIELD_JINT(headboard_z);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_ent_animation_t : packet_t
 {
@@ -486,6 +779,19 @@ struct packet_ent_animation_t : packet_t
         assemble_byte(dat, animate);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_ent_animation_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(eid);
+        PACKET_TABLE_FIELD_JBYTE(animate);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_ent_action_t : packet_t
 {
@@ -502,6 +808,19 @@ struct packet_ent_action_t : packet_t
         assemble_int(dat, eid);
         assemble_byte(dat, action_id);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_ent_action_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(eid);
+        PACKET_TABLE_FIELD_JBYTE(action_id);
+
+        ImGui::EndTable();
     }
 };
 struct packet_ent_spawn_named_t : packet_t
@@ -531,6 +850,25 @@ struct packet_ent_spawn_named_t : packet_t
         assemble_byte(dat, pitch);
         assemble_short(dat, cur_item);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0 + name.capacity());
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_ent_spawn_named_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(eid);
+        PACKET_TABLE_FIELD_JSTRING16(name);
+        PACKET_TABLE_FIELD_JINT(x);
+        PACKET_TABLE_FIELD_JINT(y);
+        PACKET_TABLE_FIELD_JINT(z);
+        PACKET_TABLE_FIELD_JBYTE(rotation);
+        PACKET_TABLE_FIELD_JBYTE(pitch);
+        PACKET_TABLE_FIELD_JSHORT(cur_item);
+
+        ImGui::EndTable();
     }
 };
 struct packet_ent_spawn_pickup_t : packet_t
@@ -565,6 +903,27 @@ struct packet_ent_spawn_pickup_t : packet_t
         assemble_byte(dat, roll);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_ent_spawn_pickup_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(eid);
+        PACKET_TABLE_FIELD_JSHORT(item);
+        PACKET_TABLE_FIELD_JBYTE(count);
+        PACKET_TABLE_FIELD_JSHORT(damage);
+        PACKET_TABLE_FIELD_JINT(x);
+        PACKET_TABLE_FIELD_JINT(y);
+        PACKET_TABLE_FIELD_JINT(z);
+        PACKET_TABLE_FIELD_JBYTE(rotation);
+        PACKET_TABLE_FIELD_JBYTE(pitch);
+        PACKET_TABLE_FIELD_JBYTE(roll);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_collect_item_t : packet_t
 {
@@ -581,6 +940,19 @@ struct packet_collect_item_t : packet_t
         assemble_int(dat, collected_eid);
         assemble_int(dat, collector_eid);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_collect_item_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(collected_eid);
+        PACKET_TABLE_FIELD_JINT(collector_eid);
+
+        ImGui::EndTable();
     }
 };
 struct packet_ent_spawn_painting_t : packet_t
@@ -607,6 +979,23 @@ struct packet_ent_spawn_painting_t : packet_t
         assemble_int(dat, direction);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0 + title.capacity());
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_ent_spawn_painting_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(eid);
+        PACKET_TABLE_FIELD_JSTRING16(title);
+        PACKET_TABLE_FIELD_JINT(center_x);
+        PACKET_TABLE_FIELD_JINT(center_y);
+        PACKET_TABLE_FIELD_JINT(center_z);
+        PACKET_TABLE_FIELD_JINT(direction);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_ent_spawn_xp_t : packet_t
 {
@@ -629,6 +1018,22 @@ struct packet_ent_spawn_xp_t : packet_t
         assemble_int(dat, z);
         assemble_short(dat, count);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_ent_spawn_xp_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(eid);
+        PACKET_TABLE_FIELD_JINT(x);
+        PACKET_TABLE_FIELD_JINT(y);
+        PACKET_TABLE_FIELD_JINT(z);
+        PACKET_TABLE_FIELD_JSHORT(count);
+
+        ImGui::EndTable();
     }
 };
 struct packet_stance_update_t : packet_t
@@ -655,6 +1060,23 @@ struct packet_stance_update_t : packet_t
         assemble_bool(dat, unknown5);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_stance_update_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JFLOAT(unknown0);
+        PACKET_TABLE_FIELD_JFLOAT(unknown1);
+        PACKET_TABLE_FIELD_JFLOAT(unknown2);
+        PACKET_TABLE_FIELD_JFLOAT(unknown3);
+        PACKET_TABLE_FIELD_JBOOL(unknown4);
+        PACKET_TABLE_FIELD_JBOOL(unknown5);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_ent_velocity_t : packet_t
 {
@@ -676,6 +1098,21 @@ struct packet_ent_velocity_t : packet_t
         assemble_short(dat, vel_z);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_ent_velocity_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(eid);
+        PACKET_TABLE_FIELD_JSHORT(vel_x);
+        PACKET_TABLE_FIELD_JSHORT(vel_y);
+        PACKET_TABLE_FIELD_JSHORT(vel_z);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_ent_destroy_t : packet_t
 {
@@ -691,6 +1128,18 @@ struct packet_ent_destroy_t : packet_t
         assemble_int(dat, eid);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_ent_destroy_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(eid);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_ent_create_t : packet_t
 {
@@ -705,6 +1154,18 @@ struct packet_ent_create_t : packet_t
         dat.push_back(id);
         assemble_int(dat, eid);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_ent_create_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(eid);
+
+        ImGui::EndTable();
     }
 };
 struct packet_ent_move_rel_t : packet_t
@@ -727,6 +1188,21 @@ struct packet_ent_move_rel_t : packet_t
         assemble_byte(dat, delta_z);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_ent_move_rel_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(eid);
+        PACKET_TABLE_FIELD_JBYTE(delta_x);
+        PACKET_TABLE_FIELD_JBYTE(delta_y);
+        PACKET_TABLE_FIELD_JBYTE(delta_z);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_ent_look_t : packet_t
 {
@@ -745,6 +1221,20 @@ struct packet_ent_look_t : packet_t
         assemble_byte(dat, yaw);
         assemble_byte(dat, pitch);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_ent_look_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(eid);
+        PACKET_TABLE_FIELD_JBYTE(yaw);
+        PACKET_TABLE_FIELD_JBYTE(pitch);
+
+        ImGui::EndTable();
     }
 };
 struct packet_ent_look_move_rel_t : packet_t
@@ -771,6 +1261,23 @@ struct packet_ent_look_move_rel_t : packet_t
         assemble_byte(dat, pitch);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_ent_look_move_rel_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(eid);
+        PACKET_TABLE_FIELD_JBYTE(delta_x);
+        PACKET_TABLE_FIELD_JBYTE(delta_y);
+        PACKET_TABLE_FIELD_JBYTE(delta_z);
+        PACKET_TABLE_FIELD_JBYTE(yaw);
+        PACKET_TABLE_FIELD_JBYTE(pitch);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_ent_teleport_t : packet_t
 {
@@ -796,6 +1303,23 @@ struct packet_ent_teleport_t : packet_t
         assemble_byte(dat, pitch);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_ent_teleport_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(eid);
+        PACKET_TABLE_FIELD_JINT(x);
+        PACKET_TABLE_FIELD_JINT(y);
+        PACKET_TABLE_FIELD_JINT(z);
+        PACKET_TABLE_FIELD_JBYTE(rotation);
+        PACKET_TABLE_FIELD_JBYTE(pitch);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_ent_status_t : packet_t
 {
@@ -813,6 +1337,19 @@ struct packet_ent_status_t : packet_t
         assemble_byte(dat, status);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_ent_status_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(eid);
+        PACKET_TABLE_FIELD_JBYTE(status);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_ent_attach_t : packet_t
 {
@@ -829,6 +1366,19 @@ struct packet_ent_attach_t : packet_t
         assemble_int(dat, eid);
         assemble_int(dat, vehicle);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_ent_attach_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(eid);
+        PACKET_TABLE_FIELD_JINT(vehicle);
+
+        ImGui::EndTable();
     }
 };
 struct packet_ent_effect_t : packet_t
@@ -851,6 +1401,21 @@ struct packet_ent_effect_t : packet_t
         assemble_short(dat, duration);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_ent_effect_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(eid);
+        PACKET_TABLE_FIELD_JBYTE(effect_id);
+        PACKET_TABLE_FIELD_JBYTE(amplifier);
+        PACKET_TABLE_FIELD_JSHORT(duration);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_ent_effect_remove_t : packet_t
 {
@@ -867,6 +1432,19 @@ struct packet_ent_effect_remove_t : packet_t
         assemble_int(dat, eid);
         assemble_byte(dat, effect_id);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_ent_effect_remove_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(eid);
+        PACKET_TABLE_FIELD_JBYTE(effect_id);
+
+        ImGui::EndTable();
     }
 };
 struct packet_xp_set_t : packet_t
@@ -887,6 +1465,20 @@ struct packet_xp_set_t : packet_t
         assemble_short(dat, total);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_xp_set_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JBYTE(current_xp);
+        PACKET_TABLE_FIELD_JBYTE(level);
+        PACKET_TABLE_FIELD_JSHORT(total);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_chunk_cache_t : packet_t
 {
@@ -905,6 +1497,20 @@ struct packet_chunk_cache_t : packet_t
         assemble_int(dat, chunk_z);
         assemble_bool(dat, mode);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_chunk_cache_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(chunk_x);
+        PACKET_TABLE_FIELD_JINT(chunk_z);
+        PACKET_TABLE_FIELD_JBOOL(mode);
+
+        ImGui::EndTable();
     }
 };
 struct packet_block_change_t : packet_t
@@ -929,6 +1535,22 @@ struct packet_block_change_t : packet_t
         assemble_byte(dat, metadata);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_block_change_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(block_x);
+        PACKET_TABLE_FIELD_JBYTE(block_y);
+        PACKET_TABLE_FIELD_JINT(block_z);
+        PACKET_TABLE_FIELD_JBYTE(type);
+        PACKET_TABLE_FIELD_JBYTE(metadata);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_block_action_t : packet_t
 {
@@ -951,6 +1573,22 @@ struct packet_block_action_t : packet_t
         assemble_byte(dat, byte0);
         assemble_byte(dat, byte1);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_block_action_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(block_x);
+        PACKET_TABLE_FIELD_JSHORT(block_y);
+        PACKET_TABLE_FIELD_JINT(block_z);
+        PACKET_TABLE_FIELD_JBYTE(byte0);
+        PACKET_TABLE_FIELD_JBYTE(byte1);
+
+        ImGui::EndTable();
     }
 };
 struct packet_sound_effect_t : packet_t
@@ -975,6 +1613,22 @@ struct packet_sound_effect_t : packet_t
         assemble_int(dat, sound_data);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_sound_effect_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(effect_id);
+        PACKET_TABLE_FIELD_JINT(x);
+        PACKET_TABLE_FIELD_JBYTE(y);
+        PACKET_TABLE_FIELD_JINT(z);
+        PACKET_TABLE_FIELD_JINT(sound_data);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_new_state_t : packet_t
 {
@@ -991,6 +1645,19 @@ struct packet_new_state_t : packet_t
         assemble_byte(dat, reason);
         assemble_byte(dat, mode);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_new_state_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JBYTE(reason);
+        PACKET_TABLE_FIELD_JBYTE(mode);
+
+        ImGui::EndTable();
     }
 };
 struct packet_thunder_t : packet_t
@@ -1015,6 +1682,22 @@ struct packet_thunder_t : packet_t
         assemble_int(dat, z);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_thunder_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(eid);
+        PACKET_TABLE_FIELD_JBOOL(unknown);
+        PACKET_TABLE_FIELD_JINT(x);
+        PACKET_TABLE_FIELD_JINT(y);
+        PACKET_TABLE_FIELD_JINT(z);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_window_open_t : packet_t
 {
@@ -1036,6 +1719,21 @@ struct packet_window_open_t : packet_t
         assemble_byte(dat, num_slots);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0 + title.capacity());
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_window_open_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JBYTE(window_id);
+        PACKET_TABLE_FIELD_JBYTE(type);
+        PACKET_TABLE_FIELD_JSTRING16(title);
+        PACKET_TABLE_FIELD_JBYTE(num_slots);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_window_close_t : packet_t
 {
@@ -1050,6 +1748,18 @@ struct packet_window_close_t : packet_t
         dat.push_back(id);
         assemble_byte(dat, window_id);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_window_close_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JBYTE(window_id);
+
+        ImGui::EndTable();
     }
 };
 /**
@@ -1073,6 +1783,20 @@ struct packet_window_update_progress_t : packet_t
         assemble_short(dat, value);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_window_update_progress_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JBYTE(window_id);
+        PACKET_TABLE_FIELD_JSHORT(progress);
+        PACKET_TABLE_FIELD_JSHORT(value);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_window_transaction_t : packet_t
 {
@@ -1091,6 +1815,20 @@ struct packet_window_transaction_t : packet_t
         assemble_short(dat, action_num);
         assemble_bool(dat, accepted);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_window_transaction_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JBYTE(window_id);
+        PACKET_TABLE_FIELD_JSHORT(action_num);
+        PACKET_TABLE_FIELD_JBOOL(accepted);
+
+        ImGui::EndTable();
     }
 };
 struct packet_inventory_action_creative_t : packet_t
@@ -1112,6 +1850,21 @@ struct packet_inventory_action_creative_t : packet_t
         assemble_short(dat, quantity);
         assemble_short(dat, damage);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_inventory_action_creative_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JSHORT(slot);
+        PACKET_TABLE_FIELD_JSHORT(item_id);
+        PACKET_TABLE_FIELD_JSHORT(quantity);
+        PACKET_TABLE_FIELD_JSHORT(damage);
+
+        ImGui::EndTable();
     }
 };
 struct packet_update_sign_t : packet_t
@@ -1140,6 +1893,24 @@ struct packet_update_sign_t : packet_t
         assemble_string16(dat, text3);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0 + text0.capacity() + text1.capacity() + text2.capacity() + text3.capacity());
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_update_sign_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(x);
+        PACKET_TABLE_FIELD_JSHORT(y);
+        PACKET_TABLE_FIELD_JINT(z);
+        PACKET_TABLE_FIELD_JSTRING16(text0);
+        PACKET_TABLE_FIELD_JSTRING16(text1);
+        PACKET_TABLE_FIELD_JSTRING16(text2);
+        PACKET_TABLE_FIELD_JSTRING16(text3);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_increment_statistic_t : packet_t
 {
@@ -1156,6 +1927,19 @@ struct packet_increment_statistic_t : packet_t
         assemble_int(dat, stat_id);
         assemble_byte(dat, amount);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_increment_statistic_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JINT(stat_id);
+        PACKET_TABLE_FIELD_JBYTE(amount);
+
+        ImGui::EndTable();
     }
 };
 struct packet_play_list_item_t : packet_t
@@ -1176,6 +1960,20 @@ struct packet_play_list_item_t : packet_t
         assemble_short(dat, ping);
         return dat;
     }
+
+    PACKET_DEFINE_MEM_SIZE(0 + username.capacity());
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_play_list_item_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JSTRING16(username);
+        PACKET_TABLE_FIELD_JBOOL(online);
+        PACKET_TABLE_FIELD_JSHORT(ping);
+
+        ImGui::EndTable();
+    }
 };
 struct packet_server_list_ping_t : packet_t
 {
@@ -1187,6 +1985,17 @@ struct packet_server_list_ping_t : packet_t
         assert(id == PACKET_ID_SERVER_LIST_PING);
         dat.push_back(id);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0);
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_server_list_ping_t");
+
+        PACKET_TABLE_FIELD_ID();
+
+        ImGui::EndTable();
     }
 };
 struct packet_kick_t : packet_t
@@ -1202,6 +2011,18 @@ struct packet_kick_t : packet_t
         dat.push_back(id);
         assemble_string16(dat, reason);
         return dat;
+    }
+
+    PACKET_DEFINE_MEM_SIZE(0 + reason.capacity());
+
+    void draw_imgui()
+    {
+        PACKET_NEW_TABLE("packet_kick_t");
+
+        PACKET_TABLE_FIELD_ID();
+        PACKET_TABLE_FIELD_JSTRING16(reason);
+
+        ImGui::EndTable();
     }
 };
 

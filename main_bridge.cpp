@@ -44,6 +44,28 @@
 #include "misc.h"
 #include "packet.h"
 
+std::string timestamp_from_tick(Uint64 sdl_tick)
+{
+    SDL_Time cur_time_tick;
+    Uint64 cur_sdl_tick = SDL_GetTicks();
+
+    if (!SDL_GetCurrentTime(&cur_time_tick))
+        return "Error creating timestamp! (SDL_GetCurrentTime)";
+
+    SDL_Time timestamp_tick = cur_time_tick - ((cur_sdl_tick - sdl_tick) * 1000000);
+
+    SDL_DateTime dt;
+
+    if (!SDL_TimeToDateTime(timestamp_tick, &dt, 0))
+        return "Error creating timestamp! (SDL_TimeToDateTime)";
+
+    char buf[128];
+
+    snprintf(buf, ARR_SIZE(buf), "%04d-%02d-%02d %02d:%02d:%02d.%02d", dt.year, dt.month, dt.day, dt.hour, dt.minute, dt.second, dt.nanosecond / 10000000);
+
+    return buf;
+}
+
 void kick_sock(SDLNet_StreamSocket* sock, std::string reason, bool log = true)
 {
     packet_kick_t packet;
@@ -106,6 +128,8 @@ struct client_t
     /* TODO-OPT: Store timestamps? */
     /* TODO: Store where the packet came from, or at least which handler was used */
     std::vector<packet_t*> packets;
+
+    size_t packets_mem_footprint = 0;
 
     packet_viewer_dat_t packet_viewer_dat_server;
     packet_viewer_dat_t packet_viewer_dat_client;
@@ -174,23 +198,50 @@ struct client_t
             return;
         }
 
-        if (!ImGui::BeginChild(
-                "Packet List", ImVec2(-1, ImGui::GetMainViewport()->WorkSize.y / 3), ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_AlwaysVerticalScrollbar))
+        float child_height = ImGui::GetMainViewport()->WorkSize.y / 3;
+
+        if (!ImGui::BeginChild("Packet List", ImVec2(-1, child_height), ImGuiChildFlags_FrameStyle, ImGuiWindowFlags_AlwaysVerticalScrollbar))
         {
             ImGui::EndChild();
             ImGui::TreePop();
             return;
         }
 
+        int start = ImGui::GetScrollY() / ImGui::GetTextLineHeightWithSpacing();
+
+        start -= 10;
+
+        if (start < 0)
+            start = 0;
+
         for (size_t i = 0; i < packs.size(); i++)
         {
             if (!dat.filters[packs[i]->id])
                 continue;
             ImGui::PushID(i);
-            if (ImGui::TreeNode("Packet", "Packet[%zu]: 0x%02x (%s)", i, packs[i]->id, packs[i]->get_name()))
+            char buf[64];
+            snprintf(buf, ARR_SIZE(buf), "Packet[%zu]: 0x%02x (%s)", i, packs[i]->id, packs[i]->get_name());
+            int buf_len = strlen(buf);
+            memset(buf + buf_len, ' ', ARR_SIZE(buf) - buf_len);
+            buf[ARR_SIZE(buf) - 1] = '\0';
+
+            /* Poor mans clipper, slows down the rate at which the list slows the application */
+            /* TODO: Make the list out of selectables, and put the information off to the side */
+            if (i < (size_t)start)
             {
-                ImGui::Text("Information coming soon");
-                ImGui::TreePop();
+                if (ImGui::TreeNode("Packet"))
+                {
+                    packs[i]->draw_imgui();
+                    ImGui::TreePop();
+                }
+            }
+            else
+            {
+                if (ImGui::TreeNode("Packet", "%s %s", buf, timestamp_from_tick(packs[i]->assemble_tick).c_str()))
+                {
+                    packs[i]->draw_imgui();
+                    ImGui::TreePop();
+                }
             }
             ImGui::PopID();
         }
@@ -202,35 +253,59 @@ struct client_t
         ImGui::TreePop();
     }
 
-#define TABLE_FIELD(field_text, fmt, ...) \
-    do                                    \
-    {                                     \
-        ImGui::TableNextRow();            \
-        ImGui::TableNextColumn();         \
-        ImGui::Text(field_text);          \
-        ImGui::TableNextColumn();         \
-        ImGui::Text(fmt, ##__VA_ARGS__);  \
+#define TABLE_FIELD(field_text, fmt, ...)   \
+    do                                      \
+    {                                       \
+        ImGui::TableNextRow();              \
+        ImGui::TableNextColumn();           \
+        ImGui::TextUnformatted(field_text); \
+        ImGui::TableNextColumn();           \
+        ImGui::Text(fmt, ##__VA_ARGS__);    \
     } while (0)
+
+    void draw_memory_field(const char* name, size_t size, bool rate)
+    {
+        if (size < 1000u)
+            TABLE_FIELD(name, "%zu bytes%s", size, rate ? "/s" : "");
+        else if (size < (1000u * 1000u))
+            TABLE_FIELD(name, "%.1f KB%s", (float)size / 1000.0f, rate ? "/s" : "");
+        else if (size < (1000u * 1000u * 1000u))
+            TABLE_FIELD(name, "%.2f MB%s", (float)(size / 1000u) / 1000.0f, rate ? "/s" : "");
+        else if (size < (1000u * 1000u * 1000u * 1000u))
+            TABLE_FIELD(name, "%.2f GB%s", (float)(size / (1000u * 1000u)) / 1000.0f, rate ? "/s" : "");
+        else
+            TABLE_FIELD(name, "%.2f TB%s", (float)(size / (1000u * 1000u * 1000u)) / 1000.0f, rate ? "/s" : "");
+    }
 
     bool draw_imgui()
     {
         if (!ImGui::BeginTable("client_info_table", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
             return false;
-        ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("Seconds since first read: ").x);
+        ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("AVG Est. Memory footprint rate: ").x);
         ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
 
-        TABLE_FIELD("Seconds since first read: ", "%.2f", ((float)((SDL_GetTicks() - time_init) / 10)) / 100.0f);
-        TABLE_FIELD("Seconds since last read: ", "%.2f", ((float)((SDL_GetTicks() - time_last_read) / 10)) / 100.0f);
+        TABLE_FIELD("Connection init timestamp: ", "%s", timestamp_from_tick(time_init).c_str());
+        TABLE_FIELD("Last read timestamp: ", "%s", timestamp_from_tick(time_last_read).c_str());
+        TABLE_FIELD("Duration of connection: ", "%.2fs", ((float)((time_last_read - time_init) / 10)) / 100.0f);
 
         TABLE_FIELD("Num packets from client: ", "%zu", packets_server.size());
         TABLE_FIELD("Num packets from server: ", "%zu", packets_client.size());
         TABLE_FIELD("Num packets: ", "%zu", packets_client.size() + packets_server.size());
 
-        if (time_last_read - time_init > 0)
+        draw_memory_field("Est. Packet memory footprint: ", packets_mem_footprint, false);
+        draw_memory_field("Client data transfer: ", pack_handler_server.get_bytes_received(), false);
+        draw_memory_field("Server data transfer: ", pack_handler_client.get_bytes_received(), false);
+
+        size_t tdiff = time_last_read - time_init;
+        if (tdiff != 0)
         {
-            TABLE_FIELD("Client packets/s: ", "%zu", packets_server.size() * 1000 / (time_last_read - time_init));
-            TABLE_FIELD("Server packets/s: ", "%zu", packets_client.size() * 1000 / (time_last_read - time_init));
-            TABLE_FIELD("Total packets/s: ", "%zu", (packets_client.size() + packets_server.size()) * 1000 / (time_last_read - time_init));
+            TABLE_FIELD("AVG Client packets/s: ", "%zu", packets_server.size() * 1000 / tdiff);
+            TABLE_FIELD("AVG Server packets/s: ", "%zu", packets_client.size() * 1000 / tdiff);
+            TABLE_FIELD("AVG Packets/s: ", "%zu", (packets_client.size() + packets_server.size()) * 1000 / tdiff);
+
+            draw_memory_field("AVG Est. Memory footprint rate: ", packets_mem_footprint * 1000 / tdiff, true);
+            draw_memory_field("AVG Client data rate: ", pack_handler_server.get_bytes_received() * 1000 / tdiff, true);
+            draw_memory_field("AVG Server data rate: ", pack_handler_client.get_bytes_received() * 1000 / tdiff, true);
         }
 
         if (kick_reason.length())
@@ -399,6 +474,7 @@ int main(int argc, const char** argv)
                     else
                         send_buffer(c->sock_client, pack_server->assemble());
 
+                    c->packets_mem_footprint += pack_server->mem_size();
                     c->packets_server.push_back(pack_server);
                     c->packets.push_back(pack_server);
                 }
@@ -416,6 +492,8 @@ int main(int argc, const char** argv)
                     c->time_last_read = sdl_tick_cur;
                     TRACE("Got packet from server: 0x%02x", pack_client->id);
                     send_buffer(c->sock_server, pack_client->assemble());
+
+                    c->packets_mem_footprint += pack_client->mem_size();
                     c->packets_client.push_back(pack_client);
                     c->packets.push_back(pack_client);
                 }
