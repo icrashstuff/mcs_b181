@@ -23,7 +23,17 @@
 #ifndef MCS_B181_MISC_H
 #define MCS_B181_MISC_H
 
+#include <SDL3/SDL_stdinc.h>
 #include <assert.h>
+
+typedef Uint8 jubyte;
+typedef Uint8 jbool;
+typedef Sint8 jbyte;
+typedef Sint16 jshort;
+typedef Sint32 jint;
+typedef Sint64 jlong;
+typedef float jfloat;
+typedef double jdouble;
 
 #define ARR_SIZE(x) (sizeof(x) / sizeof(x[0]))
 

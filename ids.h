@@ -24,6 +24,7 @@
 #define MCS_B181_IDS_H
 
 #include "SDL3/SDL_stdinc.h"
+#include "misc.h"
 
 enum damage_id_t : Uint8
 {
@@ -341,8 +342,49 @@ enum item_id_t : short
     ITEM_ID_MUSIC_DISC_13 = 2256,
     ITEM_ID_MUSIC_DISC_CAT,
 };
+
+enum vehicle_type_t : jbyte
+{
+    VEHICLE_TYPE_BOAT = 1,
+    VEHICLE_TYPE_CART = 10,
+    VEHICLE_TYPE_CART_CHEST,
+    VEHICLE_TYPE_CART_POWERED,
+    VEHICLE_TYPE_TNT = 50,
+    VEHICLE_TYPE_ARROW = 60,
+    VEHICLE_TYPE_SNOWBALL,
+    VEHICLE_TYPE_EGG,
+    VEHICLE_TYPE_SAND = 70,
+    VEHICLE_TYPE_GRAVEL,
+    VEHICLE_TYPE_FISH_FLOAT = 90,
+};
+
+enum mob_type_t : jbyte
+{
+    MOB_TYPE_CREEPER = 50,
+    MOB_TYPE_SKELETON,
+    MOB_TYPE_SPIDER,
+    MOB_TYPE_ZOMBIE_GIANT,
+    MOB_TYPE_ZOMBIE,
+    MOB_TYPE_SLIME,
+    MOB_TYPE_GHAST,
+    MOB_TYPE_ZOMBIE_PIG,
+    MOB_TYPE_ENDERMAN,
+    MOB_TYPE_SPIDER_CAVE,
+    MOB_TYPE_SILVERFISH,
+    MOB_TYPE_PIG = 90,
+    MOB_TYPE_SHEEP,
+    MOB_TYPE_COW,
+    MOB_TYPE_CHICKEN,
+    MOB_TYPE_SQUID,
+    MOB_TYPE_WOLF,
+};
+
 namespace mc_id
 {
+
+const char* get_name_vehicle(jbyte id);
+
+const char* get_name_mob(jbyte id);
 
 /**
  * Returns the name of the item with any changes applied by damage (eg. wool or dye)

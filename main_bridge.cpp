@@ -150,6 +150,62 @@ struct chat_t
     bool sent_by_client;
 };
 
+struct entity_info_t
+{
+    int eid = 0;
+
+    int pos_x = 0;
+    int pos_y = 0;
+    int pos_z = 0;
+
+    int vel_x = 0;
+    int vel_y = 0;
+    int vel_z = 0;
+
+    jbyte yaw = 0;
+    jbyte pitch = 0;
+    jbyte roll = 0;
+
+    packet_t* pack_creation = NULL;
+    packet_t* pack_destruction = NULL;
+    std::string name;
+
+    void draw_imgui()
+    {
+        if (ImGui::BeginTable("Current Players Table", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+        {
+            ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("x").x * 18);
+            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableHeadersRow();
+
+            if (pack_creation)
+                TABLE_FIELD("Created: ", "%s", timestamp_from_tick(pack_creation->assemble_tick).c_str());
+
+            if (pack_destruction)
+                TABLE_FIELD("Destroyed: ", "%s", timestamp_from_tick(pack_destruction->assemble_tick).c_str());
+
+            if (name.length())
+                TABLE_FIELD("Name", "%s", name.c_str());
+            TABLE_FIELD("pos: ", "<%.2f, %.2f, %.2f>", (float)pos_x / 32, (float)pos_y / 32, (float)pos_z / 32);
+            TABLE_FIELD("vel: ", "<%.2f, %.2f, %.2f>", (float)vel_x / (32000 / 5), (float)vel_y / (32000 / 5), (float)vel_z / (32000 / 5));
+
+            ImGui::EndTable();
+        }
+
+        if (pack_creation)
+        {
+            ImGui::SeparatorText("Packet Creation");
+            pack_creation->draw_imgui();
+        }
+
+        if (pack_destruction)
+        {
+            ImGui::SeparatorText("Packet Destruction");
+            pack_destruction->draw_imgui();
+        }
+    }
+};
+
 struct world_diag_t
 {
 public:
@@ -199,6 +255,8 @@ public:
     bool send_chat = false;
 
     std::vector<packet_play_list_item_t*> player_list;
+
+    std::vector<entity_info_t> entities;
 
 #define CAST_PACK_TO_P(type) type* p = (type*)pack
     void feed_packet_from_server(packet_t* pack)
@@ -393,6 +451,97 @@ public:
         ImGui::Text("%zu/%zu", strlen(chat_buf), ARR_SIZE(chat_buf) - 1);
     }
 
+    bool ent_viewer_force_scroll = false;
+    bool ent_viewer_no_destroyed = true;
+    size_t ent_viewer_sel = -1;
+
+    void draw_imgui_entities()
+    {
+        ImGui::Checkbox("Force Scroll", &ent_viewer_force_scroll);
+        ImGui::SameLine();
+        ImGui::Checkbox("No Destroyed", &ent_viewer_no_destroyed);
+
+        float child_height = ImGui::GetMainViewport()->WorkSize.y / 3;
+
+        float list_width = ImGui::CalcTextSize("x").x * 90 + ImGui::GetStyle().ScrollbarSize;
+
+        if (list_width < ImGui::GetContentRegionAvail().x / 2)
+            list_width = ImGui::GetContentRegionAvail().x / 2;
+
+        if (ImGui::BeginListBox("##Packet Listbox", ImVec2(list_width, child_height)))
+        {
+            float text_spacing = ImGui::GetTextLineHeightWithSpacing();
+
+            for (size_t i = 0; i < entities.size(); i++)
+            {
+                if (ent_viewer_no_destroyed && entities[i].pack_destruction)
+                    continue;
+                ImGui::PushID(i);
+                char buf[56] = "";
+                char buf2[88] = "";
+                if (!ImGui::IsRectVisible(ImVec2(20, text_spacing)))
+                    ImGui::Spacing();
+                else
+                {
+                    if (entities[i].pack_creation)
+                    {
+                        packet_t* pack = entities[i].pack_creation;
+                        const char* name = NULL;
+                        switch (pack->id)
+                        {
+                        case PACKET_ID_ENT_SPAWN_MOB:
+                        {
+                            CAST_PACK_TO_P(packet_ent_spawn_mob_t);
+                            name = mc_id::get_name_mob(p->mob_type);
+                            break;
+                        }
+                        case PACKET_ID_ADD_OBJ:
+                        {
+                            CAST_PACK_TO_P(packet_add_obj_t);
+                            name = mc_id::get_name_vehicle(p->obj_type);
+                            break;
+                        }
+                        default:
+                            name = entities[i].pack_creation->get_name();
+                            break;
+                        }
+                        snprintf(buf, ARR_SIZE(buf), "(%s)", name);
+                    }
+                    snprintf(buf2, ARR_SIZE(buf2), "eid[%d]: %s", entities[i].eid, buf);
+
+                    if (ImGui::Selectable(buf2, ent_viewer_sel == i))
+                        ent_viewer_sel = i;
+                }
+
+                ImGui::PopID();
+            }
+
+            if (ent_viewer_force_scroll)
+                ImGui::SetScrollHereY(0.0f);
+
+            ImGui::EndListBox();
+        }
+
+        ImGui::SameLine();
+
+        if (!ImGui::BeginChild("Packet Table", ImVec2(-1, child_height), 0, ImGuiWindowFlags_AlwaysVerticalScrollbar))
+        {
+            ImGui::EndChild();
+            return;
+        }
+
+        if (ent_viewer_sel < entities.size())
+            entities[ent_viewer_sel].draw_imgui();
+        else
+        {
+            PACKET_NEW_TABLE_CHOICE_IF("blank_table", goto skip_end_table;);
+            ImGui::EndTable();
+        skip_end_table:;
+        }
+
+        ImGui::EndChild();
+    }
+
     void draw_imgui_players()
     {
         ImGui::SeparatorText("Current players");
@@ -489,6 +638,9 @@ private:
         case PACKET_ID_HANDSHAKE:
         case PACKET_ID_LOGIN_REQUEST:
         case PACKET_ID_PLAYER_POS_LOOK:
+        case PACKET_ID_CHAT_MSG:
+        case PACKET_ID_KEEP_ALIVE:
+        case PACKET_ID_KICK:
             LOG_WARN("Unhandled packet 0x%02x(%s)", pack->id, pack->get_name());
             break;
         case PACKET_ID_UPDATE_TIME:
@@ -562,8 +714,307 @@ private:
                 }
             }
 
-            if (i == player_list.size())
-                player_list.push_back(p);
+            player_list.push_back(p);
+
+            break;
+        }
+        case PACKET_ID_ENT_SPAWN_NAMED:
+        {
+            CAST_PACK_TO_P(packet_ent_spawn_named_t);
+
+            entity_info_t t;
+            t.eid = p->eid;
+            t.pos_x = p->x;
+            t.pos_y = p->y;
+            t.pos_z = p->z;
+            t.yaw = p->rotation;
+            t.pitch = p->pitch;
+            t.pack_creation = p;
+
+            for (size_t i = 0; i < entities.size(); i++)
+            {
+                if (entities[i].eid == p->eid)
+                {
+                    entities[i] = t;
+                    break;
+                }
+            }
+
+            entities.push_back(t);
+
+            break;
+        }
+        case PACKET_ID_ENT_SPAWN_PICKUP:
+        {
+            CAST_PACK_TO_P(packet_ent_spawn_pickup_t);
+
+            entity_info_t t;
+            t.eid = p->eid;
+            t.pos_x = p->x;
+            t.pos_y = p->y;
+            t.pos_z = p->z;
+            t.yaw = p->rotation;
+            t.pitch = p->pitch;
+            t.roll = p->roll;
+            t.pack_creation = p;
+
+            for (size_t i = 0; i < entities.size(); i++)
+            {
+                if (entities[i].eid == p->eid)
+                {
+                    entities[i] = t;
+                    break;
+                }
+            }
+
+            entities.push_back(t);
+
+            break;
+        }
+        case PACKET_ID_ADD_OBJ:
+        {
+            CAST_PACK_TO_P(packet_add_obj_t);
+
+            entity_info_t t;
+            t.eid = p->eid;
+            t.pos_x = p->x;
+            t.pos_y = p->y;
+            t.pos_z = p->z;
+            t.pack_creation = p;
+
+            for (size_t i = 0; i < entities.size(); i++)
+            {
+                if (entities[i].eid == p->eid)
+                {
+                    entities[i] = t;
+                    break;
+                }
+            }
+
+            entities.push_back(t);
+
+            break;
+        }
+        case PACKET_ID_ENT_ENSURE_SPAWN:
+        {
+            CAST_PACK_TO_P(packet_ent_create_t);
+
+            entity_info_t t;
+            t.eid = p->eid;
+            t.pack_creation = p;
+
+            for (size_t i = 0; i < entities.size(); i++)
+            {
+                if (entities[i].eid == p->eid)
+                {
+                    entities[i] = t;
+                    break;
+                }
+            }
+
+            entities.push_back(t);
+
+            break;
+        }
+        case PACKET_ID_ENT_SPAWN_MOB:
+        {
+            CAST_PACK_TO_P(packet_ent_spawn_mob_t);
+
+            entity_info_t t;
+            t.eid = p->eid;
+            t.pos_x = p->x;
+            t.pos_y = p->y;
+            t.pos_z = p->z;
+            t.yaw = p->yaw;
+            t.pitch = p->pitch;
+            t.pack_creation = p;
+
+            for (size_t i = 0; i < entities.size(); i++)
+            {
+                if (entities[i].eid == p->eid)
+                {
+                    entities[i] = t;
+                    break;
+                }
+            }
+
+            entities.push_back(t);
+
+            break;
+        }
+        case PACKET_ID_ENT_SPAWN_PAINTING:
+        {
+            CAST_PACK_TO_P(packet_ent_spawn_painting_t);
+
+            entity_info_t t;
+            t.eid = p->eid;
+            t.pos_x = p->center_x;
+            t.pos_y = p->center_y;
+            t.pos_z = p->center_z;
+            t.pack_creation = p;
+
+            for (size_t i = 0; i < entities.size(); i++)
+            {
+                if (entities[i].eid == p->eid)
+                {
+                    entities[i] = t;
+                    break;
+                }
+            }
+
+            entities.push_back(t);
+
+            break;
+        }
+        case PACKET_ID_ENT_SPAWN_XP:
+        {
+            CAST_PACK_TO_P(packet_ent_spawn_xp_t);
+
+            entity_info_t t;
+            t.eid = p->eid;
+            t.pos_x = p->x;
+            t.pos_y = p->y;
+            t.pos_z = p->z;
+            t.pack_creation = p;
+
+            for (size_t i = 0; i < entities.size(); i++)
+            {
+                if (entities[i].eid == p->eid)
+                {
+                    entities[i] = t;
+                    break;
+                }
+            }
+
+            entities.push_back(t);
+
+            break;
+        }
+        case PACKET_ID_THUNDERBOLT:
+        {
+            CAST_PACK_TO_P(packet_thunder_t);
+
+            entity_info_t t;
+            t.eid = p->eid;
+            t.pos_x = p->x;
+            t.pos_y = p->y;
+            t.pos_z = p->z;
+            t.pack_creation = p;
+
+            for (size_t i = 0; i < entities.size(); i++)
+            {
+                if (entities[i].eid == p->eid)
+                {
+                    entities[i] = t;
+                    break;
+                }
+            }
+
+            entities.push_back(t);
+
+            break;
+        }
+        case PACKET_ID_ENT_VELOCITY:
+        {
+            CAST_PACK_TO_P(packet_ent_velocity_t);
+
+            for (size_t i = 0; i < entities.size(); i++)
+            {
+                if (entities[i].eid == p->eid)
+                {
+                    entities[i].vel_x = p->vel_x;
+                    entities[i].vel_y = p->vel_y;
+                    entities[i].vel_z = p->vel_z;
+                    break;
+                }
+            }
+            break;
+        }
+        case PACKET_ID_ENT_MOVE_REL:
+        {
+            CAST_PACK_TO_P(packet_ent_move_rel_t);
+
+            for (size_t i = 0; i < entities.size(); i++)
+            {
+                if (entities[i].eid == p->eid)
+                {
+                    entities[i].pos_x += p->delta_x;
+                    entities[i].pos_y += p->delta_y;
+                    entities[i].pos_z += p->delta_z;
+                    break;
+                }
+            }
+            break;
+        }
+        case PACKET_ID_ENT_LOOK:
+        {
+            CAST_PACK_TO_P(packet_ent_look_t);
+
+            for (size_t i = 0; i < entities.size(); i++)
+            {
+                if (entities[i].eid == p->eid)
+                {
+                    entities[i].yaw = p->yaw;
+                    entities[i].pitch = p->pitch;
+                    break;
+                }
+            }
+            break;
+        }
+        case PACKET_ID_ENT_LOOK_MOVE_REL:
+        {
+            CAST_PACK_TO_P(packet_ent_look_move_rel_t);
+
+            for (size_t i = 0; i < entities.size(); i++)
+            {
+                if (entities[i].eid == p->eid)
+                {
+                    entities[i].pos_x += p->delta_x;
+                    entities[i].pos_y += p->delta_y;
+                    entities[i].pos_z += p->delta_z;
+                    entities[i].yaw = p->yaw;
+                    entities[i].pitch = p->pitch;
+                    break;
+                }
+            }
+            break;
+        }
+        case PACKET_ID_ENT_MOVE_TELEPORT:
+        {
+            CAST_PACK_TO_P(packet_ent_teleport_t);
+
+            for (size_t i = 0; i < entities.size(); i++)
+            {
+                if (entities[i].eid == p->eid)
+                {
+                    entities[i].pos_x = p->x;
+                    entities[i].pos_y = p->y;
+                    entities[i].pos_z = p->z;
+                    entities[i].yaw = p->rotation;
+                    entities[i].pitch = p->pitch;
+                    break;
+                }
+            }
+            break;
+        }
+        case PACKET_ID_ENT_DESTROY:
+        {
+            CAST_PACK_TO_P(packet_ent_destroy_t);
+
+            for (size_t i = 0; i < entities.size(); i++)
+            {
+                if (entities[i].eid == p->eid)
+                {
+                    entities[i].pack_destruction = p;
+                    break;
+                }
+            }
+
+            entity_info_t t;
+            t.eid = p->eid;
+            t.pack_destruction = p;
+
+            entities.push_back(t);
 
             break;
         }
@@ -936,6 +1387,7 @@ struct client_t
         {
             /* TODO: Basic list of entities, their types (if declared), their positions, and maybe a history */
             /* TODO-OPT: More advanced list of entities */
+            world_diag.draw_imgui_entities();
             ImGui::TreePop();
         }
 

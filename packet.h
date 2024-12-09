@@ -28,17 +28,9 @@
 #include <string>
 #include <vector>
 
+#include "ids.h"
 #include "misc.h"
 #include "tetra/gui/imgui.h"
-
-typedef Uint8 jubyte;
-typedef Uint8 jbool;
-typedef Sint8 jbyte;
-typedef Sint16 jshort;
-typedef Sint32 jint;
-typedef Sint64 jlong;
-typedef float jfloat;
-typedef double jdouble;
 
 void assemble_string16(std::vector<Uint8>& dat, std::string str);
 
@@ -311,18 +303,6 @@ struct packet_player_place_t : packet_t
 #define ENT_ACTION_ID_SPRINT_START 4
 #define ENT_ACTION_ID_SPRINT_STOP 5
 
-#define PACK_ADD_OBJ_TYPE_BOAT 1
-#define PACK_ADD_OBJ_TYPE_CART 10
-#define PACK_ADD_OBJ_TYPE_CART_CHEST 11
-#define PACK_ADD_OBJ_TYPE_CART_POWERED 12
-#define PACK_ADD_OBJ_TYPE_TNT 50
-#define PACK_ADD_OBJ_TYPE_ARROW 60
-#define PACK_ADD_OBJ_TYPE_SNOWBALL 61
-#define PACK_ADD_OBJ_TYPE_EGG 62
-#define PACK_ADD_OBJ_TYPE_SAND 70
-#define PACK_ADD_OBJ_TYPE_GRAVEL 71
-#define PACK_ADD_OBJ_TYPE_FISH_FLOAT 90
-
 /**
  * Server -> Client
  */
@@ -331,7 +311,11 @@ struct packet_add_obj_t : packet_t
     packet_add_obj_t() { id = PACKET_ID_ADD_OBJ; }
 
     jint eid = 0;
-    jbyte type = 0;
+    union
+    {
+        jbyte type = 0;
+        vehicle_type_t obj_type;
+    };
     jint x = 0;
     jint y = 0;
     jint z = 0;
@@ -390,7 +374,11 @@ struct packet_ent_spawn_mob_t : packet_t
     packet_ent_spawn_mob_t() { id = PACKET_ID_ENT_SPAWN_MOB; }
 
     jint eid = 0;
-    jbyte type = 0;
+    union
+    {
+        jbyte type = 0;
+        mob_type_t mob_type;
+    };
     jint x = 0;
     jint y = 0;
     jint z = 0;

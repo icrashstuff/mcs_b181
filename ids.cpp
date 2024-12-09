@@ -27,6 +27,52 @@
     case id:               \
         return name
 
+const char* mc_id::get_name_vehicle(jbyte id)
+{
+    switch (id)
+    {
+        ADD_NAME(VEHICLE_TYPE_BOAT, "Boat");
+        ADD_NAME(VEHICLE_TYPE_CART, "Minecart");
+        ADD_NAME(VEHICLE_TYPE_CART_CHEST, "Minecart with Chest");
+        ADD_NAME(VEHICLE_TYPE_CART_POWERED, "Minecart with Furnace");
+        ADD_NAME(VEHICLE_TYPE_TNT, "Activated TNT");
+        ADD_NAME(VEHICLE_TYPE_ARROW, "Arrow");
+        ADD_NAME(VEHICLE_TYPE_SNOWBALL, "Thrown Snowball");
+        ADD_NAME(VEHICLE_TYPE_EGG, "Thrown Egg");
+        ADD_NAME(VEHICLE_TYPE_SAND, "Falling Sand");
+        ADD_NAME(VEHICLE_TYPE_GRAVEL, "Falling Gravel");
+        ADD_NAME(VEHICLE_TYPE_FISH_FLOAT, "Fishing Rod Float");
+    default:
+        return "Unknown Vehicle/Object";
+    }
+}
+
+const char* mc_id::get_name_mob(jbyte id)
+{
+    switch (id)
+    {
+        ADD_NAME(MOB_TYPE_CREEPER, "Creeper");
+        ADD_NAME(MOB_TYPE_SKELETON, "Skeleton");
+        ADD_NAME(MOB_TYPE_SPIDER, "Spider");
+        ADD_NAME(MOB_TYPE_ZOMBIE_GIANT, "Giant Zombie");
+        ADD_NAME(MOB_TYPE_ZOMBIE, "Zombie");
+        ADD_NAME(MOB_TYPE_SLIME, "Slime");
+        ADD_NAME(MOB_TYPE_GHAST, "Ghast");
+        ADD_NAME(MOB_TYPE_ZOMBIE_PIG, "Zombie Pigman");
+        ADD_NAME(MOB_TYPE_ENDERMAN, "Enderman");
+        ADD_NAME(MOB_TYPE_SPIDER_CAVE, "Cave Spider");
+        ADD_NAME(MOB_TYPE_SILVERFISH, "Silverfish");
+        ADD_NAME(MOB_TYPE_PIG, "Pig");
+        ADD_NAME(MOB_TYPE_SHEEP, "Sheep");
+        ADD_NAME(MOB_TYPE_COW, "Cow");
+        ADD_NAME(MOB_TYPE_CHICKEN, "Chicken");
+        ADD_NAME(MOB_TYPE_SQUID, "Squid");
+        ADD_NAME(MOB_TYPE_WOLF, "Wolf");
+    default:
+        return "Unknown Vehicle/Object";
+    }
+}
+
 const char* mc_id::get_name_from_item_id(short item_id, short damage)
 {
     switch (item_id)
