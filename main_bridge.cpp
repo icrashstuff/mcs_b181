@@ -1071,7 +1071,14 @@ int main(int argc, const char** argv)
             for (size_t i = 0; i < clients.size(); i++)
             {
                 ImGui::PushID(i);
-                if (ImGui::TreeNode("client", "Clients[%zu] %s", i, clients[i].skip ? "" : "(Active)"))
+                const char* txt_active = clients[i].skip ? "" : "(Active)";
+                bool open = false;
+                if (clients[i].world_diag.username.length())
+                    open = ImGui::TreeNode("client", "Clients[%zu] (%s) %s", i, clients[i].world_diag.username.c_str(), txt_active);
+                else
+                    open = ImGui::TreeNode("client", "Clients[%zu] %s", i, txt_active);
+
+                if (open)
                 {
                     clients[i].draw_imgui();
                     ImGui::TreePop();
