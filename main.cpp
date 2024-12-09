@@ -1139,7 +1139,7 @@ void spawn_player(std::vector<client_t> clients, client_t* client, dimension_t* 
     pack_player.z = client->player_z * 32;
     pack_player.rotation = ((int)client->player_yaw) * 255 / 360;
     pack_player.pitch = client->player_pitch * 64 / 90;
-    pack_player.cur_item = client->cur_item_idx;
+    pack_player.cur_item = client->inventory[client->cur_item_idx].id;
 
     for (size_t i = 0; i < clients.size(); i++)
     {
@@ -1162,10 +1162,10 @@ void spawn_player(std::vector<client_t> clients, client_t* client, dimension_t* 
                 pack_ext_player.x = clients[i].player_x * 32;
                 pack_ext_player.y = clients[i].player_y * 32;
                 pack_ext_player.z = clients[i].player_z * 32;
+                pack_ext_player.cur_item = clients[i].inventory[clients[i].cur_item_idx].id;
             }
             pack_ext_player.rotation = ((int)clients[i].player_yaw) * 255 / 360;
             pack_ext_player.pitch = clients[i].player_pitch * 64 / 90;
-            ;
 
             send_buffer(sock, pack_ext_player_ent.assemble());
             send_buffer(sock, pack_ext_player.assemble());
@@ -1658,9 +1658,9 @@ int main(int argc, char** argv)
                             packet_thunder_t pack_thunder;
                             pack_thunder.eid = eid_counter++;
                             pack_thunder.unknown = true;
-                            pack_thunder.x = client->player_x;
-                            pack_thunder.y = client->player_y;
-                            pack_thunder.z = client->player_z;
+                            pack_thunder.x = client->player_x * 32;
+                            pack_thunder.y = client->player_y * 32;
+                            pack_thunder.z = client->player_z * 32;
                             send_buffer_to_players_if_coords(clients, pack_thunder.assemble(), client->player_x, client->player_z, client->dimension);
                         }
                         else if (p->msg == "/unload")
