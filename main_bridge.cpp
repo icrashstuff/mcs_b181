@@ -119,14 +119,20 @@ struct packet_viewer_dat_t
     }
 };
 
+#define TABLE_VALUE(fmt, ...)            \
+    do                                   \
+    {                                    \
+        ImGui::TableNextColumn();        \
+        ImGui::Text(fmt, ##__VA_ARGS__); \
+    } while (0)
+
 #define TABLE_FIELD(field_text, fmt, ...)   \
     do                                      \
     {                                       \
         ImGui::TableNextRow();              \
         ImGui::TableNextColumn();           \
         ImGui::TextUnformatted(field_text); \
-        ImGui::TableNextColumn();           \
-        ImGui::Text(fmt, ##__VA_ARGS__);    \
+        TABLE_VALUE(fmt, ##__VA_ARGS__);    \
     } while (0)
 
 #define TABLE_FIELD_BOOL(x) TABLE_FIELD(#x ": ", "%s", (x) ? "true" : "false")
@@ -191,6 +197,8 @@ public:
     std::vector<chat_t> chat_history;
     char chat_buf[101] = "";
     bool send_chat = false;
+
+    std::vector<packet_play_list_item_t*> player_list;
 
 #define CAST_PACK_TO_P(type) type* p = (type*)pack
     void feed_packet_from_server(packet_t* pack)
@@ -385,6 +393,63 @@ public:
         ImGui::Text("%zu/%zu", strlen(chat_buf), ARR_SIZE(chat_buf) - 1);
     }
 
+    void draw_imgui_players()
+    {
+        ImGui::SeparatorText("Current players");
+
+        if (ImGui::BeginTable("Current Players Table", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+        {
+            ImGui::TableSetupColumn("Username", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("x").x * 18);
+            ImGui::TableSetupColumn("Ping", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn("Online ", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn("Last Seen", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableHeadersRow();
+
+            for (size_t i = 0; i < player_list.size(); i++)
+            {
+                packet_play_list_item_t* p = player_list[i];
+                if (!p->online)
+                    continue;
+                ImGui::TableNextRow();
+                TABLE_VALUE("%s", p->username.c_str());
+                TABLE_VALUE("%d ms", p->ping);
+                TABLE_VALUE("%s", p->online ? "Online" : "Offline");
+                TABLE_VALUE("%s", timestamp_from_tick(p->assemble_tick).c_str());
+            }
+
+            ImGui::EndTable();
+        }
+
+        ImGui::Spacing();
+
+        ImGui::SeparatorText("Previous players");
+
+        if (ImGui::BeginTable("Prior Players Table", 4, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+        {
+            ImGui::TableSetupColumn("Username", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("x").x * 18);
+            ImGui::TableSetupColumn("Ping", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn("Online ", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableSetupColumn("Last Seen", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableHeadersRow();
+
+            for (size_t i = 0; i < player_list.size(); i++)
+            {
+                packet_play_list_item_t* p = player_list[i];
+                if (p->online)
+                    continue;
+                ImGui::TableNextRow();
+                TABLE_VALUE("%s", p->username.c_str());
+                TABLE_VALUE("%d ms", p->ping);
+                TABLE_VALUE("%s", p->online ? "Online" : "Offline");
+                TABLE_VALUE("%s", timestamp_from_tick(p->assemble_tick).c_str());
+            }
+
+            ImGui::EndTable();
+        }
+
+        ImGui::Spacing();
+    }
+
 private:
     void tick()
     {
@@ -481,6 +546,25 @@ private:
             xp_current = p->current_xp;
             xp_level = p->level;
             xp_total = p->total;
+            break;
+        }
+        case PACKET_ID_PLAYER_LIST_ITEM:
+        {
+            CAST_PACK_TO_P(packet_play_list_item_t);
+
+            size_t i = 0;
+            for (i = 0; i < player_list.size(); i++)
+            {
+                if (player_list[i]->username == p->username)
+                {
+                    player_list[i] = p;
+                    break;
+                }
+            }
+
+            if (i == player_list.size())
+                player_list.push_back(p);
+
             break;
         }
         }
@@ -844,7 +928,7 @@ struct client_t
 
         if (ImGui::TreeNode("Player list"))
         {
-            /* TODO: List of every player, including a history */
+            world_diag.draw_imgui_players();
             ImGui::TreePop();
         }
 
