@@ -40,6 +40,7 @@
 
 #include "tetra/gui/console.h"
 #include "tetra/tetra.h"
+#include "tetra/util/convar.h"
 
 #include "misc.h"
 #include "packet.h"
@@ -118,6 +119,374 @@ struct packet_viewer_dat_t
     }
 };
 
+#define TABLE_FIELD(field_text, fmt, ...)   \
+    do                                      \
+    {                                       \
+        ImGui::TableNextRow();              \
+        ImGui::TableNextColumn();           \
+        ImGui::TextUnformatted(field_text); \
+        ImGui::TableNextColumn();           \
+        ImGui::Text(fmt, ##__VA_ARGS__);    \
+    } while (0)
+
+#define TABLE_FIELD_BOOL(x) TABLE_FIELD(#x ": ", "%s", (x) ? "true" : "false")
+#define TABLE_FIELD_INT(x) TABLE_FIELD(#x ": ", "%d", x)
+#define TABLE_FIELD_UINT(x) TABLE_FIELD(#x ": ", "%u", x)
+#define TABLE_FIELD_LONG(x) TABLE_FIELD(#x ": ", "%ld", x)
+#define TABLE_FIELD_ULONG(x) TABLE_FIELD(#x ": ", "%lu", x)
+#define TABLE_FIELD_FLOAT(x) TABLE_FIELD(#x ": ", "%.3f", x)
+#define TABLE_FIELD_STRING(x) TABLE_FIELD(#x ": ", "\"%s\"", x.c_str())
+#define TABLE_FIELD_CSTRING(x) TABLE_FIELD(#x ": ", "\"%s\"", x)
+
+struct chat_t
+{
+    std::string* msg;
+    bool sent_by_client;
+};
+
+struct world_diag_t
+{
+public:
+    bool handshake_occured = false;
+    Uint64 last_mc_tick = 0;
+
+    std::string connection_hash;
+    std::string username;
+
+    jint protocol_ver = 0;
+
+    jint player_eid = 0;
+    jlong seed = 0;
+    jint gamemode = 0;
+    jbyte dimension = 0;
+    jbyte difficulty = 0;
+    jubyte world_height = 0;
+    jubyte max_players = 0;
+
+    jdouble player_x = 0.0;
+    jdouble player_y = 0.0;
+    jdouble player_stance = 0.0;
+    jdouble player_z = 0.0;
+    jfloat yaw = 0.0;
+    jfloat pitch = 0.0;
+    jbool on_ground = 0;
+
+    jbyte xp_current = 0;
+    jbyte xp_level = 0;
+    jshort xp_total = 0;
+
+    jlong time = 0;
+
+    jshort health = 0;
+    jshort food = 0;
+    jfloat food_saturation = 0.0;
+
+    jint spawn_x = 0;
+    jint spawn_y = 0;
+    jint spawn_z = 0;
+
+    Uint64 keep_alive_time_from_client = 0;
+    Uint64 keep_alive_time_from_server = 0;
+
+    std::vector<chat_t> chat_history;
+    char chat_buf[101] = "";
+    bool send_chat = false;
+
+#define CAST_PACK_TO_P(type) type* p = (type*)pack
+    void feed_packet_from_server(packet_t* pack)
+    {
+        switch (pack->id)
+        {
+        case PACKET_ID_KEEP_ALIVE:
+        {
+            keep_alive_time_from_server = pack->assemble_tick;
+            break;
+        }
+        case PACKET_ID_HANDSHAKE:
+        {
+            CAST_PACK_TO_P(packet_handshake_s2c_t);
+            connection_hash = p->connection_hash;
+            handshake_occured = true;
+            break;
+        }
+        case PACKET_ID_LOGIN_REQUEST:
+        {
+            CAST_PACK_TO_P(packet_login_request_s2c_t);
+            player_eid = p->player_eid;
+            seed = p->seed;
+            gamemode = p->mode;
+            dimension = p->dimension;
+            difficulty = p->difficulty;
+            world_height = p->world_height;
+            max_players = p->max_players;
+            break;
+        }
+        case PACKET_ID_CHAT_MSG:
+        {
+            CAST_PACK_TO_P(packet_chat_message_t);
+            chat_history.push_back({ &p->msg, 0 });
+            break;
+        }
+        case PACKET_ID_PLAYER_POS_LOOK:
+        {
+            CAST_PACK_TO_P(packet_player_pos_look_s2c_t);
+            player_x = p->x;
+            player_y = p->y;
+            player_stance = p->stance;
+            player_z = p->z;
+            yaw = p->yaw;
+            pitch = p->pitch;
+            on_ground = p->on_ground;
+            break;
+        }
+        default:
+            feed_packet_common(pack);
+            break;
+        }
+        tick();
+    }
+
+    void feed_packet_from_client(packet_t* pack)
+    {
+        switch (pack->id)
+        {
+        case PACKET_ID_KEEP_ALIVE:
+        {
+            keep_alive_time_from_client = pack->assemble_tick;
+            break;
+        }
+        case PACKET_ID_HANDSHAKE:
+        {
+            CAST_PACK_TO_P(packet_handshake_c2s_t);
+            username = p->username;
+            break;
+        }
+        case PACKET_ID_LOGIN_REQUEST:
+        {
+            CAST_PACK_TO_P(packet_login_request_c2s_t);
+            username = p->username;
+            protocol_ver = p->protocol_ver;
+            break;
+        }
+        case PACKET_ID_CHAT_MSG:
+        {
+            CAST_PACK_TO_P(packet_chat_message_t);
+            chat_history.push_back({ &p->msg, 1 });
+            break;
+        }
+        case PACKET_ID_PLAYER_POS_LOOK:
+        {
+            CAST_PACK_TO_P(packet_player_pos_look_c2s_t);
+            player_x = p->x;
+            player_y = p->y;
+            player_stance = p->stance;
+            player_z = p->z;
+            yaw = p->yaw;
+            pitch = p->pitch;
+            on_ground = p->on_ground;
+            break;
+        }
+        default:
+            feed_packet_common(pack);
+            break;
+        }
+        tick();
+    }
+
+    void draw_imgui_basic()
+    {
+        if (!ImGui::BeginTable("client_info_table", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+            return;
+        ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("AVG Est. Memory footprint rate: ").x);
+        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+        ImGui::TableHeadersRow();
+
+        TABLE_FIELD_BOOL(handshake_occured);
+
+        if (!handshake_occured)
+        {
+            ImGui::EndTable();
+            return;
+        }
+
+        TABLE_FIELD_STRING(connection_hash);
+
+        TABLE_FIELD_STRING(username);
+
+        TABLE_FIELD_INT(protocol_ver);
+
+        TABLE_FIELD_LONG(seed);
+        TABLE_FIELD_INT(gamemode);
+        TABLE_FIELD_INT(dimension);
+        TABLE_FIELD_INT(difficulty);
+        TABLE_FIELD_UINT(world_height);
+        TABLE_FIELD_UINT(max_players);
+
+        TABLE_FIELD_INT(player_eid);
+        TABLE_FIELD_FLOAT(player_x);
+        TABLE_FIELD("player_y: ", "%.3f (%.3f)", player_y, player_stance - player_y);
+        TABLE_FIELD_FLOAT(player_z);
+        TABLE_FIELD_FLOAT(yaw);
+        TABLE_FIELD_FLOAT(pitch);
+        TABLE_FIELD_BOOL(on_ground);
+
+        TABLE_FIELD("XP: ", "Level: %d, Progress: %d/%d", xp_level, xp_current, xp_level * 10 + 10);
+
+        const char* time_states[4] = { "Sunrise", "Noon", "Sunset", "Midnight" };
+        long tod = time % 24000;
+        TABLE_FIELD("Time: ", "%ld (%ld) (%s) (Day: %ld)", time, tod, time_states[tod / 6000], time / 24000);
+
+        TABLE_FIELD("Keep alive server: ", "%s", timestamp_from_tick(keep_alive_time_from_server).c_str());
+        TABLE_FIELD("Keep alive client: ", "%s", timestamp_from_tick(keep_alive_time_from_client).c_str());
+
+        TABLE_FIELD_INT(health);
+        TABLE_FIELD_INT(food);
+        TABLE_FIELD_FLOAT(food_saturation);
+
+        ImGui::EndTable();
+    }
+
+    bool chat_auto_scroll = true;
+    size_t last_chat_history_size = 0;
+
+    void draw_imgui_chat()
+    {
+        ImGui::Checkbox("Auto Scroll", &chat_auto_scroll);
+
+        if (ImGui::BeginListBox("Chat History", ImVec2(0, ImGui::GetMainViewport()->WorkSize.y / 3)))
+        {
+            if (!ImGui::BeginTable("Chat Table", 2, ImGuiTableFlags_BordersInnerV))
+                goto list_box_end;
+            ImGui::TableSetupColumn("Sender", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("Client: ").x);
+            ImGui::TableSetupColumn("Message", ImGuiTableColumnFlags_WidthStretch);
+
+            for (size_t i = 0; i < chat_history.size(); i++)
+            {
+                chat_t c = chat_history[i];
+                TABLE_FIELD(c.sent_by_client ? "Client: " : "Server: ", "%s", c.msg->c_str());
+            }
+
+            if (chat_auto_scroll && last_chat_history_size != chat_history.size())
+                ImGui::SetScrollHereY(0.0f);
+
+            last_chat_history_size = chat_history.size();
+
+            ImGui::EndTable();
+        list_box_end:
+            ImGui::EndListBox();
+        }
+
+        ImGuiInputTextFlags flags = ImGuiInputTextFlags_EnterReturnsTrue;
+        flags |= send_chat ? ImGuiInputTextFlags_ReadOnly : 0;
+        if (ImGui::InputText("##chat input", chat_buf, ARR_SIZE(chat_buf), flags))
+            send_chat = true;
+
+        ImGui::SameLine();
+        ImGui::Text("%zu/%zu", strlen(chat_buf), ARR_SIZE(chat_buf) - 1);
+    }
+
+private:
+    void tick()
+    {
+        Uint64 sdl_tick_cur = SDL_GetTicks();
+        if (last_mc_tick == 0)
+        {
+            last_mc_tick = sdl_tick_cur;
+            return;
+        }
+        if (sdl_tick_cur - last_mc_tick < 50)
+            return;
+
+        Uint64 ticks = (sdl_tick_cur - last_mc_tick) / 50;
+
+        if (ticks < 50)
+        {
+            for (Uint64 i = 0; i < ticks; i++)
+            {
+                tick_real();
+                last_mc_tick += 50;
+            }
+        }
+        else
+        {
+            LOG("Skipping %lu ticks", ticks);
+            tick_real();
+            last_mc_tick = sdl_tick_cur;
+        }
+    }
+
+    void tick_real() { time++; }
+
+    void feed_packet_common(packet_t* pack)
+    {
+        switch (pack->id)
+        {
+        case PACKET_ID_HANDSHAKE:
+        case PACKET_ID_LOGIN_REQUEST:
+        case PACKET_ID_PLAYER_POS_LOOK:
+            LOG_WARN("Unhandled packet 0x%02x(%s)", pack->id, pack->get_name());
+            break;
+        case PACKET_ID_UPDATE_TIME:
+        {
+            CAST_PACK_TO_P(packet_time_update_t);
+            time = p->time;
+            break;
+        }
+        case PACKET_ID_UPDATE_HEALTH:
+        {
+            CAST_PACK_TO_P(packet_health_t);
+            health = p->health;
+            food = p->food;
+            food_saturation = p->food_saturation;
+            break;
+        }
+        case PACKET_ID_RESPAWN:
+        {
+            CAST_PACK_TO_P(packet_respawn_t);
+            seed = p->seed;
+            gamemode = p->mode;
+            dimension = p->dimension;
+            difficulty = p->difficulty;
+            world_height = p->world_height;
+            break;
+        }
+        case PACKET_ID_PLAYER_ON_GROUND:
+        {
+            CAST_PACK_TO_P(packet_on_ground_t);
+            on_ground = p->on_ground;
+            break;
+        }
+        case PACKET_ID_PLAYER_POS:
+        {
+            CAST_PACK_TO_P(packet_player_pos_t);
+            player_x = p->x;
+            player_y = p->y;
+            player_stance = p->stance;
+            player_z = p->z;
+            on_ground = p->on_ground;
+            break;
+        }
+        case PACKET_ID_PLAYER_LOOK:
+        {
+            CAST_PACK_TO_P(packet_player_look_t);
+            yaw = p->yaw;
+            pitch = p->pitch;
+            on_ground = p->on_ground;
+            break;
+        }
+        case PACKET_ID_XP_SET:
+        {
+            CAST_PACK_TO_P(packet_xp_set_t);
+
+            xp_current = p->current_xp;
+            xp_level = p->level;
+            xp_total = p->total;
+            break;
+        }
+        }
+    }
+};
+
 struct client_t
 {
     /**
@@ -158,6 +527,8 @@ struct client_t
     packet_viewer_dat_t packet_viewer_dat_client;
     packet_viewer_dat_t packet_viewer_dat;
 
+    world_diag_t world_diag;
+
     std::string kick_reason;
 
     void destroy()
@@ -192,9 +563,6 @@ struct client_t
         kick_sock(sock_client, reason);
     }
 
-    /* TODO: Add option to filter out packets (eg. Keep Alive) */
-    /* TODO: Add option to force scrolling */
-    /* TODO: Put packets in child window */
     void draw_packets(const char* label, std::vector<packet_t*>& packs, packet_viewer_dat_t& dat)
     {
         if (!ImGui::TreeNode(label))
@@ -327,16 +695,6 @@ struct client_t
         ImGui::TreePop();
     }
 
-#define TABLE_FIELD(field_text, fmt, ...)   \
-    do                                      \
-    {                                       \
-        ImGui::TableNextRow();              \
-        ImGui::TableNextColumn();           \
-        ImGui::TextUnformatted(field_text); \
-        ImGui::TableNextColumn();           \
-        ImGui::Text(fmt, ##__VA_ARGS__);    \
-    } while (0)
-
     void draw_memory_field(const char* name, size_t size, bool rate)
     {
         if (size < 1000u)
@@ -351,58 +709,158 @@ struct client_t
             TABLE_FIELD(name, "%.2f TB%s", (float)(size / (1000u * 1000u * 1000u)) / 1000.0f, rate ? "/s" : "");
     }
 
-    bool draw_imgui()
+    void calc_packet_data(std::vector<packet_t*>& packs, size_t& num, Uint64& tick_diff, size_t& mem_foot, Uint64 max_diff)
     {
-        if (!ImGui::BeginTable("client_info_table", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
-            return false;
-        ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed, ImGui::CalcTextSize("AVG Est. Memory footprint rate: ").x);
-        ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
-
-        TABLE_FIELD("Connection init timestamp: ", "%s", timestamp_from_tick(time_init).c_str());
-        TABLE_FIELD("Last read timestamp: ", "%s", timestamp_from_tick(time_last_read).c_str());
-        TABLE_FIELD("Duration of connection: ", "%.2fs", ((float)((time_last_read - time_init) / 10)) / 100.0f);
-
-        TABLE_FIELD("Num packets from client: ", "%zu", packets_server.size());
-        TABLE_FIELD("Num packets from server: ", "%zu", packets_client.size());
-        TABLE_FIELD("Num packets: ", "%zu", packets_client.size() + packets_server.size());
-
-        size_t mem_foot = packets_mem_footprint + (packets.capacity() + packets_server.capacity() + packets_client.capacity()) * sizeof(packets[0]);
-
-        draw_memory_field("Est. Packet memory footprint: ", mem_foot, false);
-        draw_memory_field("Client data transfer: ", pack_handler_server.get_bytes_received(), false);
-        draw_memory_field("Server data transfer: ", pack_handler_client.get_bytes_received(), false);
-
-        size_t tdiff = time_last_read - time_init;
-        if (tdiff != 0)
+        int misses = 0;
+        num = 0;
+        tick_diff = 0;
+        mem_foot = 0;
+        for (size_t i = packs.size() - 1; i < packs.size(); i--)
         {
-            TABLE_FIELD("AVG Client packets/s: ", "%zu", packets_server.size() * 1000 / tdiff);
-            TABLE_FIELD("AVG Server packets/s: ", "%zu", packets_client.size() * 1000 / tdiff);
-            TABLE_FIELD("AVG Packets/s: ", "%zu", (packets_client.size() + packets_server.size()) * 1000 / tdiff);
+            if (time_last_read - packs[i]->assemble_tick < max_diff)
+            {
+                tick_diff = time_last_read - packs[i]->assemble_tick;
+                num++;
+                mem_foot += packs[i]->mem_size() + sizeof(packet_t*);
+            }
+            else
+            {
+                misses++;
+                if (misses > 1000)
+                    return;
+            }
+        }
+    }
 
-            draw_memory_field("AVG Est. Memory footprint rate: ", mem_foot * 1000 / tdiff, true);
-            draw_memory_field("AVG Client data rate: ", pack_handler_server.get_bytes_received() * 1000 / tdiff, true);
-            draw_memory_field("AVG Server data rate: ", pack_handler_client.get_bytes_received() * 1000 / tdiff, true);
+    void draw_imgui()
+    {
+        float field_size = ImGui::CalcTextSize("Num packets from client (read - 10sec): ").x;
+        ImGui::SeparatorText("Connection Info Table");
+        if (ImGui::BeginTable("client_info_table", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+        {
+            ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed, field_size);
+            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableHeadersRow();
+
+            TABLE_FIELD("Connection init timestamp: ", "%s", timestamp_from_tick(time_init).c_str());
+            TABLE_FIELD("Last read timestamp: ", "%s", timestamp_from_tick(time_last_read).c_str());
+            TABLE_FIELD("Duration of connection: ", "%.2fs", ((float)((time_last_read - time_init) / 10)) / 100.0f);
+
+            TABLE_FIELD("Num packets from client: ", "%zu", packets_server.size());
+            TABLE_FIELD("Num packets from server: ", "%zu", packets_client.size());
+            TABLE_FIELD("Num packets: ", "%zu", packets.size());
+
+            size_t mem_foot = packets_mem_footprint + (packets.capacity() + packets_server.capacity() + packets_client.capacity()) * sizeof(packets[0]);
+
+            draw_memory_field("Est. Packet memory footprint: ", mem_foot, false);
+            draw_memory_field("Client data transfer: ", pack_handler_server.get_bytes_received(), false);
+            draw_memory_field("Server data transfer: ", pack_handler_client.get_bytes_received(), false);
+
+            size_t tdiff = time_last_read - time_init;
+            if (tdiff != 0)
+            {
+                TABLE_FIELD("AVG Client packets/s: ", "%zu", packets_server.size() * 1000 / tdiff);
+                TABLE_FIELD("AVG Server packets/s: ", "%zu", packets_client.size() * 1000 / tdiff);
+                TABLE_FIELD("AVG Packets/s: ", "%zu", (packets.size()) * 1000 / tdiff);
+
+                draw_memory_field("AVG Est. Memory footprint rate: ", mem_foot * 1000 / tdiff, true);
+                draw_memory_field("AVG Client data rate: ", pack_handler_server.get_bytes_received() * 1000 / tdiff, true);
+                draw_memory_field("AVG Server data rate: ", pack_handler_client.get_bytes_received() * 1000 / tdiff, true);
+            }
+
+            if (kick_reason.length())
+            {
+                TABLE_FIELD("Kick Reason: ", "%s", kick_reason.c_str());
+            }
+
+            ImGui::EndTable();
         }
 
-        if (kick_reason.length())
+        ImGui::SeparatorText("Connection Info Table (last 10 seconds)");
+        if (ImGui::BeginTable("client_info_table_10s", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
         {
-            TABLE_FIELD("Kick Reason: ", "%s", kick_reason.c_str());
-        }
+            ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed, field_size);
+            ImGui::TableSetupColumn("Value", ImGuiTableColumnFlags_WidthStretch);
+            ImGui::TableHeadersRow();
 
-        ImGui::EndTable();
+            size_t packets_recent[3] = { 0, 0, 0 };
+            Uint64 packets_recent_ticks[3] = { time_last_read, time_last_read, time_last_read };
+            size_t packets_recent_foot[3] = { 0, 0, 0 };
+
+            calc_packet_data(packets_server, packets_recent[0], packets_recent_ticks[0], packets_recent_foot[0], 10000);
+            calc_packet_data(packets_client, packets_recent[1], packets_recent_ticks[1], packets_recent_foot[1], 10000);
+            calc_packet_data(packets, packets_recent[2], packets_recent_ticks[2], packets_recent_foot[2], 10000);
+
+            TABLE_FIELD("Num packets from client: ", "%zu", packets_recent[0]);
+            TABLE_FIELD("Num packets from server: ", "%zu", packets_recent[1]);
+            TABLE_FIELD("Num packets: ", "%zu", packets_recent[2]);
+
+            draw_memory_field("Est. Packet mem footprint (client): ", packets_recent_foot[0], false);
+            draw_memory_field("Est. Packet mem footprint (server): ", packets_recent_foot[1], false);
+            draw_memory_field("Est. Packet mem footprint (total): ", packets_recent_foot[2], false);
+
+            if (packets_recent_ticks[0] != 0)
+                draw_memory_field("AVG Est. Memory footprint rate (client): ", packets_recent_foot[0] * 1000 / packets_recent_ticks[0], true);
+
+            if (packets_recent_ticks[1] != 0)
+                draw_memory_field("AVG Est. Memory footprint rate (server): ", packets_recent_foot[1] * 1000 / packets_recent_ticks[1], true);
+
+            if (packets_recent_ticks[2] != 0)
+                draw_memory_field("AVG Est. Memory footprint rate (total): ", packets_recent_foot[2] * 1000 / packets_recent_ticks[2], true);
+
+            if (packets_recent_ticks[0] != 0)
+                TABLE_FIELD("AVG Client packets/s: ", "%zu", packets_recent[0] * 1000 / packets_recent_ticks[0]);
+
+            if (packets_recent_ticks[1] != 0)
+                TABLE_FIELD("AVG Server packets/s: ", "%zu", packets_recent[1] * 1000 / packets_recent_ticks[1]);
+
+            if (packets_recent_ticks[2] != 0)
+                TABLE_FIELD("AVG Packets/s: ", "%zu", packets_recent[2] * 1000 / packets_recent_ticks[2]);
+
+            ImGui::EndTable();
+        }
 
         /* TODO: Put world information here (eg. entities, loaded chunks, time, health, player list, inventory, ...)*/
-        if (ImGui::TreeNode("World"))
+        if (ImGui::TreeNode("Basic world info"))
         {
-            ImGui::Text("Information coming soon");
+            world_diag.draw_imgui_basic();
+            ImGui::TreePop();
+        }
+
+        if (ImGui::TreeNode("Chat"))
+        {
+            world_diag.draw_imgui_chat();
+            ImGui::TreePop();
+        }
+
+        if (ImGui::TreeNode("Chunks"))
+        {
+            /* TODO: A history of chunk loading and unloading + a list or visual of loaded chunks */
+            ImGui::TreePop();
+        }
+
+        if (ImGui::TreeNode("Inventories"))
+        {
+            /* TODO: Listing of every window and the values sent for it */
+            ImGui::TreePop();
+        }
+
+        if (ImGui::TreeNode("Player list"))
+        {
+            /* TODO: List of every player, including a history */
+            ImGui::TreePop();
+        }
+
+        if (ImGui::TreeNode("Entities"))
+        {
+            /* TODO: Basic list of entities, their types (if declared), their positions, and maybe a history */
+            /* TODO-OPT: More advanced list of entities */
             ImGui::TreePop();
         }
 
         draw_packets("Packets from Client", packets_server, packet_viewer_dat_server);
         draw_packets("Packets from Server", packets_client, packet_viewer_dat_client);
         draw_packets("Packets", packets, packet_viewer_dat);
-
-        return true;
     }
 };
 
@@ -418,6 +876,9 @@ SDLNet_Address* resolve_addr(const char* addr)
 
     return t;
 }
+
+static convar_string_t address_listen("address_listen", "127.0.0.3", "Address to listen for connections");
+static convar_string_t address_server("address_server", "127.0.0.1", "Address of the server to bridge to");
 
 int main(int argc, const char** argv)
 {
@@ -447,8 +908,8 @@ int main(int argc, const char** argv)
     bool done = false;
 
     LOG("Resolving hosts");
-    SDLNet_Address* addr = resolve_addr("127.0.0.3");
-    SDLNet_Address* addr_real_server = resolve_addr(argc > 1 ? argv[1] : "127.0.0.1");
+    SDLNet_Address* addr = resolve_addr(address_listen.get().c_str());
+    SDLNet_Address* addr_real_server = resolve_addr(address_server.get().c_str());
 
     if (SDLNet_WaitUntilResolved(addr, 5000) != 1)
     {
@@ -461,6 +922,10 @@ int main(int argc, const char** argv)
         LOG("SDLNet_WaitUntilResolved: %s", SDL_GetError());
         exit(1);
     }
+
+    char imgui_win_title[128];
+
+    snprintf(imgui_win_title, 128, "Client Inspector Window (\"%s\" -> \"%s\")", address_listen.get().c_str(), address_server.get().c_str());
 
     LOG("Bridging: %s -> %s", SDLNet_GetAddressString(addr), SDLNet_GetAddressString(addr_real_server));
 
@@ -507,7 +972,14 @@ int main(int argc, const char** argv)
             new_client.time_last_read = SDL_GetTicks();
             new_client.time_init = new_client.time_last_read;
 
-            clients.push_back(new_client);
+            if (new_client.sock_client)
+                clients.push_back(new_client);
+            else
+            {
+                LOG("Failed to connect to server!");
+                if (new_client.sock_server)
+                    SDLNet_DestroyStreamSocket(new_client.sock_server);
+            }
         }
 
         for (size_t i = 0; i < clients.size() * 3; i++)
@@ -530,6 +1002,15 @@ int main(int argc, const char** argv)
 
                 c->change_happened = false;
 
+                if (c->world_diag.send_chat)
+                {
+                    packet_chat_message_t cmsg;
+                    cmsg.msg = c->world_diag.chat_buf;
+                    send_buffer(c->sock_client, cmsg.assemble());
+                    c->world_diag.chat_buf[0] = 0;
+                    c->world_diag.send_chat = false;
+                }
+
                 packet_t* pack_server = c->pack_handler_server.get_next_packet(c->sock_server);
                 packet_t* pack_client = c->pack_handler_client.get_next_packet(c->sock_client);
 
@@ -550,6 +1031,7 @@ int main(int argc, const char** argv)
                     else
                         send_buffer(c->sock_client, pack_server->assemble());
 
+                    c->world_diag.feed_packet_from_client(pack_server);
                     c->packets_mem_footprint += pack_server->mem_size();
                     c->packets_server.push_back(pack_server);
                     c->packets.push_back(pack_server);
@@ -569,11 +1051,12 @@ int main(int argc, const char** argv)
                     TRACE("Got packet from server: 0x%02x", pack_client->id);
                     send_buffer(c->sock_server, pack_client->assemble());
 
+                    c->world_diag.feed_packet_from_server(pack_client);
                     c->packets_mem_footprint += pack_client->mem_size();
                     c->packets_client.push_back(pack_client);
                     c->packets.push_back(pack_client);
                 }
-                else if (c->pack_handler_client.get_error().length())
+                else if (c->pack_handler_client.get_error().length() && !c->skip)
                 {
                     c->skip = true;
                     char buf[100];
@@ -586,7 +1069,7 @@ int main(int argc, const char** argv)
         ImGui::SetNextWindowPos(ImGui::GetMainViewport()->WorkPos);
         ImGui::SetNextWindowSize(ImGui::GetMainViewport()->WorkSize);
         Uint32 window_flags = ImGuiWindowFlags_NoBringToFrontOnFocus | ImGuiWindowFlags_NoCollapse | ImGuiWindowFlags_NoResize;
-        if (ImGui::Begin("Client Inspector Window", NULL, window_flags))
+        if (ImGui::Begin(imgui_win_title, NULL, window_flags))
         {
             for (size_t i = 0; i < clients.size(); i++)
             {
