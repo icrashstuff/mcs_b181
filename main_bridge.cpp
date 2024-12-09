@@ -492,16 +492,16 @@ struct client_t
     /**
      * Socket obtained from the server component of the bridge
      */
-    SDLNet_StreamSocket* sock_server = NULL;
+    SDLNet_StreamSocket* sock_to_client = NULL;
 
     /**
      * Socket created to connect to the real server
      */
-    SDLNet_StreamSocket* sock_client = NULL;
+    SDLNet_StreamSocket* sock_to_server = NULL;
 
-    packet_handler_t pack_handler_server = packet_handler_t(true);
+    packet_handler_t pack_handler_client = packet_handler_t(true);
 
-    packet_handler_t pack_handler_client = packet_handler_t(false);
+    packet_handler_t pack_handler_server = packet_handler_t(false);
 
     Uint64 time_init = 0;
 
@@ -511,13 +511,10 @@ struct client_t
 
     int change_happened = 0;
 
-    /* TODO-OPT: Store timestamps? */
-    std::vector<packet_t*> packets_server;
+    std::vector<packet_t*> packs_from_client;
 
-    /* TODO-OPT: Store timestamps? */
-    std::vector<packet_t*> packets_client;
+    std::vector<packet_t*> packs_from_server;
 
-    /* TODO-OPT: Store timestamps? */
     /* TODO: Store where the packet came from, or at least which handler was used */
     std::vector<packet_t*> packets;
 
@@ -533,34 +530,34 @@ struct client_t
 
     void destroy()
     {
-        for (size_t j = 0; j < packets_client.size(); j++)
-            if (packets_client[j])
-                delete packets_client[j];
-        packets_client.resize(0);
+        for (size_t j = 0; j < packs_from_server.size(); j++)
+            if (packs_from_server[j])
+                delete packs_from_server[j];
+        packs_from_server.resize(0);
 
-        for (size_t j = 0; j < packets_server.size(); j++)
-            if (packets_server[j])
-                delete packets_server[j];
-        packets_server.resize(0);
+        for (size_t j = 0; j < packs_from_client.size(); j++)
+            if (packs_from_client[j])
+                delete packs_from_client[j];
+        packs_from_client.resize(0);
 
-        if (sock_server)
+        if (sock_to_client)
         {
-            SDLNet_DestroyStreamSocket(sock_server);
-            sock_server = NULL;
+            SDLNet_DestroyStreamSocket(sock_to_client);
+            sock_to_client = NULL;
         }
 
-        if (sock_client)
+        if (sock_to_server)
         {
-            SDLNet_DestroyStreamSocket(sock_client);
-            sock_client = NULL;
+            SDLNet_DestroyStreamSocket(sock_to_server);
+            sock_to_server = NULL;
         }
     }
 
     void kick(std::string reason)
     {
         kick_reason = reason;
-        kick_sock(sock_server, reason);
-        kick_sock(sock_client, reason);
+        kick_sock(sock_to_client, reason);
+        kick_sock(sock_to_server, reason);
     }
 
     void draw_packets(const char* label, std::vector<packet_t*>& packs, packet_viewer_dat_t& dat)
@@ -746,26 +743,26 @@ struct client_t
             TABLE_FIELD("Last read timestamp: ", "%s", timestamp_from_tick(time_last_read).c_str());
             TABLE_FIELD("Duration of connection: ", "%.2fs", ((float)((time_last_read - time_init) / 10)) / 100.0f);
 
-            TABLE_FIELD("Num packets from client: ", "%zu", packets_server.size());
-            TABLE_FIELD("Num packets from server: ", "%zu", packets_client.size());
+            TABLE_FIELD("Num packets from client: ", "%zu", packs_from_client.size());
+            TABLE_FIELD("Num packets from server: ", "%zu", packs_from_server.size());
             TABLE_FIELD("Num packets: ", "%zu", packets.size());
 
-            size_t mem_foot = packets_mem_footprint + (packets.capacity() + packets_server.capacity() + packets_client.capacity()) * sizeof(packets[0]);
+            size_t mem_foot = packets_mem_footprint + (packets.capacity() + packs_from_client.capacity() + packs_from_server.capacity()) * sizeof(packets[0]);
 
             draw_memory_field("Est. Packet memory footprint: ", mem_foot, false);
-            draw_memory_field("Client data transfer: ", pack_handler_server.get_bytes_received(), false);
-            draw_memory_field("Server data transfer: ", pack_handler_client.get_bytes_received(), false);
+            draw_memory_field("Client data transfer: ", pack_handler_client.get_bytes_received(), false);
+            draw_memory_field("Server data transfer: ", pack_handler_server.get_bytes_received(), false);
 
             size_t tdiff = time_last_read - time_init;
             if (tdiff != 0)
             {
-                TABLE_FIELD("AVG Client packets/s: ", "%zu", packets_server.size() * 1000 / tdiff);
-                TABLE_FIELD("AVG Server packets/s: ", "%zu", packets_client.size() * 1000 / tdiff);
+                TABLE_FIELD("AVG Client packets/s: ", "%zu", packs_from_client.size() * 1000 / tdiff);
+                TABLE_FIELD("AVG Server packets/s: ", "%zu", packs_from_server.size() * 1000 / tdiff);
                 TABLE_FIELD("AVG Packets/s: ", "%zu", (packets.size()) * 1000 / tdiff);
 
                 draw_memory_field("AVG Est. Memory footprint rate: ", mem_foot * 1000 / tdiff, true);
-                draw_memory_field("AVG Client data rate: ", pack_handler_server.get_bytes_received() * 1000 / tdiff, true);
-                draw_memory_field("AVG Server data rate: ", pack_handler_client.get_bytes_received() * 1000 / tdiff, true);
+                draw_memory_field("AVG Client data rate: ", pack_handler_client.get_bytes_received() * 1000 / tdiff, true);
+                draw_memory_field("AVG Server data rate: ", pack_handler_server.get_bytes_received() * 1000 / tdiff, true);
             }
 
             if (kick_reason.length())
@@ -787,8 +784,8 @@ struct client_t
             Uint64 packets_recent_ticks[3] = { time_last_read, time_last_read, time_last_read };
             size_t packets_recent_foot[3] = { 0, 0, 0 };
 
-            calc_packet_data(packets_server, packets_recent[0], packets_recent_ticks[0], packets_recent_foot[0], 10000);
-            calc_packet_data(packets_client, packets_recent[1], packets_recent_ticks[1], packets_recent_foot[1], 10000);
+            calc_packet_data(packs_from_client, packets_recent[0], packets_recent_ticks[0], packets_recent_foot[0], 10000);
+            calc_packet_data(packs_from_server, packets_recent[1], packets_recent_ticks[1], packets_recent_foot[1], 10000);
             calc_packet_data(packets, packets_recent[2], packets_recent_ticks[2], packets_recent_foot[2], 10000);
 
             TABLE_FIELD("Num packets from client: ", "%zu", packets_recent[0]);
@@ -858,8 +855,8 @@ struct client_t
             ImGui::TreePop();
         }
 
-        draw_packets("Packets from Client", packets_server, packet_viewer_dat_server);
-        draw_packets("Packets from Server", packets_client, packet_viewer_dat_client);
+        draw_packets("Packets from Client", packs_from_client, packet_viewer_dat_server);
+        draw_packets("Packets from Server", packs_from_server, packet_viewer_dat_client);
         draw_packets("Packets", packets, packet_viewer_dat);
     }
 };
@@ -950,35 +947,35 @@ int main(int argc, const char** argv)
         while (!done_client_searching)
         {
             client_t new_client;
-            if (!SDLNet_AcceptClient(server, &new_client.sock_server))
+            if (!SDLNet_AcceptClient(server, &new_client.sock_to_client))
             {
                 LOG("SDLNet_AcceptClient: %s", SDL_GetError());
                 exit(1);
             }
-            if (new_client.sock_server == NULL)
+            if (new_client.sock_to_client == NULL)
             {
                 done_client_searching = true;
                 continue;
             }
 
-            SDLNet_SimulateStreamPacketLoss(new_client.sock_server, 0);
+            SDLNet_SimulateStreamPacketLoss(new_client.sock_to_client, 0);
 
-            SDLNet_Address* client_addr = SDLNet_GetStreamSocketAddress(new_client.sock_server);
-            LOG("New Socket: %s:%u", SDLNet_GetAddressString(client_addr), SDLNet_GetStreamSocketPort(new_client.sock_server));
+            SDLNet_Address* client_addr = SDLNet_GetStreamSocketAddress(new_client.sock_to_client);
+            LOG("New Socket: %s:%u", SDLNet_GetAddressString(client_addr), SDLNet_GetStreamSocketPort(new_client.sock_to_client));
             SDLNet_UnrefAddress(client_addr);
 
-            new_client.sock_client = SDLNet_CreateClient(addr_real_server, 25565);
+            new_client.sock_to_server = SDLNet_CreateClient(addr_real_server, 25565);
 
             new_client.time_last_read = SDL_GetTicks();
             new_client.time_init = new_client.time_last_read;
 
-            if (new_client.sock_client)
+            if (new_client.sock_to_server)
                 clients.push_back(new_client);
             else
             {
                 LOG("Failed to connect to server!");
-                if (new_client.sock_server)
-                    SDLNet_DestroyStreamSocket(new_client.sock_server);
+                if (new_client.sock_to_client)
+                    SDLNet_DestroyStreamSocket(new_client.sock_to_client);
             }
         }
 
@@ -1006,61 +1003,61 @@ int main(int argc, const char** argv)
                 {
                     packet_chat_message_t cmsg;
                     cmsg.msg = c->world_diag.chat_buf;
-                    send_buffer(c->sock_client, cmsg.assemble());
+                    send_buffer(c->sock_to_server, cmsg.assemble());
                     c->world_diag.chat_buf[0] = 0;
                     c->world_diag.send_chat = false;
                 }
 
-                packet_t* pack_server = c->pack_handler_server.get_next_packet(c->sock_server);
-                packet_t* pack_client = c->pack_handler_client.get_next_packet(c->sock_client);
+                packet_t* pack_from_client = c->pack_handler_client.get_next_packet(c->sock_to_client);
+                packet_t* pack_from_server = c->pack_handler_server.get_next_packet(c->sock_to_server);
 
-                if (pack_server)
+                if (pack_from_client)
                 {
                     c->change_happened++;
                     c->time_last_read = sdl_tick_cur;
                     TRACE("Got packet from client[%zu]: 0x%02x", i, pack_server->id);
-                    if (pack_server->id == PACKET_ID_CHAT_MSG)
+                    if (pack_from_client->id == PACKET_ID_CHAT_MSG)
                     {
-                        packet_chat_message_t* p = (packet_chat_message_t*)pack_server;
+                        packet_chat_message_t* p = (packet_chat_message_t*)pack_from_client;
 
                         if (p->msg == "/stop_bridge")
                             done = true;
                         else
-                            send_buffer(c->sock_client, pack_server->assemble());
+                            send_buffer(c->sock_to_server, pack_from_client->assemble());
                     }
                     else
-                        send_buffer(c->sock_client, pack_server->assemble());
+                        send_buffer(c->sock_to_server, pack_from_client->assemble());
 
-                    c->world_diag.feed_packet_from_client(pack_server);
-                    c->packets_mem_footprint += pack_server->mem_size();
-                    c->packets_server.push_back(pack_server);
-                    c->packets.push_back(pack_server);
+                    c->world_diag.feed_packet_from_client(pack_from_client);
+                    c->packets_mem_footprint += pack_from_client->mem_size();
+                    c->packs_from_client.push_back(pack_from_client);
+                    c->packets.push_back(pack_from_client);
                 }
-                else if (c->pack_handler_server.get_error().length())
+                else if (c->pack_handler_client.get_error().length())
                 {
                     c->skip = true;
                     char buf[100];
-                    snprintf(buf, ARR_SIZE(buf), "Error parsing packet from client[%zu]: %s", i, c->pack_handler_server.get_error().c_str());
+                    snprintf(buf, ARR_SIZE(buf), "Error parsing packet from client[%zu]: %s", i, c->pack_handler_client.get_error().c_str());
                     c->kick(buf);
                 }
 
-                if (pack_client)
+                if (pack_from_server)
                 {
                     c->change_happened++;
                     c->time_last_read = sdl_tick_cur;
                     TRACE("Got packet from server: 0x%02x", pack_client->id);
-                    send_buffer(c->sock_server, pack_client->assemble());
+                    send_buffer(c->sock_to_client, pack_from_server->assemble());
 
-                    c->world_diag.feed_packet_from_server(pack_client);
-                    c->packets_mem_footprint += pack_client->mem_size();
-                    c->packets_client.push_back(pack_client);
-                    c->packets.push_back(pack_client);
+                    c->world_diag.feed_packet_from_server(pack_from_server);
+                    c->packets_mem_footprint += pack_from_server->mem_size();
+                    c->packs_from_server.push_back(pack_from_server);
+                    c->packets.push_back(pack_from_server);
                 }
-                else if (c->pack_handler_client.get_error().length() && !c->skip)
+                else if (c->pack_handler_server.get_error().length() && !c->skip)
                 {
                     c->skip = true;
                     char buf[100];
-                    snprintf(buf, ARR_SIZE(buf), "Error parsing packet from server: %s", c->pack_handler_client.get_error().c_str());
+                    snprintf(buf, ARR_SIZE(buf), "Error parsing packet from server: %s", c->pack_handler_server.get_error().c_str());
                     c->kick(buf);
                 }
             }
