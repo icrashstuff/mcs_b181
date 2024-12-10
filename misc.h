@@ -25,6 +25,7 @@
 
 #include <SDL3/SDL_stdinc.h>
 #include <assert.h>
+#include <string>
 
 typedef Uint8 jubyte;
 typedef Uint8 jbool;
@@ -116,6 +117,12 @@ struct range_t
     Uint8 min;
     Uint8 max;
 };
+
+/**
+ * Format size with one of the following units: [bytes, KB, MB, GB, TB]
+ * @param rate Append "/s" to the end of unit
+ */
+std::string format_memory(size_t size, bool rate = false);
 
 SDL_FORCE_INLINE Sint16 cast_to_sint16(Uint64 in) { return *(Sint16*)&in; }
 SDL_FORCE_INLINE Sint32 cast_to_sint32(Uint64 in) { return *(Sint32*)&in; }

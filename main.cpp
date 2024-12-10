@@ -156,6 +156,20 @@ public:
         return &chunks[cx][cz];
     }
 
+    /**
+     * Returns an estimate on of memory footprint of a region_t object
+     */
+    size_t get_mem_size()
+    {
+        size_t t = sizeof(*this);
+
+        for (int i = 0; i < REGION_SIZE_X; i++)
+            for (int j = 0; j < REGION_SIZE_Z; j++)
+                t += chunks[i][j].get_mem_size();
+
+        return t;
+    }
+
 private:
     chunk_t chunks[REGION_SIZE_X][REGION_SIZE_Z];
 };
@@ -327,6 +341,23 @@ public:
     }
 
     /**
+     * Returns an estimate on of memory footprint of a dimension_t object
+     */
+    size_t get_mem_size()
+    {
+        size_t t = sizeof(*this);
+
+        for (size_t i = 0; i < regions.size(); i++)
+            if (regions[i].region)
+                t += regions[i].region->get_mem_size();
+
+        t += regions.capacity() * sizeof(regions[0]);
+        t += players.capacity() * sizeof(players[0]);
+
+        return t;
+    }
+
+    /**
      * Loads/unloads regions
      *
      * Note: this is a somewhat expensive function, be careful
@@ -460,6 +491,16 @@ public:
             SDL_WaitThread(threads[i], NULL);
 
         TRACE("Dimension Update done");
+    }
+
+    size_t get_num_loaded_regions()
+    {
+        size_t num = 0;
+        for (size_t i = 0; i < regions.size(); i++)
+            if (regions[i].region)
+                num++;
+
+        return num;
     }
 
 private:
@@ -979,12 +1020,16 @@ int main(int argc, const char** argv)
                 {
                     players_kicked.push_back((*it).username);
                     entities_kicked.push_back((*it).eid);
+                    dimensions[(*it).dimension < 0].move_player((*it).eid, 0, 0, 0);
                 }
                 it = clients.erase(it);
             }
             else
                 it = next(it);
         }
+
+        for (int i = 0; i < ARR_SIZE_I(dimensions); i++)
+            dimensions[i].update();
 
         for (size_t client_index = 0; client_index < clients.size(); client_index++)
         {
@@ -1320,7 +1365,10 @@ int main(int argc, const char** argv)
                             pack_dim_change.mode = client->player_mode;
                             pack_dim_change.world_height = WORLD_HEIGHT;
                             if (client->dimension != pack_dim_change.dimension)
+                            {
                                 client->loaded_chunks.clear();
+                                dimensions[client->dimension < 0].move_player(client->eid, 0, 0, 0);
+                            }
                             client->dimension = pack_dim_change.dimension;
                             send_buffer(sock, pack_dim_change.assemble());
 
@@ -1342,6 +1390,23 @@ int main(int argc, const char** argv)
 
                             send_buffer(sock, pack_mode.assemble());
                         }
+                        else if (p->msg == "/stats")
+                        {
+                            send_chat(sock, "§6============ Server stats ============");
+
+                            const char* time_states[4] = { "Sunrise", "Noon", "Sunset", "Midnight" };
+                            Uint64 time = SDL_GetTicks() / 50;
+                            Uint64 tod = time % 24000;
+                            send_chat(sock, "  Time: %lu (%lu) (%s) (Day: %lu)", time, tod, time_states[tod / 6000], time / 24000);
+                            send_chat(sock, "  eid_counter: %d", eid_counter);
+                            for (int i = 0; i < ARR_SIZE_I(dimensions); i++)
+                            {
+                                send_chat(sock, "§3==== dimensions[%d] ====", i);
+                                std::string mem_str = format_memory(dimensions[i].get_mem_size());
+                                send_chat(sock, "  Est. Memory footprint: %s", mem_str.c_str());
+                                send_chat(sock, "  Num Loaded Regions: %zu", dimensions[i].get_num_loaded_regions());
+                            }
+                        }
                         else if (p->msg == "/rain_on" || p->msg == "/rain_off")
                         {
                             is_raining = (p->msg == "/rain_on") ? 1 : 0;
@@ -1357,6 +1422,7 @@ int main(int argc, const char** argv)
                                 "/nether",
                                 "/c",
                                 "/s",
+                                "/stats",
                                 "/rain_on",
                                 "/rain_off",
                                 "/kill",

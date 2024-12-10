@@ -118,6 +118,11 @@ public:
     void generate_special_metadata();
 
     /**
+     * Returns an estimate on of memory footprint of a chunk_t object
+     */
+    size_t get_mem_size();
+
+    /**
      * Attempts to find a suitable place to put a player in a chunk
      *
      * Returns true if a suitable location was found, false if a fallback location at world height was selected

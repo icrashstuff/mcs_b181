@@ -106,6 +106,21 @@ bool send_buffer(SDLNet_StreamSocket* sock, std::vector<Uint8> dat)
     return SDLNet_WriteToStreamSocket(sock, dat.data(), dat.size());
 }
 
+bool send_chat(SDLNet_StreamSocket* sock, const char* fmt, ...)
+{
+    char buf[119];
+
+    va_list args;
+    va_start(args, fmt);
+    vsnprintf(buf, ARR_SIZE(buf), fmt, args);
+    va_end(args);
+
+    packet_chat_message_t chat;
+    chat.msg = buf;
+
+    return send_buffer(sock, chat.assemble());
+}
+
 bool consume_bytes(SDLNet_StreamSocket* sock, int len)
 {
     Uint8 buf_fixed[1];

@@ -54,6 +54,8 @@ void assemble_double(std::vector<Uint8>& dat, double in);
 
 bool send_buffer(SDLNet_StreamSocket* sock, std::vector<Uint8> dat);
 
+bool send_chat(SDLNet_StreamSocket* sock, const char* fmt, ...);
+
 bool consume_bytes(SDLNet_StreamSocket* sock, int len);
 
 bool read_ubyte(SDLNet_StreamSocket* sock, Uint8* out);

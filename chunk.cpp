@@ -428,6 +428,8 @@ bool chunk_t::find_spawn_point(double& x, double& y, double& z)
     return false;
 }
 
+size_t chunk_t::get_mem_size() { return sizeof(*this) + data.capacity(); }
+
 bool chunk_t::compress_to_buf(std::vector<Uint8>& out)
 {
     out.resize(compressBound(data.size()));
