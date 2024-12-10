@@ -51,6 +51,7 @@ set(tetra_SRC
 set(mcs_b181_server_SRC
     ids.cpp
     main.cpp
+    chunk.cpp
     packet.cpp
     java_strings.cpp
     simplex_noise/SimplexNoise.cpp

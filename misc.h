@@ -106,4 +106,19 @@ typedef double jdouble;
 #error "Really? You think that things will continue to work?"
 #endif
 
+/**
+ * Maximum number of chances for ore to spawn in an chunk
+ */
+#define NUM_ORE_CHANCE 384
+
+struct range_t
+{
+    Uint8 min;
+    Uint8 max;
+};
+
+SDL_FORCE_INLINE Sint16 cast_to_sint16(Uint64 in) { return *(Sint16*)&in; }
+SDL_FORCE_INLINE Sint32 cast_to_sint32(Uint64 in) { return *(Sint32*)&in; }
+SDL_FORCE_INLINE Sint64 cast_to_sint64(Uint64 in) { return *(Sint64*)&in; }
+
 #endif

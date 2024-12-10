@@ -28,8 +28,6 @@
 #include <SDL3/SDL.h>
 #include <SDL3_net/SDL_net.h>
 
-#include <zlib.h>
-
 #include <assert.h>
 #include <stdio.h>
 #include <stdlib.h>
@@ -43,7 +41,10 @@
 #include "misc.h"
 #include "packet.h"
 
-#include "simplex_noise/SimplexNoise.h"
+#include "tetra/tetra.h"
+#include "tetra/util/convar.h"
+
+#include "chunk.h"
 
 long world_seed = 0;
 
@@ -96,378 +97,6 @@ bool send_prechunk(SDLNet_StreamSocket* sock, int chunk_x, int chunk_z, bool mod
         send_buffer(sock, packet.assemble());
     return send_buffer(sock, packet.assemble());
 }
-
-/* A 16 * WORLD_HEIGHT * 16 chunk */
-class chunk_t
-{
-public:
-    chunk_t()
-    {
-        data.resize(CHUNK_SIZE_X * CHUNK_SIZE_Y * CHUNK_SIZE_Z * 5 / 2, 0);
-        assert(data.size());
-        Uint8* ptr = data.data();
-        Uint64* rptr = (Uint64*)this;
-        r_state = *(Uint64*)&ptr + *(Uint32*)this + *(Uint64*)&rptr;
-    }
-
-    /**
-     * Goes through and sets the appropriate light levels for each block,
-     *
-     * Lighting is something I don't really understand nor something I feel
-     * like currently putting in the effort to understand right now
-     */
-    void correct_lighting(int generator)
-    {
-        if (!changed)
-            return;
-
-        for (int x = 0; x < CHUNK_SIZE_X; x++)
-        {
-            for (int z = 0; z < CHUNK_SIZE_Z; z++)
-            {
-                for (int y = CHUNK_SIZE_Y - 1; y >= 0; y--)
-                {
-                    set_light_sky(x, y, z, 15);
-                    Uint8 level = mc_id::get_light_level(get_type(x, y, z));
-                    set_light_block(x, y, z, level);
-                }
-            }
-        }
-        changed = false;
-    }
-
-    void generate_from_seed_over(long seed, int cx, int cz)
-    {
-        SimplexNoise noise;
-
-        /* Source: I made this up,*/
-        int r = (seed % 0x012476) << 4 & seed % 0xF6F0AFF;
-
-        for (int x = 0; x < CHUNK_SIZE_X; x++)
-        {
-            for (int z = 0; z < CHUNK_SIZE_Z; z++)
-            {
-                double fx = x + cx * CHUNK_SIZE_X + r;
-                double fz = z + cz * CHUNK_SIZE_X + r;
-                int height_grass = (noise.fractal(2, fx / 100, fz / 100) + 1.0) + 2;
-                double height = (noise.fractal(4, fx / 100, fz / 100) + 1.0 + noise.noise((fx + 10.0) / 100, (fz + 10.0) / 100) + 1.0) * 0.05 * CHUNK_SIZE_Y
-                    + 56 - height_grass;
-                double aggressive = noise.fractal(4, fx / 150, fz / 150) + 1.0;
-                if (aggressive > 1.05)
-                    height = height * (noise.fractal(3, fx / 150, fz / 150) + 1.0);
-                if (aggressive > 1.5)
-                    height = height * 1.5 / (noise.fractal(2, fx / 150, fz / 150) + 1.0);
-                else
-                    height = height + 1.5 / (noise.fractal(2, fx / 150, fz / 150) + 1.0);
-
-                for (int i = 1; i < height && i < CHUNK_SIZE_Y; i++)
-                    set_type(x, i, z, BLOCK_ID_STONE);
-                for (int i = height; i < height + height_grass && i < CHUNK_SIZE_Y; i++)
-                    set_type(x, i, z, BLOCK_ID_DIRT);
-                set_type(x, height + height_grass, z, BLOCK_ID_GRASS);
-                for (int i = height - 2; i < CHUNK_SIZE_Y; i++)
-                    set_light_sky(x, i, z, 15);
-                set_type(x, 0, z, BLOCK_ID_BEDROCK);
-            }
-        }
-
-        correct_lighting(0);
-    }
-
-    void generate_from_seed_nether(long seed, int cx, int cz)
-    {
-        SimplexNoise noise;
-
-        int r = (seed % 0xF2FFF << 4 | seed) & seed % 0xF6F0AFF;
-
-        for (int x = 0; x < CHUNK_SIZE_X; x++)
-        {
-            for (int z = 0; z < CHUNK_SIZE_Z; z++)
-            {
-                double fx = x + cx * CHUNK_SIZE_X + r;
-                double fz = z + cz * CHUNK_SIZE_X + r;
-                int height = (noise.fractal(4, fx / 100, fz / 100) + 1.0) * 0.1 * CHUNK_SIZE_Y + 56;
-                double noise2 = (noise.fractal(4, fx / 200, fz / 200) + 1.0) * 0.1 * CHUNK_SIZE_Y + 4;
-
-                int height2 = CHUNK_SIZE_Y - noise2;
-                for (int i = 1; i < height; i++)
-                    set_type(x, i, z, BLOCK_ID_NETHERRACK);
-                for (int i = height - 2; i < height2; i++)
-                {
-                    if (i < 63)
-                    {
-                        set_type(x, i, z, BLOCK_ID_LAVA_FLOWING);
-                        set_light_block(x, i, z, mc_id::get_light_level(BLOCK_ID_LAVA_FLOWING));
-                    }
-                    else
-                        set_light_sky(x, i, z, 15);
-                }
-                for (int i = height2; i < CHUNK_SIZE_Y; i++)
-                    set_type(x, i, z, BLOCK_ID_NETHERRACK);
-                set_type(x, 0, z, BLOCK_ID_BEDROCK);
-                set_type(x, CHUNK_SIZE_Y - 1, z, BLOCK_ID_BEDROCK);
-                set_light_sky(x, CHUNK_SIZE_Y - 1, z, 15);
-                for (int i = 0; i < CHUNK_SIZE_Y; i++)
-                    set_light_block(x, i, z, 15);
-            }
-        }
-
-        correct_lighting(-1);
-    }
-
-    void generate_special_ascending_type(int max_y)
-    {
-        for (int x = 0; x < CHUNK_SIZE_X; x++)
-        {
-            for (int y = 0; y < CHUNK_SIZE_Y; y++)
-            {
-                for (int z = 0; z < CHUNK_SIZE_Z; z++)
-                {
-                    if (y < BLOCK_ID_MAX && y < max_y)
-                    {
-                        set_type(x, y, z, y);
-                    }
-                    set_light_block(x, y, z, 15);
-                    set_light_sky(x, y, z, 15);
-                }
-            }
-        }
-    }
-
-    void generate_special_metadata()
-    {
-        for (int x = 0; x < CHUNK_SIZE_X; x++)
-        {
-            for (int y = 0; y < CHUNK_SIZE_Y; y++)
-            {
-                for (int z = 0; z < CHUNK_SIZE_Z; z++)
-                {
-                    if (y < BLOCK_ID_MAX)
-                    {
-                        if (z == x)
-                        {
-                            set_type(x, y, z, y);
-                            set_metadata(x, y, z, x);
-                        }
-                    }
-                    set_light_block(x, y, z, 15);
-                    set_light_sky(x, y, z, 15);
-                }
-            }
-        }
-    }
-
-    /**
-     * Attempts to find a suitable place to put a player in a chunk
-     *
-     * Returns true if a suitable location was found, false if a fallback location at world height was selected
-     */
-    inline bool find_spawn_point(double& x, double& y, double& z)
-    {
-        Uint32 pos = ((int)(x * 3) << 24) + ((int)(y * 3) << 12) + (int)(z * 3);
-        pos += SDL_rand_bits_r(&r_state);
-
-        int cx_s = (pos >> 16) % CHUNK_SIZE_X;
-        int cz_s = pos % CHUNK_SIZE_Z;
-
-        int found_air = 0;
-        Uint8 last_type[2] = { 0, 0 };
-
-        for (int ix = 0; ix < CHUNK_SIZE_X; ix++)
-        {
-            for (int iz = 0; iz < CHUNK_SIZE_Z; iz++)
-            {
-                int cx = (ix + cx_s) % CHUNK_SIZE_X;
-                int cz = (iz + cz_s) % CHUNK_SIZE_Z;
-                TRACE("checking %d %d", cx, cz);
-                for (int i = CHUNK_SIZE_Y; i > 0; i--)
-                {
-                    int index = i - 1 + (cz * (CHUNK_SIZE_Y)) + (cx * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z));
-                    Uint8 type = data[index];
-                    if (type == 0)
-                        found_air++;
-
-                    if (type > 0 && found_air > 2 && last_type[0] == 0 && last_type[1] == 0 && type != BLOCK_ID_LAVA_FLOWING && type != BLOCK_ID_LAVA_SOURCE)
-                    {
-                        x = cx + 0.5;
-                        y = i + 1.8;
-                        z = cz + 0.5;
-                        return true;
-                    }
-                    last_type[1] = last_type[0];
-                    last_type[0] = type;
-                }
-            }
-        }
-
-        x = cx_s + 0.5;
-        y = CHUNK_SIZE_Y + 1.8;
-        z = cz_s + 0.5;
-        return false;
-    }
-
-    inline Uint8 get_type(int x, int y, int z)
-    {
-        if (x < 0)
-            x += 16;
-        if (y < 0)
-            y += 16;
-        if (z < 0)
-            z += 16;
-
-        int index = y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z));
-
-        return data[index];
-    }
-
-    inline void set_type(int x, int y, int z, Uint8 type)
-    {
-        changed = true;
-        if (x < 0)
-            x += 16;
-        if (y < 0)
-            y += 16;
-        if (z < 0)
-            z += 16;
-
-        int index = y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z));
-
-        if (type <= BLOCK_ID_MAX)
-            data[index] = type;
-        else
-            data[index] = 0;
-    }
-
-    inline Uint8 get_metadata(int x, int y, int z)
-    {
-        if (x < 0)
-            x += 16;
-        if (y < 0)
-            y += 16;
-        if (z < 0)
-            z += 16;
-
-        int index = (y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z))) + CHUNK_SIZE_Y * CHUNK_SIZE_Z * CHUNK_SIZE_X * 2;
-
-        if (index % 2 == 1)
-            return (data[index / 2] >> 4) & 0x0F;
-        else
-            return data[index / 2] & 0x0F;
-    }
-
-    inline void set_metadata(int x, int y, int z, Uint8 metadata)
-    {
-        changed = true;
-        if (x < 0)
-            x += 16;
-        if (y < 0)
-            y += 16;
-        if (z < 0)
-            z += 16;
-
-        int index = (y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z))) + CHUNK_SIZE_Y * CHUNK_SIZE_Z * CHUNK_SIZE_X * 2;
-
-        if (index % 2 == 1)
-            data[index / 2] = ((metadata & 0x0F) << 4) | (data[index / 2] & 0x0F);
-        else
-            data[index / 2] = (metadata & 0x0F) | (data[index / 2] & 0xF0);
-    }
-
-    inline Uint8 get_light_block(int x, int y, int z)
-    {
-        if (x < 0)
-            x += 16;
-        if (y < 0)
-            y += 16;
-        if (z < 0)
-            z += 16;
-
-        int index = (y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z))) + CHUNK_SIZE_Y * CHUNK_SIZE_Z * CHUNK_SIZE_X * 3;
-
-        if (index % 2 == 1)
-            return (data[index / 2] >> 4) & 0x0F;
-        else
-            return data[index / 2] & 0x0F;
-    }
-
-    inline void set_light_block(int x, int y, int z, Uint8 level)
-    {
-        changed = true;
-        if (x < 0)
-            x += 16;
-        if (y < 0)
-            y += 16;
-        if (z < 0)
-            z += 16;
-
-        int index = (y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z))) + CHUNK_SIZE_Y * CHUNK_SIZE_Z * CHUNK_SIZE_X * 3;
-
-        if (index % 2 == 1)
-            data[index / 2] = ((level & 0x0F) << 4) | (data[index / 2] & 0x0F);
-        else
-            data[index / 2] = (level & 0x0F) | (data[index / 2] & 0xF0);
-    }
-
-    inline Uint8 get_light_sky(int x, int y, int z)
-    {
-        if (x < 0)
-            x += 16;
-        if (y < 0)
-            y += 16;
-        if (z < 0)
-            z += 16;
-
-        int index = (y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z))) + CHUNK_SIZE_Y * CHUNK_SIZE_Z * CHUNK_SIZE_X * 4;
-
-        if (index % 2 == 1)
-            return (data[index / 2] >> 4) & 0x0F;
-        else
-            return data[index / 2] & 0x0F;
-    }
-
-    inline void set_light_sky(int x, int y, int z, Uint8 level)
-    {
-        changed = true;
-        if (x < 0)
-            x += 16;
-        if (y < 0)
-            y += 16;
-        if (z < 0)
-            z += 16;
-
-        int index = (y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z))) + CHUNK_SIZE_Y * CHUNK_SIZE_Z * CHUNK_SIZE_X * 4;
-
-        if (index % 2 == 1)
-            data[index / 2] = ((level & 0x0F) << 4) | (data[index / 2] & 0x0F);
-        else
-            data[index / 2] = (level & 0x0F) | (data[index / 2] & 0xF0);
-    }
-
-    bool compress_to_buf(std::vector<Uint8>& out)
-    {
-        out.resize(compressBound(data.size()));
-
-        uLongf compressed_len = out.size();
-        int result = compress(out.data(), &compressed_len, data.data(), data.size());
-        out.resize(compressed_len);
-
-        return result == Z_OK;
-    }
-
-    bool changed = false;
-
-private:
-    Uint64 r_state;
-    std::vector<Uint8> data;
-};
-
-struct light_data_t
-{
-    int x;
-    int z;
-    Uint8 y;
-    Uint8 intensity;
-};
 
 class region_t;
 
@@ -1207,11 +836,15 @@ int dim_gen_thread_func(void* data)
     return 1;
 }
 
-int main(int argc, char** argv)
+static convar_string_t address_listen("address_listen", "127.0.0.1", "Address to listen for connections");
+
+int main(int argc, const char** argv)
 {
     /* KDevelop fully buffers the output and will not display anything */
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
+
+    tetra::init("icrashstuff", "mcs_b181", argc, argv);
 
     LOG("Hello");
 
@@ -1227,21 +860,8 @@ int main(int argc, char** argv)
         exit(1);
     }
 
-    /* These seeds break terrain gen */
-
-    world_seed = -1775145942054626728;
-    world_seed = SDL_MIN_SINT64;
-    world_seed = -1705145942054626728; /* More granular */
-
-    world_seed = -((Uint64)7 << 60); /* Even more granular */
-
-    world_seed = 5090434129841486344; /* Coarse: Nether only */
-
-    /* Intentionally shift only 31 places so the number is negative */
-    world_seed = (Sint64)((Uint64)SDL_rand_bits() << 31 | (Uint64)SDL_rand_bits());
-
-    /* We limit ourselves to 16 bits because larger values tend to break the generators */
-    world_seed = SDL_rand_bits() & 0xFFFF;
+    if (!((convar_int_t*)convar_t::get_convar("dev"))->get())
+        world_seed = cast_to_sint64((Uint64)SDL_rand_bits() << 32 | (Uint64)SDL_rand_bits());
 
     LOG("World seed: %ld", world_seed);
 
@@ -1264,7 +884,7 @@ int main(int argc, char** argv)
     bool done = false;
 
     LOG("Resolving host");
-    SDLNet_Address* addr = SDLNet_ResolveHostname("127.0.0.1");
+    SDLNet_Address* addr = SDLNet_ResolveHostname(address_listen.get().c_str());
 
     if (!addr)
     {
@@ -1663,6 +1283,23 @@ int main(int argc, char** argv)
                             pack_thunder.z = client->player_z * 32;
                             send_buffer_to_players_if_coords(clients, pack_thunder.assemble(), client->player_x, client->player_z, client->dimension);
                         }
+                        else if (p->msg == "/strip_stone")
+                        {
+                            int x = (int)client->player_x >> 4;
+                            int z = (int)client->player_z >> 4;
+                            LOG("Stripping stone from chunk %d %d", x, z);
+
+                            chunk_t* c = dimensions[client->dimension < 0].get_chunk(x, z);
+                            for (int x = 0; x < CHUNK_SIZE_X; x++)
+                                for (int z = 0; z < CHUNK_SIZE_Z; z++)
+                                    for (int y = 0; y < CHUNK_SIZE_Y; y++)
+                                        if (c->get_type(x, y, z) == BLOCK_ID_STONE)
+                                            c->set_type(x, y, z, BLOCK_ID_AIR);
+
+                            c->correct_lighting(client->dimension);
+
+                            send_chunk(sock, c, x, z);
+                        }
                         else if (p->msg == "/unload")
                         {
                             int x = (int)client->player_x >> 4;
@@ -1711,8 +1348,20 @@ int main(int argc, char** argv)
                         }
                         else if (p->msg == "/help")
                         {
-                            const char* commands[]
-                                = { "/stop", "/smite", "/unload", "/overworld", "/nether", "/c", "/s", "/rain_on", "/rain_off", "/kill", NULL };
+                            const char* commands[] = {
+                                "/stop",
+                                "/smite",
+                                "/strip_stone",
+                                "/unload",
+                                "/overworld",
+                                "/nether",
+                                "/c",
+                                "/s",
+                                "/rain_on",
+                                "/rain_off",
+                                "/kill",
+                                NULL,
+                            };
                             for (int i = 0; commands[i] != 0; i++)
                             {
                                 packet_chat_message_t pack_msg;

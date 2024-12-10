@@ -293,8 +293,6 @@ void tetra::end_frame()
 
 void tetra::deinit()
 {
-    if (!was_init_gui)
-        return;
     if (was_deinit)
         return;
     was_deinit = true;
@@ -303,13 +301,15 @@ void tetra::deinit()
 
     convar_t::atexit_callback();
 
-    // Cleanup
-    ImGui_ImplOpenGL3_Shutdown();
-    ImGui_ImplSDL3_Shutdown();
-    ImGui::DestroyContext();
+    if (was_init_gui)
+    {
+        ImGui_ImplOpenGL3_Shutdown();
+        ImGui_ImplSDL3_Shutdown();
+        ImGui::DestroyContext();
 
-    SDL_GL_DestroyContext(gl_context);
-    SDL_DestroyWindow(window);
+        SDL_GL_DestroyContext(gl_context);
+        SDL_DestroyWindow(window);
+    }
 
     assert(PHYSFS_deinit());
 }
