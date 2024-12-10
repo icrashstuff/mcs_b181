@@ -152,7 +152,7 @@ void chunk_t::generate_from_seed_over(long seed, int cx, int cz)
     correct_lighting(0);
 }
 
-void chunk_t::generate_ore_chunk_vals(Uint64 arr[NUM_ORE_CHANCE], int cx, int cz, Uint64 seed_r)
+static void generate_ore_chunk_vals(Uint64 arr[NUM_ORE_CHANCE], int cx, int cz, Uint64 seed_r)
 {
     seed_r += cx * CHUNK_SIZE_X;
     seed_r += ((Sint64)cz * CHUNK_SIZE_Z) << 32;
@@ -251,7 +251,7 @@ void chunk_t::generate_ores(long seed, int cx, int cz, param_ore_t* ores, Uint8 
                     int off2 = (d >> 40) & 1 + (d >> 55) & 1;
                     int off3 = (d >> 37) & 1 + (d >> 44) & 1;
 
-                    switch ((time_it + d & 0xff + off + off2 + off3) % 7)
+                    switch ((time_it / 2 + d & 0xff + off + off2 + off3) % 7)
                     {
                     case 0:
                         x = last_jx;

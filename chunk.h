@@ -109,8 +109,6 @@ public:
      */
     void generate_from_seed_over(long seed, int cx, int cz);
 
-    void generate_ore_chunk_vals(Uint64 arr[NUM_ORE_CHANCE], int cx, int cz, Uint64 seed_r);
-
     void generate_ores(long seed, int cx, int cz, param_ore_t* ores, Uint8 ore_count);
 
     void generate_from_seed_nether(long seed, int cx, int cz);
