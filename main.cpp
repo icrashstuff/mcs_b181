@@ -57,6 +57,8 @@ int server_weather = 0;
 
 long server_time = 18000;
 
+int next_thunder_bolt = 0;
+
 void update_server_time()
 {
     static Uint64 last_time_update = 0;
@@ -734,6 +736,14 @@ void send_buffer_to_players(std::vector<client_t> clients, std::vector<Uint8> bu
             send_buffer(clients[i].sock, buf);
 }
 
+void send_buffer_to_players_if_dim(std::vector<client_t> clients, std::vector<Uint8> buf, int dimension, client_t* exclude = NULL)
+{
+    for (size_t i = 0; i < clients.size(); i++)
+        if (clients[i].sock && clients[i].username.length() > 0 && (exclude == NULL || exclude->sock != clients[i].sock))
+            if (clients[i].dimension == dimension)
+                send_buffer(clients[i].sock, buf);
+}
+
 void send_buffer_to_players_if_coords(std::vector<client_t> clients, std::vector<Uint8> buf, int world_x, int world_z, int dimension, client_t* exclude = NULL)
 {
     for (size_t i = 0; i < clients.size(); i++)
@@ -1204,6 +1214,8 @@ int main(int argc, const char** argv)
 
     server_time = cast_to_sint64(SDL_rand_bits());
 
+    next_thunder_bolt = SDL_rand_bits() & 0x7fff;
+
     LOG("World seed: %ld", server_seed);
 
     LOG("Generating regions");
@@ -1414,6 +1426,36 @@ int main(int argc, const char** argv)
                         pack_player_list.ping = sdl_tick_cur - client->packet.get_last_packet_time();
 
                         send_buffer_to_players(clients, pack_player_list.assemble());
+                    }
+
+                    if (server_weather == WEATHER_THUNDER && next_thunder_bolt >= 0)
+                        next_thunder_bolt -= 100;
+
+                    if (server_weather == WEATHER_THUNDER_SUPER && next_thunder_bolt >= 0)
+                        next_thunder_bolt -= 1000;
+
+                    if (next_thunder_bolt < 0 && server_weather > WEATHER_RAIN)
+                    {
+                        packet_thunder_t pack_thunder;
+
+                        int cx = (((int)client->player_x) >> 4) + (cast_to_sint16(SDL_rand_bits()) >> 11);
+                        int cz = (((int)client->player_z) >> 4) + (cast_to_sint16(SDL_rand_bits()) >> 11);
+
+                        chunk_t* c = dimensions[0].get_chunk(cx, cz);
+
+                        double tx, ty, tz;
+                        if (c && c->find_spawn_point(tx, ty, tz))
+                        {
+                            pack_thunder.x = (cx * CHUNK_SIZE_X + tx) * 32;
+                            pack_thunder.y = (ty - 1) * 32;
+                            if (pack_thunder.y < 0)
+                                pack_thunder.y = 0;
+                            pack_thunder.z = (cz * CHUNK_SIZE_Z + tz) * 32;
+                            pack_thunder.unknown = 1;
+                            pack_thunder.eid = eid_counter++;
+                            send_buffer_to_players_if_dim(clients, pack_thunder.assemble(), 0);
+                            next_thunder_bolt = SDL_rand_bits() & 0x7FFF;
+                        }
                     }
                 }
 
