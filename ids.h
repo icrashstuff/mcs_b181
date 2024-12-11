@@ -404,6 +404,10 @@ struct block_return_t
 
 bool is_transparent(short block_id);
 
+bool can_host_torch(short block_id);
+
+bool can_host_rail(short block_id);
+
 Uint8 get_light_level(short block_id);
 
 /**

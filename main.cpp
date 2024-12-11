@@ -1313,10 +1313,11 @@ int main(int argc, const char** argv)
             add_to_inventory(BLOCK_ID_DIAMOND, 0, 1, new_client.inventory);
             add_to_inventory(BLOCK_ID_DIAMOND, 0, 1, new_client.inventory);
             add_to_inventory(ITEM_ID_SIGN, 0, 1, new_client.inventory);
+            add_to_inventory(BLOCK_ID_TORCH, 0, 1, new_client.inventory);
 
             int wool_bits = SDL_rand_bits() & 0xFF;
 
-            for (int i = 2; i < 9; i++)
+            for (int i = 3; i < 9; i++)
             {
                 add_to_inventory(BLOCK_ID_WOOL, ((i + wool_bits) * (1 + (wool_bits > 127))) % 16, -1, new_client.inventory);
             }
@@ -1930,6 +1931,11 @@ int main(int argc, const char** argv)
                     int place_x = p->x;
                     int place_y = p->y;
                     int place_z = p->z;
+                    int center_x = p->x;
+                    int center_y = p->y;
+                    int center_z = p->z;
+                    bool check_center = false;
+                    bool center_good = true;
 
                     if (p->direction != -1 && p->block_item_id >= 0 && p->block_item_id < 256)
                     {
@@ -1937,21 +1943,51 @@ int main(int argc, const char** argv)
                         {
                         case 0:
                             place_y -= 1;
+                            if (p->block_item_id == BLOCK_ID_TORCH || p->block_item_id == BLOCK_ID_TORCH_REDSTONE_ON)
+                            {
+                                p->block_item_id = 0;
+                                check_center = 1;
+                            }
                             break;
                         case 1:
                             place_y += 1;
+                            if (p->block_item_id == BLOCK_ID_TORCH || p->block_item_id == BLOCK_ID_TORCH_REDSTONE_ON)
+                            {
+                                p->damage = 5;
+                                check_center = 1;
+                            }
                             break;
                         case 2:
                             place_z -= 1;
+                            if (p->block_item_id == BLOCK_ID_TORCH || p->block_item_id == BLOCK_ID_TORCH_REDSTONE_ON)
+                            {
+                                p->damage = 4;
+                                check_center = 1;
+                            }
                             break;
                         case 3:
                             place_z += 1;
+                            if (p->block_item_id == BLOCK_ID_TORCH || p->block_item_id == BLOCK_ID_TORCH_REDSTONE_ON)
+                            {
+                                p->damage = 3;
+                                check_center = 1;
+                            }
                             break;
                         case 4:
                             place_x -= 1;
+                            if (p->block_item_id == BLOCK_ID_TORCH || p->block_item_id == BLOCK_ID_TORCH_REDSTONE_ON)
+                            {
+                                p->damage = 2;
+                                check_center = 1;
+                            }
                             break;
                         case 5:
                             place_x += 1;
+                            if (p->block_item_id == BLOCK_ID_TORCH || p->block_item_id == BLOCK_ID_TORCH_REDSTONE_ON)
+                            {
+                                p->damage = 1;
+                                check_center = 1;
+                            }
                             break;
                         default:
                             goto loop_end;
@@ -1973,7 +2009,22 @@ int main(int argc, const char** argv)
                         int cz = place_z >> 4;
 
                         chunk_t* c = dimensions[client->dimension < 0].get_chunk(cx, cz);
-                        if (c)
+
+                        if (c && (p->block_item_id == BLOCK_ID_TORCH || p->block_item_id == BLOCK_ID_TORCH_REDSTONE_ON))
+                        {
+                            Uint8 center_type = c->get_type(center_x % 16, center_y, center_z % 16);
+                            if (!mc_id::can_host_torch(center_type))
+                                center_good = false;
+                        }
+
+                        if (c && (p->block_item_id == BLOCK_ID_RAIL || p->block_item_id == BLOCK_ID_RAIL_POWERED || p->block_item_id == BLOCK_ID_RAIL_DETECTOR))
+                        {
+                            Uint8 center_type = c->get_type(center_x % 16, center_y, center_z % 16);
+                            if (!mc_id::can_host_rail(center_type))
+                                center_good = false;
+                        }
+
+                        if (c && p->block_item_id != 0 && c->get_type(place_x % 16, place_y, place_z % 16) == BLOCK_ID_AIR && center_good)
                         {
                             packet_block_change_t pack_block_change;
                             pack_block_change.block_x = place_x;
