@@ -316,7 +316,7 @@ void chunk_t::generate_from_seed_nether(long seed, int cx, int cz)
                 set_type(x, i, z, BLOCK_ID_NETHERRACK);
             for (int i = height - 2; i < height2; i++)
             {
-                if (i < 63)
+                if (i < 32)
                 {
                     set_type(x, i, z, BLOCK_ID_LAVA_FLOWING);
                     set_light_block(x, i, z, mc_id::get_light_level(BLOCK_ID_LAVA_FLOWING));
