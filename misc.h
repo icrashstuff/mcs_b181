@@ -26,6 +26,7 @@
 #include <SDL3/SDL_stdinc.h>
 #include <assert.h>
 #include <string>
+#include <vector>
 
 typedef Uint8 jubyte;
 typedef Uint8 jbool;
@@ -123,6 +124,19 @@ struct range_t
  * @param rate Append "/s" to the end of unit
  */
 std::string format_memory(size_t size, bool rate = false);
+
+/**
+ * Take a cmd and split it into separate string components
+ */
+bool argv_from_str(std::vector<std::string>& argv, std::string cmdline, bool parse_quotes = false, size_t max_argc = -1);
+
+bool long_from_str(std::string str, long& out);
+bool int_from_str(std::string str, int& out);
+
+/**
+ * Convert boolean value to string of true or false
+ */
+#define BOOL_S(x) ((x) ? "true" : "false")
 
 SDL_FORCE_INLINE Sint16 cast_to_sint16(Uint64 in) { return *(Sint16*)&in; }
 SDL_FORCE_INLINE Sint32 cast_to_sint32(Uint64 in) { return *(Sint32*)&in; }

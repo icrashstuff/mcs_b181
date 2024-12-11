@@ -46,7 +46,28 @@
 
 #include "chunk.h"
 
-long world_seed = 0;
+long server_seed = 0;
+
+#define WEATHER_OFF 0
+#define WEATHER_RAIN 1
+#define WEATHER_THUNDER 2
+#define WEATHER_THUNDER_SUPER 3
+
+int server_weather = 0;
+
+long server_time = 18000;
+
+void update_server_time()
+{
+    static Uint64 last_time_update = 0;
+    Uint64 sdl_tick_cur = SDL_GetTicks();
+
+    while (last_time_update < sdl_tick_cur && sdl_tick_cur - last_time_update >= 50)
+    {
+        server_time++;
+        last_time_update += 50;
+    }
+}
 
 struct dying_socket_t
 {
@@ -250,6 +271,7 @@ public:
      */
     void move_player(int eid, int world_x, int world_y, int world_z)
     {
+        (void)world_y;
         needs_update = true;
         for (size_t i = 0; i < players.size(); i++)
         {
@@ -877,6 +899,282 @@ int dim_gen_thread_func(void* data)
     return 1;
 }
 
+enum command_return_t
+{
+    COMMAND_UNSET,
+    COMMAND_OK,
+    COMMAND_FAIL,
+    COMMAND_FAIL_PARSE,
+    COMMAND_FAIL_INTERNAL,
+    COMMAND_FAIL_UNHANDLED,
+};
+
+typedef command_return_t (*command_callback_t)(const char*, std::vector<client_t>&, client_t*, dimension_t*);
+#define MC_COMMAND(NAME) command_return_t command_##NAME(const char* cmdline, std::vector<client_t>& clients, client_t* client, dimension_t* dimensions)
+#define MC_COMMAND_REG(NAME, CMD, PARAMS, HELP) mc_commands.push_back({ NAME, PARAMS, HELP, command_##CMD })
+#define MC_COMMAND_REGB(NAME, PARAMS, HELP) MC_COMMAND_REG(#NAME, NAME, PARAMS, HELP)
+#define MC_COMMAND_UNUSED() \
+    do                      \
+    {                       \
+        (void)cmdline;      \
+        (void)clients;      \
+        (void)client;       \
+        (void)dimensions;   \
+    } while (0)
+
+struct mc_command_t
+{
+    const char* name;
+    const char* params;
+    const char* help;
+    command_callback_t cmd;
+};
+
+MC_COMMAND(smite)
+{
+    MC_COMMAND_UNUSED();
+    if (!client)
+        return COMMAND_FAIL_INTERNAL;
+
+    packet_thunder_t pack_thunder;
+    pack_thunder.eid = eid_counter++;
+    pack_thunder.unknown = true;
+    pack_thunder.x = client->player_x * 32;
+    pack_thunder.y = client->player_y * 32;
+    pack_thunder.z = client->player_z * 32;
+    send_buffer_to_players_if_coords(clients, pack_thunder.assemble(), client->player_x, client->player_z, client->dimension);
+
+    return COMMAND_OK;
+}
+
+MC_COMMAND(strip_stone)
+{
+    MC_COMMAND_UNUSED();
+    if (!client || !client->sock || !dimensions)
+        return COMMAND_FAIL_INTERNAL;
+    SDLNet_StreamSocket* sock = client->sock;
+
+    int x = (int)client->player_x >> 4;
+    int z = (int)client->player_z >> 4;
+    LOG("Stripping stone from chunk %d %d", x, z);
+
+    chunk_t* c = dimensions[client->dimension < 0].get_chunk(x, z);
+    for (int x = 0; x < CHUNK_SIZE_X; x++)
+        for (int z = 0; z < CHUNK_SIZE_Z; z++)
+            for (int y = 0; y < CHUNK_SIZE_Y; y++)
+                if (c->get_type(x, y, z) == BLOCK_ID_STONE)
+                    c->set_type(x, y, z, BLOCK_ID_AIR);
+
+    c->correct_lighting(client->dimension);
+
+    send_chunk(sock, c, x, z);
+
+    return COMMAND_OK;
+}
+
+MC_COMMAND(stats)
+{
+    MC_COMMAND_UNUSED();
+    if (!client || !client->sock)
+        return COMMAND_FAIL_INTERNAL;
+    SDLNet_StreamSocket* sock = client->sock;
+
+    send_chat(sock, "§6============ Server stats ============");
+
+    const char* time_states[4] = { "Sunrise", "Noon", "Sunset", "Midnight" };
+    long tod = server_time % 24000;
+    if (tod < 0)
+        tod += 24000;
+    send_chat(sock, "Time: %ld (%ld) (%s) (Day: %ld)", server_time, tod, time_states[tod / 6000], server_time / 24000);
+    send_chat(sock, "  eid_counter: %d", eid_counter);
+
+    for (int i = 0; i < 2; i++)
+    {
+        send_chat(sock, "§3==== dimensions[%d] ====", i);
+        std::string mem_str = format_memory(dimensions[i].get_mem_size());
+        send_chat(sock, "  Est. Memory footprint: %s", mem_str.c_str());
+        send_chat(sock, "  Num Loaded Regions: %zu", dimensions[i].get_num_loaded_regions());
+    }
+
+    return COMMAND_OK;
+}
+
+MC_COMMAND(kill)
+{
+    MC_COMMAND_UNUSED();
+    if (!client)
+        return COMMAND_FAIL_INTERNAL;
+
+    client->health = -100;
+    client->update_health = 2;
+
+    return COMMAND_OK;
+}
+
+MC_COMMAND(unload)
+{
+    MC_COMMAND_UNUSED();
+    if (!client || !client->sock)
+        return COMMAND_FAIL_INTERNAL;
+
+    int x = (int)client->player_x >> 4;
+    int z = (int)client->player_z >> 4;
+    LOG("Unloading chunk %d %d", x, z);
+
+    /* The notchian client does not like chunks being unloaded near it */
+    for (int i = 0; i < 16; i++)
+        for (size_t j = 0; j < clients.size(); j++)
+            if (clients[j].sock && clients[j].username.length() > 0)
+                send_prechunk(clients[j].sock, x, z, 0);
+
+    return COMMAND_OK;
+}
+MC_COMMAND(dimension)
+{
+    MC_COMMAND_UNUSED();
+    if (!client || !client->sock)
+        return COMMAND_FAIL_INTERNAL;
+    SDLNet_StreamSocket* sock = client->sock;
+
+    packet_respawn_t pack_dim_change;
+    pack_dim_change.seed = server_seed;
+    pack_dim_change.dimension = strncmp(cmdline, "overworld", 9) == 0 ? 0 : -1;
+    pack_dim_change.mode = client->player_mode;
+    pack_dim_change.world_height = WORLD_HEIGHT;
+    if (client->dimension != pack_dim_change.dimension)
+    {
+        client->loaded_chunks.clear();
+        dimensions[client->dimension < 0].move_player(client->eid, 0, 0, 0);
+    }
+    client->dimension = pack_dim_change.dimension;
+    send_buffer(sock, pack_dim_change.assemble());
+
+    packet_time_update_t pack_time;
+    pack_time.time = server_time;
+    send_buffer(sock, pack_time.assemble());
+
+    client->pos_updated = true;
+
+    spawn_player(clients, client, dimensions);
+
+    return COMMAND_OK;
+}
+
+MC_COMMAND(gamemode)
+{
+    MC_COMMAND_UNUSED();
+    if (!client || !client->sock)
+        return COMMAND_FAIL_INTERNAL;
+    SDLNet_StreamSocket* sock = client->sock;
+
+    client->player_mode = strncmp(cmdline, "c", 1) == 0 ? 1 : 0;
+
+    packet_new_state_t pack_mode;
+    pack_mode.reason = PACK_NEW_STATE_REASON_CHANGE_MODE;
+    pack_mode.mode = client->player_mode;
+
+    send_buffer(sock, pack_mode.assemble());
+
+    return COMMAND_OK;
+}
+
+MC_COMMAND(time)
+{
+    MC_COMMAND_UNUSED();
+    if (!client || !client->sock)
+        return COMMAND_FAIL_INTERNAL;
+    SDLNet_StreamSocket* sock = client->sock;
+
+    std::vector<std::string> argv;
+    if (!argv_from_str(argv, cmdline))
+        return COMMAND_FAIL_PARSE;
+
+    if (argv.size() < 2)
+    {
+        const char* time_states[4] = { "Sunrise", "Noon", "Sunset", "Midnight" };
+        long tod = server_time % 24000;
+        if (tod < 0)
+            tod += 24000;
+        send_chat(sock, "Time: %ld (%ld) (%s) (Day: %ld)", server_time, tod, time_states[tod / 6000], server_time / 24000);
+        return COMMAND_OK;
+    }
+
+    if (argv[1] == "resend")
+    {
+        send_chat(sock, "Time: Resending time to all players");
+
+        packet_time_update_t pack_time;
+        pack_time.time = server_time;
+        send_buffer_to_players(clients, pack_time.assemble());
+        return COMMAND_OK;
+    }
+
+    if (argv[1] != "set" && argv[1] != "add")
+    {
+        send_chat(sock, "Time: \"%s\" is not a valid operation!", argv[1].c_str());
+        return COMMAND_FAIL;
+    }
+
+    if (argv.size() < 3)
+    {
+        send_chat(sock, "Time: A number must be provided!");
+        return COMMAND_FAIL;
+    }
+
+    long parse_result;
+    if (!long_from_str(argv[2], parse_result))
+        return COMMAND_FAIL_PARSE;
+
+    if (argv[1] == "set")
+        server_time = parse_result;
+    else
+        server_time += parse_result;
+
+    send_chat(sock, "Time: Setting time to %ld", server_time);
+
+    packet_time_update_t pack_time;
+    pack_time.time = server_time;
+    send_buffer_to_players(clients, pack_time.assemble());
+    return COMMAND_OK;
+}
+
+MC_COMMAND(weather)
+{
+    MC_COMMAND_UNUSED();
+    if (!client || !client->sock)
+        return COMMAND_FAIL_INTERNAL;
+    SDLNet_StreamSocket* sock = client->sock;
+
+    std::vector<std::string> argv;
+    if (!argv_from_str(argv, cmdline))
+        return COMMAND_FAIL_PARSE;
+
+    if (argv.size() < 2)
+    {
+        send_chat(sock, "Weather: state: %d", server_weather);
+        send_chat(sock, "Weather: is_raining: %s", BOOL_S(server_weather > WEATHER_OFF));
+        send_chat(sock, "Weather: is_thunder: %s", BOOL_S(server_weather > WEATHER_RAIN));
+        if (server_weather == WEATHER_THUNDER_SUPER)
+            send_chat(sock, "Weather: §7is_super: %s", BOOL_S(server_weather == WEATHER_THUNDER_SUPER));
+        return COMMAND_OK;
+    }
+
+    int parse_result;
+    if (!int_from_str(argv[1], parse_result))
+        return COMMAND_FAIL_PARSE;
+
+    if (parse_result < 0 || parse_result > 3)
+    {
+        send_chat(sock, "§cWeather: %d is not a valid weather state!", parse_result);
+        return COMMAND_FAIL;
+    }
+
+    send_chat(sock, "Weather: Setting weather to %d", parse_result);
+    server_weather = parse_result;
+
+    return COMMAND_OK;
+}
+
 static convar_string_t address_listen("address_listen", "127.0.0.1", "Address to listen for connections");
 
 int main(int argc, const char** argv)
@@ -902,13 +1200,15 @@ int main(int argc, const char** argv)
     }
 
     if (!((convar_int_t*)convar_t::get_convar("dev"))->get())
-        world_seed = cast_to_sint64((Uint64)SDL_rand_bits() << 32 | (Uint64)SDL_rand_bits());
+        server_seed = cast_to_sint64((Uint64)SDL_rand_bits() << 32 | (Uint64)SDL_rand_bits());
 
-    LOG("World seed: %ld", world_seed);
+    server_time = cast_to_sint64(SDL_rand_bits());
+
+    LOG("World seed: %ld", server_seed);
 
     LOG("Generating regions");
     Uint64 tick_region_start = SDL_GetTicks();
-    dimension_t dimensions[2] = { dimension_t(0, world_seed, false), dimension_t(-1, world_seed, false) };
+    dimension_t dimensions[2] = { dimension_t(0, server_seed, false), dimension_t(-1, server_seed, false) };
 
     SDL_Thread* dim_gen_threads[ARR_SIZE(dimensions)];
     for (size_t i = 1; i < ARR_SIZE(dim_gen_threads); i++)
@@ -919,6 +1219,23 @@ int main(int argc, const char** argv)
 
     Uint64 tick_region_time = SDL_GetTicks() - tick_region_start;
     LOG("Regions generated in %lu ms", tick_region_time);
+
+    std::vector<mc_command_t> mc_commands;
+
+    MC_COMMAND_REGB(smite, "", "Smite the player");
+    if (((convar_int_t*)convar_t::get_convar("dev"))->get())
+    {
+        MC_COMMAND_REGB(strip_stone, "", "Strip all stone from chunk (dev)");
+        MC_COMMAND_REGB(unload, "", "Forcebly unload the chunk (dev)");
+    }
+    MC_COMMAND_REGB(stats, "", "Show server stats");
+    MC_COMMAND_REGB(kill, "", "Kill the player");
+    MC_COMMAND_REG("nether", dimension, "", "Transport player to nether");
+    MC_COMMAND_REG("overworld", dimension, "", "Transport player to overworld");
+    MC_COMMAND_REG("c", gamemode, "", "Change gamemode to creative");
+    MC_COMMAND_REG("s", gamemode, "", "Change gamemode to survival");
+    MC_COMMAND_REGB(weather, "<state>", "Modify weather [0: Off, 1: Rain, 2: Thunder, 3: ???]");
+    MC_COMMAND_REGB(time, "<add:set> <time>", "Modify server time");
 
     LOG("Initializing server");
 
@@ -953,8 +1270,6 @@ int main(int argc, const char** argv)
     }
 
     SDLNet_UnrefAddress(addr);
-
-    bool is_raining = 0;
 
     while (!done)
     {
@@ -1044,6 +1359,7 @@ int main(int argc, const char** argv)
         goto loop_end;       \
     } while (0)
 
+            update_server_time();
             Uint64 sdl_tick_last = client->packet.get_last_packet_time();
             Uint64 sdl_tick_cur = SDL_GetTicks();
             packet_t* pack = client->packet.get_next_packet(sock);
@@ -1083,7 +1399,7 @@ int main(int argc, const char** argv)
                 if (sdl_tick_cur - client->time_keep_alive_sent > 200)
                 {
                     packet_time_update_t pack_time;
-                    pack_time.time = sdl_tick_cur / 50;
+                    pack_time.time = server_time;
                     send_buffer(sock, pack_time.assemble());
 
                     packet_keep_alive_t pack_keep_alive;
@@ -1155,9 +1471,9 @@ int main(int argc, const char** argv)
                     }
                 }
 
-                if (client->is_raining != is_raining)
+                if (client->is_raining != server_weather)
                 {
-                    client->is_raining = is_raining;
+                    client->is_raining = server_weather;
                     packet_new_state_t pack_rain;
                     if (client->is_raining)
                         pack_rain.reason = PACK_NEW_STATE_REASON_RAIN_START;
@@ -1251,7 +1567,7 @@ int main(int argc, const char** argv)
 
                     packet_login_request_s2c_t packet_login_s2c;
                     packet_login_s2c.player_eid = client->eid;
-                    packet_login_s2c.seed = world_seed;
+                    packet_login_s2c.seed = server_seed;
                     packet_login_s2c.mode = client->player_mode;
                     packet_login_s2c.dimension = client->dimension;
                     packet_login_s2c.difficulty = 0;
@@ -1260,7 +1576,7 @@ int main(int argc, const char** argv)
                     send_buffer(sock, packet_login_s2c.assemble());
 
                     packet_time_update_t pack_time;
-                    pack_time.time = sdl_tick_cur / 50;
+                    pack_time.time = server_time;
                     send_buffer(sock, pack_time.assemble());
 
                     /* We set the username here because at this point we are committed to having them */
@@ -1303,137 +1619,81 @@ int main(int argc, const char** argv)
                         if (p->msg == "/stop")
                         {
                             done = true;
-                            for (size_t i = 0; i < clients.size(); i++)
-                            {
-                                if (clients[i].sock && clients[i].username.length())
-                                {
-                                    kick(clients[i].sock, "Server stopping!");
-                                    clients[i].sock = NULL;
-                                }
-                            }
                             goto loop_end;
                         }
-                        else if (p->msg == "/kill")
+                        else if (p->msg.rfind("/help", 0) == 0)
                         {
-                            client->health = -100;
-                            client->update_health = 2;
-                        }
-                        else if (p->msg == "/smite")
-                        {
-                            packet_thunder_t pack_thunder;
-                            pack_thunder.eid = eid_counter++;
-                            pack_thunder.unknown = true;
-                            pack_thunder.x = client->player_x * 32;
-                            pack_thunder.y = client->player_y * 32;
-                            pack_thunder.z = client->player_z * 32;
-                            send_buffer_to_players_if_coords(clients, pack_thunder.assemble(), client->player_x, client->player_z, client->dimension);
-                        }
-                        else if (p->msg == "/strip_stone")
-                        {
-                            int x = (int)client->player_x >> 4;
-                            int z = (int)client->player_z >> 4;
-                            LOG("Stripping stone from chunk %d %d", x, z);
+                            int help_page = 1;
 
-                            chunk_t* c = dimensions[client->dimension < 0].get_chunk(x, z);
-                            for (int x = 0; x < CHUNK_SIZE_X; x++)
-                                for (int z = 0; z < CHUNK_SIZE_Z; z++)
-                                    for (int y = 0; y < CHUNK_SIZE_Y; y++)
-                                        if (c->get_type(x, y, z) == BLOCK_ID_STONE)
-                                            c->set_type(x, y, z, BLOCK_ID_AIR);
+                            if (p->msg.length() > 6)
+                                help_page = atoi(p->msg.c_str() + 6);
 
-                            c->correct_lighting(client->dimension);
-
-                            send_chunk(sock, c, x, z);
-                        }
-                        else if (p->msg == "/unload")
-                        {
-                            int x = (int)client->player_x >> 4;
-                            int z = (int)client->player_z >> 4;
-                            LOG("Unloading chunk %d %d", x, z);
-
-                            /* The notchian client does not like chunks being unloaded near it */
-                            for (int i = 0; i < 16; i++)
-                                for (size_t j = 0; j < clients.size(); j++)
-                                    if (clients[j].sock && clients[j].username.length() > 0)
-                                        send_prechunk(clients[j].sock, x, z, 0);
-                        }
-                        else if (p->msg == "/nether" || p->msg == "/overworld")
-                        {
-                            packet_respawn_t pack_dim_change;
-                            pack_dim_change.seed = world_seed;
-                            pack_dim_change.dimension = p->msg == "/overworld" ? 0 : -1;
-                            pack_dim_change.mode = client->player_mode;
-                            pack_dim_change.world_height = WORLD_HEIGHT;
-                            if (client->dimension != pack_dim_change.dimension)
-                            {
-                                client->loaded_chunks.clear();
-                                dimensions[client->dimension < 0].move_player(client->eid, 0, 0, 0);
-                            }
-                            client->dimension = pack_dim_change.dimension;
-                            send_buffer(sock, pack_dim_change.assemble());
-
-                            packet_time_update_t pack_time;
-                            pack_time.time = sdl_tick_cur / 50;
-                            send_buffer(sock, pack_time.assemble());
-
-                            client->pos_updated = true;
-
-                            spawn_player(clients, client, dimensions);
-                        }
-                        else if (p->msg == "/c" || p->msg == "/s")
-                        {
-                            client->player_mode = (p->msg == "/c") ? 1 : 0;
-
-                            packet_new_state_t pack_mode;
-                            pack_mode.reason = PACK_NEW_STATE_REASON_CHANGE_MODE;
-                            pack_mode.mode = client->player_mode;
-
-                            send_buffer(sock, pack_mode.assemble());
-                        }
-                        else if (p->msg == "/stats")
-                        {
-                            send_chat(sock, "§6============ Server stats ============");
-
-                            const char* time_states[4] = { "Sunrise", "Noon", "Sunset", "Midnight" };
-                            Uint64 time = SDL_GetTicks() / 50;
-                            Uint64 tod = time % 24000;
-                            send_chat(sock, "  Time: %lu (%lu) (%s) (Day: %lu)", time, tod, time_states[tod / 6000], time / 24000);
-                            send_chat(sock, "  eid_counter: %d", eid_counter);
-                            for (int i = 0; i < ARR_SIZE_I(dimensions); i++)
-                            {
-                                send_chat(sock, "§3==== dimensions[%d] ====", i);
-                                std::string mem_str = format_memory(dimensions[i].get_mem_size());
-                                send_chat(sock, "  Est. Memory footprint: %s", mem_str.c_str());
-                                send_chat(sock, "  Num Loaded Regions: %zu", dimensions[i].get_num_loaded_regions());
-                            }
-                        }
-                        else if (p->msg == "/rain_on" || p->msg == "/rain_off")
-                        {
-                            is_raining = (p->msg == "/rain_on") ? 1 : 0;
-                        }
-                        else if (p->msg == "/help")
-                        {
-                            const char* commands[] = {
-                                "/stop",
-                                "/smite",
-                                "/strip_stone",
-                                "/unload",
-                                "/overworld",
-                                "/nether",
-                                "/c",
-                                "/s",
-                                "/stats",
-                                "/rain_on",
-                                "/rain_off",
-                                "/kill",
-                                NULL,
+                            mc_command_t hard_cmd_help[] = {
+                                { "stop", "", "Stop the server", NULL },
+                                { "help", "<page>", "Display this help", NULL },
                             };
-                            for (int i = 0; commands[i] != 0; i++)
+                            int num_cmd_pages = (7 + mc_commands.size() + ARR_SIZE(hard_cmd_help)) / 8;
+
+                            if (help_page > num_cmd_pages)
+                                help_page = num_cmd_pages;
+
+                            if (help_page <= 0)
+                                help_page = 1;
+
+                            int printed = 0;
+                            int tries = 0;
+                            send_chat(sock, "§6============ Commands (Page %d/%d) ============", help_page, num_cmd_pages);
+
+                            for (size_t i = 0; i < ARR_SIZE(hard_cmd_help) && printed < 8; i++, tries++)
                             {
-                                packet_chat_message_t pack_msg;
-                                pack_msg.msg = commands[i];
-                                send_buffer(sock, pack_msg.assemble());
+                                if ((help_page - 1) * 8 <= tries && tries < (help_page * 8))
+                                {
+                                    printed++;
+                                    if (hard_cmd_help[i].params != NULL && *(hard_cmd_help[i].params) != '\0')
+                                        send_chat(sock, "§5/%s %s", hard_cmd_help[i].name, hard_cmd_help[i].params);
+                                    else
+                                        send_chat(sock, "§5/%s", hard_cmd_help[i].name);
+
+                                    if (mc_commands[i].help != NULL && *(mc_commands[i].help) != '\0')
+                                        send_chat(sock, "  §7%s", mc_commands[i].help);
+                                }
                             }
+                            for (size_t i = 0; i < mc_commands.size() && printed < 8; i++, tries++)
+                            {
+
+                                if ((help_page - 1) * 8 <= tries && tries < (help_page * 8))
+                                {
+                                    printed++;
+                                    if (mc_commands[i].params != NULL && *(mc_commands[i].params) != '\0')
+                                        send_chat(sock, "§5/%s %s", mc_commands[i].name, mc_commands[i].params);
+                                    else
+                                        send_chat(sock, "§5/%s", mc_commands[i].name);
+
+                                    if (mc_commands[i].help != NULL && *(mc_commands[i].help) != '\0')
+                                        send_chat(sock, "  §7%s", mc_commands[i].help);
+                                }
+                            }
+                        }
+                        else
+                        {
+                            std::string cmdline;
+                            command_return_t cmd_ret = COMMAND_UNSET;
+                            for (size_t i = 0; i < mc_commands.size() && cmd_ret == COMMAND_UNSET; i++)
+                            {
+                                if (p->msg.substr(1, p->msg.find(" ") - 1) == mc_commands[i].name)
+                                {
+                                    cmd_ret = mc_commands[i].cmd(p->msg.c_str() + 1, clients, client, dimensions);
+                                }
+                            }
+
+                            if (cmd_ret == COMMAND_FAIL_INTERNAL)
+                                send_chat(sock, "§c%s: An internal error occurred!", p->msg.substr(1, p->msg.find(" ")).c_str());
+
+                            if (cmd_ret == COMMAND_FAIL_PARSE)
+                                send_chat(sock, "§c%s: A parsing error occurred!", p->msg.substr(1, p->msg.find(" ")).c_str());
+
+                            if (cmd_ret == COMMAND_FAIL_UNHANDLED)
+                                send_chat(sock, "§c%s: An error occurred!", p->msg.substr(1, p->msg.find(" ")).c_str());
                         }
                     }
                     else
@@ -1469,7 +1729,7 @@ int main(int argc, const char** argv)
                     send_buffer(sock, pack_health.assemble());
 
                     packet_respawn_t pack_respawn;
-                    pack_respawn.seed = world_seed;
+                    pack_respawn.seed = server_seed;
                     pack_respawn.dimension = client->dimension;
                     pack_respawn.mode = client->player_mode;
                     pack_respawn.world_height = WORLD_HEIGHT;
@@ -1478,7 +1738,7 @@ int main(int argc, const char** argv)
                     spawn_player(clients, client, dimensions);
 
                     packet_time_update_t pack_time;
-                    pack_time.time = sdl_tick_cur / 50;
+                    pack_time.time = server_time;
                     send_buffer(sock, pack_time.assemble());
 
                     break;
@@ -1620,6 +1880,8 @@ int main(int argc, const char** argv)
                     double y_diff = p->y - client->player_y;
                     double z_diff = p->z - client->player_z;
                     double radius = SDL_sqrt(x_diff * x_diff + y_diff * y_diff + z_diff * z_diff);
+
+                    (void)radius;
 
                     TRACE("Place %d @ <%d, %d, %d>:%d (Radius: %.3f)", p->block_item_id, p->x, p->y, p->z, p->direction, radius);
 
@@ -1789,8 +2051,10 @@ int main(int argc, const char** argv)
     for (size_t i = 0; i < clients.size(); i++)
     {
         if (clients[i].sock)
-            SDLNet_DestroyStreamSocket(clients[i].sock);
+            kick(clients[i].sock, "Server stopping!");
     }
+
+    SDL_Delay(50);
 
     cull_dying_sockets(true);
 
