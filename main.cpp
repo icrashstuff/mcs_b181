@@ -55,7 +55,7 @@ long server_seed = 0;
 
 int server_weather = 0;
 
-long server_time = 18000;
+long server_time = 0;
 
 int next_thunder_bolt = 0;
 
@@ -1212,7 +1212,8 @@ int main(int argc, const char** argv)
     if (!((convar_int_t*)convar_t::get_convar("dev"))->get())
         server_seed = cast_to_sint64((Uint64)SDL_rand_bits() << 32 | (Uint64)SDL_rand_bits());
 
-    server_time = cast_to_sint64(SDL_rand_bits());
+    if (!((convar_int_t*)convar_t::get_convar("dev"))->get())
+        server_time = cast_to_sint64(SDL_rand_bits());
 
     next_thunder_bolt = SDL_rand_bits() & 0x7fff;
 

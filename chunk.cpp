@@ -49,10 +49,10 @@ static convar_int_t strip_stone("strip_stone", 0, 0, 1, "Strip stone after gener
  * Cutters will be able to cut through anything, but must start in terrain
  */
 static param_cutter_t cutter_params[] = {
-    { 0.5f, BLOCK_ID_BRICKS, { 4, 6 }, { 0, 127 }, CUTTER_CAVE_NO_DECOR },
-    { 0.5f, BLOCK_ID_GOLD, { 8, 10 }, { 0, 127 }, CUTTER_CAVE_NO_DECOR },
-    { 0.15f, BLOCK_ID_DIAMOND, { 8, 10 }, { 0, 127 }, CUTTER_RAVINE_NO_DECOR },
-    { 0.05f, BLOCK_ID_GLOWSTONE, { 8, 10 }, { 0, 127 }, CUTTER_RAVINE_NO_DECOR },
+    { 0.5f, BLOCK_ID_BRICKS, { 4, 6 }, { 10, 128 }, { 0, 127 }, CUTTER_CAVE_NO_DECOR },
+    { 0.5f, BLOCK_ID_GOLD, { 8, 10 }, { 10, 128 }, { 0, 127 }, CUTTER_CAVE_NO_DECOR },
+    { 0.15f, BLOCK_ID_DIAMOND, { 8, 10 }, { 20, 128 }, { 0, 127 }, CUTTER_RAVINE_NO_DECOR },
+    { 0.05f, BLOCK_ID_GLOWSTONE, { 8, 10 }, { 20, 128 }, { 0, 127 }, CUTTER_RAVINE_NO_DECOR },
 };
 
 chunk_t::chunk_t()
@@ -141,6 +141,23 @@ void chunk_t::generate_from_seed_over(long seed, int cx, int cz)
     }
 
     generate_ores(seed, cx, cz, ore_params, ARR_SIZE(ore_params));
+    // generate_cutters(seed, cx, cz, cutter_params, ARR_SIZE(cutter_params));
+
+    if (((convar_int_t*)convar_t::get_convar("dev"))->get())
+    {
+        for (int x = 0; x < CHUNK_SIZE_X; x++)
+        {
+            for (int z = 0; z < CHUNK_SIZE_Z; z++)
+            {
+                if (x == 0 && z == 0)
+                    set_type(x, 0, z, BLOCK_ID_WOOL);
+                else if (SDL_abs(cx) % 2 == SDL_abs(cz) % 2)
+                    set_type(x, 0, z, BLOCK_ID_BEDROCK);
+                else
+                    set_type(x, 0, z, BLOCK_ID_BRICKS_STONE);
+            }
+        }
+    }
 
     if (strip_stone.get())
         for (int x = 0; x < CHUNK_SIZE_X; x++)
@@ -187,11 +204,14 @@ void chunk_t::generate_ores(long seed, int cx, int cz, param_ore_t* ores, Uint8 
             for (int cval_it = 0; cval_it < num_chances; cval_it++)
             {
                 Uint64 d = cvals[cval_it];
-                jbyte x = ((jbyte)(d & 0x0f)) + (ic - 1) * CHUNK_SIZE_X;
-                jbyte z = ((jbyte)(d >> 4) & 0x0f) + (jc - 1) * CHUNK_SIZE_Z;
+                jshort x = ((jbyte)(d & 0x0f)) + (ic - 1) * CHUNK_SIZE_X;
+                jshort z = ((jbyte)(d >> 4) & 0x0f) + (jc - 1) * CHUNK_SIZE_Z;
                 jubyte y = (d >> 8) & 0x7f;
                 jubyte which = ((d >> 16) & 0xff) % ore_count;
                 float rarity = (float)(((d >> 24) & 0xff) + ((d >> 36) & 0xff)) / 512.0f;
+                bool direction_x = (d >> 45) & 1;
+                int direction_move = ((d >> 46) & 1) ? -1 : 1;
+                int direction_side = (((d >> 48) & 1) ? -1 : 1) * ((d >> 47) & 1);
 
                 for (jubyte off = 0; off < ore_count; off++)
                 {
@@ -218,10 +238,44 @@ void chunk_t::generate_ores(long seed, int cx, int cz, param_ore_t* ores, Uint8 
                 if (p.vein_size.max != p.vein_size.min)
                     times += d % (p.vein_size.max - p.vein_size.min);
 
-                jshort last_jx = x, last_jy = y, last_jz = z;
+                Uint64 jitter_var = ROTATE_UINT64(d, d & 0xff);
+
                 for (int time_it = 0; time_it < times; time_it++)
                 {
+                    jitter_var = ROTATE_UINT64(jitter_var, 7);
                     Uint8 pos_ore_2r = ((d >> 45) + time_it) % ARR_SIZE(ore_2r);
+                    if (direction_x)
+                    {
+                        if (direction_side != 0)
+                        {
+                            x += direction_move;
+                            z += direction_side * ((jitter_var >> 4) & 1);
+                        }
+                        else
+                        {
+                            x += direction_move;
+                            z -= ((jitter_var >> 3) & 1);
+                            z += ((jitter_var >> 2) & 1);
+                        }
+                    }
+                    else
+                    {
+                        if (direction_side != 0)
+                        {
+                            x += direction_side * ((jitter_var >> 4) & 1);
+                            z += direction_move;
+                        }
+                        else
+                        {
+                            z += direction_move;
+                            x += ((jitter_var >> 2) & 1);
+                            x -= ((jitter_var >> 3) & 1);
+                        }
+                    }
+
+                    y += ((jitter_var >> 0) & 1);
+                    y -= ((jitter_var >> 1) & 1);
+
                     for (int shift = 0; shift < 8; shift++)
                     {
                         Uint16 shifty = (Uint16)ore_2r[pos_ore_2r] << 16 | ore_2r[pos_ore_2r];
@@ -236,53 +290,8 @@ void chunk_t::generate_ores(long seed, int cx, int cz, param_ore_t* ores, Uint8 
                         if (jy < 0 || jy >= CHUNK_SIZE_Y)
                             continue;
                         for (int k = 0; k < ARR_SIZE_I(p.can_replace); k++)
-                        {
                             if (get_type(jx, jy, jz) == p.can_replace[k])
-                            {
                                 set_type(jx, jy, jz, p.block_id);
-                                last_jx = jx;
-                                last_jy = jy;
-                                last_jy = jz;
-                            }
-                        }
-                    }
-
-                    int off = (d >> 45) & 1 + (d >> 33) & 1;
-                    int off2 = (d >> 40) & 1 + (d >> 55) & 1;
-                    int off3 = (d >> 37) & 1 + (d >> 44) & 1;
-
-                    switch ((time_it / 2 + d & 0xff + off + off2 + off3) % 7)
-                    {
-                    case 0:
-                        x = last_jx;
-                        y = last_jy;
-                        z += d & 0x1000 ? off : -off2;
-                        break;
-                    case 1:
-                        x += d & 0x100000 ? off2 : -off3;
-                        y = last_jy;
-                        z = last_jz;
-                        break;
-                    case 2:
-                        x = last_jx;
-                        y += d & 0x10 ? off3 : -off2;
-                        z = last_jz;
-                        break;
-                    case 4:
-                        x = last_jx;
-                        y = last_jy;
-                        z = last_jz;
-                        break;
-                    case 5:
-                        x += d & 0x2000 ? off2 : -off;
-                        y += d & 0x40 ? off3 : -off;
-                        z += d & 0x1000 ? off3 : -off2;
-                        break;
-                    case 6:
-                        x += d & 0x8000 ? off : -off2;
-                        y += d & 0x010000 ? off2 : -off3;
-                        z += d & 0x800000 ? off3 : -off;
-                        break;
                     }
                 }
             }

@@ -45,7 +45,7 @@ struct param_ore_t
     range_t vein_size;
 
     /**
-     * Zone of max abundance (unused)
+     * Zone of max abundance
      */
     range_t zone_y;
 
@@ -71,13 +71,23 @@ enum cutter_type_t : Uint8
 /**
  * TODO: Will be involved with cave/ravine gen
  *
- * Cutters will be able to cut through anything, but must start in terrain
+ * Cutters will be able to cut through anything (except bedrock), but must start in terrain
  */
 struct param_cutter_t
 {
     float rarity;
     Uint8 block_id;
-    range_t size;
+
+    range_t radius;
+
+    /**
+     * Cutter vein size in terms of min and max cut planes
+     */
+    range_t vein_size;
+
+    /**
+     * Zone of possible centerpoints
+     */
     range_t gen_y;
 
     cutter_type_t cutter;
@@ -110,6 +120,8 @@ public:
     void generate_from_seed_over(long seed, int cx, int cz);
 
     void generate_ores(long seed, int cx, int cz, param_ore_t* ores, Uint8 ore_count);
+
+    void generate_cutters(long seed, int cx, int cz, param_cutter_t* cutters, Uint8 cutter_count);
 
     void generate_from_seed_nether(long seed, int cx, int cz);
 

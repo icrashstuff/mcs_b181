@@ -133,6 +133,8 @@ bool argv_from_str(std::vector<std::string>& argv, std::string cmdline, bool par
 bool long_from_str(std::string str, long& out);
 bool int_from_str(std::string str, int& out);
 
+#define ROTATE_UINT64(x, amount) (((((Uint64)(x)) << (64 - ((amount) % 64))) | (((Uint64)(x)) >> ((amount) % 64))) & 0xFFFFFFFFFFFFFFFF)
+
 /**
  * Convert boolean value to string of true or false
  */
