@@ -689,7 +689,6 @@ bool mc_id::can_host_rail(short block_id)
 
 Uint8 mc_id::get_light_level(short block_id)
 {
-
     switch (block_id)
     {
         ADD_NAME(BLOCK_ID_TORCH, 15);
@@ -702,6 +701,60 @@ Uint8 mc_id::get_light_level(short block_id)
         ADD_NAME(BLOCK_ID_LAVA_SOURCE, 15);
         ADD_NAME(BLOCK_ID_LAVA_FLOWING, 15);
         ADD_NAME(BLOCK_ID_ORE_REDSTONE_ON, 7);
+    default:
+        return 0;
+    }
+}
+
+Uint8 mc_id::get_food_value(short item_id)
+{
+    switch (item_id)
+    {
+        ADD_NAME(ITEM_ID_APPLE_GOLDEN, 4);
+
+        ADD_NAME(ITEM_ID_BEEF_COOKED, 8);
+        ADD_NAME(ITEM_ID_PORK_COOKED, 8);
+
+        ADD_NAME(ITEM_ID_CHICKEN_COOKED, 6);
+        ADD_NAME(ITEM_ID_FISH_COOKED, 5);
+        ADD_NAME(ITEM_ID_BREAD, 5);
+
+        ADD_NAME(ITEM_ID_CHICKEN, 2);
+        ADD_NAME(ITEM_ID_APPLE, 4);
+        ADD_NAME(ITEM_ID_MELON, 2);
+        ADD_NAME(ITEM_ID_BEEF, 3);
+        ADD_NAME(ITEM_ID_PORK, 3);
+
+        ADD_NAME(ITEM_ID_FLESH, 4);
+        ADD_NAME(ITEM_ID_COOKIE, 2);
+        ADD_NAME(ITEM_ID_FISH, 2);
+    default:
+        return 0;
+    }
+}
+
+float mc_id::get_food_staturation_ratio(short item_id)
+{
+    switch (item_id)
+    {
+        ADD_NAME(ITEM_ID_APPLE_GOLDEN, 2.4);
+
+        ADD_NAME(ITEM_ID_BEEF_COOKED, 1.6);
+        ADD_NAME(ITEM_ID_PORK_COOKED, 1.6);
+
+        ADD_NAME(ITEM_ID_CHICKEN_COOKED, 1.2);
+        ADD_NAME(ITEM_ID_FISH_COOKED, 1.2);
+        ADD_NAME(ITEM_ID_BREAD, 1.2);
+
+        ADD_NAME(ITEM_ID_CHICKEN, 0.6);
+        ADD_NAME(ITEM_ID_APPLE, 0.6);
+        ADD_NAME(ITEM_ID_MELON, 0.6);
+        ADD_NAME(ITEM_ID_BEEF, 0.6);
+        ADD_NAME(ITEM_ID_PORK, 0.6);
+
+        ADD_NAME(ITEM_ID_FLESH, 0.2);
+        ADD_NAME(ITEM_ID_COOKIE, 0.2);
+        ADD_NAME(ITEM_ID_FISH, 0.2);
     default:
         return 0;
     }

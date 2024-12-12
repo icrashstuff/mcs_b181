@@ -408,6 +408,10 @@ bool can_host_hanging(short block_id);
 
 bool can_host_rail(short block_id);
 
+Uint8 get_food_value(short item_id);
+
+float get_food_staturation_ratio(short item_id);
+
 /**
  * For blocks like rails, ladders, torches, signs, flowers, buttons, pressure plates, levers, and such
  */

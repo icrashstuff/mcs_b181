@@ -614,6 +614,7 @@ struct client_t
     int old_dimension = 0;
     int player_mode = 1;
 
+    short last_health = -20;
     short health = 20;
     short food = 20;
     float food_satur = 5.0;
@@ -698,6 +699,22 @@ void send_inventory(client_t* client)
     pack_inv.payload_from_array(client->inventory, ARR_SIZE(client->inventory));
 
     send_buffer(client->sock, pack_inv.assemble());
+}
+
+void survival_mode_decrease_hand(client_t* client)
+{
+    if (client->player_mode == 0)
+    {
+        if (client->inventory[client->cur_item_idx].quantity > 0)
+            client->inventory[client->cur_item_idx].quantity--;
+        if (client->inventory[client->cur_item_idx].quantity == 0)
+            client->inventory[client->cur_item_idx] = {};
+    }
+
+    packet_window_set_slot_t pack_set_slot;
+    pack_set_slot.slot = client->cur_item_idx;
+    pack_set_slot.item = client->inventory[client->cur_item_idx];
+    send_buffer(client->sock, pack_set_slot.assemble());
 }
 
 bool is_chunk_loaded(std::vector<chunk_coords_t> loaded_chunks, int chunk_x, int chunk_z)
@@ -1021,6 +1038,43 @@ MC_COMMAND(kill)
     return COMMAND_OK;
 }
 
+MC_COMMAND(craft)
+{
+    MC_COMMAND_UNUSED();
+    if (!client || !client->sock)
+        return COMMAND_FAIL_INTERNAL;
+    SDLNet_StreamSocket* sock = client->sock;
+
+    packet_window_open_t pack_craft;
+    pack_craft.window_id = 1;
+    pack_craft.num_slots = 10;
+    pack_craft.title = "Crafting";
+    pack_craft.type = 1;
+    send_buffer(sock, pack_craft.assemble());
+
+    packet_window_set_slot_t pack_craft_set_result;
+    pack_craft_set_result.window_id = 1;
+    pack_craft_set_result.item.quantity = 64;
+
+    for (int i = 1; i < 10; i++)
+    {
+        pack_craft_set_result.slot = i;
+        pack_craft_set_result.item.id = BLOCK_ID_GOLD;
+        send_buffer(sock, pack_craft_set_result.assemble());
+    }
+
+    pack_craft_set_result.slot = 5;
+    pack_craft_set_result.item.id = ITEM_ID_APPLE;
+    send_buffer(sock, pack_craft_set_result.assemble());
+
+    pack_craft_set_result.slot = 0;
+    pack_craft_set_result.item.quantity = 1;
+    pack_craft_set_result.item.id = ITEM_ID_APPLE_GOLDEN;
+    send_buffer(sock, pack_craft_set_result.assemble());
+
+    return COMMAND_OK;
+}
+
 MC_COMMAND(unload)
 {
     MC_COMMAND_UNUSED();
@@ -1185,6 +1239,103 @@ MC_COMMAND(weather)
     return COMMAND_OK;
 }
 
+MC_COMMAND(health)
+{
+    MC_COMMAND_UNUSED();
+    if (!client || !client->sock)
+        return COMMAND_FAIL_INTERNAL;
+    SDLNet_StreamSocket* sock = client->sock;
+
+    std::vector<std::string> argv;
+    if (!argv_from_str(argv, cmdline))
+        return COMMAND_FAIL_PARSE;
+
+    if (argv.size() < 2)
+    {
+        send_chat(sock, "Health: %d", client->health);
+        return COMMAND_OK;
+    }
+
+    int parse_result;
+    if (!int_from_str(argv[1], parse_result))
+        return COMMAND_FAIL_PARSE;
+
+    parse_result = SDL_max(SDL_min(parse_result, 32760), -32760);
+
+    client->health = parse_result;
+    client->update_health = 1;
+
+    send_chat(sock, "Health: Setting health to %d", client->health);
+
+    return COMMAND_OK;
+}
+
+MC_COMMAND(ent_status)
+{
+    MC_COMMAND_UNUSED();
+    if (!client || !client->sock)
+        return COMMAND_FAIL_INTERNAL;
+    SDLNet_StreamSocket* sock = client->sock;
+
+    std::vector<std::string> argv;
+    if (!argv_from_str(argv, cmdline))
+        return COMMAND_FAIL_PARSE;
+
+    if (argv.size() < 2)
+    {
+        send_chat(sock, "ent_status: Requires one positional argument: status");
+        return COMMAND_FAIL;
+    }
+
+    int parse_result;
+    if (!int_from_str(argv[1], parse_result))
+        return COMMAND_FAIL_PARSE;
+
+    packet_ent_status_t stat;
+    stat.eid = client->eid;
+    stat.status = parse_result;
+
+    send_buffer_to_players_if_coords(clients, stat.assemble(), client->player_x, client->player_z, client->dimension);
+
+    send_chat(sock, "ent_status: Setting player status to %d", parse_result);
+
+    return COMMAND_OK;
+}
+
+MC_COMMAND(food)
+{
+    MC_COMMAND_UNUSED();
+    if (!client || !client->sock)
+        return COMMAND_FAIL_INTERNAL;
+    SDLNet_StreamSocket* sock = client->sock;
+
+    std::vector<std::string> argv;
+    if (!argv_from_str(argv, cmdline))
+        return COMMAND_FAIL_PARSE;
+
+    if (argv.size() < 2)
+    {
+        send_chat(sock, "Food: Food: %d", client->food);
+        send_chat(sock, "Food: Saturation: %.1f", client->food_satur);
+        return COMMAND_OK;
+    }
+
+    int parse_result;
+    if (!int_from_str(argv[1], parse_result))
+        return COMMAND_FAIL_PARSE;
+
+    parse_result = SDL_max(SDL_min(parse_result, 32760), -32760);
+
+    client->food = SDL_min(parse_result, 20);
+    client->food_satur = SDL_max(parse_result - 20, 0);
+    client->update_health = 1;
+
+    send_chat(sock, "Food: Setting food to %d", client->food);
+    send_chat(sock, "Food: Setting saturation to %.1f", client->food_satur);
+
+    return COMMAND_OK;
+}
+
 static convar_string_t address_listen("address_listen", "127.0.0.1", "Address to listen for connections");
 
 int main(int argc, const char** argv)
@@ -1243,12 +1394,16 @@ int main(int argc, const char** argv)
     }
     MC_COMMAND_REGB(stats, "", "Show server stats");
     MC_COMMAND_REGB(kill, "", "Kill the player");
+    MC_COMMAND_REGB(craft, "", "Show a crafting table");
     MC_COMMAND_REG("nether", dimension, "", "Transport player to nether");
     MC_COMMAND_REG("overworld", dimension, "", "Transport player to overworld");
     MC_COMMAND_REG("c", gamemode, "", "Change gamemode to creative");
     MC_COMMAND_REG("s", gamemode, "", "Change gamemode to survival");
+    MC_COMMAND_REGB(health, "<level>", "Modify health [0-20]");
+    MC_COMMAND_REGB(food, "<level>", "Modify food [0-25]");
     MC_COMMAND_REGB(weather, "<state>", "Modify weather [0: Off, 1: Rain, 2: Thunder, 3: ???]");
     MC_COMMAND_REGB(time, "<add:set> <time>", "Modify server time");
+    MC_COMMAND_REGB(ent_status, "<status>", "Modify player entity status");
 
     LOG("Initializing server");
 
@@ -1579,6 +1734,24 @@ int main(int argc, const char** argv)
                     pack_health.health = client->health;
                     pack_health.food = client->food;
                     pack_health.food_saturation = client->food_satur;
+
+                    packet_ent_status_t pack_player_hurt;
+                    pack_player_hurt.eid = client->eid;
+                    pack_player_hurt.status = ENT_STATUS_HURT;
+
+                    packet_ent_status_t pack_player_dead;
+                    pack_player_dead.eid = client->eid;
+                    pack_player_dead.status = ENT_STATUS_DEAD;
+
+                    if (client->health < client->last_health)
+                    {
+                        if (client->health > 0)
+                            send_buffer_to_players_if_coords(clients, pack_player_hurt.assemble(), client->player_x, client->player_z, client->dimension);
+                        else
+                            send_buffer_to_players_if_coords(clients, pack_player_dead.assemble(), client->player_x, client->player_z, client->dimension);
+                    }
+                    client->last_health = client->health;
+
                     send_buffer(sock, pack_health.assemble());
                 }
                 if (client->update_health)
@@ -1860,7 +2033,8 @@ int main(int argc, const char** argv)
                         chunk_t* c = dimensions[client->dimension < 0].get_chunk(cx, cz);
                         if (c)
                         {
-                            if (p->status == PLAYER_DIG_STATUS_FINISH_DIG || client->player_mode > 0)
+                            if (p->status == PLAYER_DIG_STATUS_FINISH_DIG
+                                || (client->player_mode > 0 && !mc_id::is_sword(client->inventory[client->cur_item_idx].id)))
                             {
                                 TRACE("%d %d %d %d", p->x, p->y, p->z, c->get_type(p->x % 16, p->y, p->z % 16));
                                 packet_sound_effect_t pack_break_sfx;
@@ -1967,6 +2141,20 @@ int main(int argc, const char** argv)
                     bool x_dir = mc_face == 1 || mc_face == 3;
 
                     TRACE("Place %d @ <%d, %d, %d>:%d (%d) (Radius: %.3f)", type, p->x, p->y, p->z, p->direction, mc_face, radius);
+
+                    Uint8 food_value = mc_id::get_food_value(type);
+                    if (food_value && client->food < 20)
+                    {
+                        client->food += food_value;
+                        if (client->food > 20)
+                        {
+                            client->food_satur = (float)(client->food - 20) * mc_id::get_food_staturation_ratio(type);
+                            client->food = 20;
+                        }
+
+                        survival_mode_decrease_hand(client);
+                        break;
+                    }
 
                     if (p->direction != -1 && type >= 0 && type < 256)
                     {
@@ -2147,16 +2335,31 @@ int main(int argc, const char** argv)
                             c->set_type(place_x % 16, place_y, place_z % 16, type);
                             c->set_metadata(place_x % 16, place_y, place_z % 16, p->damage);
                             send_buffer_to_players_if_coords(clients, pack_block_change.assemble(), place_x, place_z, client->dimension);
-                            if (client->player_mode == 0)
-                            {
-                                client->inventory[client->cur_item_idx].quantity--;
-                                if (client->inventory[client->cur_item_idx].quantity < 1)
-                                    client->inventory[client->cur_item_idx] = {};
-                            }
+
+                            survival_mode_decrease_hand(client);
+                            break;
                         }
                         else
+                        {
+                            if (c)
+                            {
+                                packet_block_change_t pack_block_change;
+                                pack_block_change.block_x = place_x;
+                                pack_block_change.block_y = place_y;
+                                pack_block_change.block_z = place_z;
+                                pack_block_change.type = c->get_type(place_x % 16, place_y, place_z % 16);
+                                pack_block_change.metadata = c->get_metadata(place_x % 16, place_y, place_z % 16);
+
+                                send_buffer_to_players_if_coords(clients, pack_block_change.assemble(), place_x, place_z, client->dimension);
+                            }
                             LOG("Unable to place block");
+                        }
                     }
+
+                    packet_window_set_slot_t pack_set_slot;
+                    pack_set_slot.slot = client->cur_item_idx;
+                    pack_set_slot.item = client->inventory[client->cur_item_idx];
+                    send_buffer(sock, pack_set_slot.assemble());
 
                     break;
                 }
@@ -2174,8 +2377,30 @@ int main(int argc, const char** argv)
                 }
                 case PACKET_ID_ENT_ACTION:
                     break;
-                case PACKET_ID_WINDOW_CLOSE:
+                case PACKET_ID_WINDOW_TRANSACTION:
+                {
+                    CAST_PACK_TO_P(packet_window_transaction_t);
+
+                    LOG("Window %d transaction: %d %d", p->window_id, p->action_num, p->accepted);
+
                     break;
+                }
+                case PACKET_ID_WINDOW_CLICK:
+                {
+                    CAST_PACK_TO_P(packet_window_click_t);
+
+                    LOG("Window %d click: %d %d %d %d", p->window_id, p->slot, p->right_click, p->action_num, p->shift);
+
+                    break;
+                }
+                case PACKET_ID_WINDOW_CLOSE:
+                {
+                    CAST_PACK_TO_P(packet_window_close_t);
+
+                    LOG("Window %d closed", p->window_id);
+
+                    break;
+                }
                 case PACKET_ID_INV_CREATIVE_ACTION:
                 {
                     CAST_PACK_TO_P(packet_inventory_action_creative_t);

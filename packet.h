@@ -305,6 +305,9 @@ struct packet_player_place_t : packet_t
 #define ENT_ACTION_ID_SPRINT_START 4
 #define ENT_ACTION_ID_SPRINT_STOP 5
 
+#define ENT_STATUS_HURT 2
+#define ENT_STATUS_DEAD 3
+
 /**
  * Server -> Client
  */
