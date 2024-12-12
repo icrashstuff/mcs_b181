@@ -83,10 +83,10 @@ enum damage_id_t : Uint8
     STONE_BRICK_ID_CRACKED,
 };
 
-typedef short item_id_t;
-typedef short block_id_t;
+typedef jshort item_id_t;
+typedef jshort block_id_t;
 
-enum item_id_t_ : short
+enum item_id_t_ : item_id_t
 {
     BLOCK_ID_NONE = -1,
     ITEM_ID_NONE = BLOCK_ID_NONE,

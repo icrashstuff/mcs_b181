@@ -1339,6 +1339,285 @@ MC_COMMAND(food)
     return COMMAND_OK;
 }
 
+void player_place(std::vector<client_t>& clients, client_t* client, packet_player_place_t* p, dimension_t* dimensions)
+{
+    double x_diff = p->x - client->player_x;
+    double y_diff = p->y - client->player_y;
+    double z_diff = p->z - client->player_z;
+    double radius = SDL_sqrt(x_diff * x_diff + y_diff * y_diff + z_diff * z_diff);
+
+    (void)radius;
+
+    jshort type = p->block_item_id;
+
+    int place_x = p->x;
+    int place_y = p->y;
+    int place_z = p->z;
+    int center_x = p->x;
+    int center_y = p->y;
+    int center_z = p->z;
+    bool center_good = true;
+    int is_torch = type == BLOCK_ID_TORCH;
+    is_torch += type == BLOCK_ID_TORCH_REDSTONE_ON;
+    is_torch += type == BLOCK_ID_TORCH_REDSTONE_OFF;
+    is_torch += type == BLOCK_ID_LEVER;
+    int is_rail = type == BLOCK_ID_RAIL;
+    is_rail += type == BLOCK_ID_RAIL_POWERED;
+    is_rail += type == BLOCK_ID_RAIL_DETECTOR;
+    float theta = SDL_atan2f(place_x + 0.5f - client->player_x, place_z + 0.5f - client->player_z) * 180.0f / SDL_PI_F;
+    theta = client->player_yaw;
+    float phi = client->player_pitch;
+    theta = SDL_fmodf(SDL_fmodf(theta, 360.f) + 360.0f, 360.f);
+
+    int mc_face = 0;
+    if (45.0f < theta && theta < 135.0f)
+        mc_face = 1;
+    else if (135.0f < theta && theta < 225.0f)
+        mc_face = 2;
+    else if (225.0f < theta && theta < 315.0f)
+        mc_face = 3;
+    else
+        mc_face = 0;
+
+    int y_dir = 0;
+    if (phi > 50.0f)
+        y_dir = 1;
+    if (phi < -50.0f)
+        y_dir = -1;
+
+    bool x_dir = mc_face == 1 || mc_face == 3;
+
+    TRACE("Place %d @ <%d, %d, %d>:%d (%d) (Radius: %.3f)", type, p->x, p->y, p->z, p->direction, mc_face, radius);
+
+    Uint8 food_value = mc_id::get_food_value(type);
+    if (food_value && client->food < 20)
+    {
+        client->food += food_value;
+        if (client->food > 20)
+        {
+            client->food_satur = (float)(client->food - 20) * mc_id::get_food_staturation_ratio(type);
+            client->food = 20;
+        }
+
+        survival_mode_decrease_hand(client);
+        return;
+    }
+
+    bool enable_decrement = true;
+
+    if (type == ITEM_ID_FLINT_STEEL)
+    {
+        type = BLOCK_ID_FIRE;
+        enable_decrement = false;
+    }
+
+    if (p->direction != -1 && type >= 0 && type < 256)
+    {
+        switch (p->direction)
+        {
+        case 0:
+            place_y -= 1;
+            if (is_torch)
+                type = 0;
+            if (type == BLOCK_ID_LADDER)
+                type = 0;
+            break;
+        case 1:
+            place_y += 1;
+            if (is_torch)
+                p->damage = 5;
+            if (type == BLOCK_ID_LEVER && x_dir)
+                p->damage = 6;
+            if (type == BLOCK_ID_LADDER)
+                type = 0;
+            break;
+        case 2:
+            place_z -= 1;
+            if (is_torch)
+                p->damage = 4;
+            if (type == BLOCK_ID_LADDER)
+                p->damage = 2;
+            break;
+        case 3:
+            place_z += 1;
+            if (is_torch)
+                p->damage = 3;
+            if (type == BLOCK_ID_LADDER)
+                p->damage = 3;
+            break;
+        case 4:
+            place_x -= 1;
+            if (is_torch)
+                p->damage = 2;
+            if (type == BLOCK_ID_LADDER)
+                p->damage = 4;
+            break;
+        case 5:
+            place_x += 1;
+            if (is_torch)
+                p->damage = 1;
+            if (type == BLOCK_ID_LADDER)
+                p->damage = 5;
+            break;
+        default:
+            return;
+        }
+
+        if (is_rail && x_dir)
+            p->damage = 1;
+
+        if (type == BLOCK_ID_FURNACE_OFF || type == BLOCK_ID_CHEST || type == BLOCK_ID_DISPENSER || type == BLOCK_ID_PISTON || type == BLOCK_ID_PISTON_STICKY)
+        {
+            switch (mc_face)
+            {
+            case 1:
+                p->damage = 5;
+                break;
+            case 2:
+                p->damage = 3;
+                break;
+            case 3:
+                p->damage = 4;
+                break;
+            default:
+                p->damage = 2;
+                break;
+            }
+        }
+
+        if (type == BLOCK_ID_PISTON || type == BLOCK_ID_PISTON_STICKY)
+        {
+            switch (y_dir)
+            {
+            case -1:
+                p->damage = 0;
+                break;
+            case 1:
+                p->damage = 1;
+                break;
+            default:
+                break;
+            }
+        }
+
+        if (type == BLOCK_ID_PUMPKIN || type == BLOCK_ID_PUMPKIN_GLOWING)
+        {
+            switch (mc_face)
+            {
+            case 1:
+                p->damage = 3;
+                break;
+            case 2:
+                p->damage = 0;
+                break;
+            case 3:
+                p->damage = 1;
+                break;
+            default:
+                p->damage = 2;
+                break;
+            }
+        }
+
+        Uint8 is_stairs = type == BLOCK_ID_STAIRS_BRICK;
+        is_stairs += type == BLOCK_ID_STAIRS_WOOD;
+        is_stairs += type == BLOCK_ID_STAIRS_BRICK_STONE;
+        is_stairs += type == BLOCK_ID_STAIRS_COBBLESTONE;
+
+        if (is_stairs)
+        {
+            switch (mc_face)
+            {
+            case 1:
+                p->damage = 1;
+                break;
+            case 2:
+                p->damage = 3;
+                break;
+            case 3:
+                p->damage = 0;
+                break;
+            default:
+                p->damage = 2;
+                break;
+            }
+        }
+
+        if (place_y < 0)
+            return;
+
+        double diff_y = (double)place_y - client->player_y;
+
+        if (SDL_floor(client->player_x) == place_x && (-0.9 < diff_y && diff_y < 1.8) && SDL_floor(client->player_z) == place_z
+            && mc_id::block_has_collision(type))
+        {
+            type = 0;
+            p->damage = 0;
+        }
+
+        int cx = place_x >> 4;
+        int cz = place_z >> 4;
+
+        chunk_t* c = dimensions[client->dimension < 0].get_chunk(cx, cz);
+
+        if (c && (is_torch || type == BLOCK_ID_LADDER))
+        {
+            Uint8 center_type = c->get_type(center_x % 16, center_y, center_z % 16);
+            if (!mc_id::can_host_hanging(center_type))
+                center_good = false;
+        }
+
+        if (c && (is_rail || type == BLOCK_ID_FIRE))
+        {
+            if (center_y > 0)
+            {
+                Uint8 lower_type = c->get_type(place_x % 16, place_y - 1, place_z % 16);
+                if (!mc_id::can_host_rail(lower_type))
+                    center_good = false;
+            }
+        }
+
+        Uint8 place_type = c->get_type(place_x % 16, place_y, place_z % 16);
+
+        if (c && type != 0 && (place_type == BLOCK_ID_FIRE || place_type == BLOCK_ID_AIR) && center_good)
+        {
+            packet_block_change_t pack_block_change;
+            pack_block_change.block_x = place_x;
+            pack_block_change.block_y = place_y;
+            pack_block_change.block_z = place_z;
+            pack_block_change.type = type;
+            pack_block_change.metadata = p->damage;
+            c->set_type(place_x % 16, place_y, place_z % 16, type);
+            c->set_metadata(place_x % 16, place_y, place_z % 16, p->damage);
+            send_buffer_to_players_if_coords(clients, pack_block_change.assemble(), place_x, place_z, client->dimension);
+
+            if (enable_decrement)
+                survival_mode_decrease_hand(client);
+            return;
+        }
+        else
+        {
+            if (c)
+            {
+                packet_block_change_t pack_block_change;
+                pack_block_change.block_x = place_x;
+                pack_block_change.block_y = place_y;
+                pack_block_change.block_z = place_z;
+                pack_block_change.type = c->get_type(place_x % 16, place_y, place_z % 16);
+                pack_block_change.metadata = c->get_metadata(place_x % 16, place_y, place_z % 16);
+
+                send_buffer_to_players_if_coords(clients, pack_block_change.assemble(), place_x, place_z, client->dimension);
+            }
+            LOG("Unable to place block");
+        }
+    }
+
+    packet_window_set_slot_t pack_set_slot;
+    pack_set_slot.slot = client->cur_item_idx;
+    pack_set_slot.item = client->inventory[client->cur_item_idx];
+    send_buffer(client->sock, pack_set_slot.assemble());
+}
+
 static convar_string_t address_listen("address_listen", "127.0.0.1", "Address to listen for connections");
 
 int main(int argc, const char** argv)
@@ -2097,272 +2376,8 @@ int main(int argc, const char** argv)
                 case PACKET_ID_PLAYER_PLACE:
                 {
                     CAST_PACK_TO_P(packet_player_place_t);
-                    double x_diff = p->x - client->player_x;
-                    double y_diff = p->y - client->player_y;
-                    double z_diff = p->z - client->player_z;
-                    double radius = SDL_sqrt(x_diff * x_diff + y_diff * y_diff + z_diff * z_diff);
 
-                    (void)radius;
-
-                    jshort type = p->block_item_id;
-
-                    int place_x = p->x;
-                    int place_y = p->y;
-                    int place_z = p->z;
-                    int center_x = p->x;
-                    int center_y = p->y;
-                    int center_z = p->z;
-                    bool center_good = true;
-                    int is_torch = type == BLOCK_ID_TORCH;
-                    is_torch += type == BLOCK_ID_TORCH_REDSTONE_ON;
-                    is_torch += type == BLOCK_ID_TORCH_REDSTONE_OFF;
-                    is_torch += type == BLOCK_ID_LEVER;
-                    int is_rail = type == BLOCK_ID_RAIL;
-                    is_rail += type == BLOCK_ID_RAIL_POWERED;
-                    is_rail += type == BLOCK_ID_RAIL_DETECTOR;
-                    float theta = SDL_atan2f(place_x + 0.5f - client->player_x, place_z + 0.5f - client->player_z) * 180.0f / SDL_PI_F;
-                    theta = client->player_yaw;
-                    float phi = client->player_pitch;
-                    theta = SDL_fmodf(SDL_fmodf(theta, 360.f) + 360.0f, 360.f);
-
-                    int mc_face = 0;
-                    if (45.0f < theta && theta < 135.0f)
-                        mc_face = 1;
-                    else if (135.0f < theta && theta < 225.0f)
-                        mc_face = 2;
-                    else if (225.0f < theta && theta < 315.0f)
-                        mc_face = 3;
-                    else
-                        mc_face = 0;
-
-                    int y_dir = 0;
-                    if (phi > 50.0f)
-                        y_dir = 1;
-                    if (phi < -50.0f)
-                        y_dir = -1;
-
-                    bool x_dir = mc_face == 1 || mc_face == 3;
-
-                    TRACE("Place %d @ <%d, %d, %d>:%d (%d) (Radius: %.3f)", type, p->x, p->y, p->z, p->direction, mc_face, radius);
-
-                    Uint8 food_value = mc_id::get_food_value(type);
-                    if (food_value && client->food < 20)
-                    {
-                        client->food += food_value;
-                        if (client->food > 20)
-                        {
-                            client->food_satur = (float)(client->food - 20) * mc_id::get_food_staturation_ratio(type);
-                            client->food = 20;
-                        }
-
-                        survival_mode_decrease_hand(client);
-                        break;
-                    }
-
-                    if (p->direction != -1 && type >= 0 && type < 256)
-                    {
-                        switch (p->direction)
-                        {
-                        case 0:
-                            place_y -= 1;
-                            if (is_torch)
-                                type = 0;
-                            if (type == BLOCK_ID_LADDER)
-                                type = 0;
-                            break;
-                        case 1:
-                            place_y += 1;
-                            if (is_torch)
-                                p->damage = 5;
-                            if (type == BLOCK_ID_LEVER && x_dir)
-                                p->damage = 6;
-                            if (type == BLOCK_ID_LADDER)
-                                type = 0;
-                            break;
-                        case 2:
-                            place_z -= 1;
-                            if (is_torch)
-                                p->damage = 4;
-                            if (type == BLOCK_ID_LADDER)
-                                p->damage = 2;
-                            break;
-                        case 3:
-                            place_z += 1;
-                            if (is_torch)
-                                p->damage = 3;
-                            if (type == BLOCK_ID_LADDER)
-                                p->damage = 3;
-                            break;
-                        case 4:
-                            place_x -= 1;
-                            if (is_torch)
-                                p->damage = 2;
-                            if (type == BLOCK_ID_LADDER)
-                                p->damage = 4;
-                            break;
-                        case 5:
-                            place_x += 1;
-                            if (is_torch)
-                                p->damage = 1;
-                            if (type == BLOCK_ID_LADDER)
-                                p->damage = 5;
-                            break;
-                        default:
-                            goto loop_end;
-                            break;
-                        }
-
-                        if (is_rail && x_dir)
-                            p->damage = 1;
-
-                        if (type == BLOCK_ID_FURNACE_OFF || type == BLOCK_ID_CHEST || type == BLOCK_ID_DISPENSER || type == BLOCK_ID_PISTON
-                            || type == BLOCK_ID_PISTON_STICKY)
-                        {
-                            switch (mc_face)
-                            {
-                            case 1:
-                                p->damage = 5;
-                                break;
-                            case 2:
-                                p->damage = 3;
-                                break;
-                            case 3:
-                                p->damage = 4;
-                                break;
-                            default:
-                                p->damage = 2;
-                                break;
-                            }
-                        }
-
-                        if (type == BLOCK_ID_PISTON || type == BLOCK_ID_PISTON_STICKY)
-                        {
-                            switch (y_dir)
-                            {
-                            case -1:
-                                p->damage = 0;
-                                break;
-                            case 1:
-                                p->damage = 1;
-                                break;
-                            default:
-                                break;
-                            }
-                        }
-
-                        if (type == BLOCK_ID_PUMPKIN || type == BLOCK_ID_PUMPKIN_GLOWING)
-                        {
-                            switch (mc_face)
-                            {
-                            case 1:
-                                p->damage = 3;
-                                break;
-                            case 2:
-                                p->damage = 0;
-                                break;
-                            case 3:
-                                p->damage = 1;
-                                break;
-                            default:
-                                p->damage = 2;
-                                break;
-                            }
-                        }
-
-                        Uint8 is_stairs = type == BLOCK_ID_STAIRS_BRICK;
-                        is_stairs += type == BLOCK_ID_STAIRS_WOOD;
-                        is_stairs += type == BLOCK_ID_STAIRS_BRICK_STONE;
-                        is_stairs += type == BLOCK_ID_STAIRS_COBBLESTONE;
-
-                        if (is_stairs)
-                        {
-                            switch (mc_face)
-                            {
-                            case 1:
-                                p->damage = 1;
-                                break;
-                            case 2:
-                                p->damage = 3;
-                                break;
-                            case 3:
-                                p->damage = 0;
-                                break;
-                            default:
-                                p->damage = 2;
-                                break;
-                            }
-                        }
-
-                        if (place_y < 0)
-                            goto loop_end;
-
-                        double diff_y = (double)place_y - client->player_y;
-
-                        if (SDL_floor(client->player_x) == place_x && (-0.9 < diff_y && diff_y < 1.8) && SDL_floor(client->player_z) == place_z
-                            && mc_id::block_has_collision(type))
-                        {
-                            type = 0;
-                            p->damage = 0;
-                        }
-
-                        int cx = place_x >> 4;
-                        int cz = place_z >> 4;
-
-                        chunk_t* c = dimensions[client->dimension < 0].get_chunk(cx, cz);
-
-                        if (c && (is_torch || type == BLOCK_ID_LADDER))
-                        {
-                            Uint8 center_type = c->get_type(center_x % 16, center_y, center_z % 16);
-                            if (!mc_id::can_host_hanging(center_type))
-                                center_good = false;
-                        }
-
-                        if (c && is_rail)
-                        {
-                            if (center_y > 0)
-                            {
-                                Uint8 lower_type = c->get_type(place_x % 16, place_y - 1, place_z % 16);
-                                if (!mc_id::can_host_rail(lower_type))
-                                    center_good = false;
-                            }
-                        }
-
-                        if (c && type != 0 && c->get_type(place_x % 16, place_y, place_z % 16) == BLOCK_ID_AIR && center_good)
-                        {
-                            packet_block_change_t pack_block_change;
-                            pack_block_change.block_x = place_x;
-                            pack_block_change.block_y = place_y;
-                            pack_block_change.block_z = place_z;
-                            pack_block_change.type = type;
-                            pack_block_change.metadata = p->damage;
-                            c->set_type(place_x % 16, place_y, place_z % 16, type);
-                            c->set_metadata(place_x % 16, place_y, place_z % 16, p->damage);
-                            send_buffer_to_players_if_coords(clients, pack_block_change.assemble(), place_x, place_z, client->dimension);
-
-                            survival_mode_decrease_hand(client);
-                            break;
-                        }
-                        else
-                        {
-                            if (c)
-                            {
-                                packet_block_change_t pack_block_change;
-                                pack_block_change.block_x = place_x;
-                                pack_block_change.block_y = place_y;
-                                pack_block_change.block_z = place_z;
-                                pack_block_change.type = c->get_type(place_x % 16, place_y, place_z % 16);
-                                pack_block_change.metadata = c->get_metadata(place_x % 16, place_y, place_z % 16);
-
-                                send_buffer_to_players_if_coords(clients, pack_block_change.assemble(), place_x, place_z, client->dimension);
-                            }
-                            LOG("Unable to place block");
-                        }
-                    }
-
-                    packet_window_set_slot_t pack_set_slot;
-                    pack_set_slot.slot = client->cur_item_idx;
-                    pack_set_slot.item = client->inventory[client->cur_item_idx];
-                    send_buffer(sock, pack_set_slot.assemble());
+                    player_place(clients, client, p, dimensions);
 
                     break;
                 }
