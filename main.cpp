@@ -364,6 +364,24 @@ public:
         return NULL;
     }
 
+    inline block_id_t get_type(int world_x, int world_y, int world_z)
+    {
+        if (world_y < 0 || world_y >= CHUNK_SIZE_Y)
+            return BLOCK_ID_NONE;
+        chunk_t* c = get_chunk(world_x >> 4, world_z >> 4);
+        if (!c)
+            return BLOCK_ID_NONE;
+        else
+            return c->get_type(world_x % CHUNK_SIZE_X, world_y, world_z % CHUNK_SIZE_Z);
+    }
+
+    inline void set_type(int world_x, int world_y, int world_z, block_id_t block_id)
+    {
+        chunk_t* c = get_chunk(world_x >> 4, world_z >> 4);
+        if (c)
+            c->set_type(world_x % CHUNK_SIZE_X, world_y, world_z % CHUNK_SIZE_Z, block_id);
+    }
+
     /**
      * Returns an estimate on of memory footprint of a dimension_t object
      */
@@ -1558,7 +1576,8 @@ void player_place(std::vector<client_t>& clients, client_t* client, packet_playe
         int cx = place_x >> 4;
         int cz = place_z >> 4;
 
-        chunk_t* c = dimensions[client->dimension < 0].get_chunk(cx, cz);
+        dimension_t* d = &dimensions[client->dimension < 0];
+        chunk_t* c = d->get_chunk(cx, cz);
 
         if (c && (is_torch || type == BLOCK_ID_LADDER))
         {
