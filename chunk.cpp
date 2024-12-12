@@ -43,16 +43,82 @@ static Uint8 ore_2r[] = { 0x3f, 0x7f, 0xff, 0x7d, 0xbf, 0x77, 0xff };
 
 static convar_int_t strip_stone("strip_stone", 0, 0, 1, "Strip stone after generating terrain", CONVAR_FLAG_HIDDEN | CONVAR_FLAG_INT_IS_BOOL);
 
+/* Each layer is on the x z plane */
+static const Uint16 cutters_layers[][10] = {
+    { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 },
+    {
+        0b0000000000000000,
+        0b0000000000000000,
+        0b0000000000000000,
+        0b0000000000000000,
+        0b0000000110000000,
+        0b0000000110000000,
+        0b0000000000000000,
+        0b0000000000000000,
+        0b0000000000000000,
+        0b0000000000000000,
+    },
+    {
+        0b0000000000000000,
+        0b0000000000000000,
+        0b0000000000000000,
+        0b0000000110000000,
+        0b0000001111000000,
+        0b0000001111000000,
+        0b0000000110000000,
+        0b0000000000000000,
+        0b0000000000000000,
+        0b0000000000000000,
+    },
+    {
+        0b0000000000000000,
+        0b0000000000000000,
+        0b0000001111000000,
+        0b0000011111100000,
+        0b0000011111100000,
+        0b0000011111100000,
+        0b0000011111100000,
+        0b0000001111000000,
+        0b0000000000000000,
+        0b0000000000000000,
+    },
+    {
+        0b0000000000000000,
+        0b0000000110000000,
+        0b0000011111100000,
+        0b0000011111100000,
+        0b0000111111110000,
+        0b0000111111110000,
+        0b0000011111100000,
+        0b0000011111100000,
+        0b0000000110000000,
+        0b0000000000000000,
+    },
+    {
+        0b0000000110000000,
+        0b0000011111100000,
+        0b0000111111110000,
+        0b0000111111110000,
+        0b0001111111111000,
+        0b0001111111111000,
+        0b0000111111110000,
+        0b0000111111110000,
+        0b0000011111100000,
+        0b0000000110000000,
+    },
+};
+
 /**
  * TODO: Will be involved with cave/ravine gen
  *
  * Cutters will be able to cut through anything, but must start in terrain
  */
 static param_cutter_t cutter_params[] = {
-    { 0.5f, BLOCK_ID_BRICKS, { 4, 6 }, { 10, 128 }, { 0, 127 }, CUTTER_CAVE_NO_DECOR },
-    { 0.5f, BLOCK_ID_GOLD, { 8, 10 }, { 10, 128 }, { 0, 127 }, CUTTER_CAVE_NO_DECOR },
-    { 0.15f, BLOCK_ID_DIAMOND, { 8, 10 }, { 20, 128 }, { 0, 127 }, CUTTER_RAVINE_NO_DECOR },
-    { 0.05f, BLOCK_ID_GLOWSTONE, { 8, 10 }, { 20, 128 }, { 0, 127 }, CUTTER_RAVINE_NO_DECOR },
+    { 0.25f, BLOCK_ID_AIR, { 0, 2 }, { 10, 80 }, { 8, 72 }, CUTTER_CAVE_NO_DECOR },
+    { 0.25f, BLOCK_ID_AIR, { 1, 2 }, { 10, 80 }, { 8, 72 }, CUTTER_CAVE_NO_DECOR },
+    { 0.25f, BLOCK_ID_AIR, { 2, 2 }, { 10, 80 }, { 8, 72 }, CUTTER_CAVE_NO_DECOR },
+    { 0.07f, BLOCK_ID_AIR, { 8, 10 }, { 20, 80 }, { 8, 72 }, CUTTER_RAVINE_NO_DECOR },
+    { 0.025f, BLOCK_ID_AIR, { 8, 10 }, { 20, 80 }, { 8, 72 }, CUTTER_RAVINE_NO_DECOR },
 };
 
 chunk_t::chunk_t()
@@ -64,12 +130,6 @@ chunk_t::chunk_t()
     r_state = *(Uint64*)&ptr + *(Uint32*)this + *(Uint64*)&rptr;
 }
 
-/**
- * Goes through and sets the appropriate light levels for each block,
- *
- * Lighting is something I don't really understand nor something I feel
- * like currently putting in the effort to understand right now
- */
 void chunk_t::correct_lighting(int generator)
 {
     if (!changed)
@@ -88,6 +148,40 @@ void chunk_t::correct_lighting(int generator)
         }
     }
     changed = false;
+}
+
+void chunk_t::correct_grass()
+{
+
+    int found_air = 0;
+    Uint8 last_type[2] = { 0, 0 };
+
+    for (int ix = 0; ix < CHUNK_SIZE_X; ix++)
+    {
+        for (int iz = 0; iz < CHUNK_SIZE_Z; iz++)
+        {
+            int cx = (ix) % CHUNK_SIZE_X;
+            int cz = (iz) % CHUNK_SIZE_Z;
+            TRACE("checking %d %d", cx, cz);
+            for (int i = CHUNK_SIZE_Y; i > 0; i--)
+            {
+                int index = i - 1 + (cz * (CHUNK_SIZE_Y)) + (cx * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z));
+                Uint8 type = data[index];
+                if (type == 0)
+                    found_air++;
+
+                if (type > 0 && found_air > 2 && last_type[0] == 0 && last_type[1] == 0 && type != BLOCK_ID_LAVA_FLOWING && type != BLOCK_ID_LAVA_SOURCE)
+                {
+                    if (type == BLOCK_ID_DIRT)
+                        set_type(cx, i, cz, BLOCK_ID_GRASS);
+                    goto next_y_column;
+                }
+                last_type[1] = last_type[0];
+                last_type[0] = type;
+            }
+        next_y_column:;
+        }
+    }
 }
 
 /**
@@ -141,7 +235,7 @@ void chunk_t::generate_from_seed_over(long seed, int cx, int cz)
     }
 
     generate_ores(seed, cx, cz, ore_params, ARR_SIZE(ore_params));
-    // generate_cutters(seed, cx, cz, cutter_params, ARR_SIZE(cutter_params));
+    generate_cutters(seed, cx, cz, cutter_params, ARR_SIZE(cutter_params));
 
     if (((convar_int_t*)convar_t::get_convar("dev"))->get())
     {
@@ -166,6 +260,7 @@ void chunk_t::generate_from_seed_over(long seed, int cx, int cz)
                     if (get_type(x, i, z) == BLOCK_ID_STONE)
                         set_type(x, i, z, BLOCK_ID_AIR);
 
+    correct_grass();
     correct_lighting(0);
 }
 
@@ -178,6 +273,196 @@ static void generate_ore_chunk_vals(Uint64 arr[NUM_ORE_CHANCE], int cx, int cz, 
         arr[i] = ((Uint64)SDL_rand_bits_r(&seed_r) << 32) | (Uint64)SDL_rand_bits_r(&seed_r);
 }
 
+void chunk_t::generate_cutters(long seed, int cx, int cz, param_cutter_t* cutters, Uint8 cutter_count)
+{
+    SimplexNoise noise;
+
+    Uint64 seed_r = *(Uint64*)&seed;
+
+    Uint32 rc1 = SDL_rand_bits_r(&seed_r);
+    Uint32 rc2 = SDL_rand_bits_r(&seed_r);
+
+    int x_diff = cast_to_sint32((rc2 & 0xF05A0FA5) | (rc1 & 0x0FA5F05A)) >> 12;
+    int z_diff = cast_to_sint32((rc2 & 0x0F0F0F0F) | (rc1 & 0xF0F0F0F0)) >> 12;
+
+    seed_r += SDL_rand_bits_r(&seed_r);
+
+    /**
+     * To access: (cutter_sphere[which][y][x] >> z) & 1
+     */
+    Uint16 cutter_sphere[3][8][10];
+
+    int sphere_radi[] = { 4, 3, 2 };
+    {
+        int j = 0;
+        int l = 2;
+        memcpy(cutter_sphere[0][j++], cutters_layers[l++], sizeof(cutters_layers[0]));
+        memcpy(cutter_sphere[0][j++], cutters_layers[l++], sizeof(cutters_layers[0]));
+        memcpy(cutter_sphere[0][j++], cutters_layers[l++], sizeof(cutters_layers[0]));
+        memcpy(cutter_sphere[0][j++], cutters_layers[l++], sizeof(cutters_layers[0]));
+        memcpy(cutter_sphere[0][j++], cutters_layers[--l], sizeof(cutters_layers[0]));
+        memcpy(cutter_sphere[0][j++], cutters_layers[--l], sizeof(cutters_layers[0]));
+        memcpy(cutter_sphere[0][j++], cutters_layers[--l], sizeof(cutters_layers[0]));
+        memcpy(cutter_sphere[0][j++], cutters_layers[--l], sizeof(cutters_layers[0]));
+
+        j = 0;
+        l = 2;
+        memcpy(cutter_sphere[1][j++], cutters_layers[l++], sizeof(cutters_layers[0]));
+        memcpy(cutter_sphere[1][j++], cutters_layers[l++], sizeof(cutters_layers[0]));
+        memcpy(cutter_sphere[1][j++], cutters_layers[l++], sizeof(cutters_layers[0]));
+        memcpy(cutter_sphere[1][j++], cutters_layers[--l], sizeof(cutters_layers[0]));
+        memcpy(cutter_sphere[1][j++], cutters_layers[--l], sizeof(cutters_layers[0]));
+        memcpy(cutter_sphere[1][j++], cutters_layers[--l], sizeof(cutters_layers[0]));
+
+        j = 0;
+        l = 1;
+        memcpy(cutter_sphere[2][j++], cutters_layers[l++], sizeof(cutters_layers[0]));
+        memcpy(cutter_sphere[2][j++], cutters_layers[l++], sizeof(cutters_layers[0]));
+        memcpy(cutter_sphere[2][j++], cutters_layers[--l], sizeof(cutters_layers[0]));
+        memcpy(cutter_sphere[2][j++], cutters_layers[--l], sizeof(cutters_layers[0]));
+    }
+
+    for (int ic = -8; ic < 8; ic++)
+    {
+        for (int jc = -8; jc < 8; jc++)
+        {
+            Uint64 cvals[NUM_ORE_CHANCE];
+            generate_ore_chunk_vals(cvals, cx + ic + x_diff, cz + jc + z_diff, seed_r);
+
+            int num_chances = (cvals[0] % 5) + 2;
+
+            for (int cval_it = 0; cval_it < num_chances; cval_it++)
+            {
+                Uint64 d = cvals[cval_it];
+                jshort x = ((jshort)(d & 0x0f)) + (ic - 1) * CHUNK_SIZE_X;
+                jshort z = ((jshort)(d >> 10) & 0x0f) + (jc - 1) * CHUNK_SIZE_Z;
+                jshort y = (d >> 20) & 0x7f;
+                jubyte which = ((d >> 28) & 0xff) % cutter_count;
+                float rarity = (float)(((d >> 36) & 0xff) + ((d >> 20) & 0xff)) / 512.0f;
+                bool direction_x = (d >> 45) & 1;
+                int direction_move = ((d >> 46) & 1) ? -1 : 1;
+                int direction_move_y = (((d >> 58) & 1) ? -1 : 1) * ((d >> 57) & 1);
+                int direction_side = (((d >> 48) & 1) ? -1 : 1) * ((d >> 47) & 1);
+
+                for (jubyte off = 0; off < cutter_count; off++)
+                {
+                    if (cutters[which].gen_y.max < y || cutters[which].gen_y.min > y || cutters[which].cutter != CUTTER_CAVE_NO_DECOR)
+                        which = (which + 3) % cutter_count;
+                    else
+                        off = cutter_count;
+                }
+
+                param_cutter_t p = cutters[which];
+
+                if (p.gen_y.max < y || p.gen_y.min > y || cutters[which].cutter != CUTTER_CAVE_NO_DECOR)
+                    continue;
+
+                if (p.rarity <= rarity)
+                    continue;
+
+                Uint8 times = p.vein_size.min;
+                if (p.vein_size.max != p.vein_size.min)
+                    times += d % (p.vein_size.max - p.vein_size.min);
+
+                if (times > 100)
+                    times = 100;
+
+                Uint64 jitter_var = ROTATE_UINT64(d, d & 0xff);
+
+                jubyte which_sphere = p.radius.min;
+                if (p.radius.max != p.radius.min)
+                    which_sphere += jitter_var % (p.radius.max - p.radius.min);
+
+                for (int time_it = 0; time_it < times; time_it++)
+                {
+                    if (p.gen_y.max < y || p.gen_y.min > y)
+                    {
+                        time_it = times;
+                        continue;
+                    }
+                    jitter_var = ROTATE_UINT64(jitter_var, 5);
+                    if ((jitter_var >> 5) & 1)
+                        direction_side = (((jitter_var >> 48) & 1) ? -1 : 1) * ((jitter_var >> 47) & 1);
+                    if ((jitter_var >> 24) & 1)
+                        direction_x = !direction_x;
+                    if (((jitter_var >> 28) & 3) == 3)
+                        direction_move_y = (((jitter_var >> 58) & 1) ? -1 : 1) * ((jitter_var >> 57) & 1);
+
+                    if (direction_x)
+                    {
+                        if (direction_side != 0)
+                        {
+                            x += direction_move;
+                            z += direction_side * ((jitter_var >> 4) & 1);
+                        }
+                        else
+                        {
+                            x += direction_move;
+                            z -= ((jitter_var >> 3) & 1);
+                            z += ((jitter_var >> 2) & 1);
+                        }
+                    }
+                    else
+                    {
+                        if (direction_side != 0)
+                        {
+                            x += direction_side * ((jitter_var >> 4) & 1);
+                            z += direction_move;
+                        }
+                        else
+                        {
+                            z += direction_move;
+                            x += ((jitter_var >> 2) & 1);
+                            x -= ((jitter_var >> 3) & 1);
+                        }
+                    }
+
+                    if (direction_move_y != 0)
+                    {
+                        y += direction_move_y * (1 + ((jitter_var >> 62) & 1));
+                    }
+                    else
+                    {
+                        y += ((jitter_var >> 0) & 3) == 3;
+                        y -= ((jitter_var >> 1) & 3) == 3;
+                    }
+
+                    if (x < -CHUNK_SIZE_X * 2 || x >= CHUNK_SIZE_X * 3)
+                        continue;
+                    if (z < -CHUNK_SIZE_Z * 2 || z >= CHUNK_SIZE_Z * 3)
+                        continue;
+                    if (y < -CHUNK_SIZE_Y * 2 || y >= CHUNK_SIZE_Y * 3)
+                        continue;
+
+                    for (int y_off = 0; y_off < sphere_radi[which_sphere] * 2; y_off++)
+                        for (int x_off = 0; x_off < 10; x_off++)
+                            for (int z_off = 0; z_off < 16; z_off++)
+                            {
+                                if (!((cutter_sphere[which_sphere][y_off][x_off] >> z_off) & 1))
+                                    continue;
+                                jshort jx = x, jy = y + y_off - sphere_radi[which_sphere], jz = z;
+
+                                jx += (x_off - 5);
+                                jz += (z_off - 8);
+
+                                if (jx < 0 || jx >= CHUNK_SIZE_X)
+                                    continue;
+                                if (jz < 0 || jz >= CHUNK_SIZE_Z)
+                                    continue;
+                                if (jy < 0 || jy >= CHUNK_SIZE_Y)
+                                    continue;
+                                Uint8 existing = get_type(jx, jy, jz);
+                                if (existing != BLOCK_ID_BEDROCK && existing != BLOCK_ID_LAVA_SOURCE && existing != BLOCK_ID_LAVA_FLOWING
+                                    && existing != BLOCK_ID_WATER_SOURCE && existing != BLOCK_ID_WATER_FLOWING)
+                                {
+                                    set_type(jx, jy, jz, p.block_id);
+                                }
+                            }
+                }
+            }
+        }
+    }
+}
 void chunk_t::generate_ores(long seed, int cx, int cz, param_ore_t* ores, Uint8 ore_count)
 {
     SimplexNoise noise;
@@ -278,7 +563,7 @@ void chunk_t::generate_ores(long seed, int cx, int cz, param_ore_t* ores, Uint8 
 
                     for (int shift = 0; shift < 8; shift++)
                     {
-                        Uint16 shifty = (Uint16)ore_2r[pos_ore_2r] << 16 | ore_2r[pos_ore_2r];
+                        Uint16 shifty = (Uint16)ore_2r[pos_ore_2r] << 8 | ore_2r[pos_ore_2r];
                         Uint8 val = (shifty >> ((shift + ((d >> 33) & 0xff) * 2) % 8)) & 1;
                         if (!val)
                             continue;

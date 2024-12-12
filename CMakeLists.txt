@@ -8,7 +8,9 @@ cmake_policy(SET CMP0077 NEW)
 project(mcs_b181 LANGUAGES CXX)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
-set(CMAKE_CXX_STANDARD 11)
+
+# C++ 14 is solely for binary literals
+set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
 set(SDL_VERSION 3)

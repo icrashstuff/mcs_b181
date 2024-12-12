@@ -78,6 +78,9 @@ struct param_cutter_t
     float rarity;
     Uint8 block_id;
 
+    /**
+     * For caves [0: Big sphere, 1: Smaller sphere, 2: Smallest sphere]
+     */
     range_t radius;
 
     /**
@@ -106,6 +109,11 @@ public:
      * like currently putting in the effort to understand right now
      */
     void correct_lighting(int generator);
+
+    /**
+     * Goes through and makes any dirt with only air above it grass
+     */
+    void correct_grass();
 
     /**
      * TODO: Multi stage generation
