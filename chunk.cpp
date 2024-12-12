@@ -114,9 +114,11 @@ static const Uint16 cutters_layers[][10] = {
  * Cutters will be able to cut through anything, but must start in terrain
  */
 static param_cutter_t cutter_params[] = {
-    { 0.25f, BLOCK_ID_AIR, { 0, 2 }, { 10, 80 }, { 8, 72 }, CUTTER_CAVE_NO_DECOR },
-    { 0.25f, BLOCK_ID_AIR, { 1, 2 }, { 10, 80 }, { 8, 72 }, CUTTER_CAVE_NO_DECOR },
-    { 0.25f, BLOCK_ID_AIR, { 2, 2 }, { 10, 80 }, { 8, 72 }, CUTTER_CAVE_NO_DECOR },
+    { 0.15f, BLOCK_ID_AIR, { 0, 1 }, { 2, 6 }, { 8, 13 }, CUTTER_CAVE },
+    { 0.20f, BLOCK_ID_AIR, { 0, 2 }, { 10, 80 }, { 8, 63 }, CUTTER_CAVE },
+    { 0.35f, BLOCK_ID_AIR, { 1, 1 }, { 10, 80 }, { 8, 63 }, CUTTER_CAVE },
+    { 0.15f, BLOCK_ID_AIR, { 2, 2 }, { 10, 80 }, { 8, 63 }, CUTTER_CAVE },
+    { 0.1f, BLOCK_ID_AIR, { 0, 2 }, { 24, 80 }, { 32, 80 }, CUTTER_CAVE },
     { 0.07f, BLOCK_ID_AIR, { 8, 10 }, { 20, 80 }, { 8, 72 }, CUTTER_RAVINE_NO_DECOR },
     { 0.025f, BLOCK_ID_AIR, { 8, 10 }, { 20, 80 }, { 8, 72 }, CUTTER_RAVINE_NO_DECOR },
 };
@@ -344,17 +346,18 @@ void chunk_t::generate_cutters(long seed, int cx, int cz, param_cutter_t* cutter
                 int direction_move_y = (((d >> 58) & 1) ? -1 : 1) * ((d >> 57) & 1);
                 int direction_side = (((d >> 48) & 1) ? -1 : 1) * ((d >> 47) & 1);
 
+                param_cutter_t p = cutters[which];
+
                 for (jubyte off = 0; off < cutter_count; off++)
                 {
-                    if (cutters[which].gen_y.max < y || cutters[which].gen_y.min > y || cutters[which].cutter != CUTTER_CAVE_NO_DECOR)
+                    p = cutters[which];
+                    if (p.gen_y.max < y || p.gen_y.min > y || (p.cutter != CUTTER_CAVE_NO_DECOR && p.cutter != CUTTER_CAVE))
                         which = (which + 3) % cutter_count;
                     else
                         off = cutter_count;
                 }
 
-                param_cutter_t p = cutters[which];
-
-                if (p.gen_y.max < y || p.gen_y.min > y || cutters[which].cutter != CUTTER_CAVE_NO_DECOR)
+                if (p.gen_y.max < y || p.gen_y.min > y || (p.cutter != CUTTER_CAVE_NO_DECOR && p.cutter != CUTTER_CAVE))
                     continue;
 
                 if (p.rarity <= rarity)
@@ -455,7 +458,10 @@ void chunk_t::generate_cutters(long seed, int cx, int cz, param_cutter_t* cutter
                                 if (existing != BLOCK_ID_BEDROCK && existing != BLOCK_ID_LAVA_SOURCE && existing != BLOCK_ID_LAVA_FLOWING
                                     && existing != BLOCK_ID_WATER_SOURCE && existing != BLOCK_ID_WATER_FLOWING)
                                 {
-                                    set_type(jx, jy, jz, p.block_id);
+                                    if (jy < 13 && p.cutter == CUTTER_CAVE)
+                                        set_type(jx, jy, jz, BLOCK_ID_LAVA_SOURCE);
+                                    else
+                                        set_type(jx, jy, jz, p.block_id);
                                 }
                             }
                 }
