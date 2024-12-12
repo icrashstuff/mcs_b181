@@ -554,6 +554,9 @@ bool send_chunk(SDLNet_StreamSocket* sock, chunk_t* chunk, int chunk_x, int chun
     if (chunk == NULL)
         return 0;
 
+    if (!chunk->ready)
+        return 0;
+
     packet_chunk_t packet;
     packet.block_x = chunk_x * CHUNK_SIZE_X;
     packet.block_y = 0;

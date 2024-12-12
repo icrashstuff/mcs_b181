@@ -25,6 +25,7 @@
 
 #include "ids.h"
 #include "misc.h"
+#include <atomic>
 #include <vector>
 
 struct param_ore_t
@@ -104,10 +105,8 @@ public:
 
     /**
      * Signifies that this chunk is ready to be sent to players (ie. loaded or generated)
-     *
-     * TODO: Make this atomic
      */
-    bool ready = false;
+    std::atomic<bool> ready = { false };
 
     /**
      * Goes through and sets the appropriate light levels for each block,
