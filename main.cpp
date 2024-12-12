@@ -1927,7 +1927,7 @@ int main(int argc, const char** argv)
 
                     (void)radius;
 
-                    TRACE("Place %d @ <%d, %d, %d>:%d (Radius: %.3f)", p->block_item_id, p->x, p->y, p->z, p->direction, radius);
+                    jshort type = p->block_item_id;
 
                     int place_x = p->x;
                     int place_y = p->y;
@@ -1935,64 +1935,171 @@ int main(int argc, const char** argv)
                     int center_x = p->x;
                     int center_y = p->y;
                     int center_z = p->z;
-                    bool check_center = false;
                     bool center_good = true;
+                    int is_torch = type == BLOCK_ID_TORCH;
+                    is_torch += type == BLOCK_ID_TORCH_REDSTONE_ON;
+                    is_torch += type == BLOCK_ID_TORCH_REDSTONE_OFF;
+                    is_torch += type == BLOCK_ID_LEVER;
+                    int is_rail = type == BLOCK_ID_RAIL;
+                    is_rail += type == BLOCK_ID_RAIL_POWERED;
+                    is_rail += type == BLOCK_ID_RAIL_DETECTOR;
+                    float theta = SDL_atan2f(place_x + 0.5f - client->player_x, place_z + 0.5f - client->player_z) * 180.0f / SDL_PI_F;
+                    theta = client->player_yaw;
+                    float phi = client->player_pitch;
+                    theta = SDL_fmodf(SDL_fmodf(theta, 360.f) + 360.0f, 360.f);
 
-                    if (p->direction != -1 && p->block_item_id >= 0 && p->block_item_id < 256)
+                    int mc_face = 0;
+                    if (45.0f < theta && theta < 135.0f)
+                        mc_face = 1;
+                    else if (135.0f < theta && theta < 225.0f)
+                        mc_face = 2;
+                    else if (225.0f < theta && theta < 315.0f)
+                        mc_face = 3;
+                    else
+                        mc_face = 0;
+
+                    int y_dir = 0;
+                    if (phi > 50.0f)
+                        y_dir = 1;
+                    if (phi < -50.0f)
+                        y_dir = -1;
+
+                    bool x_dir = mc_face == 1 || mc_face == 3;
+
+                    TRACE("Place %d @ <%d, %d, %d>:%d (%d) (Radius: %.3f)", type, p->x, p->y, p->z, p->direction, mc_face, radius);
+
+                    if (p->direction != -1 && type >= 0 && type < 256)
                     {
                         switch (p->direction)
                         {
                         case 0:
                             place_y -= 1;
-                            if (p->block_item_id == BLOCK_ID_TORCH || p->block_item_id == BLOCK_ID_TORCH_REDSTONE_ON)
-                            {
-                                p->block_item_id = 0;
-                                check_center = 1;
-                            }
+                            if (is_torch)
+                                type = 0;
+                            if (type == BLOCK_ID_LADDER)
+                                type = 0;
                             break;
                         case 1:
                             place_y += 1;
-                            if (p->block_item_id == BLOCK_ID_TORCH || p->block_item_id == BLOCK_ID_TORCH_REDSTONE_ON)
-                            {
+                            if (is_torch)
                                 p->damage = 5;
-                                check_center = 1;
-                            }
+                            if (type == BLOCK_ID_LEVER && x_dir)
+                                p->damage = 6;
+                            if (type == BLOCK_ID_LADDER)
+                                type = 0;
                             break;
                         case 2:
                             place_z -= 1;
-                            if (p->block_item_id == BLOCK_ID_TORCH || p->block_item_id == BLOCK_ID_TORCH_REDSTONE_ON)
-                            {
+                            if (is_torch)
                                 p->damage = 4;
-                                check_center = 1;
-                            }
+                            if (type == BLOCK_ID_LADDER)
+                                p->damage = 2;
                             break;
                         case 3:
                             place_z += 1;
-                            if (p->block_item_id == BLOCK_ID_TORCH || p->block_item_id == BLOCK_ID_TORCH_REDSTONE_ON)
-                            {
+                            if (is_torch)
                                 p->damage = 3;
-                                check_center = 1;
-                            }
+                            if (type == BLOCK_ID_LADDER)
+                                p->damage = 3;
                             break;
                         case 4:
                             place_x -= 1;
-                            if (p->block_item_id == BLOCK_ID_TORCH || p->block_item_id == BLOCK_ID_TORCH_REDSTONE_ON)
-                            {
+                            if (is_torch)
                                 p->damage = 2;
-                                check_center = 1;
-                            }
+                            if (type == BLOCK_ID_LADDER)
+                                p->damage = 4;
                             break;
                         case 5:
                             place_x += 1;
-                            if (p->block_item_id == BLOCK_ID_TORCH || p->block_item_id == BLOCK_ID_TORCH_REDSTONE_ON)
-                            {
+                            if (is_torch)
                                 p->damage = 1;
-                                check_center = 1;
-                            }
+                            if (type == BLOCK_ID_LADDER)
+                                p->damage = 5;
                             break;
                         default:
                             goto loop_end;
                             break;
+                        }
+
+                        if (is_rail && x_dir)
+                            p->damage = 1;
+
+                        if (type == BLOCK_ID_FURNACE_OFF || type == BLOCK_ID_CHEST || type == BLOCK_ID_DISPENSER || type == BLOCK_ID_PISTON
+                            || type == BLOCK_ID_PISTON_STICKY)
+                        {
+                            switch (mc_face)
+                            {
+                            case 1:
+                                p->damage = 5;
+                                break;
+                            case 2:
+                                p->damage = 3;
+                                break;
+                            case 3:
+                                p->damage = 4;
+                                break;
+                            default:
+                                p->damage = 2;
+                                break;
+                            }
+                        }
+
+                        if (type == BLOCK_ID_PISTON || type == BLOCK_ID_PISTON_STICKY)
+                        {
+                            switch (y_dir)
+                            {
+                            case -1:
+                                p->damage = 0;
+                                break;
+                            case 1:
+                                p->damage = 1;
+                                break;
+                            default:
+                                break;
+                            }
+                        }
+
+                        if (type == BLOCK_ID_PUMPKIN || type == BLOCK_ID_PUMPKIN_GLOWING)
+                        {
+                            switch (mc_face)
+                            {
+                            case 1:
+                                p->damage = 3;
+                                break;
+                            case 2:
+                                p->damage = 0;
+                                break;
+                            case 3:
+                                p->damage = 1;
+                                break;
+                            default:
+                                p->damage = 2;
+                                break;
+                            }
+                        }
+
+                        Uint8 is_stairs = type == BLOCK_ID_STAIRS_BRICK;
+                        is_stairs += type == BLOCK_ID_STAIRS_WOOD;
+                        is_stairs += type == BLOCK_ID_STAIRS_BRICK_STONE;
+                        is_stairs += type == BLOCK_ID_STAIRS_COBBLESTONE;
+
+                        if (is_stairs)
+                        {
+                            switch (mc_face)
+                            {
+                            case 1:
+                                p->damage = 1;
+                                break;
+                            case 2:
+                                p->damage = 3;
+                                break;
+                            case 3:
+                                p->damage = 0;
+                                break;
+                            default:
+                                p->damage = 2;
+                                break;
+                            }
                         }
 
                         if (place_y < 0)
@@ -2000,9 +2107,10 @@ int main(int argc, const char** argv)
 
                         double diff_y = (double)place_y - client->player_y;
 
-                        if (SDL_floor(client->player_x) == place_x && (-0.9 < diff_y && diff_y < 1.8) && SDL_floor(client->player_z) == place_z)
+                        if (SDL_floor(client->player_x) == place_x && (-0.9 < diff_y && diff_y < 1.8) && SDL_floor(client->player_z) == place_z
+                            && mc_id::block_has_collision(type))
                         {
-                            p->block_item_id = 0;
+                            type = 0;
                             p->damage = 0;
                         }
 
@@ -2011,29 +2119,32 @@ int main(int argc, const char** argv)
 
                         chunk_t* c = dimensions[client->dimension < 0].get_chunk(cx, cz);
 
-                        if (c && (p->block_item_id == BLOCK_ID_TORCH || p->block_item_id == BLOCK_ID_TORCH_REDSTONE_ON))
+                        if (c && (is_torch || type == BLOCK_ID_LADDER))
                         {
                             Uint8 center_type = c->get_type(center_x % 16, center_y, center_z % 16);
-                            if (!mc_id::can_host_torch(center_type))
+                            if (!mc_id::can_host_hanging(center_type))
                                 center_good = false;
                         }
 
-                        if (c && (p->block_item_id == BLOCK_ID_RAIL || p->block_item_id == BLOCK_ID_RAIL_POWERED || p->block_item_id == BLOCK_ID_RAIL_DETECTOR))
+                        if (c && is_rail)
                         {
-                            Uint8 center_type = c->get_type(center_x % 16, center_y, center_z % 16);
-                            if (!mc_id::can_host_rail(center_type))
-                                center_good = false;
+                            if (center_y > 0)
+                            {
+                                Uint8 lower_type = c->get_type(place_x % 16, place_y - 1, place_z % 16);
+                                if (!mc_id::can_host_rail(lower_type))
+                                    center_good = false;
+                            }
                         }
 
-                        if (c && p->block_item_id != 0 && c->get_type(place_x % 16, place_y, place_z % 16) == BLOCK_ID_AIR && center_good)
+                        if (c && type != 0 && c->get_type(place_x % 16, place_y, place_z % 16) == BLOCK_ID_AIR && center_good)
                         {
                             packet_block_change_t pack_block_change;
                             pack_block_change.block_x = place_x;
                             pack_block_change.block_y = place_y;
                             pack_block_change.block_z = place_z;
-                            pack_block_change.type = p->block_item_id;
+                            pack_block_change.type = type;
                             pack_block_change.metadata = p->damage;
-                            c->set_type(place_x % 16, place_y, place_z % 16, p->block_item_id);
+                            c->set_type(place_x % 16, place_y, place_z % 16, type);
                             c->set_metadata(place_x % 16, place_y, place_z % 16, p->damage);
                             send_buffer_to_players_if_coords(clients, pack_block_change.assemble(), place_x, place_z, client->dimension);
                             if (client->player_mode == 0)

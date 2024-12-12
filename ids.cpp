@@ -585,7 +585,40 @@ bool mc_id::is_transparent(short block_id)
     }
 }
 
-bool mc_id::can_host_torch(short block_id)
+bool mc_id::block_has_collision(short block_id)
+{
+    switch (block_id)
+    {
+        ADD_NAME(BLOCK_ID_SAPLING, 0);
+        ADD_NAME(BLOCK_ID_FOLIAGE, 0);
+        ADD_NAME(BLOCK_ID_DEAD_BUSH, 0);
+        ADD_NAME(BLOCK_ID_FLOWER_RED, 0);
+        ADD_NAME(BLOCK_ID_FLOWER_YELLOW, 0);
+        ADD_NAME(BLOCK_ID_LADDER, 0);
+        ADD_NAME(BLOCK_ID_RAIL, 0);
+        ADD_NAME(BLOCK_ID_RAIL_POWERED, 0);
+        ADD_NAME(BLOCK_ID_RAIL_DETECTOR, 0);
+        ADD_NAME(BLOCK_ID_TORCH, 0);
+        ADD_NAME(BLOCK_ID_TORCH_REDSTONE_OFF, 0);
+        ADD_NAME(BLOCK_ID_TORCH_REDSTONE_ON, 0);
+        ADD_NAME(BLOCK_ID_PRESSURE_PLATE_STONE, 0);
+        ADD_NAME(BLOCK_ID_PRESSURE_PLATE_WOOD, 0);
+        ADD_NAME(BLOCK_ID_LEVER, 0);
+        ADD_NAME(BLOCK_ID_BUTTON_STONE, 0);
+        ADD_NAME(BLOCK_ID_CAKE, 0);
+        ADD_NAME(BLOCK_ID_CHEST, 0);
+        ADD_NAME(BLOCK_ID_SUGAR_CANE, 0);
+        ADD_NAME(BLOCK_ID_FIRE, 0);
+        ADD_NAME(BLOCK_ID_PLANT_FOOD, 0);
+        ADD_NAME(BLOCK_ID_MOSS, 0);
+        ADD_NAME(BLOCK_ID_MUSHROOM_BLAND, 0);
+        ADD_NAME(BLOCK_ID_MUSHROOM_RED, 0);
+    default:
+        return 1;
+    }
+}
+
+bool mc_id::can_host_hanging(short block_id)
 {
     switch (block_id)
     {
@@ -650,7 +683,7 @@ bool mc_id::can_host_rail(short block_id)
         ADD_NAME(BLOCK_ID_STAIRS_COBBLESTONE, 0);
         ADD_NAME(BLOCK_ID_STAIRS_BRICK_STONE, 0);
     default:
-        return can_host_torch(block_id);
+        return can_host_hanging(block_id);
     }
 }
 

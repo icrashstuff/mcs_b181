@@ -103,6 +103,13 @@ public:
     chunk_t();
 
     /**
+     * Signifies that this chunk is ready to be sent to players (ie. loaded or generated)
+     *
+     * TODO: Make this atomic
+     */
+    bool ready = false;
+
+    /**
      * Goes through and sets the appropriate light levels for each block,
      *
      * Lighting is something I don't really understand nor something I feel

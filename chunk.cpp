@@ -164,7 +164,6 @@ void chunk_t::correct_grass()
         {
             int cx = (ix) % CHUNK_SIZE_X;
             int cz = (iz) % CHUNK_SIZE_Z;
-            TRACE("checking %d %d", cx, cz);
             for (int i = CHUNK_SIZE_Y; i > 0; i--)
             {
                 int index = i - 1 + (cz * (CHUNK_SIZE_Y)) + (cx * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z));
@@ -198,6 +197,14 @@ void chunk_t::correct_grass()
  */
 void chunk_t::generate_from_seed_over(long seed, int cx, int cz)
 {
+    if (((convar_int_t*)convar_t::get_convar("dev"))->get() && cx == 0 && cz == 0)
+    {
+        generate_special_metadata();
+
+        correct_lighting(0);
+        ready = true;
+        return;
+    }
     SimplexNoise noise;
 
     Uint64 seed_r = *(Uint64*)&seed;
@@ -264,6 +271,7 @@ void chunk_t::generate_from_seed_over(long seed, int cx, int cz)
 
     correct_grass();
     correct_lighting(0);
+    ready = true;
 }
 
 static void generate_ore_chunk_vals(Uint64 arr[NUM_ORE_CHANCE], int cx, int cz, Uint64 seed_r)
