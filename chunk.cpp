@@ -165,9 +165,9 @@ void chunk_t::correct_grass()
             int cz = (iz) % CHUNK_SIZE_Z;
 
             int i;
-            for (i = CHUNK_SIZE_Y; i > 0; i--)
+            for (i = CHUNK_SIZE_Y - 1; i >= 0; i--)
             {
-                int index = i - 1 + (cz * (CHUNK_SIZE_Y)) + (cx * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z));
+                int index = i + (cz * (CHUNK_SIZE_Y)) + (cx * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z));
                 Uint8 type = data[index];
                 if (type == 0)
                     found_air++;
@@ -196,7 +196,34 @@ void chunk_t::correct_grass()
     }
 }
 
-void chunk_t::generate_biome_toppings(long seed, int cx, int cz)
+void chunk_t::generate_biome_data(const long seed, const int cx, const int cz)
+{
+
+    Uint64 seed_r = *(Uint64*)&seed;
+
+    SimplexNoise noise(1.0f, 1.0f, 2.0f, 0.5f);
+    SimplexNoise noise2(2.0f, 1.0f, 2.2f, 0.5f);
+
+    Uint32 rc1 = SDL_rand_bits_r(&seed_r);
+    Uint32 rc2 = SDL_rand_bits_r(&seed_r);
+
+    double x_diff = cast_to_sint32((rc1 & 0xF0FA00A5) | (rc2 & 0x0F05FF5A)) / 4096.0;
+    double z_diff = cast_to_sint32((rc1 & 0x0FFF0F0F) | (rc2 & 0xF000F0F0)) / 4096.0;
+
+    for (int x = 0; x < CHUNK_SIZE_X; x++)
+    {
+        for (int z = 0; z < CHUNK_SIZE_Z; z++)
+        {
+            double fx = x + cx * CHUNK_SIZE_X + x_diff;
+            double fz = z + cz * CHUNK_SIZE_Z + z_diff;
+
+            temperatures[x * CHUNK_SIZE_X + z] = (noise.fractal(8, fz / 589.0f, fx / 589.0f) + 0.5f) * 60.0f;
+            humidties[x * CHUNK_SIZE_X + z] = (noise2.fractal(3, fx / 569.0f, fz / 569.0f) + 1.0f) * 50.0f;
+        }
+    }
+}
+
+void chunk_t::generate_biome_toppings(const long seed, const int cx, const int cz)
 {
     Uint64 seed_r = *(Uint64*)&seed;
 
@@ -213,17 +240,37 @@ void chunk_t::generate_biome_toppings(long seed, int cx, int cz)
     {
         for (int z = 0; z < CHUNK_SIZE_Z; z++)
         {
-            double fx = z + cx * CHUNK_SIZE_X + x_diff;
-            double fz = x + cz * CHUNK_SIZE_Z + z_diff;
+            double fx = cx * CHUNK_SIZE_X + x_diff;
+            double fz = cz * CHUNK_SIZE_Z + z_diff;
 
-            int topping_depth = (noise.fractal(3, fx / 189.0f, fz / 189.0f) + 1.0f) + 2.75f;
+            int temperature = temperatures[x * CHUNK_SIZE_X + z];
+            int humidty = humidties[x * CHUNK_SIZE_X + z];
 
-            for (int y = CHUNK_SIZE_Y - 1; y >= 0 && topping_depth > 0; y--)
+            block_id_t type = temperature < 30.0f ? BLOCK_ID_DIRT : BLOCK_ID_SAND;
+            block_id_t type2 = temperature < 30.0f ? BLOCK_ID_NONE : BLOCK_ID_SANDSTONE;
+
+            float topping_depth = (noise.fractal(3, fx / 89.0f, fz / 89.0f) + 1.0f) * 1.2f + 2.0f;
+            float topping_depth2 = (noise2.fractal(3, fx / 79.0f, fz / 79.0f) + 1.0f) * 1.2f + 2.0f;
+
+            if (type2 == BLOCK_ID_NONE)
+                topping_depth2 = 0;
+            if (temperature >= 30.0f)
+                topping_depth *= 1.3f;
+
+            for (int y = CHUNK_SIZE_Y - 1; y >= 0 && (topping_depth > 0.0 || topping_depth2 > 0.0); y--)
             {
                 if (get_type(x, y, z) == BLOCK_ID_STONE)
                 {
-                    set_type(x, y, z, BLOCK_ID_DIRT);
-                    topping_depth--;
+                    if (topping_depth > 0.0)
+                    {
+                        set_type(x, y, z, type);
+                        topping_depth--;
+                    }
+                    else
+                    {
+                        set_type(x, y, z, type2);
+                        topping_depth2--;
+                    }
                 }
             }
         }
@@ -241,7 +288,7 @@ void chunk_t::generate_biome_toppings(long seed, int cx, int cz)
  * 4: Cutters
  * 5: Structures (includes trees)
  */
-void chunk_t::generate_from_seed_over(long seed, int cx, int cz)
+void chunk_t::generate_from_seed_over(const long seed, const int cx, const int cz)
 {
     if (((convar_int_t*)convar_t::get_convar("dev"))->get() && cx == 0 && cz == 0)
     {
@@ -262,6 +309,8 @@ void chunk_t::generate_from_seed_over(long seed, int cx, int cz)
 
     double x_diff = cast_to_sint32((rc1 & 0xF05A0FA5) | (rc2 & 0x0FA5F05A)) / 4096.0;
     double z_diff = cast_to_sint32((rc1 & 0x0F0F0F0F) | (rc2 & 0xF0F0F0F0)) / 4096.0;
+
+    generate_biome_data(seed, cx, cz);
 
     for (int x = 0; x < CHUNK_SIZE_X; x++)
     {
@@ -309,7 +358,7 @@ void chunk_t::generate_from_seed_over(long seed, int cx, int cz)
                 if (type == BLOCK_ID_AIR)
                 {
                     break_water = 1;
-                    set_type(x, y, z, BLOCK_ID_WATER_SOURCE);
+                    set_type(x, y, z, temperatures[x * CHUNK_SIZE_X + z] < 40.0f ? BLOCK_ID_WATER_SOURCE : BLOCK_ID_LAVA_SOURCE);
                 }
                 else if (break_water)
                 {

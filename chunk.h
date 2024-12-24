@@ -131,9 +131,9 @@ public:
      * 4: Cutters
      * 5: Structures (includes trees)
      */
-    void generate_from_seed_over(long seed, int cx, int cz);
+    void generate_from_seed_over(const long int seed, const int cx, const int cz);
 
-    void generate_biome_toppings(long seed, int cx, int cz);
+    void generate_biome_toppings(const long int seed, const int cx, const int cz);
 
     void generate_ores(long seed, int cx, int cz, param_ore_t* ores, Uint8 ore_count);
 
@@ -301,8 +301,12 @@ public:
     bool changed = false;
 
 private:
+    void generate_biome_data(const long seed, const int cx, const int cz);
+
     Uint64 r_state;
     std::vector<Uint8> data;
+    float temperatures[CHUNK_SIZE_X * CHUNK_SIZE_Z];
+    float humidties[CHUNK_SIZE_X * CHUNK_SIZE_Z];
 };
 
 #endif
