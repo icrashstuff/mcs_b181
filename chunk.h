@@ -133,6 +133,8 @@ public:
      */
     void generate_from_seed_over(long seed, int cx, int cz);
 
+    void generate_biome_toppings(long seed, int cx, int cz);
+
     void generate_ores(long seed, int cx, int cz, param_ore_t* ores, Uint8 ore_count);
 
     void generate_cutters(long seed, int cx, int cz, param_cutter_t* cutters, Uint8 cutter_count);

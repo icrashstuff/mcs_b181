@@ -154,7 +154,6 @@ void chunk_t::correct_lighting(int generator)
 
 void chunk_t::correct_grass()
 {
-
     int found_air = 0;
     Uint8 last_type[2] = { 0, 0 };
 
@@ -164,7 +163,9 @@ void chunk_t::correct_grass()
         {
             int cx = (ix) % CHUNK_SIZE_X;
             int cz = (iz) % CHUNK_SIZE_Z;
-            for (int i = CHUNK_SIZE_Y; i > 0; i--)
+
+            int i;
+            for (i = CHUNK_SIZE_Y; i > 0; i--)
             {
                 int index = i - 1 + (cz * (CHUNK_SIZE_Y)) + (cx * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z));
                 Uint8 type = data[index];
@@ -175,14 +176,59 @@ void chunk_t::correct_grass()
                 {
                     if (type == BLOCK_ID_DIRT)
                         set_type(cx, i, cz, BLOCK_ID_GRASS);
-                    goto next_y_column;
+                    goto fix_dirty_grass;
                 }
                 last_type[1] = last_type[0];
                 last_type[0] = type;
             }
-        next_y_column:;
+
+            /* Cleanup any grass with a block directly above */
+        fix_dirty_grass:;
+            for (; i > 0; i--)
+            {
+                if (!mc_id::is_transparent(get_type(cx, i, cz)) && get_type(cx, i - 1, cz) == BLOCK_ID_GRASS)
+                    set_type(cx, i - 1, cz, BLOCK_ID_DIRT);
+            }
+
+            if (get_type(cx, CHUNK_SIZE_Y - 1, cz) == BLOCK_ID_DIRT)
+                set_type(cx, CHUNK_SIZE_Y - 1, cz, BLOCK_ID_GRASS);
         }
     }
+}
+
+void chunk_t::generate_biome_toppings(long seed, int cx, int cz)
+{
+    Uint64 seed_r = *(Uint64*)&seed;
+
+    SimplexNoise noise(1.0f, 1.0f, 2.0f, 0.5f);
+    SimplexNoise noise2(2.0f, 1.0f, 2.0f, 0.5f);
+
+    Uint32 rc1 = SDL_rand_bits_r(&seed_r);
+    Uint32 rc2 = SDL_rand_bits_r(&seed_r);
+
+    double x_diff = cast_to_sint32((rc1 & 0xF05A0FA5) | (rc2 & 0x0FA5F05A)) / 4096.0;
+    double z_diff = cast_to_sint32((rc1 & 0x0F0F0F0F) | (rc2 & 0xF0F0F0F0)) / 4096.0;
+
+    for (int x = 0; x < CHUNK_SIZE_X; x++)
+    {
+        for (int z = 0; z < CHUNK_SIZE_Z; z++)
+        {
+            double fx = z + cx * CHUNK_SIZE_X + x_diff;
+            double fz = x + cz * CHUNK_SIZE_Z + z_diff;
+
+            int topping_depth = (noise.fractal(3, fx / 189.0f, fz / 189.0f) + 1.0f) + 2.75f;
+
+            for (int y = CHUNK_SIZE_Y - 1; y >= 0 && topping_depth > 0; y--)
+            {
+                if (get_type(x, y, z) == BLOCK_ID_STONE)
+                {
+                    set_type(x, y, z, BLOCK_ID_DIRT);
+                    topping_depth--;
+                }
+            }
+        }
+    }
+    correct_grass();
 }
 
 /**
@@ -205,9 +251,11 @@ void chunk_t::generate_from_seed_over(long seed, int cx, int cz)
         ready = true;
         return;
     }
-    SimplexNoise noise;
 
     Uint64 seed_r = *(Uint64*)&seed;
+
+    SimplexNoise noise(1.0f, 1.0f, 2.0f, 0.5f);
+    SimplexNoise noise2(2.0f, 1.0f, 2.0f, 0.5f);
 
     Uint32 rc1 = SDL_rand_bits_r(&seed_r);
     Uint32 rc2 = SDL_rand_bits_r(&seed_r);
@@ -215,6 +263,69 @@ void chunk_t::generate_from_seed_over(long seed, int cx, int cz)
     double x_diff = cast_to_sint32((rc1 & 0xF05A0FA5) | (rc2 & 0x0FA5F05A)) / 4096.0;
     double z_diff = cast_to_sint32((rc1 & 0x0F0F0F0F) | (rc2 & 0xF0F0F0F0)) / 4096.0;
 
+    for (int x = 0; x < CHUNK_SIZE_X; x++)
+    {
+        for (int z = 0; z < CHUNK_SIZE_Z; z++)
+        {
+            double fx = x + cx * CHUNK_SIZE_X + x_diff;
+            double fz = z + cz * CHUNK_SIZE_Z + z_diff;
+            double height = (noise.fractal(4, fx / 150, fz / 150) + 1.0 + noise2.noise(fz / 175, fx / 175) + 1.0) * 0.05 * CHUNK_SIZE_Y + 56;
+            double aggressive = noise.fractal(4, fx / 200, fz / 200) + 1.0;
+
+            height = height * (noise.fractal(3, fx / 250, fz / 250, aggressive / 5.0f) + 1.0);
+
+            for (int y = 1; y < height && y < CHUNK_SIZE_Y; y++)
+                set_type(x, y, z, BLOCK_ID_STONE);
+        }
+    }
+    generate_biome_toppings(seed, cx, cz);
+
+    for (int x = 0; x < CHUNK_SIZE_X; x++)
+    {
+        for (int z = 0; z < CHUNK_SIZE_Z; z++)
+        {
+            double fx = x + cx * CHUNK_SIZE_X + x_diff;
+            double fz = z + cz * CHUNK_SIZE_Z + z_diff;
+            double heightf = (noise.fractal(4, fx / 100, fz / 100) + 1.0) / 2;
+            double height = (heightf) * 0.45 * CHUNK_SIZE_Y + 56;
+            double height2f = (noise2.noise(4, fz / 300.0, fx / 300.0) + 1.0) / 2.0;
+            double height2 = height2f * 0.15 * CHUNK_SIZE_Y + 56;
+
+            for (int y = 0; y < height && y < CHUNK_SIZE_Y; y++)
+                if (noise.fractal(3, fx / 200.0f, fz / 200.0f, (double(y / 2.0) / height)) + 1.0f < (heightf + height2f))
+                    set_type(x, y, z, BLOCK_ID_STONE);
+        }
+    }
+    generate_biome_toppings(seed, cx, cz);
+
+    for (int x = 0; x < CHUNK_SIZE_X; x++)
+    {
+        for (int z = 0; z < CHUNK_SIZE_Z; z++)
+        {
+            int break_water = 0;
+            for (int y = 63; y >= 0 && break_water < 2; y--)
+            {
+                block_id_t type = get_type(x, y, z);
+                if (type == BLOCK_ID_AIR)
+                {
+                    break_water = 1;
+                    set_type(x, y, z, BLOCK_ID_WATER_SOURCE);
+                }
+                else if (break_water)
+                {
+                    if (type == BLOCK_ID_GRASS)
+                        set_type(x, y, z, BLOCK_ID_DIRT);
+                    break_water = 2;
+                }
+                else if (!break_water && y < 40)
+                {
+                    break_water = 2;
+                }
+            }
+        }
+    }
+
+#ifdef SKY_WORLD
     for (int x = 0; x < CHUNK_SIZE_X; x++)
     {
         for (int z = 0; z < CHUNK_SIZE_Z; z++)
@@ -233,18 +344,41 @@ void chunk_t::generate_from_seed_over(long seed, int cx, int cz)
                 height = height + 1.5 / (noise.fractal(2, fx / 150, fz / 150) + 1.0);
 
             for (int i = 1; i < height && i < CHUNK_SIZE_Y; i++)
-                set_type(x, i, z, BLOCK_ID_STONE);
-            for (int i = height; i < height + height_grass && i < CHUNK_SIZE_Y; i++)
-                set_type(x, i, z, BLOCK_ID_DIRT);
-            set_type(x, height + height_grass, z, BLOCK_ID_GRASS);
-            for (int i = height - 2; i < CHUNK_SIZE_Y; i++)
-                set_light_sky(x, i, z, 15);
-            set_type(x, 0, z, BLOCK_ID_BEDROCK);
+                set_type(x, i, z, BLOCK_ID_AIR);
         }
     }
+#endif
 
     generate_ores(seed, cx, cz, ore_params, ARR_SIZE(ore_params));
     generate_cutters(seed, cx, cz, cutter_params, ARR_SIZE(cutter_params));
+
+    for (int x = 0; x < CHUNK_SIZE_X; x++)
+    {
+        for (int z = 0; z < CHUNK_SIZE_Z; z++)
+        {
+            bool found_water = 0;
+            bool break_water = 0;
+            for (int y = 63; y >= 0 && !break_water; y--)
+            {
+                block_id_t type = get_type(x, y, z);
+                if (type == BLOCK_ID_WATER_SOURCE)
+                    found_water = 1;
+                if (!found_water && type != BLOCK_ID_WATER_SOURCE)
+                    break_water = 1;
+                if (found_water)
+                {
+                    if (type != BLOCK_ID_WATER_SOURCE && type != BLOCK_ID_AIR)
+                    {
+                        if (type == BLOCK_ID_GRASS)
+                            set_type(x, y, z, BLOCK_ID_DIRT);
+                        break_water = 1;
+                    }
+                    else if (type == BLOCK_ID_AIR)
+                        set_type(x, y, z, BLOCK_ID_WATER_FLOWING);
+                }
+            }
+        }
+    }
 
     if (((convar_int_t*)convar_t::get_convar("dev"))->get())
     {
