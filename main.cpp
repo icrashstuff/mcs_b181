@@ -52,6 +52,7 @@ long server_seed = 0;
 #define WEATHER_RAIN 1
 #define WEATHER_THUNDER 2
 #define WEATHER_THUNDER_SUPER 3
+#define WEATHER_THUNDER_SUPER_DUPER 4
 
 int server_weather = 0;
 
@@ -1251,8 +1252,8 @@ MC_COMMAND(weather)
         send_chat(sock, "Weather: state: %d", server_weather);
         send_chat(sock, "Weather: is_raining: %s", BOOL_S(server_weather > WEATHER_OFF));
         send_chat(sock, "Weather: is_thunder: %s", BOOL_S(server_weather > WEATHER_RAIN));
-        if (server_weather == WEATHER_THUNDER_SUPER)
-            send_chat(sock, "Weather: §7is_super: %s", BOOL_S(server_weather == WEATHER_THUNDER_SUPER));
+        if (server_weather == WEATHER_THUNDER_SUPER || server_weather == WEATHER_THUNDER_SUPER_DUPER)
+            send_chat(sock, "Weather: §7is_super: %s", server_weather == WEATHER_THUNDER_SUPER ? "Super" : "Super Duper");
         return COMMAND_OK;
     }
 
@@ -1260,7 +1261,7 @@ MC_COMMAND(weather)
     if (!int_from_str(argv[1], parse_result))
         return COMMAND_FAIL_PARSE;
 
-    if (parse_result < 0 || parse_result > 3)
+    if (parse_result < 0 || parse_result > 4)
     {
         send_chat(sock, "§cWeather: %d is not a valid weather state!", parse_result);
         return COMMAND_FAIL;
@@ -1903,6 +1904,9 @@ int main(int argc, const char** argv)
 
                     if (server_weather == WEATHER_THUNDER_SUPER && next_thunder_bolt >= 0)
                         next_thunder_bolt -= 1000;
+
+                    if (server_weather == WEATHER_THUNDER_SUPER_DUPER && next_thunder_bolt >= 0)
+                        next_thunder_bolt -= 10000;
 
                     if (next_thunder_bolt < 0 && server_weather > WEATHER_RAIN)
                     {
