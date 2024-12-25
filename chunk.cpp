@@ -985,6 +985,14 @@ bool chunk_t::find_spawn_point(double& x, double& y, double& z)
     int cx_s = (pos >> 16) % CHUNK_SIZE_X;
     int cz_s = pos % CHUNK_SIZE_Z;
 
+    if (!ready)
+    {
+        x = cx_s + 0.5;
+        y = CHUNK_SIZE_Y + 1.8;
+        z = cz_s + 0.5;
+        return false;
+    }
+
     int found_air = 0;
     Uint8 last_type[2] = { 0, 0 };
 

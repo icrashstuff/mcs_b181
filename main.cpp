@@ -197,6 +197,10 @@ private:
     chunk_t chunks[REGION_SIZE_X][REGION_SIZE_Z];
 };
 
+static convar_int_t dim_chunk_limit("dim_chunk_limit", 0, 0, SDL_MAX_SINT32, "Limit chunk generation to a square of size (-x,x) * (-x,x) [0: Disable]");
+
+#define BETWEEN(x, a, b) ((a) < (x) && (x) < (b))
+
 int generate_chunk_thread_func(void* data)
 {
     if (!data)
@@ -210,10 +214,18 @@ int generate_chunk_thread_func(void* data)
         if (!c)
             LOG("Failed to get chunk: %d %d %d", d->cx_off, d->cz_off, cz);
         assert(c);
-        if (d->dimension < 0)
-            c->generate_from_seed_nether(d->seed, d->cx_off, d->cz_off + cz);
+
+        const int lim = dim_chunk_limit.get();
+
+        if (dim_chunk_limit.get() && (!BETWEEN(d->cx_off, -lim, lim) || !BETWEEN(d->cz_off + cz, -lim, lim)))
+            c->generate_special_ascending_type(0);
         else
-            c->generate_from_seed_over(d->seed, d->cx_off, d->cz_off + cz);
+        {
+            if (d->dimension < 0)
+                c->generate_from_seed_nether(d->seed, d->cx_off, d->cz_off + cz);
+            else
+                c->generate_from_seed_over(d->seed, d->cx_off, d->cz_off + cz);
+        }
     }
     return 1;
 }
@@ -417,6 +429,7 @@ public:
                 if (regions[i].z == 0 || regions[i].z == -1)
                     regions[i].num_players++;
         }
+
         for (size_t i = 0; i < players.size(); i++)
         {
             int rx_nom = ((players[i].x >> 4) + 0) >> 5;
