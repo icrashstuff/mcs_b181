@@ -252,7 +252,6 @@ public:
 
         Uint64* rptr = (Uint64*)this;
         r_state = seed + generator + *(Uint32*)this + *(Uint64*)&rptr;
-        ;
 
         /* Load spawn regions */
         regions.push_back({ 0, 0, NULL, 0 });

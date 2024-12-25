@@ -833,6 +833,7 @@ void chunk_t::generate_from_seed_nether(long seed, int cx, int cz)
     }
 
     correct_lighting(-1);
+    ready = true;
 }
 
 void chunk_t::generate_special_ascending_type(int max_y)
