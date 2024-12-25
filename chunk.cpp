@@ -217,8 +217,9 @@ void chunk_t::generate_biome_data(const long seed, const int cx, const int cz)
             double fx = x + cx * CHUNK_SIZE_X + x_diff;
             double fz = z + cz * CHUNK_SIZE_Z + z_diff;
 
-            temperatures[x * CHUNK_SIZE_X + z] = (noise.fractal(8, fz / 589.0f, fx / 589.0f) + 0.5f) * 60.0f;
+            temperatures[x * CHUNK_SIZE_X + z] = (noise.fractal(6, fz / 589.0f, fx / 589.0f) + 0.5f) * 60.0f;
             humidties[x * CHUNK_SIZE_X + z] = (noise2.fractal(3, fx / 569.0f, fz / 569.0f) + 1.0f) * 50.0f;
+            blends[x * CHUNK_SIZE_X + z] = (noise2.fractal(7, fx / 589.0f, fz / 589.0f) + 1.0f) / 2.0f;
         }
     }
 }
@@ -323,6 +324,8 @@ void chunk_t::generate_from_seed_over(const long seed, const int cx, const int c
 
             height = height * (noise.fractal(3, fx / 250, fz / 250, aggressive / 5.0f) + 1.0);
 
+            height = height * blends[x * CHUNK_SIZE_X + z] + (72.0f + noise.fractal(2, fx / 500.0, fz / 500.0) * 5.0f) * (1.0f - blends[x * CHUNK_SIZE_X + z]);
+
             for (int y = 1; y < height && y < CHUNK_SIZE_Y; y++)
                 set_type(x, y, z, BLOCK_ID_STONE);
         }
@@ -339,6 +342,10 @@ void chunk_t::generate_from_seed_over(const long seed, const int cx, const int c
             double height = (heightf) * 0.45 * CHUNK_SIZE_Y + 56;
             double height2f = (noise2.noise(4, fz / 300.0, fx / 300.0) + 1.0) / 2.0;
             double height2 = height2f * 0.15 * CHUNK_SIZE_Y + 56;
+
+            float blend_fact = blends[x * CHUNK_SIZE_X + z] * 0.45f;
+
+            height = height * (blend_fact) + (68.0f + noise.fractal(2, fz / 500.0, fx / 500.0) * 5.0f) * (1.0f - blend_fact);
 
             for (int y = 0; y < height && y < CHUNK_SIZE_Y; y++)
                 if (noise.fractal(3, fx / 200.0f, fz / 200.0f, (double(y / 2.0) / height)) + 1.0f < (heightf + height2f))
@@ -390,7 +397,7 @@ void chunk_t::generate_from_seed_over(const long seed, const int cx, const int c
             if (aggressive > 1.5)
                 height = height * 1.5 / (noise.fractal(2, fx / 150, fz / 150) + 1.0);
             else
-                height = height + 1.5 / (noise.fractal(2, fx / 150, fz / 150) + 1.0);
+                height = height - 1.5 / (noise.fractal(2, fx / 150, fz / 150) + 1.0);
 
             for (int i = 1; i < height && i < CHUNK_SIZE_Y; i++)
                 set_type(x, i, z, BLOCK_ID_AIR);

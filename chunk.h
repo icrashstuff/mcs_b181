@@ -307,6 +307,7 @@ private:
     std::vector<Uint8> data;
     float temperatures[CHUNK_SIZE_X * CHUNK_SIZE_Z];
     float humidties[CHUNK_SIZE_X * CHUNK_SIZE_Z];
+    float blends[CHUNK_SIZE_X * CHUNK_SIZE_Z];
 };
 
 #endif
