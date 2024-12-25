@@ -27,16 +27,21 @@
 #include <zlib.h>
 
 static param_ore_t ore_params[] = {
-    { BLOCK_ID_GRAVEL, 0.3f, { 3, 7 }, { 20, 96 }, { 0, 127 }, { BLOCK_ID_STONE, -1, -1, -1 } },
-    { BLOCK_ID_DIRT, 0.25f, { 2, 6 }, { 18, 96 }, { 0, 127 }, { BLOCK_ID_STONE, -1, -1, -1 } },
-    { BLOCK_ID_CLAY, 0.35f, { 2, 5 }, { 5, 52 }, { 40, 72 }, { BLOCK_ID_DIRT, -1, -1, -1 } },
-    { BLOCK_ID_ORE_COAL, 0.85f, { 2, 7 }, { 5, 96 }, { 0, 127 }, { BLOCK_ID_STONE, -1, -1, -1 } },
-    { BLOCK_ID_ORE_COAL, 0.5f, { 2, 7 }, { 96, 127 }, { 80, 127 }, { BLOCK_ID_STONE, -1, -1, -1 } },
-    { BLOCK_ID_ORE_LAPIS, 0.35f, { 1, 1 }, { 13, 17 }, { 0, 34 }, { BLOCK_ID_STONE, -1, -1, -1 } },
-    { BLOCK_ID_ORE_IRON, 0.65f, { 1, 2 }, { 5, 64 }, { 0, 72 }, { BLOCK_ID_STONE, -1, -1, -1 } },
-    { BLOCK_ID_ORE_GOLD, 0.5f, { 1, 1 }, { 5, 29 }, { 0, 34 }, { BLOCK_ID_STONE, -1, -1, -1 } },
-    { BLOCK_ID_ORE_REDSTONE_OFF, 0.5f, { 1, 2 }, { 5, 12 }, { 0, 16 }, { BLOCK_ID_STONE, -1, -1, -1 } },
-    { BLOCK_ID_ORE_DIAMOND, 0.35f, { 1, 1 }, { 5, 12 }, { 0, 16 }, { BLOCK_ID_STONE, -1, -1, -1 } },
+    { BLOCK_ID_GRAVEL, 1.0f, 1.0f, 0.3f, { 3, 7 }, { 20, 96 }, { 0, 127 }, { BLOCK_ID_STONE, -1, -1, -1 } },
+    { BLOCK_ID_DIRT, 1.0f, 1.0f, 0.25f, { 2, 6 }, { 18, 96 }, { 0, 127 }, { BLOCK_ID_STONE, -1, -1, -1 } },
+    { BLOCK_ID_CLAY, 1.0f, 1.0f, 0.35f, { 2, 5 }, { 5, 52 }, { 40, 72 }, { BLOCK_ID_DIRT, -1, -1, -1 } },
+    { BLOCK_ID_ORE_COAL, 1.0f, 1.0f, 0.85f, { 2, 7 }, { 5, 96 }, { 0, 127 }, { BLOCK_ID_STONE, -1, -1, -1 } },
+    { BLOCK_ID_ORE_COAL, 1.0f, 1.0f, 0.5f, { 2, 7 }, { 96, 127 }, { 80, 127 }, { BLOCK_ID_STONE, -1, -1, -1 } },
+    { BLOCK_ID_ORE_LAPIS, 1.0f, 1.0f, 0.35f, { 1, 1 }, { 13, 17 }, { 0, 34 }, { BLOCK_ID_STONE, -1, -1, -1 } },
+    { BLOCK_ID_ORE_IRON, 1.0f, 1.0f, 0.65f, { 1, 2 }, { 5, 64 }, { 0, 72 }, { BLOCK_ID_STONE, -1, -1, -1 } },
+    { BLOCK_ID_ORE_GOLD, 1.0f, 1.0f, 0.5f, { 1, 1 }, { 5, 29 }, { 0, 34 }, { BLOCK_ID_STONE, -1, -1, -1 } },
+    { BLOCK_ID_ORE_REDSTONE_OFF, 1.0f, 1.0f, 0.5f, { 1, 2 }, { 5, 12 }, { 0, 16 }, { BLOCK_ID_STONE, -1, -1, -1 } },
+    { BLOCK_ID_ORE_DIAMOND, 1.0f, 1.0f, 0.35f, { 1, 1 }, { 5, 12 }, { 0, 16 }, { BLOCK_ID_STONE, -1, -1, -1 } },
+};
+
+static param_ore_t ore_params_nether[] = {
+    { BLOCK_ID_GRAVEL, 1.0f, 1.0f, 0.1f, { 3, 7 }, { 20, 96 }, { 0, 127 }, { BLOCK_ID_NETHERRACK, -1, -1, -1 } },
+    { BLOCK_ID_GLOWSTONE, 0.35f, 2.0f, 0.13f, { 5, 10 }, { 50, 127 }, { 0, 127 }, { BLOCK_ID_GOLD, -1, -1, -1 } },
 };
 
 static Uint8 ore_2r[] = { 0x3f, 0x7f, 0xff, 0x7d, 0xbf, 0x77, 0xff };
@@ -121,6 +126,13 @@ static param_cutter_t cutter_params[] = {
     { 0.1f, BLOCK_ID_AIR, { 0, 2 }, { 24, 80 }, { 32, 80 }, CUTTER_CAVE },
     { 0.07f, BLOCK_ID_AIR, { 8, 10 }, { 20, 80 }, { 8, 72 }, CUTTER_RAVINE_NO_DECOR },
     { 0.025f, BLOCK_ID_AIR, { 8, 10 }, { 20, 80 }, { 8, 72 }, CUTTER_RAVINE_NO_DECOR },
+};
+
+static param_cutter_t cutter_params_nether[] = {
+    { 0.15f, BLOCK_ID_AIR, { 0, 1 }, { 2, 6 }, { 8, 127 }, CUTTER_CAVE_NO_DECOR },
+    { 0.20f, BLOCK_ID_AIR, { 0, 2 }, { 10, 80 }, { 8, 127 }, CUTTER_CAVE_NO_DECOR },
+    { 0.35f, BLOCK_ID_AIR, { 1, 1 }, { 10, 80 }, { 8, 127 }, CUTTER_CAVE_NO_DECOR },
+    { 0.15f, BLOCK_ID_AIR, { 2, 2 }, { 10, 80 }, { 8, 127 }, CUTTER_CAVE_NO_DECOR },
 };
 
 chunk_t::chunk_t()
@@ -340,7 +352,7 @@ void chunk_t::generate_from_seed_over(const long seed, const int cx, const int c
             double fz = z + cz * CHUNK_SIZE_Z + z_diff;
             double heightf = (noise.fractal(4, fx / 100, fz / 100) + 1.0) / 2;
             double height = (heightf) * 0.45 * CHUNK_SIZE_Y + 56;
-            double height2f = (noise2.noise(4, fz / 300.0, fx / 300.0) + 1.0) / 2.0;
+            double height2f = (noise2.fractal(4, fz / 300.0, fx / 300.0) + 1.0) / 2.0;
             double height2 = height2f * 0.15 * CHUNK_SIZE_Y + 56;
 
             float blend_fact = blends[x * CHUNK_SIZE_X + z] * 0.45f;
@@ -435,6 +447,10 @@ void chunk_t::generate_from_seed_over(const long seed, const int cx, const int c
             }
         }
     }
+
+    for (int x = 0; x < CHUNK_SIZE_X; x++)
+        for (int z = 0; z < CHUNK_SIZE_Z; z++)
+            set_type(x, 0, z, BLOCK_ID_BEDROCK);
 
     if (((convar_int_t*)convar_t::get_convar("dev"))->get())
     {
@@ -693,9 +709,9 @@ void chunk_t::generate_ores(long seed, int cx, int cz, param_ore_t* ores, Uint8 
             for (int cval_it = 0; cval_it < num_chances; cval_it++)
             {
                 Uint64 d = cvals[cval_it];
-                jshort x = ((jbyte)(d & 0x0f)) + (ic - 1) * CHUNK_SIZE_X;
-                jshort z = ((jbyte)(d >> 4) & 0x0f) + (jc - 1) * CHUNK_SIZE_Z;
-                jubyte y = (d >> 8) & 0x7f;
+                float x = ((jbyte)(d & 0x0f)) + (ic - 1) * CHUNK_SIZE_X;
+                float z = ((jbyte)(d >> 4) & 0x0f) + (jc - 1) * CHUNK_SIZE_Z;
+                float y = (d >> 8) & 0x7f;
                 jubyte which = ((d >> 16) & 0xff) % ore_count;
                 float rarity = (float)(((d >> 24) & 0xff) + ((d >> 36) & 0xff)) / 512.0f;
                 bool direction_x = (d >> 45) & 1;
@@ -737,33 +753,33 @@ void chunk_t::generate_ores(long seed, int cx, int cz, param_ore_t* ores, Uint8 
                     {
                         if (direction_side != 0)
                         {
-                            x += direction_move;
-                            z += direction_side * ((jitter_var >> 4) & 1);
+                            x += direction_move * p.bias_horiz;
+                            z += direction_side * ((jitter_var >> 4) & 1) * p.bias_horiz;
                         }
                         else
                         {
-                            x += direction_move;
-                            z -= ((jitter_var >> 3) & 1);
-                            z += ((jitter_var >> 2) & 1);
+                            x += direction_move * p.bias_horiz;
+                            z -= ((jitter_var >> 3) & 1) * p.bias_horiz;
+                            z += ((jitter_var >> 2) & 1) * p.bias_horiz;
                         }
                     }
                     else
                     {
                         if (direction_side != 0)
                         {
-                            x += direction_side * ((jitter_var >> 4) & 1);
-                            z += direction_move;
+                            x += direction_side * ((jitter_var >> 4) & 1) * p.bias_horiz;
+                            z += direction_move * p.bias_horiz;
                         }
                         else
                         {
-                            z += direction_move;
-                            x += ((jitter_var >> 2) & 1);
-                            x -= ((jitter_var >> 3) & 1);
+                            z += direction_move * p.bias_horiz;
+                            x += ((jitter_var >> 2) & 1) * p.bias_horiz;
+                            x -= ((jitter_var >> 3) & 1) * p.bias_horiz;
                         }
                     }
 
-                    y += ((jitter_var >> 0) & 1);
-                    y -= ((jitter_var >> 1) & 1);
+                    y += ((jitter_var >> 0) & 1) * p.bias_vert;
+                    y -= ((jitter_var >> 1) & 1) * p.bias_vert;
 
                     for (int shift = 0; shift < 8; shift++)
                     {
@@ -787,48 +803,126 @@ void chunk_t::generate_ores(long seed, int cx, int cz, param_ore_t* ores, Uint8 
         }
     }
 }
-
+// generate_from_seed_nether
 void chunk_t::generate_from_seed_nether(long seed, int cx, int cz)
 {
-    SimplexNoise noise;
-
     Uint64 seed_r = *(Uint64*)&seed;
+
+    SimplexNoise noise(1.0f, 1.0f, 2.0f, 0.5f);
+    SimplexNoise noise2(2.0f, 1.0f, 2.0f, 0.5f);
 
     Uint32 rc1 = SDL_rand_bits_r(&seed_r);
     Uint32 rc2 = SDL_rand_bits_r(&seed_r);
 
     double x_diff = cast_to_sint32((rc1 & 0xF05A0FA5) | (rc2 & 0x0FA5F05A)) / 4096.0;
-    double y_diff = cast_to_sint32((rc1 & 0x0F0F0F0F) | (rc2 & 0xF0F0F0F0)) / 4096.0;
+    double z_diff = cast_to_sint32((rc1 & 0x0F0F0F0F) | (rc2 & 0xF0F0F0F0)) / 4096.0;
 
     for (int x = 0; x < CHUNK_SIZE_X; x++)
     {
         for (int z = 0; z < CHUNK_SIZE_Z; z++)
         {
             double fx = x + cx * CHUNK_SIZE_X + x_diff;
-            double fz = z + cz * CHUNK_SIZE_Z + y_diff;
-            int height = (noise.fractal(4, fx / 100, fz / 100) + 1.0) * 0.1 * CHUNK_SIZE_Y + 24;
-            double noise2 = (noise.fractal(4, fx / 200, fz / 200) + 1.0) * 0.1 * CHUNK_SIZE_Y + 4;
+            double fz = z + cz * CHUNK_SIZE_Z + z_diff;
+            double heightf = (noise.fractal(4, fx / 100, fz / 100) + 1.0) / 2;
+            double height = (heightf) * 0.45 * CHUNK_SIZE_Y + 56;
+            double height2f = (noise2.fractal(3, fz / 250.0, fx / 250.0) + 1.0) / 2.0;
+            double height2 = CHUNK_SIZE_Y - height;
 
-            int height2 = CHUNK_SIZE_Y - noise2;
-            for (int i = 1; i < height; i++)
-                set_type(x, i, z, BLOCK_ID_NETHERRACK);
-            for (int i = height - 2; i < height2; i++)
+            float heights[CHUNK_SIZE_Y];
+
+            for (int y = 0; y < CHUNK_SIZE_Y; y++)
             {
-                if (i < 32)
-                {
-                    set_type(x, i, z, BLOCK_ID_LAVA_FLOWING);
-                    set_light_block(x, i, z, mc_id::get_light_level(BLOCK_ID_LAVA_FLOWING));
-                }
-                else
-                    set_light_sky(x, i, z, 15);
+                double dist = SDL_fabs(y - CHUNK_SIZE_Y * 13 / 32) / double(CHUNK_SIZE_Y / 2.675);
+                dist *= dist;
+
+                heights[y] = noise.fractal(3, fx / 200.0f, fz / 200.0f, (double(y - height2) / 2.0) / height) + 1.0f;
+                if (heights[y] < (heightf + height2f + dist))
+                    set_type(x, y, z, BLOCK_ID_NETHERRACK);
             }
-            for (int i = height2; i < CHUNK_SIZE_Y; i++)
-                set_type(x, i, z, BLOCK_ID_NETHERRACK);
+
+            float height_float = (noise.fractal(6, fx / 200.0f, fz / 200.0f) + 1.05f) * 3.0f + 1.75f;
+            for (int i = 0, y = height * 0.65; i < height_float && height < CHUNK_SIZE_Y; i++, y++)
+            {
+                if (get_type(x, y, z) != BLOCK_ID_AIR)
+                    continue;
+                if (heights[SDL_arraysize(heights) - 1 - i] < (heightf / height2f))
+                    set_type(x, y, z, BLOCK_ID_NETHERRACK);
+            }
+        }
+    }
+
+    /* Generate gold for glowstone gen */
+    {
+        for (int x = 0; x < CHUNK_SIZE_X; x++)
+        {
+            for (int z = 0; z < CHUNK_SIZE_Z; z++)
+            {
+                double fx = x + cx * CHUNK_SIZE_X + x_diff;
+                double fz = z + cz * CHUNK_SIZE_Z + z_diff;
+                int solid = 0;
+                int solid_set_to = 1.5f + (noise.fractal(3, fx / 200.0f, fz / 200.0f) + 1.0) * 1.5f;
+                for (int y = CHUNK_SIZE_Y - 1; y >= 0; y--)
+                {
+                    block_id_t type = get_type(x, y, z);
+                    if (type == BLOCK_ID_NETHERRACK)
+                    {
+                        solid = solid_set_to;
+                    }
+                    else
+                    {
+                        for (int yc = 0; yc < solid / 2; yc++)
+                        {
+                            if (y - yc < 0)
+                                solid = 0;
+                            if (get_type(x, y - yc, z) != BLOCK_ID_AIR)
+                                solid = 0;
+                        }
+                    }
+
+                    if (solid && type == BLOCK_ID_AIR)
+                    {
+                        set_type(x, y, z, BLOCK_ID_GOLD);
+                        solid--;
+                    }
+                }
+            }
+        }
+
+        generate_ores(seed, cx, cz, ore_params_nether, ARR_SIZE(ore_params_nether));
+
+        for (int i = 0; i < CHUNK_SIZE_X * CHUNK_SIZE_Y * CHUNK_SIZE_Z; i++)
+            if (data[i] == BLOCK_ID_GOLD)
+                data[i] = BLOCK_ID_AIR;
+    }
+
+    generate_cutters(seed, cx, cz, cutter_params_nether, ARR_SIZE(cutter_params_nether));
+
+    for (int x = 0; x < CHUNK_SIZE_X; x++)
+    {
+        for (int z = 0; z < CHUNK_SIZE_Z; z++)
+        {
+            for (int y = 0; y < 32; y++)
+                if (get_type(x, y, z) == BLOCK_ID_AIR)
+                    set_type(x, y, z, BLOCK_ID_LAVA_SOURCE);
+
             set_type(x, 0, z, BLOCK_ID_BEDROCK);
             set_type(x, CHUNK_SIZE_Y - 1, z, BLOCK_ID_BEDROCK);
-            set_light_sky(x, CHUNK_SIZE_Y - 1, z, 15);
-            for (int i = 0; i < CHUNK_SIZE_Y; i++)
-                set_light_block(x, i, z, 15);
+        }
+    }
+
+    if (((convar_int_t*)convar_t::get_convar("dev"))->get())
+    {
+        for (int x = 0; x < CHUNK_SIZE_X; x++)
+        {
+            for (int z = 0; z < CHUNK_SIZE_Z; z++)
+            {
+                if (x == 0 && z == 0)
+                    set_type(x, 0, z, BLOCK_ID_WOOL);
+                else if (SDL_abs(cx) % 2 == SDL_abs(cz) % 2)
+                    set_type(x, 0, z, BLOCK_ID_BEDROCK);
+                else
+                    set_type(x, 0, z, BLOCK_ID_BRICKS_STONE);
+            }
         }
     }
 

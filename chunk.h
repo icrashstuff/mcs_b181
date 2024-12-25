@@ -35,6 +35,10 @@ struct param_ore_t
      */
     block_id_t block_id;
 
+    float bias_horiz;
+
+    float bias_vert;
+
     /**
      * Rarity value in the range [0, 1]
      */
