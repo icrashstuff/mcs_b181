@@ -26,6 +26,12 @@
 
 #include <zlib.h>
 
+// #define SKY_WORLD
+#define AMP_MULT 1
+
+#define SNOISE() SimplexNoise noise(1.0f * float(AMP_MULT), 1.0f * float(AMP_MULT), 2.0f / float(AMP_MULT), 0.5f * float(AMP_MULT))
+#define SNOISE_2() SimplexNoise noise2(2.0f * float(AMP_MULT), 1.0f * float(AMP_MULT), 2.0f * float(AMP_MULT), 0.5f / float(AMP_MULT))
+
 static param_ore_t ore_params[] = {
     { BLOCK_ID_GRAVEL, 1.0f, 1.0f, 0.3f, { 3, 7 }, { 20, 96 }, { 0, 127 }, { BLOCK_ID_STONE, -1, -1, -1 } },
     { BLOCK_ID_DIRT, 1.0f, 1.0f, 0.25f, { 2, 6 }, { 18, 96 }, { 0, 127 }, { BLOCK_ID_STONE, -1, -1, -1 } },
@@ -314,8 +320,8 @@ void chunk_t::generate_from_seed_over(const long seed, const int cx, const int c
 
     Uint64 seed_r = *(Uint64*)&seed;
 
-    SimplexNoise noise(1.0f, 1.0f, 2.0f, 0.5f);
-    SimplexNoise noise2(2.0f, 1.0f, 2.0f, 0.5f);
+    SNOISE();
+    SNOISE_2();
 
     Uint32 rc1 = SDL_rand_bits_r(&seed_r);
     Uint32 rc2 = SDL_rand_bits_r(&seed_r);
@@ -808,8 +814,8 @@ void chunk_t::generate_from_seed_nether(long seed, int cx, int cz)
 {
     Uint64 seed_r = *(Uint64*)&seed;
 
-    SimplexNoise noise(1.0f, 1.0f, 2.0f, 0.5f);
-    SimplexNoise noise2(2.0f, 1.0f, 2.0f, 0.5f);
+    SNOISE();
+    SNOISE_2();
 
     Uint32 rc1 = SDL_rand_bits_r(&seed_r);
     Uint32 rc2 = SDL_rand_bits_r(&seed_r);
@@ -850,6 +856,11 @@ void chunk_t::generate_from_seed_nether(long seed, int cx, int cz)
             }
         }
     }
+
+#ifdef SKY_WORLD
+    for (int i = 0; i < CHUNK_SIZE_X * CHUNK_SIZE_Y * CHUNK_SIZE_Z; i++)
+        data[i] = data[i] ? BLOCK_ID_AIR : BLOCK_ID_NETHERRACK;
+#endif
 
     /* Generate gold for glowstone gen */
     {
@@ -901,9 +912,11 @@ void chunk_t::generate_from_seed_nether(long seed, int cx, int cz)
     {
         for (int z = 0; z < CHUNK_SIZE_Z; z++)
         {
+#ifndef SKY_WORLD
             for (int y = 0; y < 32; y++)
                 if (get_type(x, y, z) == BLOCK_ID_AIR)
                     set_type(x, y, z, BLOCK_ID_LAVA_SOURCE);
+#endif
 
             set_type(x, 0, z, BLOCK_ID_BEDROCK);
             set_type(x, CHUNK_SIZE_Y - 1, z, BLOCK_ID_BEDROCK);
@@ -917,11 +930,20 @@ void chunk_t::generate_from_seed_nether(long seed, int cx, int cz)
             for (int z = 0; z < CHUNK_SIZE_Z; z++)
             {
                 if (x == 0 && z == 0)
+                {
                     set_type(x, 0, z, BLOCK_ID_WOOL);
+                    set_type(x, CHUNK_SIZE_Y - 1, z, BLOCK_ID_WOOL);
+                }
                 else if (SDL_abs(cx) % 2 == SDL_abs(cz) % 2)
+                {
                     set_type(x, 0, z, BLOCK_ID_BEDROCK);
+                    set_type(x, CHUNK_SIZE_Y - 1, z, BLOCK_ID_BEDROCK);
+                }
                 else
+                {
                     set_type(x, 0, z, BLOCK_ID_BRICKS_STONE);
+                    set_type(x, CHUNK_SIZE_Y - 1, z, BLOCK_ID_BRICKS_STONE);
+                }
             }
         }
     }
