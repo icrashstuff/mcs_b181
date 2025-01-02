@@ -276,8 +276,8 @@ const char* mc_id::get_name_from_item_id(short item_id, short damage)
         ADD_NAME(BLOCK_ID_IRON_BARS, "Iron Bars");
         ADD_NAME(BLOCK_ID_GLASS_PANE, "Glass Pane");
         ADD_NAME(BLOCK_ID_MELON, "Melon");
-        ADD_NAME(BLOCK_ID_STEM_UNKNOWN0, "BLOCK_ID_STEM_UNKNOWN0");
-        ADD_NAME(BLOCK_ID_STEM_UNKNOWN1, "BLOCK_ID_STEM_UNKNOWN1");
+        ADD_NAME(BLOCK_ID_STEM_PUMPKIN, "Pumpkin Stem");
+        ADD_NAME(BLOCK_ID_STEM_MELON, "Melon Stem");
         ADD_NAME(BLOCK_ID_MOSS, "Vines");
         ADD_NAME(BLOCK_ID_GATE, "Wooden Fence Gate");
         ADD_NAME(BLOCK_ID_STAIRS_BRICK, "Brick Stairs");

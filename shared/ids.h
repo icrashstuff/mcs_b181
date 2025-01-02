@@ -209,8 +209,8 @@ enum item_id_t_ : item_id_t
     BLOCK_ID_IRON_BARS,
     BLOCK_ID_GLASS_PANE,
     BLOCK_ID_MELON,
-    BLOCK_ID_STEM_UNKNOWN0,
-    BLOCK_ID_STEM_UNKNOWN1,
+    BLOCK_ID_STEM_PUMPKIN,
+    BLOCK_ID_STEM_MELON,
     BLOCK_ID_MOSS,
     BLOCK_ID_GATE,
     BLOCK_ID_STAIRS_BRICK,
@@ -384,7 +384,6 @@ enum mob_type_t : jbyte
 
 namespace mc_id
 {
-
 const char* get_name_vehicle(jbyte id);
 
 const char* get_name_mob(jbyte id);

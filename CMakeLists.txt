@@ -5,13 +5,15 @@ cmake_minimum_required(VERSION 3.25)
 # Make option() honor normal variables
 cmake_policy(SET CMP0077 NEW)
 
-project(mcs_b181 LANGUAGES CXX)
+project(mcs_b181 LANGUAGES CXX C)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
 # C++ 14 is solely for binary literals
 set(CMAKE_CXX_STANDARD 14)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
+set(CMAKE_C_STANDARD 99)
+set(CMAKE_C_STANDARD_REQUIRED ON)
 
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(zlib REQUIRED zlib)

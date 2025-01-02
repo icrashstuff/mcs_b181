@@ -24,6 +24,7 @@
 #define MCS_B181_PACKET_H
 
 #include <SDL3/SDL_stdinc.h>
+#include <SDL3_net/SDL_net.h>
 #include <assert.h>
 #include <string>
 #include <vector>
