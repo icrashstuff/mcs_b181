@@ -1,7 +1,7 @@
 /* SPDX-License-Identifier: MIT
  *
- * SPDX-FileCopyrightText: Copyright (c) Copyright (c) 2014-2024 Omar Cornut and Dear ImGui Contributors
- * SPDX-FileCopyrightText: Copyright (c) 2024 Ian Hangartner <icrashstuff at outlook dot com>
+ * SPDX-FileCopyrightText: Portions Copyright (c) 2014-2024 Omar Cornut and Dear ImGui Contributors
+ * SPDX-FileCopyrightText: Portions Copyright (c) 2024-2025 Ian Hangartner <icrashstuff at outlook dot com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -60,8 +60,11 @@
 SDL_Window* tetra::window = NULL;
 SDL_GLContext tetra::gl_context = NULL;
 
-static ImGuiContext* im_ctx_default = NULL;
+static ImGuiContext* im_ctx_main = NULL;
 static ImGuiContext* im_ctx_overlay = NULL;
+
+static bool im_ctx_shown_main = true;
+static bool im_ctx_shown_overlay = true;
 
 static bool was_init = false;
 static bool was_init_gui = false;
@@ -285,7 +288,7 @@ int tetra::init_gui(const char* window_title)
 
     // Setup Dear ImGui context
     IMGUI_CHECKVERSION();
-    im_ctx_default = ImGui::CreateContext();
+    im_ctx_main = ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
     (void)io;
     io.ConfigFlags |= ImGuiConfigFlags_NavEnableKeyboard; // Enable Keyboard Controls
@@ -346,7 +349,7 @@ int tetra::init_gui(const char* window_title)
         if (!ImGui_ImplOpenGL3_Init(imgui_glsl_version))
             util::die("Failed to initialize Dear Imgui OpenGL3 backend\n");
     }
-    ImGui::SetCurrentContext(im_ctx_default);
+    ImGui::SetCurrentContext(im_ctx_main);
 
     dc_log("Init gui finished in %.1f ms", ((SDL_GetTicksNS() - start_tick) / 100000) / 10.0f);
 
@@ -358,9 +361,10 @@ bool tetra::process_event(SDL_Event event)
     if (!was_init_gui)
         return false;
 
-    ImGui::SetCurrentContext(im_ctx_default);
+    ImGui::SetCurrentContext(im_ctx_main);
 
-    ImGui_ImplSDL3_ProcessEvent(&event);
+    if (im_ctx_shown_main || dev_console::shown)
+        ImGui_ImplSDL3_ProcessEvent(&event);
 
     if (event.type == SDL_EVENT_QUIT)
         return true;
@@ -391,13 +395,19 @@ int tetra::start_frame(bool event_loop)
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
 
-    ImGui::SetCurrentContext(im_ctx_default);
+    ImGui::SetCurrentContext(im_ctx_main);
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
 
     return !done;
 }
+
+void tetra::show_imgui_ctx_main(bool shown) { im_ctx_shown_main = shown; }
+
+bool tetra::imgui_ctx_main_wants_input() { return dev_console::shown || im_ctx_shown_main; }
+
+void tetra::show_imgui_ctx_overlay(bool shown) { im_ctx_shown_overlay = shown; }
 
 void tetra::end_frame(bool clear_frame)
 {
@@ -425,15 +435,25 @@ void tetra::end_frame(bool clear_frame)
         glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT);
     }
-    ImGui::SetCurrentContext(im_ctx_default);
-    ImGui::Render();
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    ImGui::SetCurrentContext(im_ctx_main);
+    if (im_ctx_shown_main || dev_console::shown)
+    {
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    }
+    else
+        ImGui::EndFrame();
 
     ImGui::SetCurrentContext(im_ctx_overlay);
     gui_registrar::render_overlays();
-    ImGui::Render();
-    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
-    ImGui::SetCurrentContext(im_ctx_default);
+    if (im_ctx_shown_overlay)
+    {
+        ImGui::Render();
+        ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    }
+    else
+        ImGui::EndFrame();
+    ImGui::SetCurrentContext(im_ctx_main);
 
     calc_dev_font_width("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~");
 
@@ -475,7 +495,7 @@ void tetra::deinit()
         ImGui_ImplSDL3_Shutdown();
         ImGui::DestroyContext();
 
-        ImGui::SetCurrentContext(im_ctx_default);
+        ImGui::SetCurrentContext(im_ctx_main);
         ImGui_ImplOpenGL3_Shutdown();
         ImGui_ImplSDL3_Shutdown();
         ImGui::DestroyContext();
