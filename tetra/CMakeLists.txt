@@ -3,7 +3,7 @@ cmake_minimum_required(VERSION 3.27)
 # Make option() honor normal variables
 cmake_policy(SET CMP0077 NEW)
 
-project(tetra)
+project(tetra CXX C)
 
 option(ENABLE_NATIVE_OPTIMIZATION "Enable native CPU specific compiler optimizations" OFF)
 option(DISABLE_STACK_PROTECTOR "Useful for finding out where stack smashing is occurring (Debug builds only)" OFF )
@@ -54,6 +54,7 @@ set(tetra_SRC
     ${TETRA_DIR}/gui/overlay_loading.cpp
     ${TETRA_DIR}/gui/overlay_performance.cpp
 
+    ${TETRA_DIR}/util/stbi.c
     ${TETRA_DIR}/util/misc.cpp
     ${TETRA_DIR}/util/convar.cpp
     ${TETRA_DIR}/util/cli_parser.cpp

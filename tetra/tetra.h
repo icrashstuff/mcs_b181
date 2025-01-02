@@ -56,7 +56,7 @@
  * # Make option() honor normal variables
  * cmake_policy(SET CMP0077 NEW)
  *
- * project(tetra_example)
+ * project(tetra_example LANGUAGES CXX C)
  *
  * set(CMAKE_INCLUDE_CURRENT_DIR ON)
  * set(tetra_example_SRC
