@@ -33,6 +33,12 @@
 
 static convar_string_t user_config_path("user_config_path", "/user_cfg.txt", "PHYSFS path to user config", CONVAR_FLAG_HIDDEN, convar_file_parser::read);
 
+void convar_file_parser::set_config_prefix(const char* prefix)
+{
+    user_config_path.set(std::string(prefix) + "_cfg.txt");
+    user_config_path.set_default(user_config_path.get());
+}
+
 bool convar_file_parser::write()
 {
     PHYSFS_file* fd = PHYSFS_openWrite(user_config_path.get().c_str());

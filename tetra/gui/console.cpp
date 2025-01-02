@@ -40,14 +40,103 @@
 #include <SDL3/SDL_events.h>
 #include <SDL3/SDL_stdinc.h>
 #include <iostream>
+#include <mutex>
 #include <vector>
 
 #include "console.h"
 #include "tetra/util/convar.h"
 
-//-----------------------------------------------------------------------------
-// [SECTION] Example App: Debug Console / ShowAppConsole()
-//-----------------------------------------------------------------------------
+#define VA_BUF_LEN 2048
+#define ITEM_COUNT_SHRINK_AT 50000
+#define ITEM_COUNT_SHRINK_AMOUNT (ITEM_COUNT_SHRINK_AT / 10)
+
+#define decode_variadic_to_buffer(BUFFER, FMT)              \
+    do                                                      \
+    {                                                       \
+        va_list args;                                       \
+        va_start(args, FMT);                                \
+        vsnprintf(BUFFER, IM_ARRAYSIZE(BUFFER), FMT, args); \
+        BUFFER[IM_ARRAYSIZE(BUFFER) - 1] = 0;               \
+        va_end(args);                                       \
+    } while (0)
+
+struct log_item_t
+{
+    /**
+     * SDL Tick, units of 0.001s
+     */
+    Uint64 time;
+
+    char* str;
+
+    const char* str_fname;
+
+    const char* str_func;
+
+    int line;
+
+    dev_console::log_level_t lvl;
+
+    float line_width;
+
+    int num_lines;
+
+    /**
+     * Get the color of the log message associated with lvl
+     */
+    ImVec4 get_color()
+    {
+        switch (lvl)
+        {
+        case dev_console::LEVEL_FATAL:
+            return ImVec4(1.0f, 0.2f, 0.2f, 1.0f);
+        case dev_console::LEVEL_ERROR:
+            return ImVec4(1.0f, 0.4f, 0.4f, 1.0f);
+        case dev_console::LEVEL_WARN:
+            return ImVec4(1.0f, 0.4f, 0.2f, 1.0f);
+        case dev_console::LEVEL_TRACE:
+            return ImVec4(0.2f, 0.4f, 1.0f, 1.0f);
+        case dev_console::LEVEL_INTERNAL_CMD:
+            return ImVec4(1.0f, 0.8f, 0.6f, 1.0f);
+        default:
+            return ImVec4(1.0f, 1.0f, 1.0f, 1.0f);
+        }
+    }
+
+    void format_str(char* buf, size_t buf_len)
+    {
+        const char* lvl_txt;
+        switch (lvl)
+        {
+        case dev_console::LEVEL_WARN:
+            lvl_txt = "[warn]";
+            break;
+        case dev_console::LEVEL_ERROR:
+            lvl_txt = "[error]";
+            break;
+        case dev_console::LEVEL_FATAL:
+            lvl_txt = "[fatal]";
+            break;
+        case dev_console::LEVEL_TRACE:
+            lvl_txt = "[trace]";
+            break;
+        default:
+            lvl_txt = NULL;
+            break;
+        }
+
+        if (lvl < 0)
+        {
+            size_t slen = strlen(str) + 1;
+            memcpy(buf, str, SDL_min(buf_len, slen));
+            buf[SDL_min(buf_len, slen) - 1] = '\0';
+        }
+        else if (lvl_txt)
+            snprintf(buf, buf_len, "[%s:%s:%d]%s: %s", str_fname, str_func, line, lvl_txt, str);
+        else
+            snprintf(buf, buf_len, "[%s:%s:%d]: %s", str_fname, str_func, line, str);
+    }
+};
 
 // Demonstrate creating a simple console window, with scrolling, filtering, completion and history.
 // For the console example, we are using a more C++ like approach of declaring a class to hold both data and functions.
@@ -56,7 +145,7 @@ struct AppConsole
 #define MAX_INPUT_LENGTH 1024
     // #define DEBUG_EXEC_MAPPED_COMMAND
     char InputBuf[MAX_INPUT_LENGTH];
-    ImVector<char*> Items;
+    ImVector<log_item_t> Items;
     ImVector<const char*> commands_vec;
     ImVector<char*> History;
     int HistoryPos; // -1: new line, 0..History.Size-1 browsing history.
@@ -65,6 +154,7 @@ struct AppConsole
     bool ScrollToBottom;
     bool forceReclaimFocus;
     bool console_fullscreen_bool;
+    std::mutex mutex_log;
 
     std::unordered_map<std::string, std::function<int(const int, const char**)>> commands_map;
 
@@ -120,12 +210,85 @@ struct AppConsole
             return 1;
         });
 
-        AddCommand("_console_test_returncode", [=](const int argc, const char* argv[]) -> int {
+        AddCommand("_con_test_returncode", [=](const int argc, const char* argv[]) -> int {
             if (argc > 1)
             {
                 return atoi(argv[1]);
             }
             return 1;
+        });
+
+        AddCommand("_con_test_log_fatal", [=](const int argc, const char* argv[]) -> int {
+            dc_log_fatal("argc = %d, argv[0] = \"%s\"", argc, argv[0]);
+            return 0;
+        });
+
+        AddCommand("_con_test_log_error", [=](const int argc, const char* argv[]) -> int {
+            dc_log_error("argc = %d, argv[0] = \"%s\"", argc, argv[0]);
+            return 0;
+        });
+
+        AddCommand("_con_test_log_warn", [=](const int argc, const char* argv[]) -> int {
+            dc_log_warn("argc = %d, argv[0] = \"%s\"", argc, argv[0]);
+            return 0;
+        });
+
+        AddCommand("_con_test_log_info", [=](const int argc, const char* argv[]) -> int {
+            dc_log("argc = %d, argv[0] = \"%s\"", argc, argv[0]);
+            return 0;
+        });
+
+        AddCommand("_con_test_log_trace", [=](const int argc, const char* argv[]) -> int {
+            dc_log_trace("argc = %d, argv[0] = \"%s\"", argc, argv[0]);
+            return 0;
+        });
+
+        AddCommand("_con_test_log_internal", [=](const int argc, const char* argv[]) -> int {
+            dc_log_internal("argc = %d, argv[0] = \"%s\"", argc, argv[0]);
+            return 0;
+        });
+
+        AddCommand("_con_test_log_all", [=](const int argc, const char* argv[]) -> int {
+            dc_log_fatal("argc = %d, argv[0] = \"%s\"", argc, argv[0]);
+            dc_log_error("argc = %d, argv[0] = \"%s\"", argc, argv[0]);
+            dc_log_warn("argc = %d, argv[0] = \"%s\"", argc, argv[0]);
+            dc_log("argc = %d, argv[0] = \"%s\"", argc, argv[0]);
+            dc_log_trace("argc = %d, argv[0] = \"%s\"", argc, argv[0]);
+            dc_log_internal("argc = %d, argv[0] = \"%s\"", argc, argv[0]);
+            return 0;
+        });
+
+        AddCommand("_con_test_log_multiline_internal", [=](const int argc, const char* argv[]) -> int {
+            dc_log_internal("argc = %d, argv[0] = \"%s\"\nline 2\nline 3\nline 4", argc, argv[0]);
+            return 0;
+        });
+
+        AddCommand("_con_test_log_multiline_warn", [=](const int argc, const char* argv[]) -> int {
+            dc_log_warn("argc = %d, argv[0] = \"%s\"\nline 2\nline 3\nline 4", argc, argv[0]);
+            return 0;
+        });
+
+        AddCommand("_con_test_log_multiline_warn_trailing", [=](const int argc, const char* argv[]) -> int {
+            dc_log_warn("argc = %d, argv[0] = \"%s\"\nline 2\nline 3\nline 4\n\n", argc, argv[0]);
+            return 0;
+        });
+
+        AddCommand("_con_test_log_multiline_error_mult", [=](const int argc, const char* argv[]) -> int {
+            char buf[64];
+            for (int i = 0; i < IM_ARRAYSIZE(buf); i++)
+                buf[i] = (i % 2 == 0) ? 'X' : '\n';
+            buf[IM_ARRAYSIZE(buf) - 1] = '\n';
+            for (int i = 1; i < IM_ARRAYSIZE(buf); i += 2)
+            {
+                dc_log_error("Num newlines: %d%.*send", i, i, buf);
+            }
+            return 0;
+        });
+
+        AddCommand("_con_test_log_wall", [=]() -> int {
+            for (int i = Items.Size; i > 0; i--)
+                dev_console::add_log((dev_console::log_level_t)((i % 7) - 2), "str_fname", "str_func", i, "%d%x%d", i, i, i);
+            return 0;
         });
 
         AutoScroll = true;
@@ -178,37 +341,152 @@ struct AppConsole
 
     void ClearLog()
     {
+        std::lock_guard<std::mutex> lock(mutex_log);
         for (int i = 0; i < Items.Size; i++)
-            free(Items[i]);
+            free(Items[i].str);
         Items.clear();
     }
-#define decode_variadic_to_buffer(BUFFER, FMT)              \
-    do                                                      \
-    {                                                       \
-        va_list args;                                       \
-        va_start(args, FMT);                                \
-        vsnprintf(BUFFER, IM_ARRAYSIZE(BUFFER), FMT, args); \
-        BUFFER[IM_ARRAYSIZE(BUFFER) - 1] = 0;               \
-        va_end(args);                                       \
-    } while (0)
 
     void AddLogQuiet(const char* fmt, ...) IM_FMTARGS(2)
     {
-        char buf[4096];
+        char buf[VA_BUF_LEN];
         decode_variadic_to_buffer(buf, fmt);
-        Items.push_back(Strdup(buf));
+
+        log_item_t l;
+        l.time = SDL_GetTicks();
+        l.str = Strdup(buf);
+        l.str_fname = __FILE_NAME__;
+        l.str_func = __func__;
+        l.line = __LINE__;
+
+        if (strstr(buf, "[error]"))
+            l.lvl = dev_console::LEVEL_ERROR;
+        else if (strstr(buf, "[warn]"))
+            l.lvl = dev_console::LEVEL_WARN;
+        else if (strstr(buf, "[trace]"))
+            l.lvl = dev_console::LEVEL_TRACE;
+        else if (strncmp(buf, "# ", 2) == 0)
+            l.lvl = dev_console::LEVEL_INTERNAL_CMD;
+        else
+            l.lvl = dev_console::LEVEL_INTERNAL;
+
+        push_back_log(l, true);
+    }
+
+    /**
+     * Push back the a log item to Items and if necessary shrink Items
+     *
+     * Also populates the fields: line_width and num_lines
+     *
+     * @param l The log item to push back
+     * @param quiet Whether to print the log item to the console or not
+     */
+    void push_back_log(log_item_t l, bool quiet)
+    {
+        char buf[VA_BUF_LEN];
+        l.format_str(buf, IM_ARRAYSIZE(buf));
+        l.line_width = SDL_utf8strlen(buf);
+        l.num_lines = 0;
+
+        char* lstart = buf;
+        char* lend = buf;
+        for (char* i = buf; *i != '\0'; i++)
+        {
+            if (*i != '\n')
+                continue;
+            lend = i;
+            float len = SDL_utf8strnlen(lstart, lend - lstart);
+            if (len > l.line_width)
+                l.line_width = len;
+            lstart = i;
+            l.num_lines++;
+        }
+
+        float len = SDL_utf8strnlen(lstart, lend - lstart);
+        if (len > l.line_width)
+            l.line_width = len;
+
+        l.line_width *= dev_console::add_log_font_width;
+
+        if (l.num_lines == 0)
+            l.num_lines = 1;
+
+        if (!quiet)
+        {
+            size_t buf_len = strlen(buf);
+            if (buf_len > 0 && buf[buf_len - 1] == '\n')
+                printf("%s", buf);
+            else
+                printf("%s\n", buf);
+        }
+
+        std::lock_guard<std::mutex> lock(mutex_log);
+        Items.push_back(l);
+
+        if (Items.Size > ITEM_COUNT_SHRINK_AT)
+        {
+            for (int i = 0; i < ITEM_COUNT_SHRINK_AMOUNT; i++)
+                free(Items[i].str);
+
+            memmove(Items.Data, Items.Data + ITEM_COUNT_SHRINK_AMOUNT, (Items.Size - ITEM_COUNT_SHRINK_AMOUNT) * sizeof(Items[0]));
+            Items.resize(Items.Size - ITEM_COUNT_SHRINK_AMOUNT);
+        }
     }
 
     void AddLog(const char* fmt, ...) IM_FMTARGS(2)
     {
-        char buf[4096];
+        char buf[VA_BUF_LEN];
         decode_variadic_to_buffer(buf, fmt);
-        size_t buf_len = strlen(buf);
-        if (buf_len > 0 && buf[buf_len - 1] == '\n')
-            printf("%s", buf);
+
+        log_item_t l;
+        l.time = SDL_GetTicks();
+        l.str = Strdup(buf);
+        l.str_fname = __FILE_NAME__;
+        l.str_func = "";
+        l.line = -1;
+
+        if (strstr(buf, "[error]"))
+            l.lvl = dev_console::LEVEL_ERROR;
+        else if (strstr(buf, "[warn]"))
+            l.lvl = dev_console::LEVEL_WARN;
+        else if (strstr(buf, "[trace]"))
+            l.lvl = dev_console::LEVEL_TRACE;
+        else if (strncmp(buf, "# ", 2) == 0)
+            l.lvl = dev_console::LEVEL_INTERNAL_CMD;
         else
-            printf("%s\n", buf);
-        Items.push_back(Strdup(buf));
+            l.lvl = dev_console::LEVEL_INTERNAL;
+
+        push_back_log(l, false);
+    }
+
+    inline void render_item(log_item_t l, float line_height, float line_height_spacing, ImVec4& last_color)
+    {
+        ImVec2 rect(l.line_width, line_height * (l.num_lines - 1) + line_height_spacing);
+        if (ImGui::IsRectVisible(rect))
+        {
+            char buf[VA_BUF_LEN];
+
+            l.format_str(buf, IM_ARRAYSIZE(buf));
+            l.line_width = ImGui::CalcTextSize(buf).x + ImGui::GetStyle().ItemSpacing.x * 2;
+
+            ImVec4 new_color = l.get_color();
+
+            if (new_color != last_color)
+            {
+                if (last_color.x > -0.5f)
+                    ImGui::PopStyleColor();
+                ImGui::PushStyleColor(ImGuiCol_Text, new_color);
+            }
+
+            last_color = new_color;
+
+            ImGui::TextUnformatted(buf);
+        }
+        else
+        {
+            rect.y = line_height * l.num_lines;
+            ImGui::Dummy(rect);
+        }
     }
 
     void Draw(const char* title, bool* p_open)
@@ -235,7 +513,6 @@ struct AppConsole
         if (*p_open == true && console_fullscreen_bool)
         {
             window_flags = ImGuiWindowFlags_NoResize | ImGuiWindowFlags_NoSavedSettings;
-            ImGuiViewport* viewport = ImGui::GetMainViewport();
             ImGui::SetNextWindowSize(viewport->WorkSize);
             ImGui::SetNextWindowPos(viewport->WorkPos);
         }
@@ -246,7 +523,7 @@ struct AppConsole
             return;
         }
 
-        // As a specific feature guaranteed by the library, after calling Begin() the last Item represent the title bar.
+        // As a specific feature guaranteed by the library, after calling Begin() the last Item represents the title bar.
         // So e.g. IsItemHovered() will return true when hovering the title bar.
         // Here we create a context menu only available from the title bar.
         if (ImGui::BeginPopupContextItem())
@@ -278,6 +555,8 @@ struct AppConsole
             ImGui::OpenPopup("Options");
         ImGui::SameLine();
         Filter.Draw("Filter (\"incl,-excl\") (\"error\")", 180);
+        ImGui::SameLine();
+        ImGui::Text("| %d entries", Items.Size);
         ImGui::Separator();
 
         // Reserve enough left-over height for 1 separator + 1 input text
@@ -318,37 +597,29 @@ struct AppConsole
         ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1)); // Tighten spacing
         if (copy_to_clipboard)
             ImGui::LogToClipboard();
-        for (int i = 0; i < Items.Size; i++)
-        {
-            const char* item = Items[i];
-            if (!Filter.PassFilter(item))
-                continue;
 
-            // Normally you would store more information in your item than just a string.
-            // (e.g. make Items[] an array of structure, store color/type etc.)
-            ImVec4 color;
-            bool has_color = false;
-            if (strstr(item, "[error]"))
+        {
+            std::lock_guard<std::mutex> lock(mutex_log);
+
+            float line_height = ImGui::GetTextLineHeight();
+            float line_height_spacing = ImGui::GetTextLineHeightWithSpacing();
+
+            ImVec4 last_color(-1, -1, -1, -1);
+
+            for (int i = 0, j = 2; i < Items.Size; i++, j++)
             {
-                color = ImVec4(1.0f, 0.4f, 0.4f, 1.0f);
-                has_color = true;
+                const char* item = Items[i].str;
+                if (!Filter.PassFilter(item))
+                    continue;
+                render_item(Items[i], line_height, line_height_spacing, last_color);
             }
-            else if (strstr(item, "[warn]"))
-            {
-                color = ImVec4(1.0f, 0.4f, 0.2f, 1.0f);
-                has_color = true;
-            }
-            else if (strncmp(item, "# ", 2) == 0)
-            {
-                color = ImVec4(1.0f, 0.8f, 0.6f, 1.0f);
-                has_color = true;
-            }
-            if (has_color)
-                ImGui::PushStyleColor(ImGuiCol_Text, color);
-            ImGui::TextUnformatted(item);
-            if (has_color)
+
+            if (last_color.x > -0.5f)
                 ImGui::PopStyleColor();
+
+            ImGui::Dummy(ImVec2(10, (line_height + line_height_spacing) / 5.0f));
         }
+
         if (copy_to_clipboard)
             ImGui::LogFinish();
 
@@ -384,6 +655,84 @@ struct AppConsole
             ImGui::SetKeyboardFocusHere(-1); // Auto focus previous widget
             forceReclaimFocus = false;
         }
+        ImGui::End();
+    }
+
+    void draw_overlay(const char* title, dev_console::log_level_t max_lvl)
+    {
+        std::vector<int> filter_items;
+        filter_items.reserve(12);
+
+        std::lock_guard<std::mutex> lock(mutex_log);
+        Uint64 sdl_tick_cur = SDL_GetTicks();
+        int num_lines = 0;
+        for (int i = Items.Size - 1; i >= 0; i--)
+        {
+            Uint64 tdiff = sdl_tick_cur - Items[i].time;
+            if (tdiff >= 2500 && (tdiff > 7500 || num_lines >= 8))
+            {
+                i = -1;
+                continue;
+            }
+            if (tdiff < 2500 && (tdiff > 2500 || num_lines >= 12))
+            {
+                i = -1;
+                continue;
+            }
+
+            if (Items[i].lvl < 0 || Items[i].lvl > max_lvl)
+                continue;
+
+            num_lines += Items[i].num_lines;
+            filter_items.push_back(i);
+        }
+
+        if (!filter_items.size())
+            return;
+
+        ImGui::SetNextWindowPos(ImVec2(0.0f, 0.0f), ImGuiCond_Always);
+
+        ImGuiWindowFlags window_flags = ImGuiWindowFlags_NoDecoration;
+        window_flags |= ImGuiWindowFlags_AlwaysAutoResize;
+        window_flags |= ImGuiWindowFlags_NoSavedSettings;
+        window_flags |= ImGuiWindowFlags_NoFocusOnAppearing;
+        window_flags |= ImGuiWindowFlags_NoNav;
+        window_flags |= ImGuiWindowFlags_NoMove;
+        window_flags |= ImGuiWindowFlags_NoInputs;
+
+        if (dev_console::overlay_font)
+            ImGui::PushFont(dev_console::overlay_font);
+
+        ImGui::PushStyleColor(ImGuiCol_WindowBg, ImVec4(0.0f, 0.0f, 0.0f, 0.5f));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(4, 4));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(4, 1)); // Tighten spacing
+
+        if (!ImGui::Begin(title, NULL, window_flags))
+        {
+            ImGui::PopStyleVar(3);
+            ImGui::PopStyleColor();
+            if (dev_console::overlay_font)
+                ImGui::PopFont();
+            ImGui::End();
+            return;
+        }
+
+        float line_height = ImGui::GetTextLineHeightWithSpacing();
+        float line_height_spacing = ImGui::GetTextLineHeightWithSpacing();
+
+        ImVec4 last_color(-1, -1, -1, -1);
+
+        for (int i = filter_items.size() - 1; i >= 0; i--)
+            render_item(Items[filter_items[i]], line_height, line_height_spacing, last_color);
+
+        if (last_color.x > -0.5f)
+            ImGui::PopStyleColor();
+
+        ImGui::PopStyleVar(3);
+        ImGui::PopStyleColor();
+        if (dev_console::overlay_font)
+            ImGui::PopFont();
         ImGui::End();
     }
 
@@ -438,7 +787,8 @@ struct AppConsole
             for (size_t i = 0; i < convar_list->size(); i++)
             {
                 convar_t* cvr = convar_list->at(i);
-                if (!(cvr->get_convar_flags() & CONVAR_FLAG_HIDDEN))
+                CONVAR_FLAGS cvr_flags = cvr->get_convar_flags();
+                if (!(cvr_flags & CONVAR_FLAG_HIDDEN) && !(!convar_t::dev() && (cvr_flags & CONVAR_FLAG_DEV_ONLY)))
                     AddLog("- %s", cvr->get_name());
             }
         }
@@ -763,7 +1113,8 @@ struct AppConsole
             for (size_t i = 0; i < convar_list->size(); i++)
             {
                 convar_t* cvr = convar_list->at(i);
-                if (cvr->get_convar_flags() & CONVAR_FLAG_HIDDEN)
+                CONVAR_FLAGS cvr_flags = cvr->get_convar_flags();
+                if ((cvr_flags & CONVAR_FLAG_HIDDEN) || (!convar_t::dev() && (cvr_flags & CONVAR_FLAG_DEV_ONLY)))
                     continue;
                 if (Strnicmp(cvr->get_name(), word_start, (int)(word_end - word_start)) == 0)
                     candidates.push_back(cvr->get_name());
@@ -854,6 +1205,8 @@ struct AppConsole
     }
 };
 
+#include "gui_registrar.h"
+
 static AppConsole _devConsole;
 
 bool dev_console::shown = false;
@@ -864,7 +1217,7 @@ void dev_console::show_hide()
         _devConsole.forceReclaimFocus = true;
 }
 
-static convar_int_t console_fullscreen("console_fullscreen", true, false, true, "Make console fill the whole work area");
+static convar_int_t console_fullscreen("console_fullscreen", false, false, true, "Make console fill the whole work area", CONVAR_FLAG_INT_IS_BOOL);
 
 void dev_console::render()
 {
@@ -875,24 +1228,63 @@ void dev_console::render()
     }
 }
 
+static convar_int_t console_overlay(
+    "console_overlay", 0, 0, 4, "Dev console overlay console level [0: Fatal, 1: Error, 2: Warn, 3: Info, 4: Trace]", CONVAR_FLAG_DEV_ONLY);
+
+static bool draw_console_overlay()
+{
+    dev_console::log_level_t max_lvl;
+
+    switch (console_overlay.get())
+    {
+    case 0:
+        max_lvl = dev_console::LEVEL_FATAL;
+        break;
+    case 1:
+        max_lvl = dev_console::LEVEL_ERROR;
+        break;
+    case 2:
+        max_lvl = dev_console::LEVEL_WARN;
+        break;
+    case 3:
+        max_lvl = dev_console::LEVEL_INFO;
+        break;
+    case 4:
+        max_lvl = dev_console::LEVEL_TRACE;
+        break;
+    default:
+        return false;
+    }
+
+    _devConsole.draw_overlay("Developer Overlay", max_lvl);
+
+    return true;
+}
+
+static gui_register_overlay reg_console_overlay(draw_console_overlay);
+
 void dev_console::add_command(const char* name, std::function<int(const int, const char**)> func) { _devConsole.AddCommand(name, func); }
 void dev_console::add_command(const char* name, std::function<int()> func) { _devConsole.AddCommand(name, func); }
 
 void dev_console::run_command(const char* fmt, ...)
 {
-    char buf[4096];
+    char buf[MAX_INPUT_LENGTH];
     decode_variadic_to_buffer(buf, fmt);
     _devConsole.ExecCommand(buf, true);
 }
 
-void dev_console::add_log(const char* fmt, ...)
+void dev_console::add_log(dev_console::log_level_t lvl, const char* fname, const char* func, int line, const char* fmt, ...)
 {
-    char buf[4096];
+    char buf[VA_BUF_LEN];
     decode_variadic_to_buffer(buf, fmt);
-    size_t buf_len = strlen(buf);
-    if (buf_len > 0 && buf[buf_len - 1] == '\n')
-        printf("%s", buf);
-    else
-        printf("%s\n", buf);
-    _devConsole.Items.push_back(_devConsole.Strdup(buf));
+
+    log_item_t l;
+    l.time = SDL_GetTicks();
+    l.str = _devConsole.Strdup(buf);
+    l.lvl = lvl;
+    l.str_fname = fname;
+    l.str_func = func;
+    l.line = line;
+
+    _devConsole.push_back_log(l, false);
 }

@@ -1419,7 +1419,7 @@ int main(int argc, const char** argv)
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
 
-    tetra::init("icrashstuff", "mcs_b181", argc, argv);
+    tetra::init("icrashstuff", "mcs_b181", "mcs_b181_bridge", argc, argv);
     tetra::init_gui("mcs_b181_bridge");
 
     LOG("Hello");

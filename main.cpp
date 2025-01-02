@@ -1652,13 +1652,13 @@ void player_place(std::vector<client_t>& clients, client_t* client, packet_playe
 
 static convar_string_t address_listen("address_listen", "127.0.0.1", "Address to listen for connections");
 
-int main(int argc, const char** argv)
+int main(const int argc, const char** argv)
 {
     /* KDevelop fully buffers the output and will not display anything */
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
 
-    tetra::init("icrashstuff", "mcs_b181", argc, argv);
+    tetra::init("icrashstuff", "mcs_b181", "mcs_b181_server", argc, argv);
 
     LOG("Hello");
 

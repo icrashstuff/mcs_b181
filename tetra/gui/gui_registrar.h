@@ -50,6 +50,8 @@ struct gui_registrar
     /**
      * Render all registered overlays
      *
+     * These are rendered to a separate ImGui context which is rendered on top of the default context
+     *
      * Returns true if any of the overlay functions return true
      */
     static bool render_overlays();

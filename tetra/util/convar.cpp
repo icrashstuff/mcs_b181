@@ -34,6 +34,10 @@
 
 #include <limits.h>
 
+static convar_int_t dev_cvr("dev", 0, 0, 1, "Enables developer focused features", CONVAR_FLAG_HIDDEN | CONVAR_FLAG_INT_IS_BOOL);
+
+bool convar_t::dev() { return dev_cvr.get(); }
+
 std::vector<convar_t*>* convar_t::get_convar_list()
 {
     static std::vector<convar_t*> _vector;
@@ -246,28 +250,28 @@ bool convar_string_t::imgui_edit()
 void convar_int_t::log_help()
 {
     if (_bounded)
-        dev_console::add_log("\"%s\": %d (default: %d) (Min: %d, Max: %d)", _name, _value, _default, _min, _max);
+        dc_log_internal("\"%s\": %d (default: %d) (Min: %d, Max: %d)", _name, _value, _default, _min, _max);
     else
-        dev_console::add_log("\"%s\": %d (default: %d)", _name, _value, _default);
+        dc_log_internal("\"%s\": %d (default: %d)", _name, _value, _default);
     if (_help_string && strlen(_help_string) > 0)
-        dev_console::add_log("%s", _help_string);
+        dc_log_internal("%s", _help_string);
 }
 
 void convar_float_t::log_help()
 {
     if (_bounded)
-        dev_console::add_log("\"%s\": %.3f (default: %.3f) (Min: %.3f, Max: %.3f)", _name, _value, _default, _min, _max);
+        dc_log_internal("\"%s\": %.3f (default: %.3f) (Min: %.3f, Max: %.3f)", _name, _value, _default, _min, _max);
     else
-        dev_console::add_log("\"%s\": %.3f (default: %.3f)", _name, _value, _default);
+        dc_log_internal("\"%s\": %.3f (default: %.3f)", _name, _value, _default);
     if (_help_string && strlen(_help_string) > 0)
-        dev_console::add_log("%s", _help_string);
+        dc_log_internal("%s", _help_string);
 }
 
 void convar_string_t::log_help()
 {
-    dev_console::add_log("\"%s\": \"%s\" (default: \"%s\")", _name, _value.c_str(), _default.c_str());
+    dc_log_internal("\"%s\": \"%s\" (default: \"%s\")", _name, _value.c_str(), _default.c_str());
     if (_help_string && strlen(_help_string) > 0)
-        dev_console::add_log("%s", _help_string);
+        dc_log_internal("%s", _help_string);
 }
 
 int convar_int_t::convar_command(const int argc, const char** argv)
@@ -337,6 +341,18 @@ bool ImGui::BeginCVR(const char* name, convar_int_t* p_open, ImGuiWindowFlags fl
 
     if (open != p_open->get())
         p_open->set(open);
+
+    return ret;
+}
+
+bool ImGui::Checkbox(const char* label, convar_int_t* v)
+{
+    bool open = v->get();
+
+    bool ret = ImGui::Checkbox(label, &open);
+
+    if (open != v->get())
+        v->set(open);
 
     return ret;
 }

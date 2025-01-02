@@ -24,12 +24,28 @@
 #ifndef MCS_B181_TETRA_H
 #define MCS_B181_TETRA_H
 
+#include <SDL3/SDL.h>
+
 namespace tetra
 {
 /**
  * Should be called immediately, Can only be called once
  */
-void init(const char* organization, const char* appname, int argc, const char** argv);
+void init(const char* organization, const char* appname, const char* cfg_path, int argc, const char** argv);
+
+enum render_api_t
+{
+    RENDER_API_GL_CORE,
+    RENDER_API_GL_COMPATIBILITY,
+    RENDER_API_GL_ES,
+};
+
+/**
+ * Set render api and version for tetra to use
+ *
+ * NOTE: No checks are made for invalid variables
+ */
+void set_render_api(render_api_t api, int major, int minor);
 
 /**
  * Returns 0 on successful init, some non-zero value on failure
@@ -39,19 +55,40 @@ void init(const char* organization, const char* appname, int argc, const char** 
 int init_gui(const char* window_title);
 
 /**
- * Returns -1 on failure, 0 for application should exit, 1 for application should continue
+ * Feed events to imgui
+ *
+ * Returns true if application should exit, false otherwise
  */
-int start_frame();
+bool process_event(SDL_Event event);
+
+/**
+ * Returns -1 on failure, 0 for application should exit, 1 for application should continue
+ *
+ * @param event_loop Handle SDL events inside start_frame()
+ */
+int start_frame(bool event_loop = true);
 
 /**
  * Renders the frame, and optionally limits the frame rate if gui_fps_limiter is set
+ *
+ * @param clear_frame Clear OpenGL color buffer
  */
-void end_frame();
+void end_frame(bool clear_frame = true);
 
 /**
  * Deinit tetra, can only be called once
  */
 void deinit();
+
+/**
+ * Window created by tetra::init_gui()
+ */
+extern SDL_Window* window;
+
+/**
+ * OpenGL Context created by tetra::init_gui()
+ */
+extern SDL_GLContext gl_context;
 };
 
 #endif

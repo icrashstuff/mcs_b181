@@ -27,6 +27,11 @@ class convar_file_parser
 {
 public:
     /**
+     * Set prefix config file
+     */
+    static void set_config_prefix(const char* prefix);
+
+    /**
      * Read and apply convars from user config
      */
     static void read();

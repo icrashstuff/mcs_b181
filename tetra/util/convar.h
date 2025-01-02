@@ -20,8 +20,8 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#ifndef MCS_B181_TETRA_UTILS_CONVAR_H
-#define MCS_B181_TETRA_UTILS_CONVAR_H
+#ifndef MPH_TETRA_UTILS_CONVAR_H
+#define MPH_TETRA_UTILS_CONVAR_H
 
 #include <SDL3/SDL.h>
 #include <functional>
@@ -31,7 +31,7 @@
 #include "tetra/gui/imgui.h"
 
 typedef Uint32 CONVAR_FLAGS;
-enum CONVAR_FLAGS_
+enum CONVAR_FLAGS_ : Uint32
 {
     /**
      * Applies to convar_int_t
@@ -41,6 +41,8 @@ enum CONVAR_FLAGS_
     CONVAR_FLAG_INT_IS_BOOL = (1 << 0),
 
     /**
+     * Applies to all convars
+     *
      * If set then the convar will be saved to a file if changed from the default
      */
     CONVAR_FLAG_SAVE = (1 << 1),
@@ -51,6 +53,13 @@ enum CONVAR_FLAGS_
      * If set then the convar will be hidden from tab auto complete and imgui_edit, but will be manually accessible
      */
     CONVAR_FLAG_HIDDEN = (1 << 2),
+
+    /**
+     * Applies to all convars
+     *
+     * If the dev convar is not set then this acts like CONVAR_FLAG_HIDDEN
+     */
+    CONVAR_FLAG_DEV_ONLY = (1 << 3),
 };
 
 /**
@@ -75,6 +84,11 @@ public:
     inline const char* get_help_string() { return _help_string; }
 
     inline const char* get_name() { return _name; }
+
+    /**
+     * Returns true if the dev convar is set
+     */
+    static bool dev();
 
     /**
      * Prints help text to log
@@ -315,6 +329,11 @@ namespace ImGui
  * Wrapper for ImGui::Begin that replaces bool p_open with convar_int_t p_open
  */
 bool BeginCVR(const char* name, convar_int_t* p_open = NULL, ImGuiWindowFlags flags = 0);
+
+/**
+ * Wrapper for ImGui::Checkbox that replaces bool* v with convar_int_t* v
+ */
+bool Checkbox(const char* label, convar_int_t* v);
 };
 
 #endif

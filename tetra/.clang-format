@@ -1,0 +1,29 @@
+# Made with https://clang-format-configurator.site/ with version 10.0.0
+# Not sure if this yet matches my personal style, but it seems close enough
+
+BasedOnStyle: WebKit
+AlignConsecutiveAssignments: false
+AlignConsecutiveDeclarations: false
+# Left ensures that in macros it aligns to the longest line and not to ColumnLimit
+AlignEscapedNewlines: Left
+ColumnLimit: 160
+TabWidth: 4
+UseTab: Never
+
+BraceWrapping:
+  AfterCaseLabel: true
+  AfterClass: true
+  AfterControlStatement: Always
+  AfterEnum: true
+  AfterFunction: true
+  AfterNamespace: true
+  AfterObjCDeclaration: true
+  AfterStruct: true
+  AfterUnion: true
+  AfterExternBlock: true
+  BeforeCatch: true
+  BeforeElse: true
+  SplitEmptyFunction: true
+  SplitEmptyRecord: true
+  SplitEmptyNamespace: true
+BreakBeforeBraces: Custom

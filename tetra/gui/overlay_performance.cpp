@@ -96,4 +96,4 @@ static bool window_performance_overlay()
     return show;
 }
 
-static gui_register_menu reg_perf_overlay(window_performance_overlay);
+static gui_register_overlay reg_perf_overlay(window_performance_overlay);
