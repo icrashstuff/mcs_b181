@@ -76,7 +76,7 @@ static convar_int_t gfx_debug_gl("gfx_debug_gl", 0, 0, 1, "Sets SDL_GL_CONTEXT_D
 static convar_int_t gui_fps_limiter("gui_fps_limiter", 300, 0, SDL_MAX_SINT32 - 1, "Max FPS, 0 to disable", CONVAR_FLAG_SAVE);
 static convar_int_t gui_vsync("gui_vsync", 1, 0, 1, "Enable/Disable vsync", CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_SAVE);
 static convar_int_t gui_adapative_vsync("gui_adapative_vsync", 1, 0, 1, "Enable disable adaptive vsync", CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_SAVE);
-static convar_int_t gui_show_demo_window("gui_show_demo_window", 0, 0, 1, "Show Dear ImGui demo window", CONVAR_FLAG_INT_IS_BOOL);
+static convar_int_t gui_show_demo_window("gui_show_demo_window", 0, 0, 1, "Show Dear ImGui demo window", CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_DEV_ONLY);
 
 ImFont* dev_console::overlay_font = NULL;
 
@@ -143,6 +143,42 @@ void tetra::init(const char* organization, const char* appname, const char* cfg_
 
     /* Set convars from command line */
     cli_parser::apply();
+
+    if (cli_parser::get_value("-help") || cli_parser::get_value("help") || cli_parser::get_value("h"))
+    {
+        dc_log_internal("Usage: %s [ -convar_name [convar_value], ...]", argv[0]);
+        dc_log_internal("");
+        dc_log_internal("Example:");
+        dc_log_internal("  %s -dev -%s %d", argv[0], gui_vsync.get_name(), gui_vsync.get());
+        dc_log_internal("");
+        dc_log_internal("List of all console variables *without* flag CONVAR_FLAG_DEV_ONLY and associated help text (In no particular order)");
+        dc_log_internal("==================================================================================================================");
+        std::vector<convar_t*>* cvrs = convar_t::get_convar_list();
+        for (size_t i = 0; i < cvrs->size(); i++)
+        {
+            if (cvrs->at(i)->get_convar_flags() & CONVAR_FLAG_DEV_ONLY)
+                continue;
+            cvrs->at(i)->log_help();
+            dc_log_internal("");
+        }
+        if (convar_t::dev())
+        {
+            dc_log_internal("List of all console variables with flag CONVAR_FLAG_DEV_ONLY and associated help text (In no particular order)");
+            dc_log_internal("==============================================================================================================");
+            for (size_t i = 0; i < cvrs->size(); i++)
+            {
+                if (!(cvrs->at(i)->get_convar_flags() & CONVAR_FLAG_DEV_ONLY))
+                    continue;
+                cvrs->at(i)->log_help();
+                dc_log_internal("");
+            }
+        }
+        else
+        {
+            dc_log_internal("Console variables with flag CONVAR_FLAG_DEV_ONLY omitted, add `-dev` to the command line to list them.");
+        }
+        exit(0);
+    }
 
     const PHYSFS_ArchiveInfo** supported_archives = PHYSFS_supportedArchiveTypes();
 

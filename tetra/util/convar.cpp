@@ -34,7 +34,7 @@
 
 #include <limits.h>
 
-static convar_int_t dev_cvr("dev", 0, 0, 1, "Enables developer focused features", CONVAR_FLAG_HIDDEN | CONVAR_FLAG_INT_IS_BOOL);
+static convar_int_t dev_cvr("dev", 0, 0, 1, "Enables developer focused features", CONVAR_FLAG_HIDDEN | CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_DEV_ONLY);
 
 bool convar_t::dev() { return dev_cvr.get(); }
 
@@ -253,8 +253,8 @@ void convar_int_t::log_help()
         dc_log_internal("\"%s\": %d (default: %d) (Min: %d, Max: %d)", _name, _value, _default, _min, _max);
     else
         dc_log_internal("\"%s\": %d (default: %d)", _name, _value, _default);
-    if (_help_string && strlen(_help_string) > 0)
-        dc_log_internal("%s", _help_string);
+    if (_help_string && *_help_string != '\0')
+        dc_log_internal("  %s", _help_string);
 }
 
 void convar_float_t::log_help()
@@ -263,15 +263,15 @@ void convar_float_t::log_help()
         dc_log_internal("\"%s\": %.3f (default: %.3f) (Min: %.3f, Max: %.3f)", _name, _value, _default, _min, _max);
     else
         dc_log_internal("\"%s\": %.3f (default: %.3f)", _name, _value, _default);
-    if (_help_string && strlen(_help_string) > 0)
-        dc_log_internal("%s", _help_string);
+    if (_help_string && *_help_string != '\0')
+        dc_log_internal("  %s", _help_string);
 }
 
 void convar_string_t::log_help()
 {
     dc_log_internal("\"%s\": \"%s\" (default: \"%s\")", _name, _value.c_str(), _default.c_str());
-    if (_help_string && strlen(_help_string) > 0)
-        dc_log_internal("%s", _help_string);
+    if (_help_string && *_help_string != '\0')
+        dc_log_internal("  %s", _help_string);
 }
 
 int convar_int_t::convar_command(const int argc, const char** argv)
