@@ -17,24 +17,22 @@ find_package(PkgConfig REQUIRED)
 pkg_check_modules(zlib REQUIRED zlib)
 
 set(mcs_b181_server_SRC
-    ids.cpp
-    main.cpp
-    misc.cpp
-    chunk.cpp
-    packet.cpp
-    java_strings.cpp
-    simplex_noise/SimplexNoise.cpp
+    server/main_server.cpp
 
-    ${tetra_SRC}
+    shared/ids.cpp
+    shared/misc.cpp
+    shared/chunk.cpp
+    shared/packet.cpp
+    shared/java_strings.cpp
+    shared/simplex_noise/SimplexNoise.cpp
 )
 
 set(mcs_b181_bridge_SRC
-    ids.cpp
-    packet.cpp
-    java_strings.cpp
-    main_bridge.cpp
+    bridge/main_bridge.cpp
 
-    ${tetra_SRC}
+    shared/ids.cpp
+    shared/packet.cpp
+    shared/java_strings.cpp
 )
 
 set(BUILD_SHARED_LIBS OFF)

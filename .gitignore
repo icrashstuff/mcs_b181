@@ -67,3 +67,6 @@ examples/example_sdl2_sdlrenderer/example_sdl2_sdlrenderer
 .kdev4
 *.kdev4
 *.kate-swp
+
+## I want a place to write stuff artifacts
+ideas*.txt

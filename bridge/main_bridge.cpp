@@ -42,8 +42,8 @@
 #include "tetra/tetra.h"
 #include "tetra/util/convar.h"
 
-#include "misc.h"
-#include "packet.h"
+#include "shared/misc.h"
+#include "shared/packet.h"
 
 /**
  * We use this in timestamp_from_tick() to ensure it's output is stable

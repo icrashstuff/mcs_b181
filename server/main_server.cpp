@@ -36,15 +36,15 @@
 #include <string>
 #include <vector>
 
-#include "ids.h"
-#include "java_strings.h"
-#include "misc.h"
-#include "packet.h"
+#include "shared/ids.h"
+#include "shared/java_strings.h"
+#include "shared/misc.h"
+#include "shared/packet.h"
 
 #include "tetra/tetra.h"
 #include "tetra/util/convar.h"
 
-#include "chunk.h"
+#include "shared/chunk.h"
 
 long server_seed = 0;
 
