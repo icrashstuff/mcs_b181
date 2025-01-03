@@ -25,6 +25,8 @@
 
 #include "stbi.h"
 
+#ifdef STB_IMAGE_IMPLEMENTATION
+
 static int stbi_io_callback_physfs_read(void* user, char* data, int size) { return PHYSFS_readBytes((PHYSFS_file*)user, data, size); }
 
 static void stbi_io_callback_physfs_skip(void* user, int n)
@@ -36,9 +38,9 @@ static void stbi_io_callback_physfs_skip(void* user, int n)
 static int stbi_io_callback_physfs_eof(void* user) { return PHYSFS_eof((PHYSFS_file*)user); }
 
 static const stbi_io_callbacks stbi_io_callbacks_physfs = {
-    .eof = stbi_io_callback_physfs_eof,
     .read = stbi_io_callback_physfs_read,
     .skip = stbi_io_callback_physfs_skip,
+    .eof = stbi_io_callback_physfs_eof,
 };
 
 ////////////////////////////////////
@@ -140,3 +142,62 @@ STBIDEF int stbi_physfs_is_16_bit(char const* filename)
     return result;
 }
 STBIDEF int stbi_physfs_is_16_bit_from_file(PHYSFS_File* f) { return stbi_is_16_bit_from_callbacks(&stbi_io_callbacks_physfs, f); }
+
+#endif // #ifdef STB_IMAGE_IMPLEMENTATION
+
+#ifdef STB_IMAGE_WRITE_IMPLEMENTATION
+
+static void stbi_physfs_write_func(void* context, void* data, int size) { PHYSFS_writeBytes(context, data, size); }
+
+int stbi_physfs_write_png(const char* filename, int w, int h, int channels, const void* data, int stride_in_bytes)
+{
+    PHYSFS_File* fd = PHYSFS_openWrite(filename);
+    int result = 0;
+    if (!fd)
+        return result;
+    result = stbi_write_png_to_func(stbi_physfs_write_func, fd, w, h, channels, data, stride_in_bytes);
+    PHYSFS_close(fd);
+    return result;
+}
+STBIWDEF int stbi_physfs_write_bmp(char const* filename, int w, int h, int channels, const void* data)
+{
+    PHYSFS_File* fd = PHYSFS_openWrite(filename);
+    int result = 0;
+    if (!fd)
+        return result;
+    result = stbi_write_bmp_to_func(stbi_physfs_write_func, fd, w, h, channels, data);
+    PHYSFS_close(fd);
+    return result;
+}
+STBIWDEF int stbi_physfs_write_tga(char const* filename, int w, int h, int channels, const void* data)
+{
+    PHYSFS_File* fd = PHYSFS_openWrite(filename);
+    int result = 0;
+    if (!fd)
+        return result;
+    result = stbi_write_tga_to_func(stbi_physfs_write_func, fd, w, h, channels, data);
+    PHYSFS_close(fd);
+    return result;
+}
+STBIWDEF int stbi_physfs_write_hdr(char const* filename, int w, int h, int channels, const float* data)
+{
+    PHYSFS_File* fd = PHYSFS_openWrite(filename);
+    int result = 0;
+    if (!fd)
+        return result;
+    result = stbi_write_hdr_to_func(stbi_physfs_write_func, fd, w, h, channels, data);
+    PHYSFS_close(fd);
+    return result;
+}
+STBIWDEF int stbi_physfs_write_jpg(char const* filename, int x, int y, int channels, const void* data, int quality)
+{
+    PHYSFS_File* fd = PHYSFS_openWrite(filename);
+    int result = 0;
+    if (!fd)
+        return result;
+    result = stbi_write_jpg_to_func(stbi_physfs_write_func, fd, x, y, channels, data, quality);
+    PHYSFS_close(fd);
+    return result;
+}
+
+#endif // #ifdef STB_IMAGE_WRITE_IMPLEMENTATION

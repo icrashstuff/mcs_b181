@@ -59,4 +59,14 @@ STBIDEF int stbi_physfs_info_from_file(PHYSFS_File* f, int* x, int* y, int* comp
 STBIDEF int stbi_physfs_is_16_bit(char const* filename);
 STBIDEF int stbi_physfs_is_16_bit_from_file(PHYSFS_File* f);
 
+////////////////////////////////////
+//
+// STBIW interface
+//
+STBIWDEF int stbi_physfs_write_png(char const* filename, int w, int h, int channels, const void* data, int stride_in_bytes);
+STBIWDEF int stbi_physfs_write_bmp(char const* filename, int w, int h, int channels, const void* data);
+STBIWDEF int stbi_physfs_write_tga(char const* filename, int w, int h, int channels, const void* data);
+STBIWDEF int stbi_physfs_write_hdr(char const* filename, int w, int h, int channels, const float* data);
+STBIWDEF int stbi_physfs_write_jpg(char const* filename, int x, int y, int channels, const void* data, int quality);
+
 #endif
