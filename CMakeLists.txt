@@ -37,6 +37,17 @@ set(mcs_b181_bridge_SRC
     shared/java_strings.cpp
 )
 
+find_package(OpenAL REQUIRED)
+set(mcs_b181_client_SRC
+    client/main_client.cpp
+    client/texture_terrain.cpp
+    client/jzon/Jzon.cpp
+
+    shared/ids.h
+    shared/packet.cpp
+    shared/java_strings.cpp
+)
+
 set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(sdl_net/)
 
@@ -55,4 +66,7 @@ endfunction()
 
 add_bin_common(mcs_b181_server)
 add_bin_common(mcs_b181_bridge)
+add_bin_common(mcs_b181_client)
+
+target_link_libraries(mcs_b181_client OpenAL::OpenAL)
 
