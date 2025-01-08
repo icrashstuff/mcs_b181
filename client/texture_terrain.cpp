@@ -1,10 +1,10 @@
 /* SPDX-License-Identifier: MIT
  *
- * SPDX-FileCopyrightText: Copyright (c) 2025 Ian Hangartner <icrashstuff at texture_terrainlook dot com>
+ * SPDX-FileCopyrightText: Copyright (c) 2025 Ian Hangartner <icrashstuff at outlook dot com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
- * to deal in the Software withtexture_terrain restriction, including withtexture_terrain limitation
+ * to deal in the Software without restriction, including without limitation
  * the rights to use, copy, modify, merge, publish, distribute, sublicense,
  * and/or sell copies of the Software, and to permit persons to whom the
  * Software is furnished to do so, subject to the following conditions:
@@ -22,6 +22,8 @@
  */
 
 #include "texture_terrain.h"
+
+#include "texture_ids.h"
 
 #define STBRP_STATIC
 #include "tetra/gui/console.h"
@@ -190,7 +192,7 @@ texture_terrain_t::texture_terrain_t(std::string path_textures)
     /* Make min_width and min_height powers of two */
     min_height--;
     min_width--;
-    for (int i = 1; i < 24; i++)
+    for (int i = 1; i < 30; i++)
     {
         min_height |= min_height >> i;
         min_width |= min_width >> i;
@@ -288,6 +290,16 @@ texture_terrain_t::texture_terrain_t(std::string path_textures)
 
     for (size_t i = 0; i < textures.size(); i++)
     {
+        mc_id::terrain_face_id_t fid = mc_id::get_face_from_fname(textures[i].name);
+        texture_faces[fid] = texture_post_pack_t(textures[i], fid, tex_base_width, tex_base_height);
+        if (fid == mc_id::FACE_LAVA_FLOW_STRAIGHT)
+            texture_faces[mc_id::FACE_LAVA_FLOW_DIAGONAL] = texture_post_pack_t(textures[i], mc_id::FACE_LAVA_FLOW_DIAGONAL, tex_base_width, tex_base_height);
+        else if (fid == mc_id::FACE_LAVA_FLOW_DIAGONAL)
+            texture_faces[mc_id::FACE_LAVA_FLOW_STRAIGHT] = texture_post_pack_t(textures[i], mc_id::FACE_LAVA_FLOW_STRAIGHT, tex_base_width, tex_base_height);
+        else if (fid == mc_id::FACE_WATER_FLOW_STRAIGHT)
+            texture_faces[mc_id::FACE_WATER_FLOW_DIAGONAL] = texture_post_pack_t(textures[i], mc_id::FACE_WATER_FLOW_DIAGONAL, tex_base_width, tex_base_height);
+        else if (fid == mc_id::FACE_WATER_FLOW_DIAGONAL)
+            texture_faces[mc_id::FACE_WATER_FLOW_STRAIGHT] = texture_post_pack_t(textures[i], mc_id::FACE_WATER_FLOW_STRAIGHT, tex_base_width, tex_base_height);
         if (textures[i].animated)
             anim_textures.push_back(textures[i]);
         else
@@ -302,8 +314,8 @@ texture_terrain_t::texture_terrain_t(std::string path_textures)
 
     raw_mipmaps.push_back(data);
 
-    glGenTextures(1, &tex_id);
-    glBindTexture(GL_TEXTURE_2D, tex_id);
+    glGenTextures(1, &tex_id_main);
+    glBindTexture(GL_TEXTURE_2D, tex_id_main);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
@@ -472,6 +484,7 @@ bool texture_terrain_t::imgui_view(const char* title)
         title = "texture_terrain_t::imgui_view";
     ImGui::PushID(this);
     ImGui::SetNextWindowSizeConstraints(ImVec2(tex_base_width, 0), ImVec2(-1, -1));
+
     if (!ImGui::BeginChild(title))
     {
         ImGui::EndChild();
@@ -491,7 +504,20 @@ bool texture_terrain_t::imgui_view(const char* title)
         dump_mipmaps();
 
     ImGui::Text("Num mimap levels: %zu", raw_mipmaps.size());
-    ImGui::Text("Base size: %zux%zu (%.2f%% used)", tex_base_width, tex_base_height, tex_filled_area * 100.0 / double(tex_base_width * tex_base_height));
+    ImGui::Text("Atlas size: %zux%zu (%.2f%% used)", tex_base_width, tex_base_height, tex_filled_area * 100.0 / double(tex_base_width * tex_base_height));
+
+    if (ImGui::BeginCombo("Texture Selector", mc_id::get_face_id_name(imgui_selected_face)))
+    {
+        for (int i = 0; i < mc_id::FACE_COUNT; i++)
+        {
+            mc_id::terrain_face_id_t cur = (mc_id::terrain_face_id_t)i;
+            if (ImGui::Selectable(mc_id::get_face_id_name(cur), imgui_selected_face == cur))
+                imgui_selected_face = cur;
+            if (imgui_selected_face == cur)
+                ImGui::SetItemDefaultFocus();
+        }
+        ImGui::EndCombo();
+    }
 
     float my_tex_w = ImGui::GetWindowWidth() - ImGui::GetStyle().WindowPadding.x * 2 - ImGui::GetStyle().ScrollbarSize;
     float my_tex_h = (my_tex_w * (double)tex_base_height) / (double)tex_base_width;
@@ -499,10 +525,20 @@ bool texture_terrain_t::imgui_view(const char* title)
     ImGui::SetCursorPosX((ImGui::GetStyle().ScrollbarSize + ImGui::GetStyle().WindowPadding.x / 2.0f) / 2.0f);
 
     ImVec2 pos = ImGui::GetCursorScreenPos();
-    ImGui::Image((ImTextureID)(size_t)tex_id, ImVec2(my_tex_w, my_tex_h), ImVec2(0, 0), ImVec2(1, 1), ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 1));
+    if (imgui_selected_face == mc_id::FACE_ATLAS)
+        ImGui::Image((ImTextureID)(size_t)tex_id_main, ImVec2(my_tex_w, my_tex_h), ImVec2(0, 0), ImVec2(1, 1), ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 1));
+    else
+    {
+        texture_post_pack_t t = texture_faces[imgui_selected_face];
+        ImVec2 corner0(t.face.corners[0].x, t.face.corners[0].y);
+        ImVec2 corner1(t.face.corners[3].x, t.face.corners[3].y);
+        ImGui::Image((ImTextureID)(size_t)tex_id_main, ImVec2(t.w * 4, t.h * 4), corner0, corner1);
+        ImGui::SameLine();
+        ImGui::Text("%s\nSize: %dx%d", mc_id::get_face_fname(imgui_selected_face), t.w, t.h);
+    }
 
     /* Pulled from imgui_demo.cpp and lightly modified*/
-    if (ImGui::BeginItemTooltip())
+    if (imgui_selected_face == mc_id::FACE_ATLAS && ImGui::BeginItemTooltip())
     {
         ImGuiIO& io = ImGui::GetIO();
         float region_sz = 40.0f;
@@ -521,7 +557,7 @@ bool texture_terrain_t::imgui_view(const char* title)
         ImVec2 uv1 = ImVec2((region_x + region_sz) / my_tex_w, (region_y + region_sz) / my_tex_h);
         ImGui::Text("Min: (%.2f, %.2f)", tex_base_width * uv0.x, tex_base_height * uv0.y);
         ImGui::Text("Max: (%.2f, %.2f)", tex_base_width * uv1.x, tex_base_height * uv1.y);
-        ImGui::Image((ImTextureID)(size_t)tex_id, ImVec2(region_sz * zoom, region_sz * zoom), uv0, uv1);
+        ImGui::Image((ImTextureID)(size_t)tex_id_main, ImVec2(region_sz * zoom, region_sz * zoom), uv0, uv1);
         ImGui::EndTooltip();
     }
 
@@ -532,7 +568,7 @@ bool texture_terrain_t::imgui_view(const char* title)
 
 texture_terrain_t::~texture_terrain_t()
 {
-    glDeleteTextures(1, &tex_id);
+    glDeleteTextures(1, &tex_id_main);
 
     for (size_t i = 0; i < raw_mipmaps.size(); i++)
         free(raw_mipmaps[i]);
@@ -543,6 +579,119 @@ texture_terrain_t::~texture_terrain_t()
             stbi_image_free(textures[i].data_stbi);
         if (textures[i].name)
             free(textures[i].name);
+    }
+}
+
+void terrain_vertex_t::create_vao(GLuint* vao)
+{
+    glGenVertexArrays(1, vao);
+    glBindVertexArray(*vao);
+
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glEnableVertexAttribArray(2);
+}
+
+void terrain_vertex_t::create_vbo(GLuint* vbo, GLuint* ebo, const std::vector<terrain_vertex_t>& vtx, const std::vector<Uint8>& ind)
+{
+    glGenBuffers(1, vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, *vbo);
+
+    glGenBuffers(1, ebo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, *ebo);
+
+    glBufferData(GL_ARRAY_BUFFER, vtx.size() * sizeof(vtx[0]), vtx.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, ind.size() * sizeof(ind[0]), ind.data(), GL_STATIC_DRAW);
+
+    glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, pos));
+    glVertexAttribIPointer(1, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, col));
+    glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, tex));
+}
+
+void terrain_vertex_t::create_vbo(GLuint* vbo, GLuint* ebo, const std::vector<terrain_vertex_t>& vtx, const std::vector<Uint16>& ind)
+{
+    glGenBuffers(1, vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, *vbo);
+
+    glGenBuffers(1, ebo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, *ebo);
+
+    glBufferData(GL_ARRAY_BUFFER, vtx.size() * sizeof(vtx[0]), vtx.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, ind.size() * sizeof(ind[0]), ind.data(), GL_STATIC_DRAW);
+
+    glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, pos));
+    glVertexAttribIPointer(1, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, col));
+    glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, tex));
+}
+
+void terrain_vertex_t::create_vbo(GLuint* vbo, GLuint* ebo, const std::vector<terrain_vertex_t>& vtx, const std::vector<Uint32>& ind)
+{
+    glGenBuffers(1, vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, *vbo);
+
+    glGenBuffers(1, ebo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, *ebo);
+
+    glBufferData(GL_ARRAY_BUFFER, vtx.size() * sizeof(vtx[0]), vtx.data(), GL_STATIC_DRAW);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, ind.size() * sizeof(ind[0]), ind.data(), GL_STATIC_DRAW);
+
+    glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, pos));
+    glVertexAttribIPointer(1, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, col));
+    glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, tex));
+}
+
+GLenum terrain_vertex_t::create_vbo(GLuint* vbo, GLuint* ebo, const std::vector<terrain_vertex_t>& vtx)
+{
+    const size_t quads = vtx.size() / 4;
+    const size_t required_indicies = quads * 6;
+    /*
+    if(required_indicies == 0)
+        return GL_NONE;
+    else if(required_indicies < 0xFF)
+    {
+        std::vector<Uint8> ind;
+        for (size_t i = 0; i < quads; i++)
+        {
+            ind.push_back(i * 4 + 0);
+            ind.push_back(i * 4 + 1);
+            ind.push_back(i * 4 + 2);
+            ind.push_back(i * 4 + 1);
+            ind.push_back(i * 4 + 2);
+            ind.push_back(i * 4 + 3);
+        }
+        create_vbo(vbo, ebo, vtx, ind);
+       return GL_UNSIGNED_BYTE;
+    }
+    else if (required_indicies < 0xFFFF)
+    {
+        std::vector<Uint16> ind;
+        for (size_t i = 0; i < quads; i++)
+        {
+            ind.push_back(i * 4 + 0);
+            ind.push_back(i * 4 + 1);
+            ind.push_back(i * 4 + 2);
+            ind.push_back(i * 4 + 1);
+            ind.push_back(i * 4 + 2);
+            ind.push_back(i * 4 + 3);
+        }
+        create_vbo(vbo, ebo, vtx, ind);
+       return GL_UNSIGNED_SHORT;
+    }
+    else
+    */
+    {
+        std::vector<Uint32> ind;
+        for (size_t i = 0; i < quads; i++)
+        {
+            ind.push_back(i * 4 + 0);
+            ind.push_back(i * 4 + 1);
+            ind.push_back(i * 4 + 2);
+            ind.push_back(i * 4 + 2);
+            ind.push_back(i * 4 + 1);
+            ind.push_back(i * 4 + 3);
+        }
+        create_vbo(vbo, ebo, vtx, ind);
+        return GL_UNSIGNED_INT;
     }
 }
 

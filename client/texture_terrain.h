@@ -28,11 +28,90 @@
 #include <string>
 #include <vector>
 
+#include "shared/ids.h"
+#include "texture_ids.h"
+
+struct terrain_vertex_t
+{
+    struct vtx_pos_ao_t
+    {
+        Uint32 dat = 0;
+
+        vtx_pos_ao_t() { }
+        vtx_pos_ao_t(Uint16 multiplier, Uint16 x, Uint16 y, Uint16 z, Uint8 ao)
+        {
+            x *= multiplier;
+            z *= multiplier;
+            y *= multiplier;
+            assert(x <= 0x01FF);
+            assert(y <= 0x01FF);
+            assert(z <= 0x01FF);
+            assert(ao <= 0x03);
+            dat |= ((x & 0x01FF));
+            dat |= ((y & 0x01FF) << 9);
+            dat |= ((z & 0x01FF) << 18);
+            dat |= ((ao & 0x03) << 27);
+        }
+    } pos;
+
+    struct vtx_coloring_t
+    {
+        Uint32 dat = 0;
+
+        vtx_coloring_t() { }
+        vtx_coloring_t(float r, float g, float b, Uint8 light_block, Uint8 light_sky)
+        {
+            dat = 0;
+            assert(light_block <= 0x0F);
+            assert(light_sky <= 0x0F);
+            dat |= (Uint8(SDL_clamp(r, 0.0f, 1.0f) * 255.0f));
+            dat |= (Uint8(SDL_clamp(g, 0.0f, 1.0f) * 255.0f)) << 8;
+            dat |= (Uint8(SDL_clamp(b, 0.0f, 1.0f) * 255.0f)) << 16;
+            dat |= (light_block & 0x0F) << 24;
+            dat |= (light_sky & 0x0F) << 28;
+        }
+    } col;
+
+    struct vtx_texturing_t
+    {
+        Uint32 dat = 0;
+
+        vtx_texturing_t() { }
+        vtx_texturing_t(float u, float v)
+        {
+            dat = 0;
+            dat |= (Uint16(u * 32768));
+            dat |= (Uint16(v * 32768)) << 16;
+        }
+        vtx_texturing_t(glm::vec2 uv)
+        {
+            dat = 0;
+            dat |= (Uint16(uv.r * 32768));
+            dat |= (Uint16(uv.g * 32768)) << 16;
+        }
+    } tex;
+
+    /**
+     * Sets up an appropriate VAO for handling terrain_vertex_t vertices
+     */
+    static void create_vao(GLuint* vao);
+
+    static void create_vbo(GLuint* vbo, GLuint* ebo, const std::vector<terrain_vertex_t>& vtx, const std::vector<Uint8>& ind);
+    static void create_vbo(GLuint* vbo, GLuint* ebo, const std::vector<terrain_vertex_t>& vtx, const std::vector<Uint16>& ind);
+    static void create_vbo(GLuint* vbo, GLuint* ebo, const std::vector<terrain_vertex_t>& vtx, const std::vector<Uint32>& ind);
+
+    /**
+     * Creates a vbo and ebo for a mesh
+     *
+     * @return The type used for the indicies or GL_NONE if an empty mesh was provided
+     */
+    static GLenum create_vbo(GLuint* vbo, GLuint* ebo, const std::vector<terrain_vertex_t>& vtx);
+};
+
 /**
  * TODO: Mimmaping - The structure is there it just needs to be implemented
  * TODO-OPT: Make animation code less fragile
  * TODO: Merge later updates clock and compass into single texture?
- * TODO: Add mechanism to retrieve UV data, maybe get_texture("id.png")?
  */
 class texture_terrain_t
 {
@@ -80,7 +159,15 @@ public:
      */
     bool imgui_view(const char* id = NULL);
 
-    GLuint tex_id = 0;
+    GLuint tex_id_main = 0;
+    GLuint tex_id_data = 0;
+
+    mc_id::terrain_face_t get_face(mc_id::terrain_face_id_t id)
+    {
+        if (id < 0 || id > mc_id::FACE_DEBUG)
+            return texture_faces[mc_id::FACE_DEBUG].face;
+        return texture_faces[id].face;
+    }
 
 private:
     /**
@@ -129,6 +216,27 @@ private:
         int* frame_offsets = 0;
         char* name = 0;
     };
+
+    struct texture_post_pack_t
+    {
+        int w = 0, h = 0;
+        int x = 0, y = 0;
+        mc_id::terrain_face_t face;
+        texture_post_pack_t() { }
+        texture_post_pack_t(const texture_pre_pack_t a, const mc_id::terrain_face_id_t fid, const double atlas_width, const double atlas_height)
+        {
+            x = a.x, y = a.y, w = a.w, h = a.h;
+            mc_id::terrain_face_t sub_coords = mc_id::get_face_sub_coords(fid);
+            face.corners[0] = { (sub_coords.corners[0].x * w + x) / atlas_width, (sub_coords.corners[0].y * h + y) / atlas_height };
+            face.corners[1] = { (sub_coords.corners[1].x * w + x) / atlas_width, (sub_coords.corners[1].y * h + y) / atlas_height };
+            face.corners[2] = { (sub_coords.corners[2].x * w + x) / atlas_width, (sub_coords.corners[2].y * h + y) / atlas_height };
+            face.corners[3] = { (sub_coords.corners[3].x * w + x) / atlas_width, (sub_coords.corners[3].y * h + y) / atlas_height };
+        }
+    };
+
+    texture_post_pack_t texture_faces[mc_id::FACE_COUNT];
+
+    mc_id::terrain_face_id_t imgui_selected_face = mc_id::FACE_ATLAS;
 
     /* TODO-OPT: Move this to a smaller data structure? (texture_post_pack_t)*/
     std::vector<texture_pre_pack_t> textures;

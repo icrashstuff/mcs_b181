@@ -101,7 +101,14 @@ struct param_cutter_t
     cutter_type_t cutter;
 };
 
-/* A 16 * WORLD_HEIGHT * 16 chunk */
+/**
+ * A 16 * WORLD_HEIGHT * 16 chunk
+ *
+ * For memory reasons the best way to iterate over the chunk is as follows:
+ * for(int x = 0; x < CHUNK_SIZE_X; x++)
+ * for(int z = 0; z < CHUNK_SIZE_Z; z++)
+ * for(int y = 0; y < CHUNK_SIZE_Y; y++)
+ */
 class chunk_t
 {
 public:
@@ -169,6 +176,16 @@ public:
             y += 16;
         if (z < 0)
             z += 16;
+
+        int index = y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z));
+
+        return data[index];
+    }
+
+    inline Uint8 get_type_fallback(int x, int y, int z, Uint8 fallback)
+    {
+        if (x < 0 || y < 0 || z < 0 || x >= CHUNK_SIZE_X || y >= CHUNK_SIZE_Y || z >= CHUNK_SIZE_Z)
+            return fallback;
 
         int index = y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z));
 

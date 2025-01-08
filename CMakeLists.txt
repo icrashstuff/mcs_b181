@@ -41,12 +41,20 @@ find_package(OpenAL REQUIRED)
 set(mcs_b181_client_SRC
     client/main_client.cpp
     client/texture_terrain.cpp
+    client/shaders.cpp
+
     client/jzon/Jzon.cpp
 
-    shared/ids.h
+    shared/ids.cpp
+    shared/misc.cpp
+    shared/chunk.cpp
     shared/packet.cpp
     shared/java_strings.cpp
+    shared/simplex_noise/SimplexNoise.cpp
 )
+
+configure_file(client/shaders/terrain.frag shaders/terrain.frag COPYONLY)
+configure_file(client/shaders/terrain.vert shaders/terrain.vert COPYONLY)
 
 set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(sdl_net/)
