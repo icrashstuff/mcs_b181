@@ -22,6 +22,10 @@
  */
 #include "tetra/tetra.h"
 
+#include <GL/glew.h>
+#include <GL/glu.h>
+#include <SDL3/SDL_opengl.h>
+
 #include "tetra/gui/console.h"
 #include "tetra/gui/gui_registrar.h"
 
@@ -40,10 +44,6 @@
 #include "level.h"
 #include "shaders.h"
 #include "texture_terrain.h"
-
-#include <GL/glew.h>
-#include <GL/glu.h>
-#include <SDL3/SDL_opengl.h>
 
 static convar_string_t cvr_username("username", "", "Username (duh)", CONVAR_FLAG_SAVE);
 static convar_string_t cvr_dir_assets("dir_assets", "", "Path to assets (ex: \"~/.minecraft/assets/\")", CONVAR_FLAG_SAVE);
