@@ -54,42 +54,42 @@ struct shader_t
 
     void set_uniform(std::string name, int a)
     {
-        GLuint loc = glGetUniformLocation(id, name.c_str());
+        GLint loc = glGetUniformLocation(id, name.c_str());
         if (loc >= 0)
             glUniform1i(loc, a);
     }
 
     void set_uniform(std::string name, glm::mat4 a)
     {
-        GLuint loc = glGetUniformLocation(id, name.c_str());
+        GLint loc = glGetUniformLocation(id, name.c_str());
         if (loc >= 0)
             glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(a));
     }
 
     void set_uniform(std::string name, glm::mat3 a)
     {
-        GLuint loc = glGetUniformLocation(id, name.c_str());
+        GLint loc = glGetUniformLocation(id, name.c_str());
         if (loc >= 0)
             glUniformMatrix3fv(loc, 1, GL_FALSE, glm::value_ptr(a));
     }
 
     void set_uniform(std::string name, glm::vec4 a)
     {
-        GLuint loc = glGetUniformLocation(id, name.c_str());
+        GLint loc = glGetUniformLocation(id, name.c_str());
         if (loc >= 0)
             glUniform4fv(loc, 4, glm::value_ptr(a));
     }
 
     void set_uniform(std::string name, glm::vec3 a)
     {
-        GLuint loc = glGetUniformLocation(id, name.c_str());
+        GLint loc = glGetUniformLocation(id, name.c_str());
         if (loc >= 0)
             glUniform3fv(loc, 3, glm::value_ptr(a));
     }
 
     void set_uniform(std::string name, glm::vec2 a)
     {
-        GLuint loc = glGetUniformLocation(id, name.c_str());
+        GLint loc = glGetUniformLocation(id, name.c_str());
         if (loc >= 0)
             glUniform2fv(loc, 2, glm::value_ptr(a));
     }

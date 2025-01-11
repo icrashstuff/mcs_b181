@@ -39,6 +39,8 @@
 static convar_int_t r_dump_mipmaps_terrain("r_dump_mipmaps_terrain", 1, 0, 1, "Dump terrain atlas mipmaps to screenshots folder on atlas rebuild",
     CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_SAVE | CONVAR_FLAG_INT_IS_BOOL);
 
+static convar_int_t r_mipmap_disable("r_mipmap_disable", 0, 0, 1, "Disable mipmapping", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_SAVE | CONVAR_FLAG_INT_IS_BOOL);
+
 /**
  * Performs a case insensitive check if a string ends with another
  */
@@ -644,10 +646,9 @@ GLenum terrain_vertex_t::create_vbo(GLuint* vbo, GLuint* ebo, const std::vector<
 {
     const size_t quads = vtx.size() / 4;
     const size_t required_indicies = quads * 6;
-    /*
-    if(required_indicies == 0)
+    if (required_indicies == 0)
         return GL_NONE;
-    else if(required_indicies < 0xFF)
+    else if (required_indicies < 0xFF)
     {
         std::vector<Uint8> ind;
         for (size_t i = 0; i < quads; i++)
@@ -655,12 +656,12 @@ GLenum terrain_vertex_t::create_vbo(GLuint* vbo, GLuint* ebo, const std::vector<
             ind.push_back(i * 4 + 0);
             ind.push_back(i * 4 + 1);
             ind.push_back(i * 4 + 2);
-            ind.push_back(i * 4 + 1);
             ind.push_back(i * 4 + 2);
+            ind.push_back(i * 4 + 1);
             ind.push_back(i * 4 + 3);
         }
         create_vbo(vbo, ebo, vtx, ind);
-       return GL_UNSIGNED_BYTE;
+        return GL_UNSIGNED_BYTE;
     }
     else if (required_indicies < 0xFFFF)
     {
@@ -670,15 +671,14 @@ GLenum terrain_vertex_t::create_vbo(GLuint* vbo, GLuint* ebo, const std::vector<
             ind.push_back(i * 4 + 0);
             ind.push_back(i * 4 + 1);
             ind.push_back(i * 4 + 2);
-            ind.push_back(i * 4 + 1);
             ind.push_back(i * 4 + 2);
+            ind.push_back(i * 4 + 1);
             ind.push_back(i * 4 + 3);
         }
         create_vbo(vbo, ebo, vtx, ind);
-       return GL_UNSIGNED_SHORT;
+        return GL_UNSIGNED_SHORT;
     }
     else
-    */
     {
         std::vector<Uint32> ind;
         for (size_t i = 0; i < quads; i++)

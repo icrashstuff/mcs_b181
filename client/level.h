@@ -1,4 +1,3 @@
-#version 330 core
 /* SPDX-License-Identifier: MIT
  *
  * SPDX-FileCopyrightText: Copyright (c) 2025 Ian Hangartner <icrashstuff at outlook dot com>
@@ -21,54 +20,55 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-in vec3 frag_color;
-in vec2 frag_uv;
-in float frag_ao;
-in float frag_light_block;
-in float frag_light_sky;
 
-out vec4 out_color;
+#ifndef TETRA_CLIENT_LEVEL_H_INCLUDED
+#define TETRA_CLIENT_LEVEL_H_INCLUDED
 
-uniform float daylight = 0.99;
+#include "chunk_cubic.h"
+#include "texture_terrain.h"
+#include <vector>
 
-uniform sampler2D tex0;
-
-uniform int ao_algorithm = 1;
-uniform int use_texture = 1;
-
-void main()
+struct level_t
 {
-    out_color = vec4(frag_color.xyz, 1.0);
+    level_t() { }
 
-    if (use_texture == 1)
-        out_color *= texture2D(tex0, frag_uv);
-
-    if (out_color.a < 0.01)
-        discard;
-    else
-        out_color.a = 1.0;
-
-    switch (ao_algorithm)
+    ~level_t()
     {
-    case 0:
-        break;
-    case 1:
-        out_color.xyz *= 1.0 - frag_ao / 10.0;
-    case 2:
-        out_color.xyz *= clamp(1.1 - (-0.1 / (frag_ao - 1.25)), 0.0, 1.0);
-        break;
-    case 3:
-        out_color.xyz *= clamp(1.15 - (-0.2 / (frag_ao - 1.25)), 0.0, 1.0);
-        break;
-    case 4:
-        out_color.xyz *= (1.0 - (pow(64.0, frag_ao / 2.0) - 1) / 64.0);
-        break;
-    case 5:
-        out_color.xyz *= (1.0 - (pow(64.0, frag_ao / 1.5) - 1) / 64.0);
-        break;
-    default:
-        break;
+        for (size_t i = 0; i < chunks.size(); i++)
+            delete chunks[i];
+        delete terrain;
     }
 
-    out_color.xyz *= clamp((frag_light_block + frag_light_sky * daylight), 0.1, 1);
-}
+    std::vector<chunk_cubic_t*> chunks;
+
+    /** Items should probably be removed from terrain **/
+    texture_terrain_t* terrain;
+
+    /**
+     * Builds all dirt meshes
+     * TODO: Rebuild clean meshes that surround dirty ones
+     */
+    void build_dirty_meshes();
+
+    /**
+     * Clears chunks (if any), optionally rebuilds the terrain atlas, and then builds all the chunks
+     */
+    void rebuild_meshes(bool rebuild_terrain);
+
+    /**
+     * Clears all meshes
+     */
+    void clear_mesh();
+
+    /**
+     * Clears all chunks
+     */
+    void clear();
+
+    // TODO
+    void render();
+
+    void build_mesh(int chunk_x, int chunk_y, int chunk_z);
+};
+
+#endif

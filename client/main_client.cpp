@@ -37,6 +37,7 @@
 #include "shared/ids.h"
 #include "shared/packet.h"
 
+#include "level.h"
 #include "shaders.h"
 #include "texture_terrain.h"
 
@@ -54,37 +55,7 @@ static convar_int_t cvr_autoconnect("dev_autoconnect", 0, 0, 1, "Auto connect to
 static convar_string_t cvr_autoconnect_addr(
     "dev_server_addr", "localhost:25565", "Address of server to autoconnect to when dev_autoconnect is specified", CONVAR_FLAG_DEV_ONLY);
 
-texture_terrain_t* terrain = NULL;
 shader_t* shader = NULL;
-chunk_t* chunk = NULL;
-std::vector<terrain_vertex_t> vtx;
-std::vector<Uint32> ind;
-
-struct chunk_gl_t
-{
-    bool empty = 0;
-    bool dirty = 0;
-    GLuint vbo = 0;
-    GLuint ebo = 0;
-    /**
-     * One of GL_UNSIGNED_INT, GL_UNSIGNED_SHORT, or GL_UNSIGNED_BYTE
-     */
-    GLenum index_type = 0;
-    size_t index_count = 0;
-
-    Uint32 world_x = 0;
-    Uint32 world_y = 0;
-    Uint32 world_z = 0;
-
-    chunk_t* chunk;
-};
-
-struct chunk_cache_t
-{
-    std::vector<chunk_gl_t> chunks;
-
-    void build_chunk() { }
-};
 
 int ao_algorithm = 1;
 int use_texture = 1;
@@ -98,195 +69,82 @@ void compile_shaders()
     dc_log("Compiled shaders in %.2f ms", (SDL_GetTicksNS() - tick_shader_start) / 1000000.0);
 }
 
-GLuint vao, vbo, ebo;
+level_t* level;
+
+// GLuint vao;
 bool initialize_resources()
 {
     /* In the future parsing of one of the indexes at /assets/indexes/ will need to happen here (For sound) */
 
-    terrain = new texture_terrain_t("/_resources/assets/minecraft/textures/");
+    level = new level_t();
+    level->terrain = new texture_terrain_t("/_resources/assets/minecraft/textures/");
     shader = new shader_t("/shaders/terrain.vert", "/shaders/terrain.frag");
 
-    chunk = new chunk_t();
-
-    compile_shaders();
-
-    chunk->generate_from_seed_over(0, -1, 0);
-    for (int x = 3; x < 13; x++)
-        for (int z = 3; z < 13; z++)
-            for (int y = 55; y < 67; y++)
-            {
-                chunk->set_type(x, y, z, BLOCK_ID_ORE_COAL);
-                chunk->set_light_sky(x, y, z, SDL_min((SDL_fabs(x - 7.5) + SDL_fabs(z - 7.5)) * 2.2, 15));
-            }
-
-    for (int x = 4; x < 12; x++)
-        for (int z = 4; z < 12; z++)
-            for (int y = 56; y < 66; y++)
-                chunk->set_type(x, y, z, 0);
-
-    for (int dat_it = 0; dat_it < CHUNK_SIZE_X * CHUNK_SIZE_Y * CHUNK_SIZE_Z; dat_it++)
+    for (int i = 0; i < 256; i++)
     {
-        const int y = (dat_it) & 0x7F;
-        const int z = (dat_it >> 7) & 0x0F;
-        const int x = (dat_it >> 11) & 0x0F;
+        chunk_cubic_t* c = new chunk_cubic_t();
+        c->chunk_x = i % 4;
+        c->chunk_y = (i / 4) % 4;
+        c->chunk_z = (i / 16);
+        level->chunks.push_back(c);
+        for (int x = 0; x < 16; x++)
+            for (int z = 0; z < 16; z++)
+                for (int y = 0; y < 16; y++)
+                {
+                    c->set_type(x, y, z, i + 1);
+                    c->set_light_sky(x, y, z, SDL_min((SDL_fabs(x - 7.5) + SDL_fabs(z - 7.5)) * 2.2, 15));
+                }
 
-        block_id_t type = chunk->get_type(x, y, z);
-        if (type == BLOCK_ID_AIR)
-            continue;
-
-        float r = float((type) & 3) / 3.0f, g = float((type >> 2) & 3) / 3.0f, b = float((type >> 4) & 3) / 3.0f;
-        r = 1.0, g = 1.0, b = 1.0;
-
-        Uint8 light_block = chunk->get_light_block(x, y, z);
-        Uint8 light_sky = chunk->get_light_sky(x, y, z);
-
-        /** Index: [x+1][y+1][z+1] */
-        block_id_t stypes[3][3][3];
-        for (int i = -1; i < 2; i++)
-            for (int j = -1; j < 2; j++)
-                for (int k = -1; k < 2; k++)
-                    stypes[i + 1][j + 1][k + 1] = chunk->get_type_fallback(x + i, y + j, z + k, BLOCK_ID_AIR);
-
-        mc_id::terrain_face_t f;
-
-        if (type == BLOCK_ID_STONE)
-            f = terrain->get_face(mc_id::FACE_STONE);
-        else if (type == BLOCK_ID_SAND)
-            f = terrain->get_face(mc_id::FACE_SAND);
-        else if (type == BLOCK_ID_SANDSTONE)
-            f = terrain->get_face(mc_id::FACE_SANDSTONE_NORMAL);
-        else if (type == BLOCK_ID_DIRT)
-            f = terrain->get_face(mc_id::FACE_DIRT);
-        else if (type == BLOCK_ID_GRAVEL)
-            f = terrain->get_face(mc_id::FACE_GRAVEL);
-        else if (type == BLOCK_ID_ORE_COAL)
-            f = terrain->get_face(mc_id::FACE_COAL_ORE);
-        else if (type == BLOCK_ID_ORE_IRON)
-            f = terrain->get_face(mc_id::FACE_IRON_ORE);
-        else if (type == BLOCK_ID_ORE_GOLD)
-            f = terrain->get_face(mc_id::FACE_GOLD_ORE);
-        else if (type == BLOCK_ID_ORE_LAPIS)
-            f = terrain->get_face(mc_id::FACE_LAPIS_ORE);
-        else if (type == BLOCK_ID_ORE_REDSTONE_ON || type == BLOCK_ID_ORE_REDSTONE_OFF)
-            f = terrain->get_face(mc_id::FACE_REDSTONE_ORE);
-        else if (type == BLOCK_ID_ORE_DIAMOND)
-            f = terrain->get_face(mc_id::FACE_DIAMOND_ORE);
-        else if (type == BLOCK_ID_BRICKS_STONE)
-            f = terrain->get_face(mc_id::FACE_STONEBRICK);
-        else if (type == BLOCK_ID_LAVA_SOURCE)
-            f = terrain->get_face(mc_id::FACE_LAVA_STILL);
-        else
-            f = terrain->get_face(mc_id::FACE_DEBUG);
-
-        /* Positive Y */
-        if (mc_id::is_transparent(stypes[1][2][1]))
-        {
-            Uint8 ao[] = {
-                Uint8((stypes[0][2][0] != BLOCK_ID_AIR) + (stypes[1][2][0] != BLOCK_ID_AIR) + (stypes[0][2][1] != BLOCK_ID_AIR)),
-                Uint8((stypes[2][2][0] != BLOCK_ID_AIR) + (stypes[1][2][0] != BLOCK_ID_AIR) + (stypes[2][2][1] != BLOCK_ID_AIR)),
-                Uint8((stypes[0][2][2] != BLOCK_ID_AIR) + (stypes[0][2][1] != BLOCK_ID_AIR) + (stypes[1][2][2] != BLOCK_ID_AIR)),
-                Uint8((stypes[2][2][2] != BLOCK_ID_AIR) + (stypes[1][2][2] != BLOCK_ID_AIR) + (stypes[2][2][1] != BLOCK_ID_AIR)),
-            };
-
-            vtx.push_back({ { 1, Uint16(x + 1), Uint16(y + 1), Uint16(z + 1), ao[3] }, { r, g, b, light_block, light_sky }, f.corners[0] });
-            vtx.push_back({ { 1, Uint16(x + 1), Uint16(y + 1), Uint16(z + 0), ao[1] }, { r, g, b, light_block, light_sky }, f.corners[2] });
-            vtx.push_back({ { 1, Uint16(x + 0), Uint16(y + 1), Uint16(z + 1), ao[2] }, { r, g, b, light_block, light_sky }, f.corners[1] });
-            vtx.push_back({ { 1, Uint16(x + 0), Uint16(y + 1), Uint16(z + 0), ao[0] }, { r, g, b, light_block, light_sky }, f.corners[3] });
-        }
-
-        /* Negative Y */
-        if (mc_id::is_transparent(stypes[1][0][1]))
-        {
-            Uint8 ao[] = {
-                Uint8((stypes[0][0][0] != BLOCK_ID_AIR) + (stypes[1][0][0] != BLOCK_ID_AIR) + (stypes[0][0][1] != BLOCK_ID_AIR)),
-                Uint8((stypes[2][0][0] != BLOCK_ID_AIR) + (stypes[1][0][0] != BLOCK_ID_AIR) + (stypes[2][0][1] != BLOCK_ID_AIR)),
-                Uint8((stypes[0][0][2] != BLOCK_ID_AIR) + (stypes[0][0][1] != BLOCK_ID_AIR) + (stypes[1][0][2] != BLOCK_ID_AIR)),
-                Uint8((stypes[2][0][2] != BLOCK_ID_AIR) + (stypes[1][0][2] != BLOCK_ID_AIR) + (stypes[2][0][1] != BLOCK_ID_AIR)),
-            };
-
-            vtx.push_back({ { 1, Uint16(x + 0), Uint16(y + 0), Uint16(z + 0), ao[0] }, { r, g, b, light_block, light_sky }, f.corners[1] });
-            vtx.push_back({ { 1, Uint16(x + 1), Uint16(y + 0), Uint16(z + 0), ao[1] }, { r, g, b, light_block, light_sky }, f.corners[0] });
-            vtx.push_back({ { 1, Uint16(x + 0), Uint16(y + 0), Uint16(z + 1), ao[2] }, { r, g, b, light_block, light_sky }, f.corners[3] });
-            vtx.push_back({ { 1, Uint16(x + 1), Uint16(y + 0), Uint16(z + 1), ao[3] }, { r, g, b, light_block, light_sky }, f.corners[2] });
-        }
-
-        /* Positive X */
-        if (mc_id::is_transparent(stypes[2][1][1]))
-        {
-            Uint8 ao[] = {
-                Uint8((stypes[2][0][0] != BLOCK_ID_AIR) + (stypes[2][1][0] != BLOCK_ID_AIR) + (stypes[2][0][1] != BLOCK_ID_AIR)),
-                Uint8((stypes[2][2][0] != BLOCK_ID_AIR) + (stypes[2][1][0] != BLOCK_ID_AIR) + (stypes[2][2][1] != BLOCK_ID_AIR)),
-                Uint8((stypes[2][0][2] != BLOCK_ID_AIR) + (stypes[2][0][1] != BLOCK_ID_AIR) + (stypes[2][1][2] != BLOCK_ID_AIR)),
-                Uint8((stypes[2][2][2] != BLOCK_ID_AIR) + (stypes[2][1][2] != BLOCK_ID_AIR) + (stypes[2][2][1] != BLOCK_ID_AIR)),
-            };
-
-            vtx.push_back({ { 1, Uint16(x + 1), Uint16(y + 0), Uint16(z + 0), ao[0] }, { r, g, b, light_block, light_sky }, f.corners[3] });
-            vtx.push_back({ { 1, Uint16(x + 1), Uint16(y + 1), Uint16(z + 0), ao[1] }, { r, g, b, light_block, light_sky }, f.corners[1] });
-            vtx.push_back({ { 1, Uint16(x + 1), Uint16(y + 0), Uint16(z + 1), ao[2] }, { r, g, b, light_block, light_sky }, f.corners[2] });
-            vtx.push_back({ { 1, Uint16(x + 1), Uint16(y + 1), Uint16(z + 1), ao[3] }, { r, g, b, light_block, light_sky }, f.corners[0] });
-        }
-
-        /* Negative X */
-        if (mc_id::is_transparent(stypes[0][1][1]))
-        {
-            Uint8 ao[] = {
-                Uint8((stypes[0][0][0] != BLOCK_ID_AIR) + (stypes[0][1][0] != BLOCK_ID_AIR) + (stypes[0][0][1] != BLOCK_ID_AIR)),
-                Uint8((stypes[0][2][0] != BLOCK_ID_AIR) + (stypes[0][1][0] != BLOCK_ID_AIR) + (stypes[0][2][1] != BLOCK_ID_AIR)),
-                Uint8((stypes[0][0][2] != BLOCK_ID_AIR) + (stypes[0][0][1] != BLOCK_ID_AIR) + (stypes[0][1][2] != BLOCK_ID_AIR)),
-                Uint8((stypes[0][2][2] != BLOCK_ID_AIR) + (stypes[0][1][2] != BLOCK_ID_AIR) + (stypes[0][2][1] != BLOCK_ID_AIR)),
-            };
-
-            vtx.push_back({ { 1, Uint16(x + 0), Uint16(y + 1), Uint16(z + 1), ao[3] }, { r, g, b, light_block, light_sky }, f.corners[1] });
-            vtx.push_back({ { 1, Uint16(x + 0), Uint16(y + 1), Uint16(z + 0), ao[1] }, { r, g, b, light_block, light_sky }, f.corners[0] });
-            vtx.push_back({ { 1, Uint16(x + 0), Uint16(y + 0), Uint16(z + 1), ao[2] }, { r, g, b, light_block, light_sky }, f.corners[3] });
-            vtx.push_back({ { 1, Uint16(x + 0), Uint16(y + 0), Uint16(z + 0), ao[0] }, { r, g, b, light_block, light_sky }, f.corners[2] });
-        }
-
-        /* Positive Z */
-        if (mc_id::is_transparent(stypes[1][1][2]))
-        {
-            Uint8 ao[] = {
-                Uint8((stypes[0][0][2] != BLOCK_ID_AIR) + (stypes[1][0][2] != BLOCK_ID_AIR) + (stypes[0][1][2] != BLOCK_ID_AIR)),
-                Uint8((stypes[0][2][2] != BLOCK_ID_AIR) + (stypes[0][1][2] != BLOCK_ID_AIR) + (stypes[1][2][2] != BLOCK_ID_AIR)),
-                Uint8((stypes[2][0][2] != BLOCK_ID_AIR) + (stypes[1][0][2] != BLOCK_ID_AIR) + (stypes[2][1][2] != BLOCK_ID_AIR)),
-                Uint8((stypes[2][2][2] != BLOCK_ID_AIR) + (stypes[1][2][2] != BLOCK_ID_AIR) + (stypes[2][1][2] != BLOCK_ID_AIR)),
-            };
-
-            vtx.push_back({ { 1, Uint16(x + 1), Uint16(y + 1), Uint16(z + 1), ao[3] }, { r, g, b, light_block, light_sky }, f.corners[1] });
-            vtx.push_back({ { 1, Uint16(x + 0), Uint16(y + 1), Uint16(z + 1), ao[1] }, { r, g, b, light_block, light_sky }, f.corners[0] });
-            vtx.push_back({ { 1, Uint16(x + 1), Uint16(y + 0), Uint16(z + 1), ao[2] }, { r, g, b, light_block, light_sky }, f.corners[3] });
-            vtx.push_back({ { 1, Uint16(x + 0), Uint16(y + 0), Uint16(z + 1), ao[0] }, { r, g, b, light_block, light_sky }, f.corners[2] });
-        }
-
-        /* Negative Z */
-        if (mc_id::is_transparent(stypes[1][1][0]))
-        {
-            Uint8 ao[] = {
-                Uint8((stypes[0][0][0] != BLOCK_ID_AIR) + (stypes[1][0][0] != BLOCK_ID_AIR) + (stypes[0][1][0] != BLOCK_ID_AIR)),
-                Uint8((stypes[0][2][0] != BLOCK_ID_AIR) + (stypes[0][1][0] != BLOCK_ID_AIR) + (stypes[1][2][0] != BLOCK_ID_AIR)),
-                Uint8((stypes[2][0][0] != BLOCK_ID_AIR) + (stypes[1][0][0] != BLOCK_ID_AIR) + (stypes[2][1][0] != BLOCK_ID_AIR)),
-                Uint8((stypes[2][2][0] != BLOCK_ID_AIR) + (stypes[1][2][0] != BLOCK_ID_AIR) + (stypes[2][1][0] != BLOCK_ID_AIR)),
-            };
-
-            vtx.push_back({ { 1, Uint16(x + 0), Uint16(y + 0), Uint16(z + 0), ao[0] }, { r, g, b, light_block, light_sky }, f.corners[3] });
-            vtx.push_back({ { 1, Uint16(x + 0), Uint16(y + 1), Uint16(z + 0), ao[1] }, { r, g, b, light_block, light_sky }, f.corners[1] });
-            vtx.push_back({ { 1, Uint16(x + 1), Uint16(y + 0), Uint16(z + 0), ao[2] }, { r, g, b, light_block, light_sky }, f.corners[2] });
-            vtx.push_back({ { 1, Uint16(x + 1), Uint16(y + 1), Uint16(z + 0), ao[3] }, { r, g, b, light_block, light_sky }, f.corners[0] });
-        }
+        for (int x = 4; x < 12; x++)
+            for (int z = 4; z < 12; z++)
+                for (int y = 2; y < 12; y++)
+                    c->set_type(x, y, z, 0);
     }
 
-    dc_log("Vertices: %zu", vtx.size());
-    terrain_vertex_t::create_vao(&vao);
-    terrain_vertex_t::create_vbo(&vbo, &ebo, vtx);
+    for (int i = 0; i < 256; i++)
+    {
+        chunk_cubic_t* c = new chunk_cubic_t();
+        c->chunk_x = -6;
+        c->chunk_y = i / 16;
+        c->chunk_z = (i % 16) - 2;
+        level->chunks.push_back(c);
+        for (int x = 0; x < 16; x++)
+            for (int z = 0; z < 16; z++)
+                for (int y = 0; y < 16; y++)
+                {
+                    c->set_type(x, y, z, i);
+                    c->set_light_sky(x, y, z, y);
+                    c->set_light_block(x, y, z, z);
+                }
+    }
+
+    for (int i = 0; i < 128; i++)
+    {
+        chunk_cubic_t* c = new chunk_cubic_t();
+        c->chunk_x = (i / 12) - 6;
+        c->chunk_y = -2;
+        c->chunk_z = (i % 12) - 6;
+        level->chunks.push_back(c);
+        for (int x = 0; x < 16; x++)
+            for (int z = 0; z < 16; z++)
+            {
+                c->set_type(x, 5, z, i);
+                c->set_light_sky(x, 5, z, x);
+                c->set_light_block(x, 5, z, z);
+            }
+    }
+
+    level->build_dirty_meshes();
+
+    compile_shaders();
 
     return true;
 }
 
 bool deinitialize_resources()
 {
-    delete terrain;
     delete shader;
-    delete chunk;
+    delete level;
     return true;
 }
 
@@ -475,7 +333,9 @@ glm::vec3 camera_up = glm::vec3(0.0f, 1.0f, 0.0f);
 
 void normal_loop()
 {
-    terrain->update();
+    level->terrain->update();
+
+    level->build_dirty_meshes();
 
     if (SDL_GetWindowMouseGrab(tetra::window) != mouse_grabbed)
         SDL_SetWindowMouseGrab(tetra::window, mouse_grabbed);
@@ -535,10 +395,17 @@ void normal_loop()
 
     shader->set_model(glm::mat4(1.0f));
 
-    glBindVertexArray(vao);
-    glBindBuffer(GL_ARRAY_BUFFER, vbo);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glDrawElements(GL_TRIANGLES, vtx.size() / 4 * 6, GL_UNSIGNED_INT, 0);
+    glBindTexture(GL_TEXTURE_2D, level->terrain->tex_id_main);
+    for (size_t i = 0; i < level->chunks.size(); i++)
+    {
+        chunk_cubic_t* c = level->chunks[i];
+        if (c->index_type == GL_NONE)
+            continue;
+        glBindVertexArray(c->vao);
+        glm::vec3 translate(c->chunk_x * SUBCHUNK_SIZE_X, c->chunk_y * SUBCHUNK_SIZE_Y, c->chunk_z * SUBCHUNK_SIZE_Z);
+        shader->set_model(glm::translate(glm::mat4(1.0f), translate));
+        glDrawElements(GL_TRIANGLES, c->index_count, c->index_type, 0);
+    }
 }
 
 void process_event(SDL_Event& event, bool* done)
@@ -804,13 +671,13 @@ int main(const int argc, const char** argv)
 
                 if (ImGui::Button("Rebuild atlas"))
                 {
-                    delete terrain;
-                    terrain = new texture_terrain_t("/_resources/assets/minecraft/textures/");
+                    delete level->terrain;
+                    level->terrain = new texture_terrain_t("/_resources/assets/minecraft/textures/");
                 }
                 if (ImGui::Button("Rebuild shaders"))
                     compile_shaders();
 
-                terrain->imgui_view();
+                level->terrain->imgui_view();
 
                 ImGui::End();
             }

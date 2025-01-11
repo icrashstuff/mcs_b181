@@ -42,6 +42,7 @@ set(mcs_b181_client_SRC
     client/main_client.cpp
     client/texture_terrain.cpp
     client/shaders.cpp
+    client/level.cpp
 
     client/jzon/Jzon.cpp
 
