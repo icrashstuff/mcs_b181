@@ -39,7 +39,10 @@
 static convar_int_t r_dump_mipmaps_terrain("r_dump_mipmaps_terrain", 1, 0, 1, "Dump terrain atlas mipmaps to screenshots folder on atlas rebuild",
     CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_SAVE | CONVAR_FLAG_INT_IS_BOOL);
 
-static convar_int_t r_mipmap_disable("r_mipmap_disable", 0, 0, 1, "Disable mipmapping", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_SAVE | CONVAR_FLAG_INT_IS_BOOL);
+static convar_int_t r_mipmap_levels(
+    "r_mipmap_max_initial_levels", TERRAIN_MAX_MIPMAP_LEVELS, 0, TERRAIN_MAX_MIPMAP_LEVELS, "Maximum number of mipmap levels", CONVAR_FLAG_SAVE);
+
+static convar_float_t r_mipmap_bias("r_mipmap_bias", -1.125f, -2.0, 2.0f, "Bias value for switching between mipmap levels", CONVAR_FLAG_SAVE);
 
 /**
  * Performs a case insensitive check if a string ends with another
@@ -69,6 +72,7 @@ texture_terrain_t::texture_terrain_t(std::string path_textures)
         { "/items/", true },
         { "/item/", true },
     };
+    std::vector<texture_pre_pack_t> textures;
     for (size_t i_path = 0; i_path < SDL_arraysize(paths); i_path++)
     {
         bool is_item = paths[i_path].second;
@@ -83,7 +87,7 @@ texture_terrain_t::texture_terrain_t(std::string path_textures)
             texture_pre_pack_t t;
             t.data_stbi = stbi_physfs_load(tpath.c_str(), &t.w, &t.h, NULL, 4);
             t.is_item = is_item;
-            t.name = strdup(*it);
+            t.name = *it;
 
             /** TODO: Check for .mcmeta files */
             if (t.h > t.w && t.h % t.w == 0)
@@ -151,8 +155,8 @@ texture_terrain_t::texture_terrain_t(std::string path_textures)
                 if (node_frames.isArray())
                 {
                     t.frame_offsets_len = node_frames.getCount();
-                    t.frame_offsets = (int*)calloc(t.frame_offsets_len, sizeof(*t.frame_offsets));
-                    for (int i = 0; i < t.frame_offsets_len && t.frame_offsets; i++)
+                    t.frame_offsets.resize(t.frame_offsets_len, 0);
+                    for (int i = 0; i < t.frame_offsets_len; i++)
                     {
                         Jzon::Node node_frame = node_frames.get(i);
                         if (!node_frame.isNumber())
@@ -167,7 +171,7 @@ texture_terrain_t::texture_terrain_t(std::string path_textures)
         PHYSFS_freeList(rc);
     }
 
-    /* Missing texture */
+    /* Debug texture */
     {
         texture_pre_pack_t t = {
             .w = 0,
@@ -176,16 +180,105 @@ texture_terrain_t::texture_terrain_t(std::string path_textures)
         textures.push_back(t);
     }
 
-    size_t min_area = 0;
-    size_t min_height = 1;
-    size_t min_width = 1;
+    /* Ensure all textures have data and are at least 16x16 */
     for (size_t i = 0; i < textures.size(); i++)
     {
         if (textures[i].w <= 0 || textures[i].h <= 0 || textures[i].data_stbi == NULL)
         {
             textures[i].w = 16;
             textures[i].h = 16;
+            textures[i].data_mipmaped[0].resize(16 * 16 * 4);
+            for (GLsizei i_w = 0; i_w < 16; i_w++)
+            {
+                for (GLsizei i_h = 0; i_h < 16; i_h++)
+                {
+                    textures[i].data_mipmaped[0][(i_w + i_h * 16) * 4 + 0] = 0xFF * (i_w / 8 % 2 == i_h / 8 % 2);
+                    textures[i].data_mipmaped[0][(i_w + i_h * 16) * 4 + 1] = 0;
+                    textures[i].data_mipmaped[0][(i_w + i_h * 16) * 4 + 2] = 0xFF * (i_w / 8 % 2 == i_h / 8 % 2);
+                    textures[i].data_mipmaped[0][(i_w + i_h * 16) * 4 + 3] = 0xFF;
+                }
+            }
         }
+        else if (textures[i].w < 16)
+        {
+            textures[i].data_mipmaped[0].resize(16 * 16 * 4);
+
+            int scale = 16 / textures[i].w;
+
+            for (GLsizei i_w = 0; i_w < 16; i_w++)
+            {
+                for (GLsizei i_h = 0; i_h < 16 * textures[i].frame_num_individual; i_h++)
+                {
+                    textures[i].data_mipmaped[0][(i_w + i_h * 16) * 4 + 0] = textures[i].data_stbi[((i_w / scale) + (i_h / scale) * textures[i].w) * 4 + 0];
+                    textures[i].data_mipmaped[0][(i_w + i_h * 16) * 4 + 1] = textures[i].data_stbi[((i_w / scale) + (i_h / scale) * textures[i].w) * 4 + 1];
+                    textures[i].data_mipmaped[0][(i_w + i_h * 16) * 4 + 2] = textures[i].data_stbi[((i_w / scale) + (i_h / scale) * textures[i].w) * 4 + 2];
+                    textures[i].data_mipmaped[0][(i_w + i_h * 16) * 4 + 3] = textures[i].data_stbi[((i_w / scale) + (i_h / scale) * textures[i].w) * 4 + 3];
+                }
+            }
+            textures[i].w = 16;
+            textures[i].h = 16;
+        }
+        else
+        {
+            textures[i].data_mipmaped[0].resize(textures[i].w * textures[i].h * 4 * textures[i].frame_num_individual);
+            memcpy(textures[i].data_mipmaped[0].data(), textures[i].data_stbi, textures[i].data_mipmaped[0].size());
+        }
+        stbi_image_free(textures[i].data_stbi);
+        textures[i].data_stbi = NULL;
+    }
+
+    /* Mipmap textures */
+    for (size_t i = 0; i < textures.size(); i++)
+    {
+        for (size_t mip_lvl = 1; mip_lvl < SDL_arraysize(textures[0].data_mipmaped); mip_lvl++)
+        {
+            int new_w = textures[i].w / (1 << mip_lvl);
+            int new_h = textures[i].h / (1 << mip_lvl);
+
+            textures[i].data_mipmaped[mip_lvl].resize(textures[i].data_mipmaped[mip_lvl - 1].size() / 4);
+
+            Uint8* result = textures[i].data_mipmaped[mip_lvl].data();
+            Uint8* source = textures[i].data_mipmaped[mip_lvl - 1].data();
+
+            for (GLsizei i_w = 0; i_w < new_w; i_w++)
+            {
+                for (GLsizei i_h = 0; i_h < new_h * textures[i].frame_num_individual; i_h++)
+                {
+                    Uint16 r = 0, g = 0, b = 0, a = 0;
+                    r += source[((i_w * 2 + 0) + (i_h * 2 + 0) * new_w * 2) * 4 + 0];
+                    g += source[((i_w * 2 + 0) + (i_h * 2 + 0) * new_w * 2) * 4 + 1];
+                    b += source[((i_w * 2 + 0) + (i_h * 2 + 0) * new_w * 2) * 4 + 2];
+                    a += source[((i_w * 2 + 0) + (i_h * 2 + 0) * new_w * 2) * 4 + 3];
+
+                    r += source[((i_w * 2 + 1) + (i_h * 2 + 0) * new_w * 2) * 4 + 0];
+                    g += source[((i_w * 2 + 1) + (i_h * 2 + 0) * new_w * 2) * 4 + 1];
+                    b += source[((i_w * 2 + 1) + (i_h * 2 + 0) * new_w * 2) * 4 + 2];
+                    a += source[((i_w * 2 + 1) + (i_h * 2 + 0) * new_w * 2) * 4 + 3];
+
+                    r += source[((i_w * 2 + 0) + (i_h * 2 + 1) * new_w * 2) * 4 + 0];
+                    g += source[((i_w * 2 + 0) + (i_h * 2 + 1) * new_w * 2) * 4 + 1];
+                    b += source[((i_w * 2 + 0) + (i_h * 2 + 1) * new_w * 2) * 4 + 2];
+                    a += source[((i_w * 2 + 0) + (i_h * 2 + 1) * new_w * 2) * 4 + 3];
+
+                    r += source[((i_w * 2 + 1) + (i_h * 2 + 1) * new_w * 2) * 4 + 0];
+                    g += source[((i_w * 2 + 1) + (i_h * 2 + 1) * new_w * 2) * 4 + 1];
+                    b += source[((i_w * 2 + 1) + (i_h * 2 + 1) * new_w * 2) * 4 + 2];
+                    a += source[((i_w * 2 + 1) + (i_h * 2 + 1) * new_w * 2) * 4 + 3];
+
+                    result[(i_w + i_h * new_w) * 4 + 0] = r / 4;
+                    result[(i_w + i_h * new_w) * 4 + 1] = g / 4;
+                    result[(i_w + i_h * new_w) * 4 + 2] = b / 4;
+                    result[(i_w + i_h * new_w) * 4 + 3] = a / 4;
+                }
+            }
+        }
+    }
+
+    size_t min_area = 0;
+    size_t min_height = 1;
+    size_t min_width = 1;
+    for (size_t i = 0; i < textures.size(); i++)
+    {
         min_area += textures[i].w * textures[i].h;
         min_height = SDL_max(min_height, textures[i].h);
         min_width = SDL_max(min_width, textures[i].w);
@@ -252,47 +345,60 @@ texture_terrain_t::texture_terrain_t(std::string path_textures)
     dc_log("Loaded %zu block/item textures with dimensions: %zux%zu (%.2f%% used)", textures.size(), min_width, min_height,
         tex_filled_area * 100.0 / double(tex_base_width * tex_base_height));
 
-    Uint8* data = (Uint8*)malloc(min_height * min_width * 4);
-    for (size_t i_h = 0; i_h < min_height; i_h++)
+    /* Actually create the atlases */
+    for (int mip_lvl = 0; mip_lvl <= r_mipmap_levels.get(); mip_lvl++)
     {
-        const size_t i_h_remaining = i_h / 4 % 2;
-        for (size_t i_w = 0; i_w < min_width; i_w++)
-        {
-            data[(i_h * min_width + i_w) * 4 + 0] = 0;
-            data[(i_h * min_width + i_w) * 4 + 1] = 0xFF * (i_w / 4 % 2 == i_h_remaining);
-            data[(i_h * min_width + i_w) * 4 + 2] = 0x00 * (i_w / 4 % 2 == i_h_remaining);
-            data[(i_h * min_width + i_w) * 4 + 3] = 0xFF;
-        }
-    }
+        size_t atlas_height = tex_base_height >> mip_lvl;
+        size_t atlas_width = tex_base_width >> mip_lvl;
 
-    for (size_t i = 0; i < rects.size(); i++)
-    {
-        if (!rects[i].was_packed)
-            continue;
-        textures[rects[i].id].x = rects[i].x;
-        textures[rects[i].id].y = rects[i].y;
-        texture_pre_pack_t t = textures[rects[i].id];
+        Uint8* data = (Uint8*)malloc(atlas_height * atlas_width * 4);
 
-        for (int y = 0; y < t.h; y++)
+        for (size_t i_h = 0; i_h < atlas_height; i_h++)
         {
-            if (t.data_stbi != NULL)
-                memcpy(data + ((y + t.y) * tex_base_width + t.x) * 4, t.data_stbi + y * t.w * 4, t.w * 4);
-            else
+            const size_t i_h_remaining = i_h / 4 % 2;
+            for (size_t i_w = 0; i_w < atlas_width; i_w++)
             {
-                for (GLsizei i_w = t.x; i_w < t.w + t.x; i_w++)
+                data[(i_h * atlas_width + i_w) * 4 + 0] = 0;
+                data[(i_h * atlas_width + i_w) * 4 + 1] = 0xFF * (i_w / 4 % 2 == i_h_remaining);
+                data[(i_h * atlas_width + i_w) * 4 + 2] = 0x00 * (i_w / 4 % 2 == i_h_remaining);
+                data[(i_h * atlas_width + i_w) * 4 + 3] = 0xFF;
+            }
+        }
+
+        for (size_t i = 0; i < rects.size(); i++)
+        {
+            if (!rects[i].was_packed)
+                continue;
+            textures[rects[i].id].x = rects[i].x;
+            textures[rects[i].id].y = rects[i].y;
+            texture_pre_pack_t t = textures[rects[i].id];
+            t.x >>= mip_lvl;
+            t.y >>= mip_lvl;
+            t.w >>= mip_lvl;
+            t.h >>= mip_lvl;
+
+            for (int y = 0; y < t.h; y++)
+            {
+                if (t.data_mipmaped[mip_lvl].size())
+                    memcpy(data + ((y + t.y) * atlas_width + t.x) * 4, t.data_mipmaped[mip_lvl].data() + y * t.w * 4, t.w * 4);
+                else
                 {
-                    data[((y + t.y) * tex_base_width + i_w) * 4 + 0] = 0xFF * (i_w / 8 % 2 == y / 8 % 2);
-                    data[((y + t.y) * tex_base_width + i_w) * 4 + 1] = 0;
-                    data[((y + t.y) * tex_base_width + i_w) * 4 + 2] = 0xFF * (i_w / 8 % 2 == y / 8 % 2);
-                    data[((y + t.y) * tex_base_width + i_w) * 4 + 3] = 0xFF;
+                    for (GLsizei i_w = t.x; i_w < t.w + t.x; i_w++)
+                    {
+                        data[((y + t.y) * atlas_width + i_w) * 4 + 0] = 0xFF * (i_w / 8 % 2 == y / 8 % 2);
+                        data[((y + t.y) * atlas_width + i_w) * 4 + 1] = 0x7F * (i_w / 8 % 2 == y / 8 % 2);
+                        data[((y + t.y) * atlas_width + i_w) * 4 + 2] = 0x00;
+                        data[((y + t.y) * atlas_width + i_w) * 4 + 3] = 0xFF;
+                    }
                 }
             }
         }
+        raw_mipmaps.push_back(data);
     }
 
     for (size_t i = 0; i < textures.size(); i++)
     {
-        mc_id::terrain_face_id_t fid = mc_id::get_face_from_fname(textures[i].name);
+        mc_id::terrain_face_id_t fid = mc_id::get_face_from_fname(textures[i].name.c_str());
         texture_faces[fid] = texture_post_pack_t(textures[i], fid, tex_base_width, tex_base_height);
         if (fid == mc_id::FACE_LAVA_FLOW_STRAIGHT)
             texture_faces[mc_id::FACE_LAVA_FLOW_DIAGONAL] = texture_post_pack_t(textures[i], mc_id::FACE_LAVA_FLOW_DIAGONAL, tex_base_width, tex_base_height);
@@ -304,26 +410,28 @@ texture_terrain_t::texture_terrain_t(std::string path_textures)
             texture_faces[mc_id::FACE_WATER_FLOW_STRAIGHT] = texture_post_pack_t(textures[i], mc_id::FACE_WATER_FLOW_STRAIGHT, tex_base_width, tex_base_height);
         if (textures[i].animated)
             anim_textures.push_back(textures[i]);
-        else
+
+        if (textures[i].data_stbi)
         {
-            if (textures[i].data_stbi)
-            {
-                stbi_image_free(textures[i].data_stbi);
-                textures[i].data_stbi = NULL;
-            }
+            stbi_image_free(textures[i].data_stbi);
+            textures[i].data_stbi = NULL;
         }
     }
-
-    raw_mipmaps.push_back(data);
 
     glGenTextures(1, &tex_id_main);
     glBindTexture(GL_TEXTURE_2D, tex_id_main);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_NEAREST);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_REPEAT);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_LOD, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, raw_mipmaps.size() - 1);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
+    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, raw_mipmaps.size() - 1);
+    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, -1.0f);
 
     update();
 
@@ -345,7 +453,7 @@ void texture_terrain_t::update()
     {
         texture_pre_pack_t t = anim_textures[i];
 
-        if (t.is_item && t.name && strcmp(t.name, "compass.png") == 0)
+        if (t.is_item && t.name == "compass.png")
         {
             if (compass_flail)
             {
@@ -357,7 +465,7 @@ void texture_terrain_t::update()
                 compass_flail_rotation += (SDL_randf() * 10.0 - SDL_randf() * 2.0) * compass_flail_dir;
             }
         }
-        else if (t.is_item && t.name && strcmp(t.name, "clock.png") == 0)
+        else if (t.is_item && t.name == "clock.png")
         {
             if (clock_flail)
             {
@@ -376,25 +484,30 @@ void texture_terrain_t::update()
         }
     }
 
-    double cur_mc_tick = cur_sdl_tick / 50.0;
+    const double cur_mc_tick = cur_sdl_tick / 50.0;
 
     /* Actually update animations */
-    for (size_t mip_level = 0; mip_level < raw_mipmaps.size(); mip_level++)
+    for (size_t mip_lvl = 0; mip_lvl < raw_mipmaps.size(); mip_lvl++)
     {
-        Uint8* data = raw_mipmaps[mip_level];
+        size_t atlas_width = tex_base_width >> mip_lvl;
+        Uint8* data = raw_mipmaps[mip_lvl];
         for (size_t i = 0; i < anim_textures.size(); i++)
         {
             texture_pre_pack_t t = anim_textures[i];
+            t.x >>= mip_lvl;
+            t.y >>= mip_lvl;
+            t.w >>= mip_lvl;
+            t.h >>= mip_lvl;
 
             double frame_cur_f = SDL_fmod(cur_mc_tick / (double)t.frame_time, t.frame_offsets_len);
 
-            if (t.is_item && t.name && strcmp(t.name, "compass.png") == 0)
+            if (t.is_item && t.name == "compass.png")
             {
                 float rotation = compass_flail ? compass_flail_rotation : compass_rotation;
                 frame_cur_f = ((((int)rotation) % 360 + 360) % 360) / 360.0;
                 frame_cur_f *= (double)t.frame_offsets_len;
             }
-            else if (t.is_item && t.name && strcmp(t.name, "clock.png") == 0)
+            else if (t.is_item && t.name == "clock.png")
             {
                 Uint64 time = clock_flail ? clock_flail_mc_time : clock_mc_time;
                 frame_cur_f = (time % 24000) / (24000 / t.frame_offsets_len);
@@ -406,13 +519,13 @@ void texture_terrain_t::update()
             frame_blend = SDL_clamp(frame_blend, 0.0f, 1.0f);
 
             int frame_cur_i = 0;
-            if (t.frame_offsets)
+            if (t.frame_offsets.size())
                 frame_cur_i = t.frame_offsets[frame_off_cur_i];
             else
                 frame_cur_i = frame_off_cur_i;
 
             int frame_cur_n = 0;
-            if (t.frame_offsets)
+            if (t.frame_offsets.size())
                 frame_cur_n = t.frame_offsets[frame_off_cur_n];
             else
                 frame_cur_n = frame_off_cur_n;
@@ -420,21 +533,19 @@ void texture_terrain_t::update()
             if (frame_off_cur_n < 0 || (frame_off_cur_n + 1) * t.h > t.h * t.frame_offsets_len)
                 continue;
 
-            t.data_mipmaped[0] = t.data_stbi;
-
             for (int y = 0; y < t.h; y++)
             {
-                if (t.data_mipmaped[mip_level] != NULL)
+                if (t.data_mipmaped[mip_lvl].size())
                 {
                     if (!t.interpolate)
-                        memcpy(data + ((y + t.y) * tex_base_width + t.x) * 4, t.data_mipmaped[mip_level] + (y + frame_cur_i * t.h) * t.w * 4, t.w * 4);
+                        memcpy(data + ((y + t.y) * atlas_width + t.x) * 4, t.data_mipmaped[mip_lvl].data() + (y + frame_cur_i * t.h) * t.w * 4, t.w * 4);
                     else
                     {
-                        int startx = ((y + t.y) * tex_base_width + t.x) * 4;
+                        int startx = ((y + t.y) * atlas_width + t.x) * 4;
                         for (int j = 0; j < t.w * 4; j++)
                         {
-                            Uint8 col0 = *(t.data_mipmaped[mip_level] + (y + frame_cur_i * t.h) * t.w * 4 + j) * (1.0 - frame_blend);
-                            Uint8 col1 = *(t.data_mipmaped[mip_level] + (y + frame_cur_n * t.h) * t.w * 4 + j) * frame_blend;
+                            Uint8 col0 = t.data_mipmaped[mip_lvl][(y + frame_cur_i * t.h) * t.w * 4 + j] * (1.0 - frame_blend);
+                            Uint8 col1 = t.data_mipmaped[mip_lvl][(y + frame_cur_n * t.h) * t.w * 4 + j] * frame_blend;
                             data[startx + j] = col0 + col1;
                         }
                     }
@@ -443,10 +554,10 @@ void texture_terrain_t::update()
                 {
                     for (GLsizei i_w = t.x; i_w < t.w + t.x; i_w++)
                     {
-                        data[((y + t.y) * tex_base_width + i_w) * 4 + 0] = 0xFF * (i_w / 8 % 2 == y / 8 % 2);
-                        data[((y + t.y) * tex_base_width + i_w) * 4 + 1] = 0;
-                        data[((y + t.y) * tex_base_width + i_w) * 4 + 2] = 0xFF * (i_w / 8 % 2 == y / 8 % 2);
-                        data[((y + t.y) * tex_base_width + i_w) * 4 + 3] = 0xFF;
+                        data[((y + t.y) * atlas_width + i_w) * 4 + 0] = 0xFF * (i_w / 8 % 2 == y / 8 % 2);
+                        data[((y + t.y) * atlas_width + i_w) * 4 + 1] = 0;
+                        data[((y + t.y) * atlas_width + i_w) * 4 + 2] = 0xFF * (i_w / 8 % 2 == y / 8 % 2);
+                        data[((y + t.y) * atlas_width + i_w) * 4 + 3] = 0xFF;
                     }
                 }
             }
@@ -454,7 +565,7 @@ void texture_terrain_t::update()
     }
 
     for (size_t i = 0; i < raw_mipmaps.size(); i++)
-        glTexImage2D(GL_TEXTURE_2D, i, GL_RGBA, tex_base_width, tex_base_height, 0, GL_RGBA, GL_UNSIGNED_BYTE, raw_mipmaps[i]);
+        glTexImage2D(GL_TEXTURE_2D, i, GL_RGBA, tex_base_width >> i, tex_base_height >> i, 0, GL_RGBA, GL_UNSIGNED_BYTE, raw_mipmaps[i]);
 }
 
 void texture_terrain_t::dump_mipmaps()
@@ -470,7 +581,7 @@ void texture_terrain_t::dump_mipmaps()
             continue;
         char buf[64];
         snprintf(buf, SDL_arraysize(buf), "/game/screenshots/terrain_%zu.png", i);
-        stbi_physfs_write_png(buf, tex_base_width >> i, tex_base_height >> i, 4, raw_mipmaps[i], tex_base_width * 4);
+        stbi_physfs_write_png(buf, tex_base_width >> i, tex_base_height >> i, 4, raw_mipmaps[i], (tex_base_width >> i) * 4);
     }
 }
 
@@ -478,6 +589,26 @@ static bool DragUint64(
     const char* label, Uint64* v, float v_speed = 1.0f, Uint64 v_min = 0, Uint64 v_max = 0, const char* format = "%zu", ImGuiSliderFlags flags = 0)
 {
     return ImGui::DragScalar(label, ImGuiDataType_U64, v, v_speed, &v_min, &v_max, format, flags);
+}
+
+static bool slider_tex_parameteri(const char* name, GLenum target, GLenum pname, int min, int max)
+{
+    GLint params;
+    glGetTexParameteriv(target, pname, &params);
+    if (!ImGui::SliderInt(name, &params, min, max))
+        return false;
+    glTexParameteri(target, pname, params);
+    return true;
+}
+
+static bool slider_tex_parameterf(const char* name, GLenum target, GLenum pname, float min, float max)
+{
+    GLfloat params;
+    glGetTexParameterfv(target, pname, &params);
+    if (!ImGui::SliderFloat(name, &params, min, max))
+        return false;
+    glTexParameterf(target, pname, params);
+    return true;
 }
 
 bool texture_terrain_t::imgui_view(const char* title)
@@ -495,6 +626,14 @@ bool texture_terrain_t::imgui_view(const char* title)
     }
 
     ImGuiViewport* viewport = ImGui::GetMainViewport();
+
+    slider_tex_parameteri("GL_TEXTURE_MIN_LOD", GL_TEXTURE_2D, GL_TEXTURE_MIN_LOD, 0, raw_mipmaps.size() - 1);
+    slider_tex_parameteri("GL_TEXTURE_MAX_LOD", GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, 0, raw_mipmaps.size() - 1);
+    slider_tex_parameteri("GL_TEXTURE_BASE_LEVEL", GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0, raw_mipmaps.size() - 1);
+    slider_tex_parameteri("GL_TEXTURE_MAX_LEVEL", GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0, raw_mipmaps.size() - 1);
+    float max_lod = 0;
+    glGetFloatv(GL_MAX_TEXTURE_LOD_BIAS, &max_lod);
+    slider_tex_parameterf("GL_TEXTURE_LOD_BIAS", GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, -max_lod, max_lod);
 
     ImGui::Text("Num animated textures: %zu", anim_textures.size());
     ImGui::Checkbox("Compass flail", &compass_flail);
@@ -574,14 +713,6 @@ texture_terrain_t::~texture_terrain_t()
 
     for (size_t i = 0; i < raw_mipmaps.size(); i++)
         free(raw_mipmaps[i]);
-
-    for (size_t i = 0; i < textures.size(); i++)
-    {
-        if (textures[i].data_stbi)
-            stbi_image_free(textures[i].data_stbi);
-        if (textures[i].name)
-            free(textures[i].name);
-    }
 }
 
 void terrain_vertex_t::create_vao(GLuint* vao)

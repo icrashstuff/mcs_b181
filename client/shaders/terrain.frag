@@ -43,7 +43,7 @@ void main()
     if (use_texture == 1)
         out_color *= texture2D(tex0, frag_uv);
 
-    if (out_color.a < 0.01)
+    if (out_color.a < 0.25)
         discard;
     else
         out_color.a = 1.0;

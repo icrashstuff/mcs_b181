@@ -31,6 +31,8 @@
 #include "shared/ids.h"
 #include "texture_ids.h"
 
+#define TERRAIN_MAX_MIPMAP_LEVELS 4
+
 struct terrain_vertex_t
 {
     struct vtx_pos_ao_t
@@ -201,7 +203,7 @@ private:
     struct texture_pre_pack_t
     {
         Uint8* data_stbi = 0;
-        Uint8* data_mipmaped[5] = { 0 };
+        std::vector<Uint8> data_mipmaped[TERRAIN_MAX_MIPMAP_LEVELS + 1] = {};
         int w;
         int h;
         int x = 0;
@@ -213,8 +215,8 @@ private:
         int frame_cur = 0;
         int frame_num_individual = 1;
         int frame_offsets_len = 1;
-        int* frame_offsets = 0;
-        char* name = 0;
+        std::vector<int> frame_offsets = {};
+        std::string name = {};
     };
 
     struct texture_post_pack_t
@@ -238,8 +240,6 @@ private:
 
     mc_id::terrain_face_id_t imgui_selected_face = mc_id::FACE_ATLAS;
 
-    /* TODO-OPT: Move this to a smaller data structure? (texture_post_pack_t)*/
-    std::vector<texture_pre_pack_t> textures;
     std::vector<texture_pre_pack_t> anim_textures;
 };
 #endif
