@@ -530,7 +530,7 @@ void texture_terrain_t::update()
             else
                 frame_cur_n = frame_off_cur_n;
 
-            if (frame_off_cur_n < 0 || (frame_off_cur_n + 1) * t.h > t.h * t.frame_offsets_len)
+            if (frame_off_cur_n < 0 || (frame_off_cur_n + 1) > t.frame_offsets_len)
                 continue;
 
             for (int y = 0; y < t.h; y++)
@@ -563,6 +563,8 @@ void texture_terrain_t::update()
             }
         }
     }
+
+    glBindTexture(GL_TEXTURE_2D, tex_id_main);
 
     for (size_t i = 0; i < raw_mipmaps.size(); i++)
         glTexImage2D(GL_TEXTURE_2D, i, GL_RGBA, tex_base_width >> i, tex_base_height >> i, 0, GL_RGBA, GL_UNSIGNED_BYTE, raw_mipmaps[i]);
@@ -627,6 +629,7 @@ bool texture_terrain_t::imgui_view(const char* title)
 
     ImGuiViewport* viewport = ImGui::GetMainViewport();
 
+    glBindTexture(GL_TEXTURE_2D, tex_id_main);
     slider_tex_parameteri("GL_TEXTURE_MIN_LOD", GL_TEXTURE_2D, GL_TEXTURE_MIN_LOD, 0, raw_mipmaps.size() - 1);
     slider_tex_parameteri("GL_TEXTURE_MAX_LOD", GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, 0, raw_mipmaps.size() - 1);
     slider_tex_parameteri("GL_TEXTURE_BASE_LEVEL", GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0, raw_mipmaps.size() - 1);
