@@ -77,8 +77,33 @@ bool initialize_resources()
     /* In the future parsing of one of the indexes at /assets/indexes/ will need to happen here (For sound) */
 
     level = new level_t();
-    level->terrain = new texture_terrain_t("/_resources/assets/minecraft/textures/");
+    level->terrain = std::make_shared<texture_terrain_t>("/_resources/assets/minecraft/textures/");
     shader = new shader_t("/shaders/terrain.vert", "/shaders/terrain.frag");
+
+    level->lightmap.set_world_time(1000);
+
+    for (int i = 0; i < 36; i++)
+    {
+        chunk_t c_old;
+        c_old.generate_from_seed_over(0, i / 6 - 3, i % 6 - 3);
+        for (int j = 0; j < 8; j++)
+        {
+            chunk_cubic_t* c = new chunk_cubic_t();
+            c->chunk_x = i / 6 - 6;
+            c->chunk_z = i % 6 - 6;
+            c->chunk_y = j - 6;
+            level->chunks.push_back(c);
+            for (int x = 0; x < 16; x++)
+                for (int z = 0; z < 16; z++)
+                    for (int y = 0; y < 16; y++)
+                    {
+                        c->set_type(x, y, z, c_old.get_type(x, y + j * 16, z));
+                        c->set_metadata(x, y, z, c_old.get_metadata(x, y + j * 16, z));
+                        c->set_light_block(x, y, z, c_old.get_light_block(x, y + j * 16, z));
+                        c->set_light_sky(x, y, z, c_old.get_light_sky(x, y + j * 16, z));
+                    }
+        }
+    }
 
     for (int i = 0; i < 256; i++)
     {
@@ -121,9 +146,9 @@ bool initialize_resources()
     for (int i = 0; i < 128; i++)
     {
         chunk_cubic_t* c = new chunk_cubic_t();
-        c->chunk_x = (i / 12) - 6;
+        c->chunk_x = (i / 12);
         c->chunk_y = -2;
-        c->chunk_z = (i % 12) - 6;
+        c->chunk_z = (i % 12);
         level->chunks.push_back(c);
         for (int x = 0; x < 16; x++)
             for (int z = 0; z < 16; z++)
@@ -394,8 +419,14 @@ void normal_loop()
     shader->set_camera(glm::lookAt(camera_pos, camera_pos + camera_front, camera_up));
 
     shader->set_model(glm::mat4(1.0f));
+    shader->set_uniform("tex_atlas", 0);
+    shader->set_uniform("tex_lightmap", 1);
 
+    glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, level->terrain->tex_id_main);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, level->lightmap.tex_id_nearest);
+    glActiveTexture(GL_TEXTURE0);
     for (size_t i = 0; i < level->chunks.size(); i++)
     {
         chunk_cubic_t* c = level->chunks[i];
@@ -549,6 +580,7 @@ void process_event(SDL_Event& event, bool* done)
 }
 
 static convar_int_t cvr_gui_renderer("gui_renderer", 0, 0, 1, "Show renderer internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
+static convar_int_t cvr_gui_lightmap("gui_lightmap", 0, 0, 1, "Show lightmap internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 
 int main(const int argc, const char** argv)
 {
@@ -671,8 +703,7 @@ int main(const int argc, const char** argv)
 
                 if (ImGui::Button("Rebuild atlas"))
                 {
-                    delete level->terrain;
-                    level->terrain = new texture_terrain_t("/_resources/assets/minecraft/textures/");
+                    level->terrain.reset(new texture_terrain_t("/_resources/assets/minecraft/textures/"));
                 }
                 if (ImGui::Button("Rebuild shaders"))
                     compile_shaders();
@@ -682,7 +713,19 @@ int main(const int argc, const char** argv)
                 ImGui::End();
             }
 
+            if (cvr_gui_lightmap.get())
+            {
+                ImGui::SetNextWindowPos(viewport->Size * ImVec2(0.0075f, 0.1875f), ImGuiCond_FirstUseEver, ImVec2(0.0, 0.0));
+                ImGui::SetNextWindowSize(viewport->Size * ImVec2(0.425f, 0.8f), ImGuiCond_FirstUseEver);
+                ImGui::BeginCVR("Lightmap", &cvr_gui_lightmap);
+                level->lightmap.imgui_contents();
+                ImGui::End();
+            }
+
+            level->lightmap.update();
+
             normal_loop();
+
             break;
         }
         case ENGINE_STATE_SHUTDOWN:

@@ -31,7 +31,8 @@ out vec4 out_color;
 
 uniform float daylight = 0.99;
 
-uniform sampler2D tex0;
+uniform sampler2D tex_atlas;
+uniform sampler2D tex_lightmap;
 
 uniform int ao_algorithm = 1;
 uniform int use_texture = 1;
@@ -41,7 +42,7 @@ void main()
     out_color = vec4(frag_color.xyz, 1.0);
 
     if (use_texture == 1)
-        out_color *= texture2D(tex0, frag_uv);
+        out_color *= texture2D(tex_atlas, frag_uv);
 
     if (out_color.a < 0.25)
         discard;
@@ -70,5 +71,5 @@ void main()
         break;
     }
 
-    out_color.xyz *= clamp((frag_light_block + frag_light_sky * daylight), 0.1, 1);
+    out_color *= texture2D(tex_lightmap,vec2(frag_light_block, frag_light_sky));
 }

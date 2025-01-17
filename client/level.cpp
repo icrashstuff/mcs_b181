@@ -84,14 +84,15 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
         if (type == BLOCK_ID_AIR)
             continue;
 
+        Uint8 metadata = rubik[1][1][1]->get_metadata(x, y, z);
+
         float r = float((type) & 3) / 3.0f, g = float((type >> 2) & 3) / 3.0f, b = float((type >> 4) & 3) / 3.0f;
         r = 1.0, g = 1.0, b = 1.0;
 
-        Uint8 light_block = rubik[1][1][1]->get_light_block(x, y, z);
-        Uint8 light_sky = rubik[1][1][1]->get_light_sky(x, y, z);
-
         /** Index: [x+1][y+1][z+1] */
         block_id_t stypes[3][3][3];
+        Uint8 slight_block[3][3][3];
+        Uint8 slight_sky[3][3][3];
         for (int i = -1; i < 2; i++)
         {
             for (int j = -1; j < 2; j++)
@@ -136,60 +137,244 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
 
                     chunk_cubic_t* c = rubik[chunk_ix][chunk_iy][chunk_iz];
                     stypes[i + 1][j + 1][k + 1] = c == NULL ? BLOCK_ID_AIR : c->get_type_fallback(local_x, local_y, local_z, BLOCK_ID_AIR);
+                    slight_block[i + 1][j + 1][k + 1] = c == NULL ? 0 : c->get_light_block(local_x, local_y, local_z);
+                    slight_sky[i + 1][j + 1][k + 1] = c == NULL ? 0 : c->get_light_sky(local_x, local_y, local_z);
                 }
             }
         }
 
-        mc_id::terrain_face_t f;
+        /**
+         * Ordered +XYZ then -XYZ for simple blocks
+         */
+        mc_id::terrain_face_t faces[6];
+#define BLOCK_SIMPLE(ID_BLOCK, ID_FACE)        \
+    case ID_BLOCK:                             \
+    {                                          \
+        faces[0] = terrain->get_face(ID_FACE); \
+        faces[1] = faces[0];                   \
+        faces[2] = faces[0];                   \
+        faces[3] = faces[0];                   \
+        faces[4] = faces[0];                   \
+        faces[5] = faces[0];                   \
+        break;                                 \
+    }
+#define BLOCK_TNT(ID_BLOCK, ID_FACE_TOP, ID_FACE_BOTTOM, ID_FACE_SIDE) \
+    case ID_BLOCK:                                                     \
+    {                                                                  \
+        faces[0] = terrain->get_face(ID_FACE_SIDE);                    \
+        faces[1] = terrain->get_face(ID_FACE_TOP);                     \
+        faces[2] = faces[0];                                           \
+        faces[3] = faces[0];                                           \
+        faces[4] = terrain->get_face(ID_FACE_BOTTOM);                  \
+        faces[5] = faces[0];                                           \
+        break;                                                         \
+    }
+#define BLOCK_LOG(ID_BLOCK, ID_FACE_TOP, ID_FACE_SIDE) \
+    case ID_BLOCK:                                     \
+    {                                                  \
+        faces[0] = terrain->get_face(ID_FACE_SIDE);    \
+        faces[1] = terrain->get_face(ID_FACE_TOP);     \
+        faces[2] = faces[0];                           \
+        faces[3] = faces[0];                           \
+        faces[4] = faces[1];                           \
+        faces[5] = faces[0];                           \
+        break;                                         \
+    }
 
-        if (type == BLOCK_ID_STONE)
-            f = terrain->get_face(mc_id::FACE_STONE);
-        else if (type == BLOCK_ID_SAND)
-            f = terrain->get_face(mc_id::FACE_SAND);
-        else if (type == BLOCK_ID_GRASS)
-            f = terrain->get_face(mc_id::FACE_GRASS_TOP);
-        else if (type == BLOCK_ID_COBWEB)
-            f = terrain->get_face(mc_id::FACE_WEB);
-        else if (type == BLOCK_ID_CACTUS)
-            f = terrain->get_face(mc_id::FACE_CACTUS_SIDE);
-        else if (type == BLOCK_ID_COBBLESTONE)
-            f = terrain->get_face(mc_id::FACE_COBBLESTONE);
-        else if (type == BLOCK_ID_SPONGE)
-            f = terrain->get_face(mc_id::FACE_SPONGE);
-        else if (type == BLOCK_ID_GLASS)
-            f = terrain->get_face(mc_id::FACE_GLASS);
-        else if (type == BLOCK_ID_COBBLESTONE_MOSSY)
-            f = terrain->get_face(mc_id::FACE_COBBLESTONE_MOSSY);
-        else if (type == BLOCK_ID_SANDSTONE)
-            f = terrain->get_face(mc_id::FACE_SANDSTONE_NORMAL);
-        else if (type == BLOCK_ID_DIRT)
-            f = terrain->get_face(mc_id::FACE_DIRT);
-        else if (type == BLOCK_ID_GRAVEL)
-            f = terrain->get_face(mc_id::FACE_GRAVEL);
-        else if (type == BLOCK_ID_ORE_COAL)
-            f = terrain->get_face(mc_id::FACE_COAL_ORE);
-        else if (type == BLOCK_ID_ORE_IRON)
-            f = terrain->get_face(mc_id::FACE_IRON_ORE);
-        else if (type == BLOCK_ID_ORE_GOLD)
-            f = terrain->get_face(mc_id::FACE_GOLD_ORE);
-        else if (type == BLOCK_ID_ORE_LAPIS)
-            f = terrain->get_face(mc_id::FACE_LAPIS_ORE);
-        else if (type == BLOCK_ID_ORE_REDSTONE_ON || type == BLOCK_ID_ORE_REDSTONE_OFF)
-            f = terrain->get_face(mc_id::FACE_REDSTONE_ORE);
-        else if (type == BLOCK_ID_ORE_DIAMOND)
-            f = terrain->get_face(mc_id::FACE_DIAMOND_ORE);
-        else if (type == BLOCK_ID_BRICKS_STONE)
-            f = terrain->get_face(mc_id::FACE_STONEBRICK);
-        else if (type == BLOCK_ID_LAVA_SOURCE)
-            f = terrain->get_face(mc_id::FACE_LAVA_STILL);
-        else if (type == BLOCK_ID_LAVA_FLOWING)
-            f = terrain->get_face(mc_id::FACE_LAVA_FLOW_STRAIGHT);
-        else if (type == BLOCK_ID_WATER_SOURCE)
-            f = terrain->get_face(mc_id::FACE_WATER_STILL);
-        else if (type == BLOCK_ID_WATER_FLOWING)
-            f = terrain->get_face(mc_id::FACE_WATER_FLOW_STRAIGHT);
-        else
-            f = terrain->get_face(mc_id::FACE_DEBUG);
+        switch ((item_id_t_)type)
+        {
+            BLOCK_SIMPLE(BLOCK_ID_AIR, mc_id::FACE_DEBUG);
+            BLOCK_SIMPLE(BLOCK_ID_STONE, mc_id::FACE_STONE);
+            BLOCK_SIMPLE(BLOCK_ID_GRASS, mc_id::FACE_GRASS_TOP);
+            BLOCK_SIMPLE(BLOCK_ID_DIRT, mc_id::FACE_DIRT);
+            BLOCK_SIMPLE(BLOCK_ID_COBBLESTONE, mc_id::FACE_COBBLESTONE);
+            BLOCK_SIMPLE(BLOCK_ID_WOOD_PLANKS, mc_id::FACE_PLANKS_OAK);
+            BLOCK_SIMPLE(BLOCK_ID_SAPLING, mc_id::FACE_SAPLING_OAK); //----
+            BLOCK_SIMPLE(BLOCK_ID_BEDROCK, mc_id::FACE_BEDROCK);
+
+            BLOCK_SIMPLE(BLOCK_ID_WATER_FLOWING, mc_id::FACE_WATER_FLOW_STRAIGHT);
+            BLOCK_SIMPLE(BLOCK_ID_WATER_SOURCE, mc_id::FACE_WATER_STILL);
+            BLOCK_SIMPLE(BLOCK_ID_LAVA_FLOWING, mc_id::FACE_LAVA_FLOW_STRAIGHT);
+            BLOCK_SIMPLE(BLOCK_ID_LAVA_SOURCE, mc_id::FACE_LAVA_STILL);
+
+            BLOCK_SIMPLE(BLOCK_ID_SAND, mc_id::FACE_SAND);
+            BLOCK_SIMPLE(BLOCK_ID_GRAVEL, mc_id::FACE_GRAVEL);
+            BLOCK_SIMPLE(BLOCK_ID_ORE_GOLD, mc_id::FACE_GOLD_ORE);
+            BLOCK_SIMPLE(BLOCK_ID_ORE_IRON, mc_id::FACE_IRON_ORE);
+            BLOCK_SIMPLE(BLOCK_ID_ORE_COAL, mc_id::FACE_COAL_ORE);
+            BLOCK_LOG(BLOCK_ID_LOG, mc_id::FACE_LOG_OAK_TOP, mc_id::FACE_LOG_OAK); //----
+            BLOCK_SIMPLE(BLOCK_ID_LEAVES, mc_id::FACE_LEAVES_OAK);
+            BLOCK_SIMPLE(BLOCK_ID_SPONGE, mc_id::FACE_SPONGE);
+            BLOCK_SIMPLE(BLOCK_ID_GLASS, mc_id::FACE_GLASS);
+            BLOCK_SIMPLE(BLOCK_ID_ORE_LAPIS, mc_id::FACE_LAPIS_ORE);
+
+            BLOCK_SIMPLE(BLOCK_ID_LAPIS, mc_id::FACE_LAPIS_BLOCK);
+            BLOCK_SIMPLE(BLOCK_ID_DISPENSER, mc_id::FACE_DISPENSER_FRONT_HORIZONTAL);
+            BLOCK_TNT(BLOCK_ID_SANDSTONE, mc_id::FACE_SANDSTONE_TOP, mc_id::FACE_SANDSTONE_BOTTOM, mc_id::FACE_SANDSTONE_NORMAL)
+            BLOCK_SIMPLE(BLOCK_ID_NOTE_BLOCK, mc_id::FACE_NOTEBLOCK);
+            BLOCK_SIMPLE(BLOCK_ID_BED, mc_id::FACE_BED_HEAD_TOP);
+            BLOCK_SIMPLE(BLOCK_ID_RAIL_POWERED, mc_id::FACE_RAIL_GOLDEN_POWERED);
+            BLOCK_SIMPLE(BLOCK_ID_RAIL_DETECTOR, mc_id::FACE_RAIL_DETECTOR);
+            BLOCK_SIMPLE(BLOCK_ID_PISTON_STICKY, mc_id::FACE_PISTON_TOP_STICKY);
+            BLOCK_SIMPLE(BLOCK_ID_COBWEB, mc_id::FACE_WEB); //----
+            BLOCK_SIMPLE(BLOCK_ID_FOLIAGE, mc_id::FACE_TALLGRASS);
+            BLOCK_SIMPLE(BLOCK_ID_DEAD_BUSH, mc_id::FACE_DEADBUSH);
+            BLOCK_SIMPLE(BLOCK_ID_PISTON, mc_id::FACE_PISTON_TOP_NORMAL);
+            BLOCK_SIMPLE(BLOCK_ID_PISTON_HEAD, mc_id::FACE_PISTON_TOP_NORMAL);
+            BLOCK_SIMPLE(BLOCK_ID_WOOL, mc_id::FACE_WOOL_COLORED_WHITE);
+
+            BLOCK_SIMPLE(BLOCK_ID_UNKNOWN, mc_id::FACE_DEBUG);
+            BLOCK_SIMPLE(BLOCK_ID_FLOWER_YELLOW, mc_id::FACE_FLOWER_DANDELION);
+            BLOCK_SIMPLE(BLOCK_ID_FLOWER_RED, mc_id::FACE_FLOWER_ROSE);
+            BLOCK_SIMPLE(BLOCK_ID_MUSHROOM_BLAND, mc_id::FACE_MUSHROOM_BROWN);
+            BLOCK_SIMPLE(BLOCK_ID_MUSHROOM_RED, mc_id::FACE_MUSHROOM_RED);
+
+            BLOCK_SIMPLE(BLOCK_ID_GOLD, mc_id::FACE_GOLD_BLOCK);
+            BLOCK_SIMPLE(BLOCK_ID_IRON, mc_id::FACE_IRON_BLOCK);
+
+            BLOCK_SIMPLE(BLOCK_ID_SLAB_DOUBLE, mc_id::FACE_STONE_SLAB_SIDE);
+            BLOCK_SIMPLE(BLOCK_ID_SLAB_SINGLE, mc_id::FACE_STONE_SLAB_SIDE);
+            BLOCK_SIMPLE(BLOCK_ID_BRICKS, mc_id::FACE_BRICK);
+            BLOCK_TNT(BLOCK_ID_TNT, mc_id::FACE_TNT_TOP, mc_id::FACE_TNT_BOTTOM, mc_id::FACE_TNT_SIDE)
+            BLOCK_SIMPLE(BLOCK_ID_BOOKSHELF, mc_id::FACE_BOOKSHELF);
+            BLOCK_SIMPLE(BLOCK_ID_COBBLESTONE_MOSSY, mc_id::FACE_COBBLESTONE_MOSSY);
+            BLOCK_SIMPLE(BLOCK_ID_OBSIDIAN, mc_id::FACE_OBSIDIAN);
+
+            BLOCK_SIMPLE(BLOCK_ID_TORCH, mc_id::FACE_TORCH_ON);
+            BLOCK_SIMPLE(BLOCK_ID_FIRE, mc_id::FACE_FIRE_LAYER_0);
+            BLOCK_SIMPLE(BLOCK_ID_SPAWNER, mc_id::FACE_MOB_SPAWNER);
+
+            BLOCK_SIMPLE(BLOCK_ID_STAIRS_WOOD, mc_id::FACE_PLANKS_OAK); //----
+            BLOCK_SIMPLE(BLOCK_ID_CHEST, mc_id::FACE_DEBUG); //----
+            BLOCK_SIMPLE(BLOCK_ID_REDSTONE, mc_id::FACE_REDSTONE_DUST_LINE); //----
+            BLOCK_SIMPLE(BLOCK_ID_ORE_DIAMOND, mc_id::FACE_DIAMOND_ORE);
+            BLOCK_SIMPLE(BLOCK_ID_DIAMOND, mc_id::FACE_DIAMOND_BLOCK);
+        case BLOCK_ID_CRAFTING_TABLE:
+        {
+            faces[0] = terrain->get_face(mc_id::FACE_CRAFTING_TABLE_FRONT);
+            faces[1] = terrain->get_face(mc_id::FACE_CRAFTING_TABLE_TOP);
+            faces[2] = terrain->get_face(mc_id::FACE_CRAFTING_TABLE_SIDE);
+
+            faces[3] = terrain->get_face(mc_id::FACE_CRAFTING_TABLE_FRONT);
+            faces[4] = terrain->get_face(mc_id::FACE_PLANKS_OAK);
+            faces[5] = terrain->get_face(mc_id::FACE_CRAFTING_TABLE_SIDE);
+            break;
+        }
+            BLOCK_SIMPLE(BLOCK_ID_PLANT_FOOD, mc_id::FACE_DEBUG);
+            BLOCK_SIMPLE(BLOCK_ID_DIRT_TILLED, mc_id::FACE_DEBUG);
+        case BLOCK_ID_FURNACE_OFF:
+        {
+            faces[0] = terrain->get_face(mc_id::FACE_FURNACE_FRONT_OFF);
+            faces[1] = terrain->get_face(mc_id::FACE_FURNACE_TOP);
+            faces[2] = terrain->get_face(mc_id::FACE_FURNACE_SIDE);
+
+            faces[3] = terrain->get_face(mc_id::FACE_FURNACE_SIDE);
+            faces[4] = terrain->get_face(mc_id::FACE_FURNACE_TOP);
+            faces[5] = terrain->get_face(mc_id::FACE_FURNACE_SIDE);
+            break;
+        }
+        case BLOCK_ID_FURNACE_ON:
+        {
+            faces[0] = terrain->get_face(mc_id::FACE_FURNACE_FRONT_ON);
+            faces[1] = terrain->get_face(mc_id::FACE_FURNACE_TOP);
+            faces[2] = terrain->get_face(mc_id::FACE_FURNACE_SIDE);
+
+            faces[3] = terrain->get_face(mc_id::FACE_FURNACE_SIDE);
+            faces[4] = terrain->get_face(mc_id::FACE_FURNACE_TOP);
+            faces[5] = terrain->get_face(mc_id::FACE_FURNACE_SIDE);
+            break;
+        }
+            BLOCK_SIMPLE(BLOCK_ID_SIGN_STANDING, mc_id::FACE_DEBUG);
+            BLOCK_SIMPLE(BLOCK_ID_DOOR_WOOD, mc_id::FACE_DOOR_WOOD_UPPER);
+            BLOCK_SIMPLE(BLOCK_ID_LADDER, mc_id::FACE_LADDER);
+            BLOCK_SIMPLE(BLOCK_ID_RAIL, mc_id::FACE_RAIL_NORMAL);
+            BLOCK_SIMPLE(BLOCK_ID_STAIRS_COBBLESTONE, mc_id::FACE_COBBLESTONE); //----
+            BLOCK_SIMPLE(BLOCK_ID_SIGN_WALL, mc_id::FACE_DEBUG);
+            BLOCK_SIMPLE(BLOCK_ID_LEVER, mc_id::FACE_DEBUG);
+            BLOCK_SIMPLE(BLOCK_ID_PRESSURE_PLATE_STONE, mc_id::FACE_STONE);
+            BLOCK_SIMPLE(BLOCK_ID_DOOR_IRON, mc_id::FACE_DOOR_IRON_UPPER);
+            BLOCK_SIMPLE(BLOCK_ID_PRESSURE_PLATE_WOOD, mc_id::FACE_PLANKS_OAK);
+            BLOCK_SIMPLE(BLOCK_ID_ORE_REDSTONE_OFF, mc_id::FACE_REDSTONE_ORE);
+            BLOCK_SIMPLE(BLOCK_ID_ORE_REDSTONE_ON, mc_id::FACE_REDSTONE_ORE);
+            BLOCK_SIMPLE(BLOCK_ID_TORCH_REDSTONE_OFF, mc_id::FACE_REDSTONE_TORCH_OFF);
+            BLOCK_SIMPLE(BLOCK_ID_TORCH_REDSTONE_ON, mc_id::FACE_REDSTONE_TORCH_ON);
+            BLOCK_SIMPLE(BLOCK_ID_BUTTON_STONE, mc_id::FACE_STONE);
+            BLOCK_SIMPLE(BLOCK_ID_SNOW, mc_id::FACE_SNOW);
+            BLOCK_SIMPLE(BLOCK_ID_ICE, mc_id::FACE_ICE);
+            BLOCK_SIMPLE(BLOCK_ID_SNOW_BLOCK, mc_id::FACE_SNOW);
+            BLOCK_SIMPLE(BLOCK_ID_CACTUS, mc_id::FACE_CACTUS_SIDE);
+            BLOCK_SIMPLE(BLOCK_ID_CLAY, mc_id::FACE_CLAY);
+            BLOCK_SIMPLE(BLOCK_ID_SUGAR_CANE, mc_id::FACE_DEBUG);
+        case BLOCK_ID_JUKEBOX:
+        {
+            faces[0] = terrain->get_face(mc_id::FACE_JUKEBOX_SIDE);
+            faces[1] = terrain->get_face(mc_id::FACE_JUKEBOX_TOP);
+            faces[2] = terrain->get_face(mc_id::FACE_JUKEBOX_SIDE);
+
+            faces[3] = terrain->get_face(mc_id::FACE_JUKEBOX_SIDE);
+            faces[4] = terrain->get_face(mc_id::FACE_JUKEBOX_SIDE);
+            faces[5] = terrain->get_face(mc_id::FACE_JUKEBOX_SIDE);
+            break;
+        }
+            BLOCK_SIMPLE(BLOCK_ID_FENCE_WOOD, mc_id::FACE_DEBUG);
+        case BLOCK_ID_PUMPKIN:
+        {
+            faces[0] = terrain->get_face(mc_id::FACE_PUMPKIN_FACE_OFF);
+            faces[1] = terrain->get_face(mc_id::FACE_PUMPKIN_TOP);
+            faces[2] = terrain->get_face(mc_id::FACE_PUMPKIN_SIDE);
+
+            faces[3] = terrain->get_face(mc_id::FACE_PUMPKIN_SIDE);
+            faces[4] = terrain->get_face(mc_id::FACE_PUMPKIN_TOP);
+            faces[5] = terrain->get_face(mc_id::FACE_PUMPKIN_SIDE);
+            break;
+        }
+            BLOCK_SIMPLE(BLOCK_ID_NETHERRACK, mc_id::FACE_NETHERRACK);
+            BLOCK_SIMPLE(BLOCK_ID_SOULSAND, mc_id::FACE_SOUL_SAND);
+            BLOCK_SIMPLE(BLOCK_ID_GLOWSTONE, mc_id::FACE_GLOWSTONE);
+            BLOCK_SIMPLE(BLOCK_ID_NETHER_PORTAL, mc_id::FACE_PORTAL);
+        case BLOCK_ID_PUMPKIN_GLOWING:
+        {
+            faces[0] = terrain->get_face(mc_id::FACE_PUMPKIN_FACE_ON);
+            faces[1] = terrain->get_face(mc_id::FACE_PUMPKIN_TOP);
+            faces[2] = terrain->get_face(mc_id::FACE_PUMPKIN_SIDE);
+
+            faces[3] = terrain->get_face(mc_id::FACE_PUMPKIN_SIDE);
+            faces[4] = terrain->get_face(mc_id::FACE_PUMPKIN_TOP);
+            faces[5] = terrain->get_face(mc_id::FACE_PUMPKIN_SIDE);
+            break;
+        }
+            BLOCK_SIMPLE(BLOCK_ID_CAKE, mc_id::FACE_CAKE_TOP);
+            BLOCK_SIMPLE(BLOCK_ID_REPEATER_OFF, mc_id::FACE_REPEATER_OFF);
+            BLOCK_SIMPLE(BLOCK_ID_REPEATER_ON, mc_id::FACE_REPEATER_ON);
+            BLOCK_SIMPLE(BLOCK_ID_CHEST_LOCKED, mc_id::FACE_DEBUG);
+            BLOCK_SIMPLE(BLOCK_ID_TRAPDOOR, mc_id::FACE_TRAPDOOR);
+            BLOCK_SIMPLE(BLOCK_ID_UNKNOWN_STONE, mc_id::FACE_STONE);
+            BLOCK_SIMPLE(BLOCK_ID_BRICKS_STONE, mc_id::FACE_STONEBRICK);
+            BLOCK_SIMPLE(BLOCK_ID_MUSHROOM_BLOCK_BLAND, mc_id::FACE_MUSHROOM_BLOCK_SKIN_BROWN);
+            BLOCK_SIMPLE(BLOCK_ID_MUSHROOM_BLOCK_RED, mc_id::FACE_MUSHROOM_BLOCK_SKIN_RED);
+            BLOCK_SIMPLE(BLOCK_ID_IRON_BARS, mc_id::FACE_IRON_BARS);
+            BLOCK_SIMPLE(BLOCK_ID_GLASS_PANE, mc_id::FACE_GLASS);
+            BLOCK_LOG(BLOCK_ID_MELON, mc_id::FACE_MELON_TOP, mc_id::FACE_MELON_SIDE)
+            BLOCK_SIMPLE(BLOCK_ID_STEM_PUMPKIN, mc_id::FACE_DEBUG);
+            BLOCK_SIMPLE(BLOCK_ID_STEM_MELON, mc_id::FACE_DEBUG);
+            BLOCK_SIMPLE(BLOCK_ID_MOSS, mc_id::FACE_VINE);
+            BLOCK_SIMPLE(BLOCK_ID_GATE, mc_id::FACE_DEBUG);
+            BLOCK_SIMPLE(BLOCK_ID_STAIRS_BRICK, mc_id::FACE_DEBUG);
+            BLOCK_SIMPLE(BLOCK_ID_STAIRS_BRICK_STONE, mc_id::FACE_DEBUG);
+        default:
+        {
+            faces[0] = terrain->get_face(mc_id::FACE_DEBUG);
+            faces[1] = faces[0];
+            faces[2] = faces[0];
+            faces[3] = faces[0];
+            faces[4] = faces[0];
+            faces[5] = faces[0];
+            break;
+        }
+        }
+
+        if (type == BLOCK_ID_GRASS || type == BLOCK_ID_LEAVES || type == BLOCK_ID_MOSS || type == BLOCK_ID_FOLIAGE)
+            r = 0.2f, g = 1.0f, b = 0.2f;
 
         /* Positive Y */
         if (mc_id::is_transparent(stypes[1][2][1]) && stypes[1][2][1] != type)
@@ -201,10 +386,26 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 Uint8((stypes[2][2][2] != BLOCK_ID_AIR) + (stypes[1][2][2] != BLOCK_ID_AIR) + (stypes[2][2][1] != BLOCK_ID_AIR)),
             };
 
-            vtx.push_back({ { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 1), ao[3] }, { r, g, b, light_block, light_sky }, f.corners[0] });
-            vtx.push_back({ { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 0), ao[1] }, { r, g, b, light_block, light_sky }, f.corners[2] });
-            vtx.push_back({ { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 1), ao[2] }, { r, g, b, light_block, light_sky }, f.corners[1] });
-            vtx.push_back({ { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 0), ao[0] }, { r, g, b, light_block, light_sky }, f.corners[3] });
+            vtx.push_back({
+                { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 1), ao[3] },
+                { r, g, b, slight_block[1][2][1], slight_sky[1][2][1] },
+                faces[1].corners[0],
+            });
+            vtx.push_back({
+                { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 0), ao[1] },
+                { r, g, b, slight_block[1][2][1], slight_sky[1][2][1] },
+                faces[1].corners[2],
+            });
+            vtx.push_back({
+                { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 1), ao[2] },
+                { r, g, b, slight_block[1][2][1], slight_sky[1][2][1] },
+                faces[1].corners[1],
+            });
+            vtx.push_back({
+                { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 0), ao[0] },
+                { r, g, b, slight_block[1][2][1], slight_sky[1][2][1] },
+                faces[1].corners[3],
+            });
         }
 
         /* Negative Y */
@@ -217,10 +418,26 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 Uint8((stypes[2][0][2] != BLOCK_ID_AIR) + (stypes[1][0][2] != BLOCK_ID_AIR) + (stypes[2][0][1] != BLOCK_ID_AIR)),
             };
 
-            vtx.push_back({ { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 0), ao[0] }, { r, g, b, light_block, light_sky }, f.corners[1] });
-            vtx.push_back({ { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 0), ao[1] }, { r, g, b, light_block, light_sky }, f.corners[0] });
-            vtx.push_back({ { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 1), ao[2] }, { r, g, b, light_block, light_sky }, f.corners[3] });
-            vtx.push_back({ { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 1), ao[3] }, { r, g, b, light_block, light_sky }, f.corners[2] });
+            vtx.push_back({
+                { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 0), ao[0] },
+                { r, g, b, slight_block[1][0][1], slight_sky[1][0][1] },
+                faces[4].corners[1],
+            });
+            vtx.push_back({
+                { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 0), ao[1] },
+                { r, g, b, slight_block[1][0][1], slight_sky[1][0][1] },
+                faces[4].corners[0],
+            });
+            vtx.push_back({
+                { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 1), ao[2] },
+                { r, g, b, slight_block[1][0][1], slight_sky[1][0][1] },
+                faces[4].corners[3],
+            });
+            vtx.push_back({
+                { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 1), ao[3] },
+                { r, g, b, slight_block[1][0][1], slight_sky[1][0][1] },
+                faces[4].corners[2],
+            });
         }
 
         /* Positive X */
@@ -233,10 +450,26 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 Uint8((stypes[2][2][2] != BLOCK_ID_AIR) + (stypes[2][1][2] != BLOCK_ID_AIR) + (stypes[2][2][1] != BLOCK_ID_AIR)),
             };
 
-            vtx.push_back({ { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 0), ao[0] }, { r, g, b, light_block, light_sky }, f.corners[3] });
-            vtx.push_back({ { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 0), ao[1] }, { r, g, b, light_block, light_sky }, f.corners[1] });
-            vtx.push_back({ { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 1), ao[2] }, { r, g, b, light_block, light_sky }, f.corners[2] });
-            vtx.push_back({ { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 1), ao[3] }, { r, g, b, light_block, light_sky }, f.corners[0] });
+            vtx.push_back({
+                { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 0), ao[0] },
+                { r, g, b, slight_block[2][1][1], slight_sky[2][1][1] },
+                faces[0].corners[3],
+            });
+            vtx.push_back({
+                { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 0), ao[1] },
+                { r, g, b, slight_block[2][1][1], slight_sky[2][1][1] },
+                faces[0].corners[1],
+            });
+            vtx.push_back({
+                { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 1), ao[2] },
+                { r, g, b, slight_block[2][1][1], slight_sky[2][1][1] },
+                faces[0].corners[2],
+            });
+            vtx.push_back({
+                { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 1), ao[3] },
+                { r, g, b, slight_block[2][1][1], slight_sky[2][1][1] },
+                faces[0].corners[0],
+            });
         }
 
         /* Negative X */
@@ -249,10 +482,26 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 Uint8((stypes[0][2][2] != BLOCK_ID_AIR) + (stypes[0][1][2] != BLOCK_ID_AIR) + (stypes[0][2][1] != BLOCK_ID_AIR)),
             };
 
-            vtx.push_back({ { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 1), ao[3] }, { r, g, b, light_block, light_sky }, f.corners[1] });
-            vtx.push_back({ { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 0), ao[1] }, { r, g, b, light_block, light_sky }, f.corners[0] });
-            vtx.push_back({ { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 1), ao[2] }, { r, g, b, light_block, light_sky }, f.corners[3] });
-            vtx.push_back({ { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 0), ao[0] }, { r, g, b, light_block, light_sky }, f.corners[2] });
+            vtx.push_back({
+                { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 1), ao[3] },
+                { r, g, b, slight_block[0][1][1], slight_sky[0][1][1] },
+                faces[3].corners[1],
+            });
+            vtx.push_back({
+                { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 0), ao[1] },
+                { r, g, b, slight_block[0][1][1], slight_sky[0][1][1] },
+                faces[3].corners[0],
+            });
+            vtx.push_back({
+                { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 1), ao[2] },
+                { r, g, b, slight_block[0][1][1], slight_sky[0][1][1] },
+                faces[3].corners[3],
+            });
+            vtx.push_back({
+                { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 0), ao[0] },
+                { r, g, b, slight_block[0][1][1], slight_sky[0][1][1] },
+                faces[3].corners[2],
+            });
         }
 
         /* Positive Z */
@@ -265,10 +514,26 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 Uint8((stypes[2][2][2] != BLOCK_ID_AIR) + (stypes[1][2][2] != BLOCK_ID_AIR) + (stypes[2][1][2] != BLOCK_ID_AIR)),
             };
 
-            vtx.push_back({ { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 1), ao[3] }, { r, g, b, light_block, light_sky }, f.corners[1] });
-            vtx.push_back({ { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 1), ao[1] }, { r, g, b, light_block, light_sky }, f.corners[0] });
-            vtx.push_back({ { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 1), ao[2] }, { r, g, b, light_block, light_sky }, f.corners[3] });
-            vtx.push_back({ { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 1), ao[0] }, { r, g, b, light_block, light_sky }, f.corners[2] });
+            vtx.push_back({
+                { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 1), ao[3] },
+                { r, g, b, slight_block[1][1][2], slight_sky[1][1][2] },
+                faces[2].corners[1],
+            });
+            vtx.push_back({
+                { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 1), ao[1] },
+                { r, g, b, slight_block[1][1][2], slight_sky[1][1][2] },
+                faces[2].corners[0],
+            });
+            vtx.push_back({
+                { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 1), ao[2] },
+                { r, g, b, slight_block[1][1][2], slight_sky[1][1][2] },
+                faces[2].corners[3],
+            });
+            vtx.push_back({
+                { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 1), ao[0] },
+                { r, g, b, slight_block[1][1][2], slight_sky[1][1][2] },
+                faces[2].corners[2],
+            });
         }
 
         /* Negative Z */
@@ -281,10 +546,26 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 Uint8((stypes[2][2][0] != BLOCK_ID_AIR) + (stypes[1][2][0] != BLOCK_ID_AIR) + (stypes[2][1][0] != BLOCK_ID_AIR)),
             };
 
-            vtx.push_back({ { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 0), ao[0] }, { r, g, b, light_block, light_sky }, f.corners[3] });
-            vtx.push_back({ { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 0), ao[1] }, { r, g, b, light_block, light_sky }, f.corners[1] });
-            vtx.push_back({ { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 0), ao[2] }, { r, g, b, light_block, light_sky }, f.corners[2] });
-            vtx.push_back({ { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 0), ao[3] }, { r, g, b, light_block, light_sky }, f.corners[0] });
+            vtx.push_back({
+                { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 0), ao[0] },
+                { r, g, b, slight_block[1][1][0], slight_sky[1][1][0] },
+                faces[5].corners[3],
+            });
+            vtx.push_back({
+                { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 0), ao[1] },
+                { r, g, b, slight_block[1][1][0], slight_sky[1][1][0] },
+                faces[5].corners[1],
+            });
+            vtx.push_back({
+                { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 0), ao[2] },
+                { r, g, b, slight_block[1][1][0], slight_sky[1][1][0] },
+                faces[5].corners[2],
+            });
+            vtx.push_back({
+                { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 0), ao[3] },
+                { r, g, b, slight_block[1][1][0], slight_sky[1][1][0] },
+                faces[5].corners[0],
+            });
         }
     }
 

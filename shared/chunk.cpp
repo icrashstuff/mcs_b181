@@ -161,7 +161,10 @@ void chunk_t::correct_lighting(int generator)
         {
             for (int y = CHUNK_SIZE_Y - 1; y >= 0; y--)
             {
-                set_light_sky(x, y, z, 15);
+                if (get_type(x, y, z) == BLOCK_ID_AIR)
+                    set_light_sky(x, y, z, 15);
+                else
+                    set_light_sky(x, y, z, 0);
                 Uint8 level = mc_id::get_light_level(get_type(x, y, z));
                 set_light_block(x, y, z, level);
             }

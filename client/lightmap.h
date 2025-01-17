@@ -20,58 +20,68 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+#ifndef CLIENT_IGHTMAP_H_INCLUDED
+#define CLIENT_IGHTMAP_H_INCLUDED
 
-#ifndef TETRA_CLIENT_LEVEL_H_INCLUDED
-#define TETRA_CLIENT_LEVEL_H_INCLUDED
-
-#include "chunk_cubic.h"
-#include "lightmap.h"
-#include "texture_terrain.h"
-#include <memory>
+#include <SDL3/SDL.h>
+#include <glm/glm.hpp>
 #include <vector>
 
-struct level_t
+class lightmap_t
 {
-    level_t() { }
-
-    ~level_t()
+public:
+    enum lightmap_preset_t
     {
-        for (size_t i = 0; i < chunks.size(); i++)
-            delete chunks[i];
-    }
+        LIGHTMAP_PRESET_OVERWORLD,
+        LIGHTMAP_PRESET_NETHER,
+        LIGHTMAP_PRESET_END,
+    };
+    lightmap_t(lightmap_preset_t preset = LIGHTMAP_PRESET_OVERWORLD);
 
-    std::vector<chunk_cubic_t*> chunks;
+    ~lightmap_t();
 
-    /** Items should probably be removed from terrain **/
-    std::shared_ptr<texture_terrain_t> terrain;
+    void set_world_time(Uint64 _mc_time) { mc_time = _mc_time; };
 
-    lightmap_t lightmap;
-
-    /**
-     * Builds all dirt meshes
-     * TODO: Rebuild clean meshes that surround dirty ones
-     */
-    void build_dirty_meshes();
+    void set_preset(lightmap_preset_t preset);
 
     /**
-     * Clears chunks (if any), optionally rebuilds the terrain atlas, and then builds all the chunks
+     * Updates and uploads light map
      */
-    void rebuild_meshes(bool rebuild_terrain);
+    void update();
 
+    void imgui_contents();
+
+    GLuint tex_id_linear = 0;
+    GLuint tex_id_nearest = 0;
+
+private:
+    float flicker_strength = 0.25f;
     /**
-     * Clears all meshes
+     * Value from [-1.0, 1.0]
      */
-    void clear_mesh();
+    float flicker_value = 0.0f;
 
-    /**
-     * Clears all chunks
-     */
-    void clear();
+    float flicker_midpoint = 0.9f;
 
-    // TODO
-    void render();
+    Uint64 last_flicker_tick = 0;
+    Uint64 ticks_per_flicker_tick = 5;
+    Uint64 r_state = 0;
+    Uint64 mc_time = 0;
 
-    void build_mesh(int chunk_x, int chunk_y, int chunk_z);
+    int time_of_day_override = -1;
+
+    int width = 16;
+    int height = 16;
+
+    glm::vec3 color_block = { 0.0f, 0.0f, 0.0f };
+    glm::vec3 color_night = { 0.0f, 0.0f, 0.0f };
+    glm::vec3 color_day = { 0.0f, 0.0f, 0.0f };
+    glm::vec3 color_minimum = { 0.0f, 0.0f, 0.0f };
+
+    std::vector<Uint8> dat;
+
+    float flicker_graph_values[512] = {};
+    int flicker_graph_pos = 0;
 };
 
 #endif
