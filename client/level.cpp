@@ -26,22 +26,179 @@
 
 #include "level.h"
 
+#define PASS_TIMER_START()             \
+    do                                 \
+    {                                  \
+        built = 0;                     \
+        tick_start = SDL_GetTicksNS(); \
+    } while (0)
+#define PASS_TIMER_STOP(fmt, ...)                \
+    do                                           \
+    {                                            \
+        elapsed = SDL_GetTicksNS() - tick_start; \
+        if (built)                               \
+            dc_log(fmt, ##__VA_ARGS__);          \
+    } while (0)
+
 void level_t::build_dirty_meshes()
 {
-    Uint64 tick_mesh_start = SDL_GetTicksNS();
-    size_t built = 0;
+    size_t built;
+    Uint64 elapsed;
+    Uint64 tick_start;
+
+    /* First Light Pass */
+    PASS_TIMER_START();
     for (size_t i = 0; i < chunks.size(); i++)
     {
         if (!chunks[i]->dirty)
             continue;
+        chunks[i]->clear_light_block(0);
+        chunks[i]->clear_light_sky(0);
+        light_pass(chunks[i]->chunk_x, chunks[i]->chunk_y, chunks[i]->chunk_z, true);
+        built++;
+    }
+    PASS_TIMER_STOP("Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 1)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
+
+    /* Second Light Pass */
+    PASS_TIMER_START();
+    for (size_t i = 0; i < chunks.size(); i++)
+    {
+        if (!chunks[i]->dirty)
+            continue;
+        light_pass(chunks[i]->chunk_x, chunks[i]->chunk_y, chunks[i]->chunk_z, false);
+        built++;
+    }
+    PASS_TIMER_STOP("Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 2)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
+
+    /* Mesh Pass */
+    PASS_TIMER_START();
+    for (size_t i = 0; i < chunks.size(); i++)
+    {
+        if (!chunks[i]->dirty)
+            continue;
+        build_mesh(chunks[i]->chunk_x, chunks[i]->chunk_y, chunks[i]->chunk_z);
         chunks[i]->dirty = 0;
         built++;
-        build_mesh(chunks[i]->chunk_x, chunks[i]->chunk_y, chunks[i]->chunk_z);
     }
-    Uint64 elapsed = SDL_GetTicksNS() - tick_mesh_start;
-    if (built)
-        dc_log("Built %zu meshes in %.2f ms (%.2f ms per)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
+    PASS_TIMER_STOP("Built %zu meshes in %.2f ms (%.2f ms per)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
 }
+
+/**
+ * Force inlining in debug builds
+ *
+ * Without this debug builds are *very*, *very* slow (~6x slower)
+ */
+#pragma GCC push_options
+#pragma GCC optimize("Ofast")
+void level_t::light_pass(int chunk_x, int chunk_y, int chunk_z, bool local_only)
+{
+    /** Index: [x+1][y+1][z+1] */
+    chunk_cubic_t* rubik[3][3][3];
+
+    for (int i = 0; i < 27; i++)
+    {
+        const int ix = (i / 9) % 3 - 1;
+        const int iy = (i / 3) % 3 - 1;
+        const int iz = i % 3 - 1;
+        rubik[ix + 1][iy + 1][iz + 1] = NULL;
+        if (local_only && (ix != 0 || iy != 0 || iz != 0))
+            continue;
+        for (chunk_cubic_t* c : chunks)
+        {
+            if (!c || c->chunk_x != (ix + chunk_x) || c->chunk_y != (iy + chunk_y) || c->chunk_z != (iz + chunk_z))
+                continue;
+            rubik[ix + 1][iy + 1][iz + 1] = c;
+        }
+    }
+
+    chunk_cubic_t* center = rubik[1][1][1];
+
+    if (!center)
+    {
+        dc_log_error("Attempt made to update lighting for unloaded chunk at chunk coordinates: %d, %d, %d", chunk_x, chunk_y, chunk_z);
+        return;
+    }
+
+    for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_X * SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z; dat_it++)
+    {
+        const int y = (dat_it) & 0x0F;
+        const int z = (dat_it >> 4) & 0x0F;
+        const int x = (dat_it >> 8) & 0x0F;
+        center->set_light_block(x, y, z, mc_id::get_light_level(center->get_type(x, y, z)));
+    }
+
+    for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_X * SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z * 24; dat_it++)
+    {
+        const int y = (dat_it) & 0x0F;
+        const int z = (dat_it >> 4) & 0x0F;
+        const int x = (dat_it >> 8) & 0x0F;
+
+        if (!mc_id::is_transparent(center->get_type(x, y, z)))
+            continue;
+
+        Uint8 cur_level = center->get_light_block(x, y, z);
+        /** Index: [x+1][y+1][z+1] */
+        Sint8 sur_levels[3][3][3];
+        for (int i = -1; i < 2; i++)
+        {
+            for (int j = -1; j < 2; j++)
+            {
+                for (int k = -1; k < 2; k++)
+                {
+                    int chunk_ix = 1, chunk_iy = 1, chunk_iz = 1;
+                    int local_x = x + i, local_y = y + j, local_z = z + k;
+
+                    if (local_x < 0)
+                    {
+                        local_x += SUBCHUNK_SIZE_X;
+                        chunk_ix--;
+                    }
+                    else if (local_x >= SUBCHUNK_SIZE_X)
+                    {
+                        local_x -= SUBCHUNK_SIZE_X;
+                        chunk_ix++;
+                    }
+
+                    if (local_y < 0)
+                    {
+                        local_y += SUBCHUNK_SIZE_Y;
+                        chunk_iy--;
+                    }
+                    else if (local_y >= SUBCHUNK_SIZE_Y)
+                    {
+                        local_y -= SUBCHUNK_SIZE_Y;
+                        chunk_iy++;
+                    }
+
+                    if (local_z < 0)
+                    {
+                        local_z += SUBCHUNK_SIZE_Z;
+                        chunk_iz--;
+                    }
+                    else if (local_z >= SUBCHUNK_SIZE_Z)
+                    {
+                        local_z -= SUBCHUNK_SIZE_Z;
+                        chunk_iz++;
+                    }
+
+                    chunk_cubic_t* c = rubik[chunk_ix][chunk_iy][chunk_iz];
+                    sur_levels[i + 1][j + 1][k + 1] = c == NULL ? 0 : (Sint8(c->get_light_block(local_x, local_y, local_z)) - 1);
+                }
+            }
+        }
+
+        Uint8 lvl = cur_level;
+        lvl = SDL_max(lvl, sur_levels[0][1][1]);
+        lvl = SDL_max(lvl, sur_levels[2][1][1]);
+        lvl = SDL_max(lvl, sur_levels[1][0][1]);
+        lvl = SDL_max(lvl, sur_levels[1][2][1]);
+        lvl = SDL_max(lvl, sur_levels[1][1][0]);
+        lvl = SDL_max(lvl, sur_levels[1][1][2]);
+
+        center->set_light_block(x, y, z, lvl);
+    }
+}
+#pragma GCC pop_options
 
 void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
 {
@@ -54,9 +211,8 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
         const int iy = (i / 3) % 3 - 1;
         const int iz = i % 3 - 1;
         rubik[ix + 1][iy + 1][iz + 1] = NULL;
-        for (size_t j = 0; j < chunks.size(); j++)
+        for (chunk_cubic_t* c : chunks)
         {
-            chunk_cubic_t* c = chunks[j];
             if (!c || c->chunk_x != (ix + chunk_x) || c->chunk_y != (iy + chunk_y) || c->chunk_z != (iz + chunk_z))
                 continue;
             rubik[ix + 1][iy + 1][iz + 1] = c;
@@ -376,34 +532,44 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
         if (type == BLOCK_ID_GRASS || type == BLOCK_ID_LEAVES || type == BLOCK_ID_MOSS || type == BLOCK_ID_FOLIAGE)
             r = 0.2f, g = 1.0f, b = 0.2f;
 
+#define UAO(X) (!mc_id::is_transparent(stypes X))
+#define UBL(X) (slight_block X * mc_id::is_transparent(stypes X))
+
         /* Positive Y */
         if (mc_id::is_transparent(stypes[1][2][1]) && stypes[1][2][1] != type)
         {
             Uint8 ao[] = {
-                Uint8((stypes[0][2][0] != BLOCK_ID_AIR) + (stypes[1][2][0] != BLOCK_ID_AIR) + (stypes[0][2][1] != BLOCK_ID_AIR)),
-                Uint8((stypes[2][2][0] != BLOCK_ID_AIR) + (stypes[1][2][0] != BLOCK_ID_AIR) + (stypes[2][2][1] != BLOCK_ID_AIR)),
-                Uint8((stypes[0][2][2] != BLOCK_ID_AIR) + (stypes[0][2][1] != BLOCK_ID_AIR) + (stypes[1][2][2] != BLOCK_ID_AIR)),
-                Uint8((stypes[2][2][2] != BLOCK_ID_AIR) + (stypes[1][2][2] != BLOCK_ID_AIR) + (stypes[2][2][1] != BLOCK_ID_AIR)),
+                Uint8(UAO([0][2][0]) + UAO([1][2][0]) + UAO([0][2][1])),
+                Uint8(UAO([2][2][0]) + UAO([1][2][0]) + UAO([2][2][1])),
+                Uint8(UAO([0][2][2]) + UAO([0][2][1]) + UAO([1][2][2])),
+                Uint8(UAO([2][2][2]) + UAO([1][2][2]) + UAO([2][2][1])),
+            };
+
+            Uint8 bl[] = {
+                Uint8((UBL([0][2][0]) + UBL([1][2][0]) + UBL([0][2][1]) + slight_block[1][2][1]) / (4 - ao[0])),
+                Uint8((UBL([2][2][0]) + UBL([1][2][0]) + UBL([2][2][1]) + slight_block[1][2][1]) / (4 - ao[1])),
+                Uint8((UBL([0][2][2]) + UBL([0][2][1]) + UBL([1][2][2]) + slight_block[1][2][1]) / (4 - ao[2])),
+                Uint8((UBL([2][2][2]) + UBL([1][2][2]) + UBL([2][2][1]) + slight_block[1][2][1]) / (4 - ao[3])),
             };
 
             vtx.push_back({
                 { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 1), ao[3] },
-                { r, g, b, slight_block[1][2][1], slight_sky[1][2][1] },
+                { r, g, b, bl[3], slight_sky[1][2][1] },
                 faces[1].corners[0],
             });
             vtx.push_back({
                 { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 0), ao[1] },
-                { r, g, b, slight_block[1][2][1], slight_sky[1][2][1] },
+                { r, g, b, bl[1], slight_sky[1][2][1] },
                 faces[1].corners[2],
             });
             vtx.push_back({
                 { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 1), ao[2] },
-                { r, g, b, slight_block[1][2][1], slight_sky[1][2][1] },
+                { r, g, b, bl[2], slight_sky[1][2][1] },
                 faces[1].corners[1],
             });
             vtx.push_back({
                 { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 0), ao[0] },
-                { r, g, b, slight_block[1][2][1], slight_sky[1][2][1] },
+                { r, g, b, bl[0], slight_sky[1][2][1] },
                 faces[1].corners[3],
             });
         }
@@ -412,30 +578,37 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
         if (mc_id::is_transparent(stypes[1][0][1]) && stypes[1][0][1] != type)
         {
             Uint8 ao[] = {
-                Uint8((stypes[0][0][0] != BLOCK_ID_AIR) + (stypes[1][0][0] != BLOCK_ID_AIR) + (stypes[0][0][1] != BLOCK_ID_AIR)),
-                Uint8((stypes[2][0][0] != BLOCK_ID_AIR) + (stypes[1][0][0] != BLOCK_ID_AIR) + (stypes[2][0][1] != BLOCK_ID_AIR)),
-                Uint8((stypes[0][0][2] != BLOCK_ID_AIR) + (stypes[0][0][1] != BLOCK_ID_AIR) + (stypes[1][0][2] != BLOCK_ID_AIR)),
-                Uint8((stypes[2][0][2] != BLOCK_ID_AIR) + (stypes[1][0][2] != BLOCK_ID_AIR) + (stypes[2][0][1] != BLOCK_ID_AIR)),
+                Uint8(UAO([0][0][0]) + UAO([1][0][0]) + UAO([0][0][1])),
+                Uint8(UAO([2][0][0]) + UAO([1][0][0]) + UAO([2][0][1])),
+                Uint8(UAO([0][0][2]) + UAO([0][0][1]) + UAO([1][0][2])),
+                Uint8(UAO([2][0][2]) + UAO([1][0][2]) + UAO([2][0][1])),
+            };
+
+            Uint8 bl[] = {
+                Uint8((UBL([0][0][0]) + UBL([1][0][0]) + UBL([0][0][1]) + slight_block[1][0][1]) / (4 - ao[0])),
+                Uint8((UBL([2][0][0]) + UBL([1][0][0]) + UBL([2][0][1]) + slight_block[1][0][1]) / (4 - ao[1])),
+                Uint8((UBL([0][0][2]) + UBL([0][0][1]) + UBL([1][0][2]) + slight_block[1][0][1]) / (4 - ao[2])),
+                Uint8((UBL([2][0][2]) + UBL([1][0][2]) + UBL([2][0][1]) + slight_block[1][0][1]) / (4 - ao[3])),
             };
 
             vtx.push_back({
                 { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 0), ao[0] },
-                { r, g, b, slight_block[1][0][1], slight_sky[1][0][1] },
+                { r, g, b, bl[0], slight_sky[1][0][1] },
                 faces[4].corners[1],
             });
             vtx.push_back({
                 { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 0), ao[1] },
-                { r, g, b, slight_block[1][0][1], slight_sky[1][0][1] },
+                { r, g, b, bl[1], slight_sky[1][0][1] },
                 faces[4].corners[0],
             });
             vtx.push_back({
                 { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 1), ao[2] },
-                { r, g, b, slight_block[1][0][1], slight_sky[1][0][1] },
+                { r, g, b, bl[2], slight_sky[1][0][1] },
                 faces[4].corners[3],
             });
             vtx.push_back({
                 { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 1), ao[3] },
-                { r, g, b, slight_block[1][0][1], slight_sky[1][0][1] },
+                { r, g, b, bl[3], slight_sky[1][0][1] },
                 faces[4].corners[2],
             });
         }
@@ -444,30 +617,37 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
         if (mc_id::is_transparent(stypes[2][1][1]) && stypes[2][1][1] != type)
         {
             Uint8 ao[] = {
-                Uint8((stypes[2][0][0] != BLOCK_ID_AIR) + (stypes[2][1][0] != BLOCK_ID_AIR) + (stypes[2][0][1] != BLOCK_ID_AIR)),
-                Uint8((stypes[2][2][0] != BLOCK_ID_AIR) + (stypes[2][1][0] != BLOCK_ID_AIR) + (stypes[2][2][1] != BLOCK_ID_AIR)),
-                Uint8((stypes[2][0][2] != BLOCK_ID_AIR) + (stypes[2][0][1] != BLOCK_ID_AIR) + (stypes[2][1][2] != BLOCK_ID_AIR)),
-                Uint8((stypes[2][2][2] != BLOCK_ID_AIR) + (stypes[2][1][2] != BLOCK_ID_AIR) + (stypes[2][2][1] != BLOCK_ID_AIR)),
+                Uint8(UAO([2][0][0]) + UAO([2][1][0]) + UAO([2][0][1])),
+                Uint8(UAO([2][2][0]) + UAO([2][1][0]) + UAO([2][2][1])),
+                Uint8(UAO([2][0][2]) + UAO([2][0][1]) + UAO([2][1][2])),
+                Uint8(UAO([2][2][2]) + UAO([2][1][2]) + UAO([2][2][1])),
+            };
+
+            Uint8 bl[] = {
+                Uint8((UBL([2][0][0]) + UBL([2][0][1]) + UBL([2][1][0]) + slight_block[2][1][1]) / (4 - ao[0])),
+                Uint8((UBL([2][2][0]) + UBL([2][2][1]) + UBL([2][1][0]) + slight_block[2][1][1]) / (4 - ao[1])),
+                Uint8((UBL([2][0][2]) + UBL([2][0][1]) + UBL([2][1][2]) + slight_block[2][1][1]) / (4 - ao[2])),
+                Uint8((UBL([2][2][2]) + UBL([2][2][1]) + UBL([2][1][2]) + slight_block[2][1][1]) / (4 - ao[3])),
             };
 
             vtx.push_back({
                 { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 0), ao[0] },
-                { r, g, b, slight_block[2][1][1], slight_sky[2][1][1] },
+                { r, g, b, bl[0], slight_sky[2][1][1] },
                 faces[0].corners[3],
             });
             vtx.push_back({
                 { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 0), ao[1] },
-                { r, g, b, slight_block[2][1][1], slight_sky[2][1][1] },
+                { r, g, b, bl[1], slight_sky[2][1][1] },
                 faces[0].corners[1],
             });
             vtx.push_back({
                 { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 1), ao[2] },
-                { r, g, b, slight_block[2][1][1], slight_sky[2][1][1] },
+                { r, g, b, bl[2], slight_sky[2][1][1] },
                 faces[0].corners[2],
             });
             vtx.push_back({
                 { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 1), ao[3] },
-                { r, g, b, slight_block[2][1][1], slight_sky[2][1][1] },
+                { r, g, b, bl[3], slight_sky[2][1][1] },
                 faces[0].corners[0],
             });
         }
@@ -476,30 +656,37 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
         if (mc_id::is_transparent(stypes[0][1][1]) && stypes[0][1][1] != type)
         {
             Uint8 ao[] = {
-                Uint8((stypes[0][0][0] != BLOCK_ID_AIR) + (stypes[0][1][0] != BLOCK_ID_AIR) + (stypes[0][0][1] != BLOCK_ID_AIR)),
-                Uint8((stypes[0][2][0] != BLOCK_ID_AIR) + (stypes[0][1][0] != BLOCK_ID_AIR) + (stypes[0][2][1] != BLOCK_ID_AIR)),
-                Uint8((stypes[0][0][2] != BLOCK_ID_AIR) + (stypes[0][0][1] != BLOCK_ID_AIR) + (stypes[0][1][2] != BLOCK_ID_AIR)),
-                Uint8((stypes[0][2][2] != BLOCK_ID_AIR) + (stypes[0][1][2] != BLOCK_ID_AIR) + (stypes[0][2][1] != BLOCK_ID_AIR)),
+                Uint8(UAO([0][0][0]) + UAO([0][1][0]) + UAO([0][0][1])),
+                Uint8(UAO([0][2][0]) + UAO([0][1][0]) + UAO([0][2][1])),
+                Uint8(UAO([0][0][2]) + UAO([0][0][1]) + UAO([0][1][2])),
+                Uint8(UAO([0][2][2]) + UAO([0][1][2]) + UAO([0][2][1])),
+            };
+
+            Uint8 bl[] = {
+                Uint8((UBL([0][0][0]) + UBL([0][1][0]) + UBL([0][0][1]) + slight_block[0][1][1]) / (4 - ao[0])),
+                Uint8((UBL([0][2][0]) + UBL([0][1][0]) + UBL([0][2][1]) + slight_block[0][1][1]) / (4 - ao[1])),
+                Uint8((UBL([0][0][2]) + UBL([0][0][1]) + UBL([0][1][2]) + slight_block[0][1][1]) / (4 - ao[2])),
+                Uint8((UBL([0][2][2]) + UBL([0][1][2]) + UBL([0][2][1]) + slight_block[0][1][1]) / (4 - ao[3])),
             };
 
             vtx.push_back({
                 { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 1), ao[3] },
-                { r, g, b, slight_block[0][1][1], slight_sky[0][1][1] },
+                { r, g, b, bl[3], slight_sky[0][1][1] },
                 faces[3].corners[1],
             });
             vtx.push_back({
                 { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 0), ao[1] },
-                { r, g, b, slight_block[0][1][1], slight_sky[0][1][1] },
+                { r, g, b, bl[1], slight_sky[0][1][1] },
                 faces[3].corners[0],
             });
             vtx.push_back({
                 { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 1), ao[2] },
-                { r, g, b, slight_block[0][1][1], slight_sky[0][1][1] },
+                { r, g, b, bl[2], slight_sky[0][1][1] },
                 faces[3].corners[3],
             });
             vtx.push_back({
                 { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 0), ao[0] },
-                { r, g, b, slight_block[0][1][1], slight_sky[0][1][1] },
+                { r, g, b, bl[0], slight_sky[0][1][1] },
                 faces[3].corners[2],
             });
         }
@@ -508,30 +695,37 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
         if (mc_id::is_transparent(stypes[1][1][2]) && stypes[1][1][2] != type)
         {
             Uint8 ao[] = {
-                Uint8((stypes[0][0][2] != BLOCK_ID_AIR) + (stypes[1][0][2] != BLOCK_ID_AIR) + (stypes[0][1][2] != BLOCK_ID_AIR)),
-                Uint8((stypes[0][2][2] != BLOCK_ID_AIR) + (stypes[0][1][2] != BLOCK_ID_AIR) + (stypes[1][2][2] != BLOCK_ID_AIR)),
-                Uint8((stypes[2][0][2] != BLOCK_ID_AIR) + (stypes[1][0][2] != BLOCK_ID_AIR) + (stypes[2][1][2] != BLOCK_ID_AIR)),
-                Uint8((stypes[2][2][2] != BLOCK_ID_AIR) + (stypes[1][2][2] != BLOCK_ID_AIR) + (stypes[2][1][2] != BLOCK_ID_AIR)),
+                Uint8(UAO([0][0][2]) + UAO([1][0][2]) + UAO([0][1][2])),
+                Uint8(UAO([0][2][2]) + UAO([0][1][2]) + UAO([1][2][2])),
+                Uint8(UAO([2][0][2]) + UAO([1][0][2]) + UAO([2][1][2])),
+                Uint8(UAO([2][2][2]) + UAO([1][2][2]) + UAO([2][1][2])),
+            };
+
+            Uint8 bl[] = {
+                Uint8((UBL([0][0][2]) + UBL([1][0][2]) + UBL([0][1][2]) + slight_block[1][1][2]) / (4 - ao[0])),
+                Uint8((UBL([0][2][2]) + UBL([0][1][2]) + UBL([1][2][2]) + slight_block[1][1][2]) / (4 - ao[1])),
+                Uint8((UBL([2][0][2]) + UBL([1][0][2]) + UBL([2][1][2]) + slight_block[1][1][2]) / (4 - ao[2])),
+                Uint8((UBL([2][2][2]) + UBL([1][2][2]) + UBL([2][1][2]) + slight_block[1][1][2]) / (4 - ao[3])),
             };
 
             vtx.push_back({
                 { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 1), ao[3] },
-                { r, g, b, slight_block[1][1][2], slight_sky[1][1][2] },
+                { r, g, b, bl[3], slight_sky[1][1][2] },
                 faces[2].corners[1],
             });
             vtx.push_back({
                 { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 1), ao[1] },
-                { r, g, b, slight_block[1][1][2], slight_sky[1][1][2] },
+                { r, g, b, bl[1], slight_sky[1][1][2] },
                 faces[2].corners[0],
             });
             vtx.push_back({
                 { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 1), ao[2] },
-                { r, g, b, slight_block[1][1][2], slight_sky[1][1][2] },
+                { r, g, b, bl[2], slight_sky[1][1][2] },
                 faces[2].corners[3],
             });
             vtx.push_back({
                 { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 1), ao[0] },
-                { r, g, b, slight_block[1][1][2], slight_sky[1][1][2] },
+                { r, g, b, bl[0], slight_sky[1][1][2] },
                 faces[2].corners[2],
             });
         }
@@ -540,36 +734,43 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
         if (mc_id::is_transparent(stypes[1][1][0]) && stypes[1][1][0] != type)
         {
             Uint8 ao[] = {
-                Uint8((stypes[0][0][0] != BLOCK_ID_AIR) + (stypes[1][0][0] != BLOCK_ID_AIR) + (stypes[0][1][0] != BLOCK_ID_AIR)),
-                Uint8((stypes[0][2][0] != BLOCK_ID_AIR) + (stypes[0][1][0] != BLOCK_ID_AIR) + (stypes[1][2][0] != BLOCK_ID_AIR)),
-                Uint8((stypes[2][0][0] != BLOCK_ID_AIR) + (stypes[1][0][0] != BLOCK_ID_AIR) + (stypes[2][1][0] != BLOCK_ID_AIR)),
-                Uint8((stypes[2][2][0] != BLOCK_ID_AIR) + (stypes[1][2][0] != BLOCK_ID_AIR) + (stypes[2][1][0] != BLOCK_ID_AIR)),
+                Uint8(UAO([0][0][0]) + UAO([1][0][0]) + UAO([0][1][0])),
+                Uint8(UAO([0][2][0]) + UAO([0][1][0]) + UAO([1][2][0])),
+                Uint8(UAO([2][0][0]) + UAO([1][0][0]) + UAO([2][1][0])),
+                Uint8(UAO([2][2][0]) + UAO([1][2][0]) + UAO([2][1][0])),
+            };
+
+            Uint8 bl[] = {
+                Uint8((UBL([0][0][0]) + UBL([1][0][0]) + UBL([0][1][0]) + slight_block[1][1][0]) / (4 - ao[0])),
+                Uint8((UBL([0][2][0]) + UBL([0][1][0]) + UBL([1][2][0]) + slight_block[1][1][0]) / (4 - ao[1])),
+                Uint8((UBL([2][0][0]) + UBL([1][0][0]) + UBL([2][1][0]) + slight_block[1][1][0]) / (4 - ao[2])),
+                Uint8((UBL([2][2][0]) + UBL([1][2][0]) + UBL([2][1][0]) + slight_block[1][1][0]) / (4 - ao[3])),
             };
 
             vtx.push_back({
                 { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 0), ao[0] },
-                { r, g, b, slight_block[1][1][0], slight_sky[1][1][0] },
+                { r, g, b, bl[0], slight_sky[1][1][0] },
                 faces[5].corners[3],
             });
             vtx.push_back({
                 { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 0), ao[1] },
-                { r, g, b, slight_block[1][1][0], slight_sky[1][1][0] },
+                { r, g, b, bl[1], slight_sky[1][1][0] },
                 faces[5].corners[1],
             });
             vtx.push_back({
                 { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 0), ao[2] },
-                { r, g, b, slight_block[1][1][0], slight_sky[1][1][0] },
+                { r, g, b, bl[2], slight_sky[1][1][0] },
                 faces[5].corners[2],
             });
             vtx.push_back({
                 { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 0), ao[3] },
-                { r, g, b, slight_block[1][1][0], slight_sky[1][1][0] },
+                { r, g, b, bl[3], slight_sky[1][1][0] },
                 faces[5].corners[0],
             });
         }
     }
 
-    dc_log_trace("Chunk: <%d, %d, %d>, Vertices: %zu, Indices: %zu", chunk_x, chunk_y, chunk_z, vtx.size(), vtx.size() / 4 * 6);
+    TRACE("Chunk: <%d, %d, %d>, Vertices: %zu, Indices: %zu", chunk_x, chunk_y, chunk_z, vtx.size(), vtx.size() / 4 * 6);
 
     if (!center->vao)
         terrain_vertex_t::create_vao(&center->vao);

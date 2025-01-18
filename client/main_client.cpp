@@ -105,7 +105,7 @@ bool initialize_resources()
         }
     }
 
-    for (int i = 0; i < 256; i++)
+    for (int i = 0; i < 16; i++)
     {
         chunk_cubic_t* c = new chunk_cubic_t();
         c->chunk_x = i % 4;
@@ -124,23 +124,9 @@ bool initialize_resources()
             for (int z = 4; z < 12; z++)
                 for (int y = 2; y < 12; y++)
                     c->set_type(x, y, z, 0);
-    }
-
-    for (int i = 0; i < 256; i++)
-    {
-        chunk_cubic_t* c = new chunk_cubic_t();
-        c->chunk_x = -6;
-        c->chunk_y = i / 16;
-        c->chunk_z = (i % 16) - 2;
-        level->chunks.push_back(c);
-        for (int x = 0; x < 16; x++)
-            for (int z = 0; z < 16; z++)
-                for (int y = 0; y < 16; y++)
-                {
-                    c->set_type(x, y, z, i);
-                    c->set_light_sky(x, y, z, y);
-                    c->set_light_block(x, y, z, z);
-                }
+        c->set_type(7, 2, 5 + i % 4, BLOCK_ID_GLASS);
+        c->set_type(8, 2, 5 + i % 4, BLOCK_ID_GLASS);
+        c->set_type(7, 2, 7, BLOCK_ID_TORCH);
     }
 
     for (int i = 0; i < 128; i++)
@@ -157,6 +143,8 @@ bool initialize_resources()
                 c->set_light_sky(x, 5, z, x);
                 c->set_light_block(x, 5, z, z);
             }
+        if (c->chunk_x == 2 && c->chunk_z == 1)
+            c->set_type(7, 6, 7, BLOCK_ID_TORCH);
     }
 
     level->build_dirty_meshes();
@@ -425,7 +413,7 @@ void normal_loop()
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, level->terrain->tex_id_main);
     glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, level->lightmap.tex_id_nearest);
+    glBindTexture(GL_TEXTURE_2D, level->lightmap.tex_id_linear);
     glActiveTexture(GL_TEXTURE0);
     for (size_t i = 0; i < level->chunks.size(); i++)
     {
@@ -521,6 +509,48 @@ void process_event(SDL_Event& event, bool* done)
         {
             wireframe = !wireframe;
             glPolygonMode(GL_FRONT_AND_BACK, wireframe ? GL_LINE : GL_FILL);
+            break;
+        }
+        case SDL_SCANCODE_P:
+        {
+            for (chunk_cubic_t* c : level->chunks)
+            {
+                if (int(camera_pos.x) >> 4 != c->chunk_x || int(camera_pos.y) >> 4 != c->chunk_y || int(camera_pos.z) >> 4 != c->chunk_z)
+                    continue;
+                c->free_gl();
+                c->dirty = 0;
+            }
+            break;
+        }
+        case SDL_SCANCODE_N:
+        {
+            for (chunk_cubic_t* c : level->chunks)
+            {
+                if (int(camera_pos.x) >> 4 != c->chunk_x || int(camera_pos.y) >> 4 != c->chunk_y || int(camera_pos.z) >> 4 != c->chunk_z)
+                    continue;
+                c->dirty = 1;
+            }
+            break;
+        }
+        case SDL_SCANCODE_1:
+        {
+            glm::vec3 cpos = camera_pos + camera_front;
+            for (chunk_cubic_t* c : level->chunks)
+            {
+                if (int(cpos.x) >> 4 != c->chunk_x || int(cpos.y) >> 4 != c->chunk_y || int(cpos.z) >> 4 != c->chunk_z)
+                    continue;
+                c->set_type(int(cpos.x) & 0x0F, int(cpos.y) & 0x0F, int(cpos.z) & 0x0F, BLOCK_ID_TORCH);
+            }
+        } /* Fall-through */
+        case SDL_SCANCODE_M:
+        {
+            for (chunk_cubic_t* c : level->chunks)
+            {
+                if (SDL_abs((int(camera_pos.x) >> 4) - c->chunk_x) > 1 || SDL_abs((int(camera_pos.y) >> 4) - c->chunk_y) > 1
+                    || SDL_abs((int(camera_pos.z) >> 4) - c->chunk_z) > 1)
+                    continue;
+                c->dirty = 1;
+            }
             break;
         }
         case SDL_SCANCODE_C:

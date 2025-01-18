@@ -72,6 +72,8 @@ struct level_t
     void render();
 
     void build_mesh(int chunk_x, int chunk_y, int chunk_z);
+
+    void light_pass(int chunk_x, int chunk_y, int chunk_z, bool local_only);
 };
 
 #endif
