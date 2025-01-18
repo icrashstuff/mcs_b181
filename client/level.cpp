@@ -70,6 +70,17 @@ void level_t::build_dirty_meshes()
     }
     PASS_TIMER_STOP("Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 2)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
 
+    /* Third Light Pass */
+    PASS_TIMER_START();
+    for (size_t i = 0; i < chunks.size(); i++)
+    {
+        if (!chunks[i]->dirty)
+            continue;
+        light_pass(chunks[i]->chunk_x, chunks[i]->chunk_y, chunks[i]->chunk_z, false);
+        built++;
+    }
+    PASS_TIMER_STOP("Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 3)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
+
     /* Mesh Pass */
     PASS_TIMER_START();
     for (size_t i = 0; i < chunks.size(); i++)
@@ -90,30 +101,50 @@ void level_t::build_dirty_meshes()
  */
 #pragma GCC push_options
 #pragma GCC optimize("Ofast")
+
+struct chunk_cross_t
+{
+    chunk_cubic_t* c = NULL;
+    chunk_cubic_t* pos_x = NULL;
+    chunk_cubic_t* pos_y = NULL;
+    chunk_cubic_t* pos_z = NULL;
+    chunk_cubic_t* neg_x = NULL;
+    chunk_cubic_t* neg_y = NULL;
+    chunk_cubic_t* neg_z = NULL;
+
+    chunk_cross_t() { }
+};
+
 void level_t::light_pass(int chunk_x, int chunk_y, int chunk_z, bool local_only)
 {
-    /** Index: [x+1][y+1][z+1] */
-    chunk_cubic_t* rubik[3][3][3];
+    /** Index: C +XYZ -XYZ */
+    chunk_cross_t cross;
 
-    for (int i = 0; i < 27; i++)
+    for (chunk_cubic_t* c : chunks)
     {
-        const int ix = (i / 9) % 3 - 1;
-        const int iy = (i / 3) % 3 - 1;
-        const int iz = i % 3 - 1;
-        rubik[ix + 1][iy + 1][iz + 1] = NULL;
-        if (local_only && (ix != 0 || iy != 0 || iz != 0))
+        if (!c)
             continue;
-        for (chunk_cubic_t* c : chunks)
-        {
-            if (!c || c->chunk_x != (ix + chunk_x) || c->chunk_y != (iy + chunk_y) || c->chunk_z != (iz + chunk_z))
-                continue;
-            rubik[ix + 1][iy + 1][iz + 1] = c;
-        }
+
+        if (c->chunk_x == chunk_x && c->chunk_y == chunk_y && c->chunk_z == chunk_z)
+            cross.c = c;
+
+        if (local_only)
+            continue;
+        else if (c->chunk_x == chunk_x + 1 && c->chunk_y == chunk_y && c->chunk_z == chunk_z)
+            cross.pos_x = c;
+        else if (c->chunk_x == chunk_x - 1 && c->chunk_y == chunk_y && c->chunk_z == chunk_z)
+            cross.neg_x = c;
+        else if (c->chunk_x == chunk_x && c->chunk_y == chunk_y + 1 && c->chunk_z == chunk_z)
+            cross.pos_y = c;
+        else if (c->chunk_x == chunk_x && c->chunk_y == chunk_y - 1 && c->chunk_z == chunk_z)
+            cross.neg_y = c;
+        else if (c->chunk_x == chunk_x && c->chunk_y == chunk_y && c->chunk_z == chunk_z + 1)
+            cross.pos_z = c;
+        else if (c->chunk_x == chunk_x && c->chunk_y == chunk_y && c->chunk_z == chunk_z - 1)
+            cross.neg_z = c;
     }
 
-    chunk_cubic_t* center = rubik[1][1][1];
-
-    if (!center)
+    if (!cross.c)
     {
         dc_log_error("Attempt made to update lighting for unloaded chunk at chunk coordinates: %d, %d, %d", chunk_x, chunk_y, chunk_z);
         return;
@@ -124,78 +155,78 @@ void level_t::light_pass(int chunk_x, int chunk_y, int chunk_z, bool local_only)
         const int y = (dat_it) & 0x0F;
         const int z = (dat_it >> 4) & 0x0F;
         const int x = (dat_it >> 8) & 0x0F;
-        center->set_light_block(x, y, z, mc_id::get_light_level(center->get_type(x, y, z)));
+        cross.c->set_light_block(x, y, z, mc_id::get_light_level(cross.c->get_type(x, y, z)));
     }
 
-    for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_X * SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z * 24; dat_it++)
+    for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_X * SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z * 16; dat_it++)
     {
         const int y = (dat_it) & 0x0F;
         const int z = (dat_it >> 4) & 0x0F;
         const int x = (dat_it >> 8) & 0x0F;
 
-        if (!mc_id::is_transparent(center->get_type(x, y, z)))
+        if (!mc_id::is_transparent(cross.c->get_type(x, y, z)))
             continue;
 
-        Uint8 cur_level = center->get_light_block(x, y, z);
-        /** Index: [x+1][y+1][z+1] */
-        Sint8 sur_levels[3][3][3];
-        for (int i = -1; i < 2; i++)
+        /** Index: +XYZ -XYZ */
+        Sint8 sur_levels[6] = { 0 };
+
+        switch (x)
         {
-            for (int j = -1; j < 2; j++)
-            {
-                for (int k = -1; k < 2; k++)
-                {
-                    int chunk_ix = 1, chunk_iy = 1, chunk_iz = 1;
-                    int local_x = x + i, local_y = y + j, local_z = z + k;
-
-                    if (local_x < 0)
-                    {
-                        local_x += SUBCHUNK_SIZE_X;
-                        chunk_ix--;
-                    }
-                    else if (local_x >= SUBCHUNK_SIZE_X)
-                    {
-                        local_x -= SUBCHUNK_SIZE_X;
-                        chunk_ix++;
-                    }
-
-                    if (local_y < 0)
-                    {
-                        local_y += SUBCHUNK_SIZE_Y;
-                        chunk_iy--;
-                    }
-                    else if (local_y >= SUBCHUNK_SIZE_Y)
-                    {
-                        local_y -= SUBCHUNK_SIZE_Y;
-                        chunk_iy++;
-                    }
-
-                    if (local_z < 0)
-                    {
-                        local_z += SUBCHUNK_SIZE_Z;
-                        chunk_iz--;
-                    }
-                    else if (local_z >= SUBCHUNK_SIZE_Z)
-                    {
-                        local_z -= SUBCHUNK_SIZE_Z;
-                        chunk_iz++;
-                    }
-
-                    chunk_cubic_t* c = rubik[chunk_ix][chunk_iy][chunk_iz];
-                    sur_levels[i + 1][j + 1][k + 1] = c == NULL ? 0 : (Sint8(c->get_light_block(local_x, local_y, local_z)) - 1);
-                }
-            }
+        case 0:
+            sur_levels[0] = Sint8(cross.c->get_light_block(x + 1, y, z)) - 1;
+            sur_levels[3] = cross.neg_x ? (Sint8(cross.neg_x->get_light_block(SUBCHUNK_SIZE_X - 1, y, z)) - 1) : 0;
+            break;
+        case (SUBCHUNK_SIZE_X - 1):
+            sur_levels[0] = cross.pos_x ? (Sint8(cross.pos_x->get_light_block(0, y, z)) - 1) : 0;
+            sur_levels[3] = Sint8(cross.c->get_light_block(x - 1, y, z)) - 1;
+            break;
+        default:
+            sur_levels[0] = Sint8(cross.c->get_light_block(x + 1, y, z)) - 1;
+            sur_levels[3] = Sint8(cross.c->get_light_block(x - 1, y, z)) - 1;
+            break;
         }
 
-        Uint8 lvl = cur_level;
-        lvl = SDL_max(lvl, sur_levels[0][1][1]);
-        lvl = SDL_max(lvl, sur_levels[2][1][1]);
-        lvl = SDL_max(lvl, sur_levels[1][0][1]);
-        lvl = SDL_max(lvl, sur_levels[1][2][1]);
-        lvl = SDL_max(lvl, sur_levels[1][1][0]);
-        lvl = SDL_max(lvl, sur_levels[1][1][2]);
+        switch (y)
+        {
+        case 0:
+            sur_levels[1] = Sint8(cross.c->get_light_block(x, y + 1, z)) - 1;
+            sur_levels[4] = cross.neg_y ? (Sint8(cross.neg_y->get_light_block(x, SUBCHUNK_SIZE_Y - 1, z)) - 1) : 0;
+            break;
+        case (SUBCHUNK_SIZE_Y - 1):
+            sur_levels[1] = cross.pos_y ? (Sint8(cross.pos_y->get_light_block(x, 0, z)) - 1) : 0;
+            sur_levels[4] = Sint8(cross.c->get_light_block(x, y - 1, z)) - 1;
+            break;
+        default:
+            sur_levels[1] = Sint8(cross.c->get_light_block(x, y + 1, z)) - 1;
+            sur_levels[4] = Sint8(cross.c->get_light_block(x, y - 1, z)) - 1;
+            break;
+        }
 
-        center->set_light_block(x, y, z, lvl);
+        switch (z)
+        {
+        case 0:
+            sur_levels[2] = Sint8(cross.c->get_light_block(x, y, z + 1)) - 1;
+            sur_levels[5] = cross.neg_z ? (Sint8(cross.neg_z->get_light_block(x, y, SUBCHUNK_SIZE_Z - 1)) - 1) : 0;
+            break;
+        case (SUBCHUNK_SIZE_Z - 1):
+            sur_levels[2] = cross.pos_z ? (Sint8(cross.pos_z->get_light_block(x, y, 0)) - 1) : 0;
+            sur_levels[5] = Sint8(cross.c->get_light_block(x, y, z - 1)) - 1;
+            break;
+        default:
+            sur_levels[2] = Sint8(cross.c->get_light_block(x, y, z + 1)) - 1;
+            sur_levels[5] = Sint8(cross.c->get_light_block(x, y, z - 1)) - 1;
+            break;
+        }
+
+        Uint8 lvl = cross.c->get_light_block(x, y, z);
+        lvl = SDL_max(lvl, sur_levels[0]);
+        lvl = SDL_max(lvl, sur_levels[1]);
+        lvl = SDL_max(lvl, sur_levels[2]);
+        lvl = SDL_max(lvl, sur_levels[3]);
+        lvl = SDL_max(lvl, sur_levels[4]);
+        lvl = SDL_max(lvl, sur_levels[5]);
+
+        cross.c->set_light_block(x, y, z, lvl);
     }
 }
 #pragma GCC pop_options
