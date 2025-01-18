@@ -491,7 +491,7 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
             BLOCK_SIMPLE(BLOCK_ID_SNOW_BLOCK, mc_id::FACE_SNOW);
             BLOCK_SIMPLE(BLOCK_ID_CACTUS, mc_id::FACE_CACTUS_SIDE);
             BLOCK_SIMPLE(BLOCK_ID_CLAY, mc_id::FACE_CLAY);
-            BLOCK_SIMPLE(BLOCK_ID_SUGAR_CANE, mc_id::FACE_DEBUG);
+            BLOCK_SIMPLE(BLOCK_ID_SUGAR_CANE, mc_id::FACE_REEDS);
         case BLOCK_ID_JUKEBOX:
         {
             faces[0] = terrain->get_face(mc_id::FACE_JUKEBOX_SIDE);
@@ -711,6 +711,122 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 });
                 vtx.push_back({
                     { 1, Uint16(x * 16 + 16), Uint16(y * 16 + 16), Uint16(z * 16 + 7), ao[3] },
+                    { r, g, b, bl[3], slight_sky[1][1][0] },
+                    faces[5].corners[0],
+                });
+            }
+        }
+        else if (type == BLOCK_ID_FLOWER_RED || type == BLOCK_ID_FLOWER_YELLOW || type == BLOCK_ID_COBWEB || type == BLOCK_ID_MUSHROOM_BLAND
+            || type == BLOCK_ID_MUSHROOM_RED || type == BLOCK_ID_FOLIAGE || type == BLOCK_ID_DEAD_BUSH || type == BLOCK_ID_SAPLING
+            || type == BLOCK_ID_SUGAR_CANE)
+        {
+            /* Positive X */
+            {
+                Uint8 ao[] = { 0, 0, 0, 0 };
+
+                Uint8 bl[] = { slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1] };
+
+                vtx.push_back({
+                    { 1, Uint16(x * 16 + 15), Uint16(y * 16 + 0), Uint16(z * 16 + 1), ao[0] },
+                    { r, g, b, bl[0], slight_sky[2][1][1] },
+                    faces[0].corners[3],
+                });
+                vtx.push_back({
+                    { 1, Uint16(x * 16 + 15), Uint16(y * 16 + 16), Uint16(z * 16 + 1), ao[1] },
+                    { r, g, b, bl[1], slight_sky[2][1][1] },
+                    faces[0].corners[1],
+                });
+                vtx.push_back({
+                    { 1, Uint16(x * 16 + 1), Uint16(y * 16 + 0), Uint16(z * 16 + 15), ao[2] },
+                    { r, g, b, bl[2], slight_sky[2][1][1] },
+                    faces[0].corners[2],
+                });
+                vtx.push_back({
+                    { 1, Uint16(x * 16 + 1), Uint16(y * 16 + 16), Uint16(z * 16 + 15), ao[3] },
+                    { r, g, b, bl[3], slight_sky[2][1][1] },
+                    faces[0].corners[0],
+                });
+            }
+
+            /* Negative X */
+            {
+                Uint8 ao[] = { 0, 0, 0, 0 };
+
+                Uint8 bl[] = { slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1] };
+
+                vtx.push_back({
+                    { 1, Uint16(x * 16 + 1), Uint16(y * 16 + 16), Uint16(z * 16 + 15), ao[3] },
+                    { r, g, b, bl[3], slight_sky[0][1][1] },
+                    faces[3].corners[1],
+                });
+                vtx.push_back({
+                    { 1, Uint16(x * 16 + 15), Uint16(y * 16 + 16), Uint16(z * 16 + 1), ao[1] },
+                    { r, g, b, bl[1], slight_sky[0][1][1] },
+                    faces[3].corners[0],
+                });
+                vtx.push_back({
+                    { 1, Uint16(x * 16 + 1), Uint16(y * 16 + 0), Uint16(z * 16 + 15), ao[2] },
+                    { r, g, b, bl[2], slight_sky[0][1][1] },
+                    faces[3].corners[3],
+                });
+                vtx.push_back({
+                    { 1, Uint16(x * 16 + 15), Uint16(y * 16 + 0), Uint16(z * 16 + 1), ao[0] },
+                    { r, g, b, bl[0], slight_sky[0][1][1] },
+                    faces[3].corners[2],
+                });
+            }
+
+            /* Positive Z */
+            {
+                Uint8 ao[] = { 0, 0, 0, 0 };
+
+                Uint8 bl[] = { slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1] };
+
+                vtx.push_back({
+                    { 1, Uint16(x * 16 + 15), Uint16(y * 16 + 16), Uint16(z * 16 + 15), ao[3] },
+                    { r, g, b, bl[3], slight_sky[1][1][2] },
+                    faces[2].corners[1],
+                });
+                vtx.push_back({
+                    { 1, Uint16(x * 16 + 0), Uint16(y * 16 + 16), Uint16(z * 16 + 0), ao[1] },
+                    { r, g, b, bl[1], slight_sky[1][1][2] },
+                    faces[2].corners[0],
+                });
+                vtx.push_back({
+                    { 1, Uint16(x * 16 + 15), Uint16(y * 16 + 0), Uint16(z * 16 + 15), ao[2] },
+                    { r, g, b, bl[2], slight_sky[1][1][2] },
+                    faces[2].corners[3],
+                });
+                vtx.push_back({
+                    { 1, Uint16(x * 16 + 0), Uint16(y * 16 + 0), Uint16(z * 16 + 0), ao[0] },
+                    { r, g, b, bl[0], slight_sky[1][1][2] },
+                    faces[2].corners[2],
+                });
+            }
+
+            /* Negative Z */
+            {
+                Uint8 ao[] = { 0, 0, 0, 0 };
+
+                Uint8 bl[] = { slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1] };
+
+                vtx.push_back({
+                    { 1, Uint16(x * 16 + 1), Uint16(y * 16 + 0), Uint16(z * 16 + 1), ao[0] },
+                    { r, g, b, bl[0], slight_sky[1][1][0] },
+                    faces[5].corners[3],
+                });
+                vtx.push_back({
+                    { 1, Uint16(x * 16 + 1), Uint16(y * 16 + 16), Uint16(z * 16 + 1), ao[1] },
+                    { r, g, b, bl[1], slight_sky[1][1][0] },
+                    faces[5].corners[1],
+                });
+                vtx.push_back({
+                    { 1, Uint16(x * 16 + 15), Uint16(y * 16 + 0), Uint16(z * 16 + 15), ao[2] },
+                    { r, g, b, bl[2], slight_sky[1][1][0] },
+                    faces[5].corners[2],
+                });
+                vtx.push_back({
+                    { 1, Uint16(x * 16 + 15), Uint16(y * 16 + 16), Uint16(z * 16 + 15), ao[3] },
                     { r, g, b, bl[3], slight_sky[1][1][0] },
                     faces[5].corners[0],
                 });
