@@ -399,7 +399,8 @@ texture_terrain_t::texture_terrain_t(std::string path_textures)
     for (size_t i = 0; i < textures.size(); i++)
     {
         mc_id::terrain_face_id_t fid = mc_id::get_face_from_fname(textures[i].name.c_str());
-        texture_faces[fid] = texture_post_pack_t(textures[i], fid, tex_base_width, tex_base_height);
+        if (!textures[i].is_item)
+            texture_faces[fid] = texture_post_pack_t(textures[i], fid, tex_base_width, tex_base_height);
         if (fid == mc_id::FACE_LAVA_FLOW_STRAIGHT)
             texture_faces[mc_id::FACE_LAVA_FLOW_DIAGONAL] = texture_post_pack_t(textures[i], mc_id::FACE_LAVA_FLOW_DIAGONAL, tex_base_width, tex_base_height);
         else if (fid == mc_id::FACE_LAVA_FLOW_DIAGONAL)
