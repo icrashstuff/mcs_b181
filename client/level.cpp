@@ -375,8 +375,29 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
             BLOCK_SIMPLE(BLOCK_ID_GRASS, mc_id::FACE_GRASS_TOP);
             BLOCK_SIMPLE(BLOCK_ID_DIRT, mc_id::FACE_DIRT);
             BLOCK_SIMPLE(BLOCK_ID_COBBLESTONE, mc_id::FACE_COBBLESTONE);
-            BLOCK_SIMPLE(BLOCK_ID_WOOD_PLANKS, mc_id::FACE_PLANKS_OAK);
-            BLOCK_SIMPLE(BLOCK_ID_SAPLING, mc_id::FACE_SAPLING_OAK); //----
+        case BLOCK_ID_WOOD_PLANKS:
+        {
+            /* Multiple plank types are not in Minecraft Beta 1.8.x */
+            switch (metadata)
+            {
+                BLOCK_SIMPLE(WOOD_ID_SPRUCE, mc_id::FACE_PLANKS_SPRUCE);
+                BLOCK_SIMPLE(WOOD_ID_BIRCH, mc_id::FACE_PLANKS_BIRCH);
+            default: /* Fall through */
+                BLOCK_SIMPLE(WOOD_ID_OAK, mc_id::FACE_PLANKS_OAK);
+            }
+            break;
+        }
+        case BLOCK_ID_SAPLING:
+        {
+            switch (metadata % 4)
+            {
+                BLOCK_SIMPLE(WOOD_ID_SPRUCE, mc_id::FACE_SAPLING_SPRUCE);
+                BLOCK_SIMPLE(WOOD_ID_BIRCH, mc_id::FACE_SAPLING_BIRCH);
+            default: /* Fall through */
+                BLOCK_SIMPLE(WOOD_ID_OAK, mc_id::FACE_SAPLING_OAK);
+            }
+            break;
+        }
             BLOCK_SIMPLE(BLOCK_ID_BEDROCK, mc_id::FACE_BEDROCK);
 
             BLOCK_SIMPLE(BLOCK_ID_WATER_FLOWING, mc_id::FACE_WATER_FLOW_STRAIGHT);
@@ -389,27 +410,92 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
             BLOCK_SIMPLE(BLOCK_ID_ORE_GOLD, mc_id::FACE_GOLD_ORE);
             BLOCK_SIMPLE(BLOCK_ID_ORE_IRON, mc_id::FACE_IRON_ORE);
             BLOCK_SIMPLE(BLOCK_ID_ORE_COAL, mc_id::FACE_COAL_ORE);
-            BLOCK_LOG(BLOCK_ID_LOG, mc_id::FACE_LOG_OAK_TOP, mc_id::FACE_LOG_OAK); //----
-            BLOCK_SIMPLE(BLOCK_ID_LEAVES, mc_id::FACE_LEAVES_OAK);
+        case BLOCK_ID_LOG:
+        {
+            switch (metadata)
+            {
+                BLOCK_LOG(WOOD_ID_SPRUCE, mc_id::FACE_LOG_SPRUCE_TOP, mc_id::FACE_LOG_SPRUCE);
+                BLOCK_LOG(WOOD_ID_BIRCH, mc_id::FACE_LOG_BIRCH_TOP, mc_id::FACE_LOG_BIRCH);
+            default: /* Fall through */
+                BLOCK_LOG(WOOD_ID_OAK, mc_id::FACE_LOG_OAK_TOP, mc_id::FACE_LOG_OAK);
+            }
+            break;
+        }
+        case BLOCK_ID_LEAVES:
+        {
+            switch (metadata)
+            {
+                BLOCK_SIMPLE(WOOD_ID_SPRUCE, mc_id::FACE_LEAVES_SPRUCE);
+                BLOCK_SIMPLE(WOOD_ID_BIRCH, mc_id::FACE_LEAVES_BIRCH);
+            default: /* Fall through */
+                BLOCK_SIMPLE(WOOD_ID_OAK, mc_id::FACE_LEAVES_OAK);
+            }
+            break;
+        }
             BLOCK_SIMPLE(BLOCK_ID_SPONGE, mc_id::FACE_SPONGE);
             BLOCK_SIMPLE(BLOCK_ID_GLASS, mc_id::FACE_GLASS);
             BLOCK_SIMPLE(BLOCK_ID_ORE_LAPIS, mc_id::FACE_LAPIS_ORE);
 
             BLOCK_SIMPLE(BLOCK_ID_LAPIS, mc_id::FACE_LAPIS_BLOCK);
-            BLOCK_SIMPLE(BLOCK_ID_DISPENSER, mc_id::FACE_DISPENSER_FRONT_HORIZONTAL);
+        case BLOCK_ID_DISPENSER:
+        {
+            mc_id::terrain_face_t face_front = terrain->get_face(mc_id::FACE_DISPENSER_FRONT_HORIZONTAL);
+            mc_id::terrain_face_t face_side = terrain->get_face(mc_id::FACE_FURNACE_SIDE);
+
+            faces[1] = terrain->get_face(mc_id::FACE_FURNACE_TOP);
+            faces[4] = faces[1];
+
+            faces[5] = metadata == 2 ? face_front : face_side;
+            faces[2] = metadata == 3 ? face_front : face_side;
+            faces[3] = metadata == 4 ? face_front : face_side;
+            faces[0] = metadata == 5 ? face_front : face_side;
+
+            break;
+        }
             BLOCK_TNT(BLOCK_ID_SANDSTONE, mc_id::FACE_SANDSTONE_TOP, mc_id::FACE_SANDSTONE_BOTTOM, mc_id::FACE_SANDSTONE_NORMAL)
             BLOCK_SIMPLE(BLOCK_ID_NOTE_BLOCK, mc_id::FACE_NOTEBLOCK);
             BLOCK_SIMPLE(BLOCK_ID_BED, mc_id::FACE_BED_HEAD_TOP);
             BLOCK_SIMPLE(BLOCK_ID_RAIL_POWERED, mc_id::FACE_RAIL_GOLDEN_POWERED);
             BLOCK_SIMPLE(BLOCK_ID_RAIL_DETECTOR, mc_id::FACE_RAIL_DETECTOR);
             BLOCK_SIMPLE(BLOCK_ID_PISTON_STICKY, mc_id::FACE_PISTON_TOP_STICKY);
-            BLOCK_SIMPLE(BLOCK_ID_COBWEB, mc_id::FACE_WEB); //----
-            BLOCK_SIMPLE(BLOCK_ID_FOLIAGE, mc_id::FACE_TALLGRASS);
+            BLOCK_SIMPLE(BLOCK_ID_COBWEB, mc_id::FACE_WEB);
+        case BLOCK_ID_FOLIAGE:
+        {
+            switch (metadata)
+            {
+                BLOCK_SIMPLE(0, mc_id::FACE_DEADBUSH);
+                BLOCK_SIMPLE(1, mc_id::FACE_FERN);
+            default: /* Fall through */
+                BLOCK_SIMPLE(2, mc_id::FACE_TALLGRASS);
+            }
+            break;
+        }
             BLOCK_SIMPLE(BLOCK_ID_DEAD_BUSH, mc_id::FACE_DEADBUSH);
             BLOCK_SIMPLE(BLOCK_ID_PISTON, mc_id::FACE_PISTON_TOP_NORMAL);
             BLOCK_SIMPLE(BLOCK_ID_PISTON_HEAD, mc_id::FACE_PISTON_TOP_NORMAL);
-            BLOCK_SIMPLE(BLOCK_ID_WOOL, mc_id::FACE_WOOL_COLORED_WHITE);
-
+        case BLOCK_ID_WOOL:
+        {
+            switch (metadata)
+            {
+                BLOCK_SIMPLE(WOOL_ID_WHITE, mc_id::FACE_WOOL_COLORED_WHITE)
+                BLOCK_SIMPLE(WOOL_ID_ORANGE, mc_id::FACE_WOOL_COLORED_ORANGE)
+                BLOCK_SIMPLE(WOOL_ID_MAGENTA, mc_id::FACE_WOOL_COLORED_MAGENTA)
+                BLOCK_SIMPLE(WOOL_ID_LIGHT_BLUE, mc_id::FACE_WOOL_COLORED_LIGHT_BLUE)
+                BLOCK_SIMPLE(WOOL_ID_YELLOW, mc_id::FACE_WOOL_COLORED_YELLOW)
+                BLOCK_SIMPLE(WOOL_ID_LIME, mc_id::FACE_WOOL_COLORED_LIME)
+                BLOCK_SIMPLE(WOOL_ID_PINK, mc_id::FACE_WOOL_COLORED_PINK)
+                BLOCK_SIMPLE(WOOL_ID_GRAY, mc_id::FACE_WOOL_COLORED_GRAY)
+                BLOCK_SIMPLE(WOOL_ID_LIGHT_GRAY, mc_id::FACE_WOOL_COLORED_SILVER)
+                BLOCK_SIMPLE(WOOL_ID_CYAN, mc_id::FACE_WOOL_COLORED_CYAN)
+                BLOCK_SIMPLE(WOOL_ID_PURPLE, mc_id::FACE_WOOL_COLORED_PURPLE)
+                BLOCK_SIMPLE(WOOL_ID_BLUE, mc_id::FACE_WOOL_COLORED_BLUE)
+                BLOCK_SIMPLE(WOOL_ID_BROWN, mc_id::FACE_WOOL_COLORED_BROWN)
+                BLOCK_SIMPLE(WOOL_ID_GREEN, mc_id::FACE_WOOL_COLORED_GREEN)
+                BLOCK_SIMPLE(WOOL_ID_RED, mc_id::FACE_WOOL_COLORED_RED)
+                BLOCK_SIMPLE(WOOL_ID_BLACK, mc_id::FACE_WOOL_COLORED_BLACK)
+            }
+            break;
+        }
             BLOCK_SIMPLE(BLOCK_ID_UNKNOWN, mc_id::FACE_DEBUG);
             BLOCK_SIMPLE(BLOCK_ID_FLOWER_YELLOW, mc_id::FACE_FLOWER_DANDELION);
             BLOCK_SIMPLE(BLOCK_ID_FLOWER_RED, mc_id::FACE_FLOWER_ROSE);
@@ -419,8 +505,22 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
             BLOCK_SIMPLE(BLOCK_ID_GOLD, mc_id::FACE_GOLD_BLOCK);
             BLOCK_SIMPLE(BLOCK_ID_IRON, mc_id::FACE_IRON_BLOCK);
 
-            BLOCK_SIMPLE(BLOCK_ID_SLAB_DOUBLE, mc_id::FACE_STONE_SLAB_SIDE);
-            BLOCK_SIMPLE(BLOCK_ID_SLAB_SINGLE, mc_id::FACE_STONE_SLAB_SIDE);
+        case BLOCK_ID_SLAB_DOUBLE:
+        case BLOCK_ID_SLAB_SINGLE:
+        {
+            switch (metadata)
+            {
+                BLOCK_LOG(SLAB_ID_SMOOTH, mc_id::FACE_STONE_SLAB_TOP, mc_id::FACE_STONE_SLAB_SIDE);
+                BLOCK_TNT(SLAB_ID_SANDSTONE, mc_id::FACE_SANDSTONE_TOP, mc_id::FACE_SANDSTONE_BOTTOM, mc_id::FACE_SANDSTONE_NORMAL);
+                BLOCK_SIMPLE(SLAB_ID_WOOD, mc_id::FACE_PLANKS_OAK);
+                BLOCK_SIMPLE(SLAB_ID_COBBLESTONE, mc_id::FACE_COBBLESTONE);
+                BLOCK_SIMPLE(SLAB_ID_BRICKS, mc_id::FACE_BRICK);
+                BLOCK_SIMPLE(SLAB_ID_BRICKS_STONE, mc_id::FACE_STONEBRICK);
+            default: /* Fall through */
+                BLOCK_SIMPLE(SLAB_ID_SMOOTH_SIDE, mc_id::FACE_STONE_SLAB_TOP);
+            }
+            break;
+        }
             BLOCK_SIMPLE(BLOCK_ID_BRICKS, mc_id::FACE_BRICK);
             BLOCK_TNT(BLOCK_ID_TNT, mc_id::FACE_TNT_TOP, mc_id::FACE_TNT_BOTTOM, mc_id::FACE_TNT_SIDE)
             BLOCK_SIMPLE(BLOCK_ID_BOOKSHELF, mc_id::FACE_BOOKSHELF);
@@ -433,7 +533,19 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
 
             BLOCK_SIMPLE(BLOCK_ID_STAIRS_WOOD, mc_id::FACE_PLANKS_OAK); //----
             BLOCK_SIMPLE(BLOCK_ID_CHEST, mc_id::FACE_DEBUG); //----
-            BLOCK_SIMPLE(BLOCK_ID_REDSTONE, mc_id::FACE_REDSTONE_DUST_LINE); //----
+        case BLOCK_ID_REDSTONE:
+        {
+            r = (metadata + 5) / 20.0f;
+            g = 0.0f;
+            b = 0.0f;
+            faces[0] = terrain->get_face(mc_id::FACE_REDSTONE_DUST_LINE);
+            faces[1] = faces[0];
+            faces[2] = faces[0];
+            faces[3] = faces[0];
+            faces[4] = faces[0];
+            faces[5] = faces[0];
+            break;
+        }
             BLOCK_SIMPLE(BLOCK_ID_ORE_DIAMOND, mc_id::FACE_DIAMOND_ORE);
             BLOCK_SIMPLE(BLOCK_ID_DIAMOND, mc_id::FACE_DIAMOND_BLOCK);
         case BLOCK_ID_CRAFTING_TABLE:
@@ -449,26 +561,20 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
         }
             BLOCK_SIMPLE(BLOCK_ID_PLANT_FOOD, mc_id::FACE_DEBUG);
             BLOCK_SIMPLE(BLOCK_ID_DIRT_TILLED, mc_id::FACE_DEBUG);
-        case BLOCK_ID_FURNACE_OFF:
-        {
-            faces[0] = terrain->get_face(mc_id::FACE_FURNACE_FRONT_OFF);
-            faces[1] = terrain->get_face(mc_id::FACE_FURNACE_TOP);
-            faces[2] = terrain->get_face(mc_id::FACE_FURNACE_SIDE);
-
-            faces[3] = terrain->get_face(mc_id::FACE_FURNACE_SIDE);
-            faces[4] = terrain->get_face(mc_id::FACE_FURNACE_TOP);
-            faces[5] = terrain->get_face(mc_id::FACE_FURNACE_SIDE);
-            break;
-        }
+        case BLOCK_ID_FURNACE_OFF: /* Fall through */
         case BLOCK_ID_FURNACE_ON:
         {
-            faces[0] = terrain->get_face(mc_id::FACE_FURNACE_FRONT_ON);
-            faces[1] = terrain->get_face(mc_id::FACE_FURNACE_TOP);
-            faces[2] = terrain->get_face(mc_id::FACE_FURNACE_SIDE);
+            mc_id::terrain_face_t face_front = terrain->get_face(type == BLOCK_ID_FURNACE_OFF ? mc_id::FACE_FURNACE_FRONT_OFF : mc_id::FACE_FURNACE_FRONT_ON);
+            mc_id::terrain_face_t face_side = terrain->get_face(mc_id::FACE_FURNACE_SIDE);
 
-            faces[3] = terrain->get_face(mc_id::FACE_FURNACE_SIDE);
-            faces[4] = terrain->get_face(mc_id::FACE_FURNACE_TOP);
-            faces[5] = terrain->get_face(mc_id::FACE_FURNACE_SIDE);
+            faces[1] = terrain->get_face(mc_id::FACE_FURNACE_TOP);
+            faces[4] = faces[1];
+
+            faces[5] = metadata == 2 ? face_front : face_side;
+            faces[2] = metadata == 3 ? face_front : face_side;
+            faces[3] = metadata == 4 ? face_front : face_side;
+            faces[0] = metadata == 5 ? face_front : face_side;
+
             break;
         }
             BLOCK_SIMPLE(BLOCK_ID_SIGN_STANDING, mc_id::FACE_DEBUG);
@@ -503,7 +609,18 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
             faces[5] = terrain->get_face(mc_id::FACE_JUKEBOX_SIDE);
             break;
         }
-            BLOCK_SIMPLE(BLOCK_ID_FENCE_WOOD, mc_id::FACE_DEBUG);
+        case BLOCK_ID_FENCE_WOOD:
+        {
+            /* Multiple fence types are not in Minecraft Beta 1.8.x */
+            switch (metadata)
+            {
+                BLOCK_SIMPLE(WOOD_ID_SPRUCE, mc_id::FACE_PLANKS_SPRUCE);
+                BLOCK_SIMPLE(WOOD_ID_BIRCH, mc_id::FACE_PLANKS_BIRCH);
+            default: /* Fall through */
+                BLOCK_SIMPLE(WOOD_ID_OAK, mc_id::FACE_PLANKS_OAK);
+            }
+            break;
+        }
         case BLOCK_ID_PUMPKIN:
         {
             faces[0] = terrain->get_face(mc_id::FACE_PUMPKIN_FACE_OFF);
@@ -535,10 +652,69 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
             BLOCK_SIMPLE(BLOCK_ID_REPEATER_ON, mc_id::FACE_REPEATER_ON);
             BLOCK_SIMPLE(BLOCK_ID_CHEST_LOCKED, mc_id::FACE_DEBUG);
             BLOCK_SIMPLE(BLOCK_ID_TRAPDOOR, mc_id::FACE_TRAPDOOR);
-            BLOCK_SIMPLE(BLOCK_ID_UNKNOWN_STONE, mc_id::FACE_STONE);
-            BLOCK_SIMPLE(BLOCK_ID_BRICKS_STONE, mc_id::FACE_STONEBRICK);
-            BLOCK_SIMPLE(BLOCK_ID_MUSHROOM_BLOCK_BLAND, mc_id::FACE_MUSHROOM_BLOCK_SKIN_BROWN);
-            BLOCK_SIMPLE(BLOCK_ID_MUSHROOM_BLOCK_RED, mc_id::FACE_MUSHROOM_BLOCK_SKIN_RED);
+        case BLOCK_ID_UNKNOWN_STONE:
+        {
+            switch (metadata)
+            {
+                BLOCK_SIMPLE(1, mc_id::FACE_COBBLESTONE);
+                BLOCK_SIMPLE(2, mc_id::FACE_STONEBRICK);
+            default: /* Fall through */
+                BLOCK_SIMPLE(0, mc_id::FACE_STONE);
+            }
+            break;
+        }
+        case BLOCK_ID_BRICKS_STONE:
+        {
+            switch (metadata)
+            {
+                BLOCK_SIMPLE(STONE_BRICK_ID_MOSSY, mc_id::FACE_STONEBRICK_MOSSY);
+                BLOCK_SIMPLE(STONE_BRICK_ID_CRACKED, mc_id::FACE_STONEBRICK_CRACKED);
+            default: /* Fall through */
+                BLOCK_SIMPLE(STONE_BRICK_ID_REGULAR, mc_id::FACE_STONEBRICK);
+            }
+            break;
+        }
+        case BLOCK_ID_MUSHROOM_BLOCK_BLAND:
+        case BLOCK_ID_MUSHROOM_BLOCK_RED:
+        {
+            faces[0] = terrain->get_face(mc_id::FACE_MUSHROOM_BLOCK_INSIDE);
+            faces[1] = faces[0];
+            faces[2] = faces[0];
+            faces[3] = faces[0];
+            faces[4] = faces[0];
+            faces[5] = faces[0];
+
+            if (metadata == 0 || WOOL_ID_BLUE <= metadata)
+                break;
+            else if (metadata == WOOL_ID_PURPLE)
+            {
+                faces[0] = terrain->get_face(mc_id::FACE_MUSHROOM_BLOCK_SKIN_STEM);
+                faces[2] = faces[0], faces[3] = faces[0], faces[5] = faces[0];
+            }
+            else
+            {
+                bool is_red = type == BLOCK_ID_MUSHROOM_BLOCK_RED;
+
+                mc_id::terrain_face_t mushroom_skin = terrain->get_face(is_red ? mc_id::FACE_MUSHROOM_BLOCK_SKIN_RED : mc_id::FACE_MUSHROOM_BLOCK_SKIN_BROWN);
+
+                if (metadata > 0 && (metadata + 1) % 3 == 1)
+                    faces[0] = mushroom_skin;
+
+                if (1 <= metadata && metadata <= 9)
+                    faces[1] = mushroom_skin;
+
+                if (7 <= metadata && metadata <= 9)
+                    faces[2] = mushroom_skin;
+
+                if (metadata % 3 == 1)
+                    faces[3] = mushroom_skin;
+
+                if (1 <= metadata && metadata <= 3)
+                    faces[5] = mushroom_skin;
+            }
+
+            break;
+        }
             BLOCK_SIMPLE(BLOCK_ID_IRON_BARS, mc_id::FACE_IRON_BARS);
             BLOCK_SIMPLE(BLOCK_ID_GLASS_PANE, mc_id::FACE_GLASS);
             BLOCK_LOG(BLOCK_ID_MELON, mc_id::FACE_MELON_TOP, mc_id::FACE_MELON_SIDE)
@@ -560,8 +736,24 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
         }
         }
 
-        if (type == BLOCK_ID_GRASS || type == BLOCK_ID_LEAVES || type == BLOCK_ID_MOSS || type == BLOCK_ID_FOLIAGE)
-            r = 0.2f, g = 1.0f, b = 0.2f;
+        if (type == BLOCK_ID_GRASS || type == BLOCK_ID_MOSS || type == BLOCK_ID_FOLIAGE)
+            r = 0.2f, g = 0.8f, b = 0.2f;
+        else if (type == BLOCK_ID_LEAVES)
+        {
+            switch (metadata)
+            {
+            case WOOD_ID_SPRUCE:
+                r = 0.380f, g = 0.600f, b = 0.380f;
+                break;
+            case WOOD_ID_BIRCH:
+                r = 0.502f, g = 0.655f, b = 0.333f;
+                break;
+            case WOOD_ID_OAK: /* Fall through */
+            default:
+                r = 0.2f, g = 1.0f, b = 0.2f;
+                break;
+            }
+        }
 
 #define UAO(X) (!mc_id::is_transparent(stypes X))
 #define UBL(X) (slight_block X * mc_id::is_transparent(stypes X))
