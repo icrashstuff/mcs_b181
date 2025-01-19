@@ -569,7 +569,6 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
         if (type == BLOCK_ID_TORCH || type == BLOCK_ID_TORCH_REDSTONE_ON || type == BLOCK_ID_TORCH_REDSTONE_OFF)
         {
             /* Positive Y */
-            if (mc_id::is_transparent(stypes[1][2][1]) && stypes[1][2][1] != type)
             {
                 Uint8 ao[] = { 0, 0, 0, 0 };
 
@@ -1072,10 +1071,58 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
 
     TRACE("Chunk: <%d, %d, %d>, Vertices: %zu, Indices: %zu", chunk_x, chunk_y, chunk_z, vtx.size(), vtx.size() / 4 * 6);
 
+    if (!vtx.size())
+    {
+        center->index_type = GL_NONE;
+        center->index_count = 0;
+        return;
+    }
+
     if (!center->vao)
         terrain_vertex_t::create_vao(&center->vao);
     glBindVertexArray(center->vao);
-    // TODO: Recycle VBO, and use one global chunk EBO
-    center->index_type = terrain_vertex_t::create_vbo(&center->vbo, &center->ebo, vtx);
+    if (!center->vbo)
+    {
+        glGenBuffers(1, &center->vbo);
+        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    }
+
+    glBindBuffer(GL_ARRAY_BUFFER, center->vbo);
+    glBufferData(GL_ARRAY_BUFFER, vtx.size() * sizeof(vtx[0]), vtx.data(), GL_STATIC_DRAW);
+    glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, pos));
+    glVertexAttribIPointer(1, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, col));
+    glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, tex));
+
+    center->index_type = GL_UNSIGNED_INT;
     center->index_count = vtx.size() / 4 * 6;
+}
+
+level_t::level_t()
+{
+    /* Size the buffer for maximum 36 quads for every block, TODO-OPT: Would multiple smaller buffers be better? */
+    size_t quads = SUBCHUNK_SIZE_X * SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z * 6 * 6;
+    std::vector<Uint32> ind;
+    ind.reserve(quads * 6);
+    for (size_t i = 0; i < quads; i++)
+    {
+        ind.push_back(i * 4 + 0);
+        ind.push_back(i * 4 + 1);
+        ind.push_back(i * 4 + 2);
+        ind.push_back(i * 4 + 2);
+        ind.push_back(i * 4 + 1);
+        ind.push_back(i * 4 + 3);
+    }
+
+    glBindVertexArray(0);
+    glGenBuffers(1, &ebo);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glBufferData(GL_ELEMENT_ARRAY_BUFFER, ind.size() * sizeof(ind[0]), ind.data(), GL_STATIC_DRAW);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+}
+
+level_t::~level_t()
+{
+    glDeleteBuffers(1, &ebo);
+    for (size_t i = 0; i < chunks.size(); i++)
+        delete chunks[i];
 }

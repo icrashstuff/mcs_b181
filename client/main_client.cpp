@@ -415,9 +415,8 @@ void normal_loop()
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, level->lightmap.tex_id_linear);
     glActiveTexture(GL_TEXTURE0);
-    for (size_t i = 0; i < level->chunks.size(); i++)
+    for (chunk_cubic_t* c : level->chunks)
     {
-        chunk_cubic_t* c = level->chunks[i];
         if (c->index_type == GL_NONE)
             continue;
         glBindVertexArray(c->vao);

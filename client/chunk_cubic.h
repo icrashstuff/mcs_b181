@@ -44,7 +44,6 @@ struct chunk_cubic_t
     bool dirty = 1;
     GLuint vao = 0;
     GLuint vbo = 0;
-    GLuint ebo = 0;
     /**
      * One of GL_UNSIGNED_INT, GL_UNSIGNED_SHORT, GL_UNSIGNED_BYTE, or GL_NONE
      */
@@ -72,10 +71,8 @@ struct chunk_cubic_t
     {
         vao = 0;
         vbo = 0;
-        ebo = 0;
         glDeleteVertexArrays(1, &vao);
         glDeleteBuffers(1, &vbo);
-        glDeleteBuffers(1, &ebo);
     }
 
     CHUNK_CUBIC_INLINE Uint8 get_type(int x, int y, int z)

@@ -27,18 +27,15 @@
 #include "chunk_cubic.h"
 #include "lightmap.h"
 #include "texture_terrain.h"
+#include <GL/glew.h>
 #include <memory>
 #include <vector>
 
 struct level_t
 {
-    level_t() { }
+    level_t();
 
-    ~level_t()
-    {
-        for (size_t i = 0; i < chunks.size(); i++)
-            delete chunks[i];
-    }
+    ~level_t();
 
     std::vector<chunk_cubic_t*> chunks;
 
@@ -46,6 +43,8 @@ struct level_t
     std::shared_ptr<texture_terrain_t> terrain;
 
     lightmap_t lightmap;
+
+    GLuint ebo = 0;
 
     /**
      * Builds all dirt meshes
