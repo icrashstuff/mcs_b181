@@ -533,14 +533,33 @@ void process_event(SDL_Event& event, bool* done)
         }
         case SDL_SCANCODE_1:
         {
-            glm::vec3 cpos = camera_pos + camera_front;
+            glm::vec3 cam_posf = camera_pos + glm::vec3(SDL_cosf(glm::radians(yaw)), SDL_sinf(glm::radians(pitch)), SDL_sinf(glm::radians(yaw))) * 2.0f;
+            glm::ivec3 cam_pos = glm::round(cam_posf);
+
             for (chunk_cubic_t* c : level->chunks)
             {
-                if (int(cpos.x) >> 4 != c->chunk_x || int(cpos.y) >> 4 != c->chunk_y || int(cpos.z) >> 4 != c->chunk_z)
+                if (cam_pos.x >> 4 != c->chunk_x || cam_pos.y >> 4 != c->chunk_y || cam_pos.z >> 4 != c->chunk_z)
                     continue;
-                c->set_type(int(cpos.x) & 0x0F, int(cpos.y) & 0x0F, int(cpos.z) & 0x0F, BLOCK_ID_TORCH);
+                c->set_type(cam_pos.x & 0x0F, cam_pos.y & 0x0F, cam_pos.z & 0x0F, BLOCK_ID_TORCH);
             }
-        } /* Fall-through */
+
+            int diff_x = ((cam_pos.x & 0x0F) < 8) ? -1 : 1;
+            int diff_y = ((cam_pos.y & 0x0F) < 8) ? -1 : 1;
+            int diff_z = ((cam_pos.z & 0x0F) < 8) ? -1 : 1;
+            glm::ivec3 chunk_coords(cam_pos.x >> 4, cam_pos.y >> 4, cam_pos.z >> 4);
+
+            for (chunk_cubic_t* c : level->chunks)
+            {
+                if (SDL_abs(chunk_coords.x - c->chunk_x) > 1 || SDL_abs(chunk_coords.y - c->chunk_y) > 1 || SDL_abs(chunk_coords.z - c->chunk_z) > 1)
+                    continue;
+
+                if (chunk_coords.x - c->chunk_x == diff_x || chunk_coords.y - c->chunk_y == diff_y || chunk_coords.z - c->chunk_z == diff_z)
+                    continue;
+
+                c->dirty = 1;
+            }
+            break;
+        }
         case SDL_SCANCODE_M:
         {
             for (chunk_cubic_t* c : level->chunks)
