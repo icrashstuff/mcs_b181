@@ -774,22 +774,22 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 faces[1].corners[2] = { faces[1].corners[0].x, faces[1].corners[3].y };
 
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 9), Uint16(y * 16 + 10), Uint16(z * 16 + 9), ao[3] },
+                    { 1, Sint16(x * 16 + 9), Sint16(y * 16 + 10), Sint16(z * 16 + 9), ao[3] },
                     { r, g, b, bl[3], slight_sky[1][2][1] },
                     faces[1].corners[0],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 9), Uint16(y * 16 + 10), Uint16(z * 16 + 7), ao[1] },
+                    { 1, Sint16(x * 16 + 9), Sint16(y * 16 + 10), Sint16(z * 16 + 7), ao[1] },
                     { r, g, b, bl[1], slight_sky[1][2][1] },
                     faces[1].corners[2],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 7), Uint16(y * 16 + 10), Uint16(z * 16 + 9), ao[2] },
+                    { 1, Sint16(x * 16 + 7), Sint16(y * 16 + 10), Sint16(z * 16 + 9), ao[2] },
                     { r, g, b, bl[2], slight_sky[1][2][1] },
                     faces[1].corners[1],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 7), Uint16(y * 16 + 10), Uint16(z * 16 + 7), ao[0] },
+                    { 1, Sint16(x * 16 + 7), Sint16(y * 16 + 10), Sint16(z * 16 + 7), ao[0] },
                     { r, g, b, bl[0], slight_sky[1][2][1] },
                     faces[1].corners[3],
                 });
@@ -802,22 +802,22 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 Uint8 bl[] = { slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1] };
 
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 9), Uint16(y * 16 + 0), Uint16(z * 16 + 0), ao[0] },
+                    { 1, Sint16(x * 16 + 9), Sint16(y * 16 + 0), Sint16(z * 16 + 0), ao[0] },
                     { r, g, b, bl[0], slight_sky[2][1][1] },
                     faces[0].corners[3],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 9), Uint16(y * 16 + 16), Uint16(z * 16 + 0), ao[1] },
+                    { 1, Sint16(x * 16 + 9), Sint16(y * 16 + 16), Sint16(z * 16 + 0), ao[1] },
                     { r, g, b, bl[1], slight_sky[2][1][1] },
                     faces[0].corners[1],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 9), Uint16(y * 16 + 0), Uint16(z * 16 + 16), ao[2] },
+                    { 1, Sint16(x * 16 + 9), Sint16(y * 16 + 0), Sint16(z * 16 + 16), ao[2] },
                     { r, g, b, bl[2], slight_sky[2][1][1] },
                     faces[0].corners[2],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 9), Uint16(y * 16 + 16), Uint16(z * 16 + 16), ao[3] },
+                    { 1, Sint16(x * 16 + 9), Sint16(y * 16 + 16), Sint16(z * 16 + 16), ao[3] },
                     { r, g, b, bl[3], slight_sky[2][1][1] },
                     faces[0].corners[0],
                 });
@@ -830,22 +830,22 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 Uint8 bl[] = { slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1] };
 
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 7), Uint16(y * 16 + 16), Uint16(z * 16 + 16), ao[3] },
+                    { 1, Sint16(x * 16 + 7), Sint16(y * 16 + 16), Sint16(z * 16 + 16), ao[3] },
                     { r, g, b, bl[3], slight_sky[0][1][1] },
                     faces[3].corners[1],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 7), Uint16(y * 16 + 16), Uint16(z * 16 + 0), ao[1] },
+                    { 1, Sint16(x * 16 + 7), Sint16(y * 16 + 16), Sint16(z * 16 + 0), ao[1] },
                     { r, g, b, bl[1], slight_sky[0][1][1] },
                     faces[3].corners[0],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 7), Uint16(y * 16 + 0), Uint16(z * 16 + 16), ao[2] },
+                    { 1, Sint16(x * 16 + 7), Sint16(y * 16 + 0), Sint16(z * 16 + 16), ao[2] },
                     { r, g, b, bl[2], slight_sky[0][1][1] },
                     faces[3].corners[3],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 7), Uint16(y * 16 + 0), Uint16(z * 16 + 0), ao[0] },
+                    { 1, Sint16(x * 16 + 7), Sint16(y * 16 + 0), Sint16(z * 16 + 0), ao[0] },
                     { r, g, b, bl[0], slight_sky[0][1][1] },
                     faces[3].corners[2],
                 });
@@ -858,22 +858,22 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 Uint8 bl[] = { slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1] };
 
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 16), Uint16(y * 16 + 16), Uint16(z * 16 + 9), ao[3] },
+                    { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 16), Sint16(z * 16 + 9), ao[3] },
                     { r, g, b, bl[3], slight_sky[1][1][2] },
                     faces[2].corners[1],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 0), Uint16(y * 16 + 16), Uint16(z * 16 + 9), ao[1] },
+                    { 1, Sint16(x * 16 + 0), Sint16(y * 16 + 16), Sint16(z * 16 + 9), ao[1] },
                     { r, g, b, bl[1], slight_sky[1][1][2] },
                     faces[2].corners[0],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 16), Uint16(y * 16 + 0), Uint16(z * 16 + 9), ao[2] },
+                    { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 0), Sint16(z * 16 + 9), ao[2] },
                     { r, g, b, bl[2], slight_sky[1][1][2] },
                     faces[2].corners[3],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 0), Uint16(y * 16 + 0), Uint16(z * 16 + 9), ao[0] },
+                    { 1, Sint16(x * 16 + 0), Sint16(y * 16 + 0), Sint16(z * 16 + 9), ao[0] },
                     { r, g, b, bl[0], slight_sky[1][1][2] },
                     faces[2].corners[2],
                 });
@@ -886,22 +886,22 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 Uint8 bl[] = { slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1] };
 
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 0), Uint16(y * 16 + 0), Uint16(z * 16 + 7), ao[0] },
+                    { 1, Sint16(x * 16 + 0), Sint16(y * 16 + 0), Sint16(z * 16 + 7), ao[0] },
                     { r, g, b, bl[0], slight_sky[1][1][0] },
                     faces[5].corners[3],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 0), Uint16(y * 16 + 16), Uint16(z * 16 + 7), ao[1] },
+                    { 1, Sint16(x * 16 + 0), Sint16(y * 16 + 16), Sint16(z * 16 + 7), ao[1] },
                     { r, g, b, bl[1], slight_sky[1][1][0] },
                     faces[5].corners[1],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 16), Uint16(y * 16 + 0), Uint16(z * 16 + 7), ao[2] },
+                    { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 0), Sint16(z * 16 + 7), ao[2] },
                     { r, g, b, bl[2], slight_sky[1][1][0] },
                     faces[5].corners[2],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 16), Uint16(y * 16 + 16), Uint16(z * 16 + 7), ao[3] },
+                    { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 16), Sint16(z * 16 + 7), ao[3] },
                     { r, g, b, bl[3], slight_sky[1][1][0] },
                     faces[5].corners[0],
                 });
@@ -918,22 +918,22 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 Uint8 bl[] = { slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1] };
 
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 15), Uint16(y * 16 + 0), Uint16(z * 16 + 1), ao[0] },
+                    { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 0), Sint16(z * 16 + 1), ao[0] },
                     { r, g, b, bl[0], slight_sky[2][1][1] },
                     faces[0].corners[3],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 15), Uint16(y * 16 + 16), Uint16(z * 16 + 1), ao[1] },
+                    { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 16), Sint16(z * 16 + 1), ao[1] },
                     { r, g, b, bl[1], slight_sky[2][1][1] },
                     faces[0].corners[1],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 1), Uint16(y * 16 + 0), Uint16(z * 16 + 15), ao[2] },
+                    { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 0), Sint16(z * 16 + 15), ao[2] },
                     { r, g, b, bl[2], slight_sky[2][1][1] },
                     faces[0].corners[2],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 1), Uint16(y * 16 + 16), Uint16(z * 16 + 15), ao[3] },
+                    { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 16), Sint16(z * 16 + 15), ao[3] },
                     { r, g, b, bl[3], slight_sky[2][1][1] },
                     faces[0].corners[0],
                 });
@@ -946,22 +946,22 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 Uint8 bl[] = { slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1] };
 
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 1), Uint16(y * 16 + 16), Uint16(z * 16 + 15), ao[3] },
+                    { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 16), Sint16(z * 16 + 15), ao[3] },
                     { r, g, b, bl[3], slight_sky[0][1][1] },
                     faces[3].corners[1],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 15), Uint16(y * 16 + 16), Uint16(z * 16 + 1), ao[1] },
+                    { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 16), Sint16(z * 16 + 1), ao[1] },
                     { r, g, b, bl[1], slight_sky[0][1][1] },
                     faces[3].corners[0],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 1), Uint16(y * 16 + 0), Uint16(z * 16 + 15), ao[2] },
+                    { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 0), Sint16(z * 16 + 15), ao[2] },
                     { r, g, b, bl[2], slight_sky[0][1][1] },
                     faces[3].corners[3],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 15), Uint16(y * 16 + 0), Uint16(z * 16 + 1), ao[0] },
+                    { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 0), Sint16(z * 16 + 1), ao[0] },
                     { r, g, b, bl[0], slight_sky[0][1][1] },
                     faces[3].corners[2],
                 });
@@ -974,22 +974,22 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 Uint8 bl[] = { slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1] };
 
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 15), Uint16(y * 16 + 16), Uint16(z * 16 + 15), ao[3] },
+                    { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 16), Sint16(z * 16 + 15), ao[3] },
                     { r, g, b, bl[3], slight_sky[1][1][2] },
                     faces[2].corners[1],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 0), Uint16(y * 16 + 16), Uint16(z * 16 + 0), ao[1] },
+                    { 1, Sint16(x * 16 + 0), Sint16(y * 16 + 16), Sint16(z * 16 + 0), ao[1] },
                     { r, g, b, bl[1], slight_sky[1][1][2] },
                     faces[2].corners[0],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 15), Uint16(y * 16 + 0), Uint16(z * 16 + 15), ao[2] },
+                    { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 0), Sint16(z * 16 + 15), ao[2] },
                     { r, g, b, bl[2], slight_sky[1][1][2] },
                     faces[2].corners[3],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 0), Uint16(y * 16 + 0), Uint16(z * 16 + 0), ao[0] },
+                    { 1, Sint16(x * 16 + 0), Sint16(y * 16 + 0), Sint16(z * 16 + 0), ao[0] },
                     { r, g, b, bl[0], slight_sky[1][1][2] },
                     faces[2].corners[2],
                 });
@@ -1002,22 +1002,22 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 Uint8 bl[] = { slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1] };
 
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 1), Uint16(y * 16 + 0), Uint16(z * 16 + 1), ao[0] },
+                    { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 0), Sint16(z * 16 + 1), ao[0] },
                     { r, g, b, bl[0], slight_sky[1][1][0] },
                     faces[5].corners[3],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 1), Uint16(y * 16 + 16), Uint16(z * 16 + 1), ao[1] },
+                    { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 16), Sint16(z * 16 + 1), ao[1] },
                     { r, g, b, bl[1], slight_sky[1][1][0] },
                     faces[5].corners[1],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 15), Uint16(y * 16 + 0), Uint16(z * 16 + 15), ao[2] },
+                    { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 0), Sint16(z * 16 + 15), ao[2] },
                     { r, g, b, bl[2], slight_sky[1][1][0] },
                     faces[5].corners[2],
                 });
                 vtx.push_back({
-                    { 1, Uint16(x * 16 + 15), Uint16(y * 16 + 16), Uint16(z * 16 + 15), ao[3] },
+                    { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 16), Sint16(z * 16 + 15), ao[3] },
                     { r, g, b, bl[3], slight_sky[1][1][0] },
                     faces[5].corners[0],
                 });
@@ -1043,22 +1043,22 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 };
 
                 vtx.push_back({
-                    { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 1), ao[3] },
+                    { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
                     { r, g, b, bl[3], slight_sky[1][2][1] },
                     faces[1].corners[0],
                 });
                 vtx.push_back({
-                    { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 0), ao[1] },
+                    { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[1] },
                     { r, g, b, bl[1], slight_sky[1][2][1] },
                     faces[1].corners[2],
                 });
                 vtx.push_back({
-                    { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 1), ao[2] },
+                    { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[2] },
                     { r, g, b, bl[2], slight_sky[1][2][1] },
                     faces[1].corners[1],
                 });
                 vtx.push_back({
-                    { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 0), ao[0] },
+                    { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[0] },
                     { r, g, b, bl[0], slight_sky[1][2][1] },
                     faces[1].corners[3],
                 });
@@ -1082,22 +1082,22 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 };
 
                 vtx.push_back({
-                    { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 0), ao[0] },
+                    { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
                     { r, g, b, bl[0], slight_sky[1][0][1] },
                     faces[4].corners[1],
                 });
                 vtx.push_back({
-                    { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 0), ao[1] },
+                    { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[1] },
                     { r, g, b, bl[1], slight_sky[1][0][1] },
                     faces[4].corners[0],
                 });
                 vtx.push_back({
-                    { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 1), ao[2] },
+                    { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 1), ao[2] },
                     { r, g, b, bl[2], slight_sky[1][0][1] },
                     faces[4].corners[3],
                 });
                 vtx.push_back({
-                    { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 1), ao[3] },
+                    { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 1), ao[3] },
                     { r, g, b, bl[3], slight_sky[1][0][1] },
                     faces[4].corners[2],
                 });
@@ -1121,22 +1121,22 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 };
 
                 vtx.push_back({
-                    { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 0), ao[0] },
+                    { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[0] },
                     { r, g, b, bl[0], slight_sky[2][1][1] },
                     faces[0].corners[3],
                 });
                 vtx.push_back({
-                    { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 0), ao[1] },
+                    { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[1] },
                     { r, g, b, bl[1], slight_sky[2][1][1] },
                     faces[0].corners[1],
                 });
                 vtx.push_back({
-                    { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 1), ao[2] },
+                    { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 1), ao[2] },
                     { r, g, b, bl[2], slight_sky[2][1][1] },
                     faces[0].corners[2],
                 });
                 vtx.push_back({
-                    { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 1), ao[3] },
+                    { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
                     { r, g, b, bl[3], slight_sky[2][1][1] },
                     faces[0].corners[0],
                 });
@@ -1160,22 +1160,22 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 };
 
                 vtx.push_back({
-                    { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 1), ao[3] },
+                    { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[3] },
                     { r, g, b, bl[3], slight_sky[0][1][1] },
                     faces[3].corners[1],
                 });
                 vtx.push_back({
-                    { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 0), ao[1] },
+                    { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[1] },
                     { r, g, b, bl[1], slight_sky[0][1][1] },
                     faces[3].corners[0],
                 });
                 vtx.push_back({
-                    { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 1), ao[2] },
+                    { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 1), ao[2] },
                     { r, g, b, bl[2], slight_sky[0][1][1] },
                     faces[3].corners[3],
                 });
                 vtx.push_back({
-                    { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 0), ao[0] },
+                    { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
                     { r, g, b, bl[0], slight_sky[0][1][1] },
                     faces[3].corners[2],
                 });
@@ -1199,22 +1199,22 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 };
 
                 vtx.push_back({
-                    { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 1), ao[3] },
+                    { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
                     { r, g, b, bl[3], slight_sky[1][1][2] },
                     faces[2].corners[1],
                 });
                 vtx.push_back({
-                    { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 1), ao[1] },
+                    { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[1] },
                     { r, g, b, bl[1], slight_sky[1][1][2] },
                     faces[2].corners[0],
                 });
                 vtx.push_back({
-                    { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 1), ao[2] },
+                    { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 1), ao[2] },
                     { r, g, b, bl[2], slight_sky[1][1][2] },
                     faces[2].corners[3],
                 });
                 vtx.push_back({
-                    { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 1), ao[0] },
+                    { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 1), ao[0] },
                     { r, g, b, bl[0], slight_sky[1][1][2] },
                     faces[2].corners[2],
                 });
@@ -1238,22 +1238,22 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 };
 
                 vtx.push_back({
-                    { 16, Uint16(x + 0), Uint16(y + 0), Uint16(z + 0), ao[0] },
+                    { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
                     { r, g, b, bl[0], slight_sky[1][1][0] },
                     faces[5].corners[3],
                 });
                 vtx.push_back({
-                    { 16, Uint16(x + 0), Uint16(y + 1), Uint16(z + 0), ao[1] },
+                    { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[1] },
                     { r, g, b, bl[1], slight_sky[1][1][0] },
                     faces[5].corners[1],
                 });
                 vtx.push_back({
-                    { 16, Uint16(x + 1), Uint16(y + 0), Uint16(z + 0), ao[2] },
+                    { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[2] },
                     { r, g, b, bl[2], slight_sky[1][1][0] },
                     faces[5].corners[2],
                 });
                 vtx.push_back({
-                    { 16, Uint16(x + 1), Uint16(y + 1), Uint16(z + 0), ao[3] },
+                    { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[3] },
                     { r, g, b, bl[3], slight_sky[1][1][0] },
                     faces[5].corners[0],
                 });
