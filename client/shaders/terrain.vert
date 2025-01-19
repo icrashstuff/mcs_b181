@@ -58,9 +58,9 @@ uniform mat4 projection;
 void main()
 {
     vec3 pos;
-    pos.x = float((vtx_pos_ao) & 511u) / 16.0;
-    pos.y = float((vtx_pos_ao >> 9) & 511u) / 16.0;
-    pos.z = float((vtx_pos_ao >> 18) & 511u) / 16.0;
+    pos.x = float(int((vtx_pos_ao      ) & 511u ) - 128) / 16.0;
+    pos.y = float(int((vtx_pos_ao >>  9) & 511u ) - 128) / 16.0;
+    pos.z = float(int((vtx_pos_ao >> 18) & 511u ) - 128) / 16.0;
     vec4 position = camera * model * vec4(pos, 1.0);
     gl_Position = projection * position;
 

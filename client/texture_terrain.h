@@ -40,15 +40,21 @@ struct terrain_vertex_t
         Uint32 dat = 0;
 
         vtx_pos_ao_t() { }
-        vtx_pos_ao_t(Uint16 multiplier, Uint16 x, Uint16 y, Uint16 z, Uint8 ao)
+        vtx_pos_ao_t(Uint16 multiplier, Sint16 x, Sint16 y, Sint16 z, Uint8 ao)
         {
             x *= multiplier;
             z *= multiplier;
             y *= multiplier;
-            assert(x <= 0x01FF);
-            assert(y <= 0x01FF);
-            assert(z <= 0x01FF);
+            assert(x >= -128);
+            assert(y >= -128);
+            assert(z >= -128);
+            assert(x < 384);
+            assert(y < 384);
+            assert(z < 384);
             assert(ao <= 0x03);
+            x += 128;
+            y += 128;
+            z += 128;
             dat |= ((x & 0x01FF));
             dat |= ((y & 0x01FF) << 9);
             dat |= ((z & 0x01FF) << 18);
