@@ -70,8 +70,18 @@ struct level_t
     // TODO
     void render();
 
+    /**
+     * Build and or replace the mesh for the corresponding chunk
+     */
     void build_mesh(int chunk_x, int chunk_y, int chunk_z);
 
+    /**
+     * Conduct a lighting pass on corresponding chunk
+     *
+     * 3 Light passes are necessary for light to correctly jump chunks
+     *
+     * TODO: Handle light transmission in water/other translucent blocks
+     */
     void light_pass(int chunk_x, int chunk_y, int chunk_z, bool local_only);
 };
 

@@ -49,8 +49,7 @@ struct chunk_cubic_t
      */
     GLenum index_type = GL_NONE;
     size_t index_count = 0;
-    size_t index_offset_water = 0;
-    size_t index_count_water = 0;
+    size_t index_count_translucent = 0;
 
     int chunk_x = 0;
     int chunk_y = 0;

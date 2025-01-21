@@ -46,7 +46,7 @@
 
 #include "shared/chunk.h"
 
-long server_seed = 0;
+long server_seed = 1;
 
 #define WEATHER_OFF 0
 #define WEATHER_RAIN 1

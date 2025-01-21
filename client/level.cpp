@@ -40,6 +40,16 @@
             dc_log(fmt, ##__VA_ARGS__);          \
     } while (0)
 
+void level_t::rebuild_meshes(bool rebuild_terrain)
+{
+    for (chunk_cubic_t* c : chunks)
+        c->dirty = true;
+
+    terrain.reset(new texture_terrain_t("/_resources/assets/minecraft/textures/"));
+
+    build_dirty_meshes();
+}
+
 void level_t::build_dirty_meshes()
 {
     size_t built;
@@ -259,6 +269,7 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
     }
 
     std::vector<terrain_vertex_t> vtx;
+    std::vector<terrain_vertex_t> vtx_translucent;
 
     for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_X * SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z; dat_it++)
     {
@@ -278,6 +289,7 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
 
         /** Index: [x+1][y+1][z+1] */
         block_id_t stypes[3][3][3];
+        Uint8 smetadata[3][3][3];
         Uint8 slight_block[3][3][3];
         Uint8 slight_sky[3][3][3];
         for (int i = -1; i < 2; i++)
@@ -324,6 +336,8 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
 
                     chunk_cubic_t* c = rubik[chunk_ix][chunk_iy][chunk_iz];
                     stypes[i + 1][j + 1][k + 1] = c == NULL ? BLOCK_ID_AIR : c->get_type_fallback(local_x, local_y, local_z, BLOCK_ID_AIR);
+                    /* TODO: Move this out? */
+                    smetadata[i + 1][j + 1][k + 1] = c == NULL ? 0 : c->get_metadata(local_x, local_y, local_z);
                     slight_block[i + 1][j + 1][k + 1] = c == NULL ? 0 : c->get_light_block(local_x, local_y, local_z);
                     slight_sky[i + 1][j + 1][k + 1] = c == NULL ? 0 : c->get_light_sky(local_x, local_y, local_z);
                 }
@@ -400,9 +414,9 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
         }
             BLOCK_SIMPLE(BLOCK_ID_BEDROCK, mc_id::FACE_BEDROCK);
 
-            BLOCK_SIMPLE(BLOCK_ID_WATER_FLOWING, mc_id::FACE_WATER_FLOW_STRAIGHT);
+            BLOCK_SIMPLE(BLOCK_ID_WATER_FLOWING, mc_id::FACE_WATER_FLOW);
             BLOCK_SIMPLE(BLOCK_ID_WATER_SOURCE, mc_id::FACE_WATER_STILL);
-            BLOCK_SIMPLE(BLOCK_ID_LAVA_FLOWING, mc_id::FACE_LAVA_FLOW_STRAIGHT);
+            BLOCK_SIMPLE(BLOCK_ID_LAVA_FLOWING, mc_id::FACE_LAVA_FLOW);
             BLOCK_SIMPLE(BLOCK_ID_LAVA_SOURCE, mc_id::FACE_LAVA_STILL);
 
             BLOCK_SIMPLE(BLOCK_ID_SAND, mc_id::FACE_SAND);
@@ -758,6 +772,7 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
 #define UAO(X) (!mc_id::is_transparent(stypes X))
 #define UBL(X) (slight_block X * mc_id::is_transparent(stypes X))
 
+        /* ============ BEGIN: IS_TORCH ============ */
         if (type == BLOCK_ID_TORCH || type == BLOCK_ID_TORCH_REDSTONE_ON || type == BLOCK_ID_TORCH_REDSTONE_OFF)
         {
             /* Positive Y */
@@ -907,6 +922,8 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 });
             }
         }
+        /* ============ END: IS_TORCH ============ */
+        /* ============ BEGIN: IS_CROSS_BLOCK ============ */
         else if (type == BLOCK_ID_FLOWER_RED || type == BLOCK_ID_FLOWER_YELLOW || type == BLOCK_ID_COBWEB || type == BLOCK_ID_MUSHROOM_BLAND
             || type == BLOCK_ID_MUSHROOM_RED || type == BLOCK_ID_FOLIAGE || type == BLOCK_ID_DEAD_BUSH || type == BLOCK_ID_SAPLING
             || type == BLOCK_ID_SUGAR_CANE)
@@ -1023,6 +1040,556 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 });
             }
         }
+        /* ============ END: IS_CROSS_BLOCK  ============*/
+        /* ============ BEGIN: IS_FLUID ============ */
+        else if (type == BLOCK_ID_LAVA_FLOWING || type == BLOCK_ID_LAVA_SOURCE || type == BLOCK_ID_WATER_FLOWING || type == BLOCK_ID_WATER_SOURCE)
+        {
+            /* Simplify block id checking */
+            for (int i = 0; i < 3; i++)
+                for (int j = 0; j < 3; j++)
+                    for (int k = 0; k < 3; k++)
+                    {
+                        if (stypes[i][j][k] == BLOCK_ID_LAVA_FLOWING)
+                            stypes[i][j][k] = BLOCK_ID_LAVA_SOURCE;
+                        else if (stypes[i][j][k] == BLOCK_ID_WATER_FLOWING)
+                            stypes[i][j][k] = BLOCK_ID_WATER_SOURCE;
+                    }
+            type = stypes[1][1][1];
+
+            bool is_water = (type == BLOCK_ID_WATER_SOURCE);
+            std::vector<terrain_vertex_t>* vtx_fluid = is_water ? &vtx_translucent : &vtx;
+
+            mc_id::terrain_face_t face_flow = terrain->get_face(is_water ? mc_id::FACE_WATER_FLOW : mc_id::FACE_LAVA_FLOW);
+            mc_id::terrain_face_t face_still = terrain->get_face(is_water ? mc_id::FACE_WATER_STILL : mc_id::FACE_LAVA_STILL);
+
+#define IS_SAME_FLUID(A, B) (A == B)
+#define IS_FLUID(A) ((A) == BLOCK_ID_WATER_SOURCE || (A) == BLOCK_ID_LAVA_SOURCE)
+
+            struct fluid_corners_t
+            {
+                Uint8 zero;
+                Uint8 posx;
+                Uint8 posz;
+                Uint8 both;
+
+                fluid_corners_t() { }
+                fluid_corners_t(int set)
+                    : fluid_corners_t(set, set, set, set)
+                {
+                }
+                fluid_corners_t(int z, int px, int pz, int b)
+                {
+                    zero = SDL_clamp(z, 0, 16);
+                    posx = SDL_clamp(px, 0, 16);
+                    posz = SDL_clamp(pz, 0, 16);
+                    both = SDL_clamp(b, 0, 16);
+                }
+
+                fluid_corners_t operator/(int a)
+                {
+                    fluid_corners_t t;
+                    t.zero = zero / a;
+                    t.posx = posx / a;
+                    t.posz = posz / a;
+                    t.both = both / a;
+                    return t;
+                }
+            };
+            /** Fluid depths (For deciding texture info) */
+            fluid_corners_t corner_depths;
+            /** Actual mesh heights*/
+            fluid_corners_t corner_heights;
+
+            int fluid_force_flow = 0;
+
+            /* When nearby block is same override normal corner? */
+            /* Block above is fluid, skip decision making*/
+            if (IS_FLUID(stypes[1][2][1]))
+            {
+                corner_depths = 8;
+                corner_heights = 16;
+            }
+            else
+            {
+#define FLUID_MAX_META 8
+#define FLUID_DEPTH_FROM_METADATA(METADATA) ((METADATA < FLUID_MAX_META) ? FLUID_MAX_META - METADATA : FLUID_MAX_META)
+#define FLUID_DEPTH_IF_SAME(SUBSCRIPT) (IS_SAME_FLUID(stypes SUBSCRIPT, type) ? FLUID_DEPTH_FROM_METADATA(smetadata SUBSCRIPT) : 0)
+#define FLUID_DEPTH_IF_SAME_MAX(VAR, SUBSCRIPT)                                                              \
+    do                                                                                                       \
+    {                                                                                                        \
+        Uint8 NEW_##VAR = (IS_FLUID(stypes SUBSCRIPT) ? FLUID_DEPTH_FROM_METADATA(smetadata SUBSCRIPT) : 0); \
+        corner_depths.VAR = SDL_max(NEW_##VAR, corner_depths.VAR);                                           \
+    } while (0)
+
+                corner_depths = FLUID_DEPTH_FROM_METADATA(metadata);
+                corner_heights = 0;
+
+                /* Max a corner if the 2x2 region above the corner contains the same fluid */
+                bool max_zero = IS_FLUID(stypes[0][2][0]) || IS_FLUID(stypes[1][2][0]) || IS_FLUID(stypes[0][2][1]);
+                bool max_posx = IS_FLUID(stypes[1][2][0]) || IS_FLUID(stypes[2][2][0]) || IS_FLUID(stypes[2][2][1]);
+                bool max_posz = IS_FLUID(stypes[0][2][2]) || IS_FLUID(stypes[1][2][2]) || IS_FLUID(stypes[0][2][1]);
+                bool max_both = IS_FLUID(stypes[1][2][2]) || IS_FLUID(stypes[2][2][2]) || IS_FLUID(stypes[2][2][1]);
+
+                if (FLUID_DEPTH_FROM_METADATA(smetadata[1][1][0]) < corner_depths.zero)
+                    fluid_force_flow = 1;
+                if (FLUID_DEPTH_FROM_METADATA(smetadata[1][1][0]) < corner_depths.posx)
+                    fluid_force_flow = 1;
+
+                if (FLUID_DEPTH_FROM_METADATA(smetadata[0][1][1]) < corner_depths.zero)
+                    fluid_force_flow = 2;
+                if (FLUID_DEPTH_FROM_METADATA(smetadata[0][1][1]) < corner_depths.posz)
+                    fluid_force_flow = 2;
+
+                if (FLUID_DEPTH_FROM_METADATA(smetadata[1][1][2]) < corner_depths.both)
+                    fluid_force_flow = 3;
+                if (FLUID_DEPTH_FROM_METADATA(smetadata[1][1][2]) < corner_depths.posz)
+                    fluid_force_flow = 3;
+
+                if (FLUID_DEPTH_FROM_METADATA(smetadata[2][1][1]) < corner_depths.both)
+                    fluid_force_flow = 4;
+                if (FLUID_DEPTH_FROM_METADATA(smetadata[2][1][1]) < corner_depths.posx)
+                    fluid_force_flow = 4;
+
+                FLUID_DEPTH_IF_SAME_MAX(zero, [0][1][0]);
+                FLUID_DEPTH_IF_SAME_MAX(zero, [1][1][0]);
+                FLUID_DEPTH_IF_SAME_MAX(zero, [0][1][1]);
+
+                FLUID_DEPTH_IF_SAME_MAX(both, [2][1][2]);
+                FLUID_DEPTH_IF_SAME_MAX(both, [1][1][2]);
+                FLUID_DEPTH_IF_SAME_MAX(both, [2][1][1]);
+
+                FLUID_DEPTH_IF_SAME_MAX(posx, [2][1][0]);
+                FLUID_DEPTH_IF_SAME_MAX(posx, [1][1][0]);
+                FLUID_DEPTH_IF_SAME_MAX(posx, [2][1][1]);
+
+                FLUID_DEPTH_IF_SAME_MAX(posz, [0][1][2]);
+                FLUID_DEPTH_IF_SAME_MAX(posz, [0][1][1]);
+                FLUID_DEPTH_IF_SAME_MAX(posz, [1][1][2]);
+
+                corner_depths.zero = max_zero ? FLUID_MAX_META : corner_depths.zero;
+                corner_depths.posx = max_posx ? FLUID_MAX_META : corner_depths.posx;
+                corner_depths.posz = max_posz ? FLUID_MAX_META : corner_depths.posz;
+                corner_depths.both = max_both ? FLUID_MAX_META : corner_depths.both;
+
+                corner_heights.zero = 1 + corner_depths.zero + (corner_depths.zero == FLUID_MAX_META) * 2;
+                corner_heights.posx = 1 + corner_depths.posx + (corner_depths.posx == FLUID_MAX_META) * 2;
+                corner_heights.posz = 1 + corner_depths.posz + (corner_depths.posz == FLUID_MAX_META) * 2;
+                corner_heights.both = 1 + corner_depths.both + (corner_depths.both == FLUID_MAX_META) * 2;
+
+#define FLUID_RAISE(X) ((stypes X) != BLOCK_ID_AIR)
+                corner_heights.zero += (FLUID_RAISE([0][1][0]) + FLUID_RAISE([1][1][0]) + FLUID_RAISE([0][1][1]));
+                corner_heights.posx += (FLUID_RAISE([2][1][0]) + FLUID_RAISE([1][1][0]) + FLUID_RAISE([2][1][1]));
+                corner_heights.posz += (FLUID_RAISE([0][1][2]) + FLUID_RAISE([0][1][1]) + FLUID_RAISE([1][1][2]));
+                corner_heights.both += (FLUID_RAISE([2][1][2]) + FLUID_RAISE([2][1][1]) + FLUID_RAISE([1][1][2]));
+
+                corner_heights.zero = max_zero ? 16 : SDL_clamp(corner_heights.zero, 1, 16);
+                corner_heights.posx = max_posx ? 16 : SDL_clamp(corner_heights.posx, 1, 16);
+                corner_heights.posz = max_posz ? 16 : SDL_clamp(corner_heights.posz, 1, 16);
+                corner_heights.both = max_both ? 16 : SDL_clamp(corner_heights.both, 1, 16);
+            }
+
+            glm::vec2 face_flow_tsize = (face_flow.corners[3] - face_flow.corners[0]);
+
+            /* Positive Y */
+            if (!IS_SAME_FLUID(stypes[1][2][1], type))
+            {
+                Uint8 ao[] = { 0, 0, 0, 0 };
+
+                Uint8 bl[] = { Uint8(slight_block[1][1][1]), Uint8(slight_block[1][1][1]), Uint8(slight_block[1][1][1]), Uint8(slight_block[1][1][1]) };
+
+                int slope_left = corner_depths.zero - corner_depths.posx;
+                int slope_bot = corner_depths.zero - corner_depths.posz;
+                int slope_right = corner_depths.both - corner_depths.posz;
+                int slope_top = corner_depths.both - corner_depths.posx;
+                int slope_zeroboth = corner_depths.both - corner_depths.zero;
+                int slope_posxposz = corner_depths.posx - corner_depths.posz;
+
+                mc_id::terrain_face_t face_top;
+
+                bool is_still = slope_left == 0 && slope_bot == 0 && slope_right == 0 && slope_top == 0;
+                if (!is_still)
+                    fluid_force_flow = false;
+                if (fluid_force_flow)
+                    is_still = false;
+                float flow_rot = 0.0f;
+
+                if (is_still)
+                    face_top = face_still;
+                else if (fluid_force_flow)
+                {
+                    switch (fluid_force_flow)
+                    {
+                    case 2:
+                        flow_rot = 0.0f;
+                        break;
+                    case 3:
+                        flow_rot = 90.0f;
+                        break;
+                    case 4:
+                        flow_rot = 180.0f;
+                        break;
+                    case 1: /* Fall through */
+                    default:
+                        flow_rot = 270.0f;
+                        break;
+                    }
+                }
+                else if (slope_left == -slope_right && slope_top == -slope_bot) /* Axis aligned flow */
+                {
+                    if (slope_left > 0)
+                        flow_rot -= 180.0f;
+
+                    if (slope_top > 0)
+                        flow_rot -= 90.0f;
+                    if (slope_bot > 0)
+                        flow_rot += 90.0f;
+                }
+                else if (slope_zeroboth != 0 || slope_posxposz != 0) /* Diagonal Flow */
+                {
+                    int slope_to_use = (SDL_abs(slope_posxposz) < SDL_abs(slope_zeroboth)) ? slope_zeroboth : slope_posxposz;
+                    flow_rot = 45.0f;
+
+                    if (slope_to_use < 0)
+                        flow_rot += 90.0f;
+
+                    if (slope_posxposz < slope_zeroboth)
+                        flow_rot += 90.0f;
+
+                    if (slope_posxposz < slope_zeroboth && slope_to_use > 0)
+                        flow_rot += 180.0f;
+
+                    // TODO-OPT: Add 22.5 degree adjustments
+                }
+                else if (slope_zeroboth == 0 && slope_posxposz == 0)
+                {
+                    if (corner_depths.both > corner_depths.posx)
+                        flow_rot = 45.0f;
+                    else
+                        flow_rot = 225.0f;
+                }
+                else
+                {
+                    face_top = terrain->get_face(mc_id::FACE_DEBUG);
+                    is_still = true;
+                }
+
+                if (!is_still)
+                {
+                    float radius = SDL_sqrtf(2.0f) * 0.25f;
+
+                    face_top.corners[0] = glm::vec2(glm::cos(glm::radians(135.0f + flow_rot)), glm::sin(glm::radians(135.0f + flow_rot))) * radius;
+                    face_top.corners[1] = glm::vec2(glm::cos(glm::radians(225.0f + flow_rot)), glm::sin(glm::radians(225.0f + flow_rot))) * radius;
+                    face_top.corners[2] = glm::vec2(glm::cos(glm::radians(45.0f + flow_rot)), glm::sin(glm::radians(45.0f + flow_rot))) * radius;
+                    face_top.corners[3] = glm::vec2(glm::cos(glm::radians(315.0f + flow_rot)), glm::sin(glm::radians(315.0f + flow_rot))) * radius;
+
+                    face_top.corners[0] = (face_top.corners[0] + glm::vec2(0.5f, 0.5f)) * face_flow_tsize + face_flow.corners[0];
+                    face_top.corners[1] = (face_top.corners[1] + glm::vec2(0.5f, 0.5f)) * face_flow_tsize + face_flow.corners[0];
+                    face_top.corners[2] = (face_top.corners[2] + glm::vec2(0.5f, 0.5f)) * face_flow_tsize + face_flow.corners[0];
+                    face_top.corners[3] = (face_top.corners[3] + glm::vec2(0.5f, 0.5f)) * face_flow_tsize + face_flow.corners[0];
+                }
+
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 16), Sint16(y * 16 + corner_heights.both), Sint16(z * 16 + 16), ao[3] },
+                    { r, g, b, bl[3], slight_sky[1][2][1] },
+                    face_top.corners[3],
+                });
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 16), Sint16(y * 16 + corner_heights.posx), Sint16(z * 16 + 00), ao[1] },
+                    { r, g, b, bl[1], slight_sky[1][2][1] },
+                    face_top.corners[1],
+                });
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 00), Sint16(y * 16 + corner_heights.posz), Sint16(z * 16 + 16), ao[2] },
+                    { r, g, b, bl[2], slight_sky[1][2][1] },
+                    face_top.corners[2],
+                });
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 00), Sint16(y * 16 + corner_heights.zero), Sint16(z * 16 + 00), ao[0] },
+                    { r, g, b, bl[0], slight_sky[1][2][1] },
+                    face_top.corners[0],
+                });
+            }
+
+            /* Negative Y */
+            if (mc_id::is_transparent(stypes[1][0][1]) && !IS_SAME_FLUID(stypes[1][0][1], type))
+            {
+                Uint8 ao[] = { 0, 0, 0, 0 };
+
+                Uint8 bl[] = { Uint8(slight_block[1][1][1]), Uint8(slight_block[1][1][1]), Uint8(slight_block[1][1][1]), Uint8(slight_block[1][1][1]) };
+
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 00), Sint16(y * 16 + 00), Sint16(z * 16 + 00), ao[0] },
+                    { r, g, b, bl[0], slight_sky[1][0][1] },
+                    face_still.corners[1],
+                });
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 00), Sint16(z * 16 + 00), ao[1] },
+                    { r, g, b, bl[1], slight_sky[1][0][1] },
+                    face_still.corners[0],
+                });
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 00), Sint16(y * 16 + 00), Sint16(z * 16 + 16), ao[2] },
+                    { r, g, b, bl[2], slight_sky[1][0][1] },
+                    face_still.corners[3],
+                });
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 00), Sint16(z * 16 + 16), ao[3] },
+                    { r, g, b, bl[3], slight_sky[1][0][1] },
+                    face_still.corners[2],
+                });
+            }
+
+            fluid_corners_t corner_tex_heights;
+            corner_tex_heights.zero = 16 - corner_heights.zero;
+            corner_tex_heights.posx = 16 - corner_heights.posx;
+            corner_tex_heights.posz = 16 - corner_heights.posz;
+            corner_tex_heights.both = 16 - corner_heights.both;
+
+#define FLUID_CALC_SIDE_HEIGHTS(CORNER1, CORNER2)                                                                               \
+    mc_id::terrain_face_t face_side;                                                                                            \
+    mc_id::terrain_face_t face_side_tri;                                                                                        \
+                                                                                                                                \
+    Uint8 max_corner_tex_heights = SDL_max(corner_tex_heights.CORNER1, corner_tex_heights.CORNER2);                             \
+    Uint8 min_corner_tex_heights = SDL_min(corner_tex_heights.CORNER1, corner_tex_heights.CORNER2);                             \
+                                                                                                                                \
+    Uint8 max_corner_heights = SDL_max(corner_heights.CORNER1, corner_heights.CORNER2);                                         \
+    Uint8 min_corner_heights = SDL_min(corner_heights.CORNER1, corner_heights.CORNER2);                                         \
+                                                                                                                                \
+    bool which_height = corner_heights.CORNER1 > corner_heights.CORNER2;                                                        \
+                                                                                                                                \
+    face_side.corners[0] = glm::vec2(0.0f, 0.5f * max_corner_tex_heights / 16.0f) * face_flow_tsize + face_flow.corners[0];     \
+    face_side.corners[1] = glm::vec2(0.5f, 0.5f * max_corner_tex_heights / 16.0f) * face_flow_tsize + face_flow.corners[0];     \
+    face_side.corners[2] = glm::vec2(0.0f, 0.5f) * face_flow_tsize + face_flow.corners[0];                                      \
+    face_side.corners[3] = glm::vec2(0.5f, 0.5f) * face_flow_tsize + face_flow.corners[0];                                      \
+                                                                                                                                \
+    face_side_tri.corners[0] = glm::vec2(0.0f, 0.5f * min_corner_tex_heights / 16.0f) * face_flow_tsize + face_flow.corners[0]; \
+    face_side_tri.corners[1] = glm::vec2(0.5f, 0.5f * min_corner_tex_heights / 16.0f) * face_flow_tsize + face_flow.corners[0]; \
+    face_side_tri.corners[2] = glm::vec2(0.0f, 0.5f * max_corner_tex_heights / 16.0f) * face_flow_tsize + face_flow.corners[0]; \
+    face_side_tri.corners[3] = glm::vec2(0.5f, 0.5f * max_corner_tex_heights / 16.0f) * face_flow_tsize + face_flow.corners[0];
+
+            /* Positive X */
+            if (mc_id::is_transparent(stypes[2][1][1]) && !IS_SAME_FLUID(stypes[2][1][1], type))
+            {
+                Uint8 ao[] = { 0, 0, 0, 0 };
+
+                Uint8 bl[] = { Uint8(slight_block[1][1][1]), Uint8(slight_block[1][1][1]), Uint8(slight_block[1][1][1]), Uint8(slight_block[1][1][1]) };
+
+                FLUID_CALC_SIDE_HEIGHTS(posx, both);
+
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 00), Sint16(z * 16 + 00), ao[0] },
+                    { r, g, b, bl[0], slight_sky[2][1][1] },
+                    face_side.corners[3],
+                });
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 16), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 00), ao[1] },
+                    { r, g, b, bl[1], slight_sky[2][1][1] },
+                    face_side.corners[1],
+                });
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 00), Sint16(z * 16 + 16), ao[2] },
+                    { r, g, b, bl[2], slight_sky[2][1][1] },
+                    face_side.corners[2],
+                });
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 16), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 16), ao[3] },
+                    { r, g, b, bl[3], slight_sky[2][1][1] },
+                    face_side.corners[0],
+                });
+
+                if (max_corner_heights != min_corner_heights)
+                {
+                    vtx_fluid->push_back({
+                        { 1, Sint16(x * 16 + 16), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 00), ao[0] },
+                        { r, g, b, bl[0], slight_sky[2][1][1] },
+                        face_side_tri.corners[3],
+                    });
+                    vtx_fluid->push_back({
+                        { 1, Sint16(x * 16 + 16), Sint16(y * 16 + corner_heights.posx), Sint16(z * 16 + 00), ao[1] },
+                        { r, g, b, bl[1], slight_sky[2][1][1] },
+                        face_side_tri.corners[which_height ? 1 : 3],
+                    });
+                    vtx_fluid->push_back({
+                        { 1, Sint16(x * 16 + 16), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 16), ao[2] },
+                        { r, g, b, bl[2], slight_sky[2][1][1] },
+                        face_side_tri.corners[2],
+                    });
+                    vtx_fluid->push_back({
+                        { 1, Sint16(x * 16 + 16), Sint16(y * 16 + corner_heights.both), Sint16(z * 16 + 16), ao[3] },
+                        { r, g, b, bl[3], slight_sky[2][1][1] },
+                        face_side_tri.corners[which_height ? 2 : 0],
+                    });
+                }
+            }
+
+            /* Negative X */
+            if (mc_id::is_transparent(stypes[0][1][1]) && !IS_SAME_FLUID(stypes[0][1][1], type))
+            {
+                Uint8 ao[] = { 0, 0, 0, 0 };
+
+                Uint8 bl[] = { Uint8(slight_block[1][1][1]), Uint8(slight_block[1][1][1]), Uint8(slight_block[1][1][1]), Uint8(slight_block[1][1][1]) };
+
+                FLUID_CALC_SIDE_HEIGHTS(zero, posz);
+
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 00), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 16), ao[3] },
+                    { r, g, b, bl[3], slight_sky[0][1][1] },
+                    face_side.corners[1],
+                });
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 00), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 00), ao[1] },
+                    { r, g, b, bl[1], slight_sky[0][1][1] },
+                    face_side.corners[0],
+                });
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 00), Sint16(y * 16 + 00), Sint16(z * 16 + 16), ao[2] },
+                    { r, g, b, bl[2], slight_sky[0][1][1] },
+                    face_side.corners[3],
+                });
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 00), Sint16(y * 16 + 00), Sint16(z * 16 + 00), ao[0] },
+                    { r, g, b, bl[0], slight_sky[0][1][1] },
+                    face_side.corners[2],
+                });
+
+                if (max_corner_heights != min_corner_heights)
+                {
+
+                    vtx_fluid->push_back({
+                        { 1, Sint16(x * 16 + 00), Sint16(y * 16 + corner_heights.posz), Sint16(z * 16 + 16), ao[3] },
+                        { r, g, b, bl[3], slight_sky[0][1][1] },
+                        face_side_tri.corners[!which_height ? 1 : 3],
+                    });
+                    vtx_fluid->push_back({
+                        { 1, Sint16(x * 16 + 00), Sint16(y * 16 + corner_heights.zero), Sint16(z * 16 + 00), ao[1] },
+                        { r, g, b, bl[1], slight_sky[0][1][1] },
+                        face_side_tri.corners[!which_height ? 2 : 0],
+                    });
+                    vtx_fluid->push_back({
+                        { 1, Sint16(x * 16 + 00), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 16), ao[2] },
+                        { r, g, b, bl[2], slight_sky[0][1][1] },
+                        face_side_tri.corners[3],
+                    });
+                    vtx_fluid->push_back({
+                        { 1, Sint16(x * 16 + 00), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 00), ao[0] },
+                        { r, g, b, bl[0], slight_sky[0][1][1] },
+                        face_side_tri.corners[2],
+                    });
+                }
+            }
+
+            /* Positive Z */
+            if (mc_id::is_transparent(stypes[1][1][2]) && !IS_SAME_FLUID(stypes[1][1][2], type))
+            {
+                Uint8 ao[] = { 0, 0, 0, 0 };
+
+                Uint8 bl[] = { Uint8(slight_block[1][1][1]), Uint8(slight_block[1][1][1]), Uint8(slight_block[1][1][1]), Uint8(slight_block[1][1][1]) };
+
+                FLUID_CALC_SIDE_HEIGHTS(both, posz);
+
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 16), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 16), ao[3] },
+                    { r, g, b, bl[3], slight_sky[1][1][2] },
+                    face_side.corners[1],
+                });
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 00), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 16), ao[1] },
+                    { r, g, b, bl[1], slight_sky[1][1][2] },
+                    face_side.corners[0],
+                });
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 00), Sint16(z * 16 + 16), ao[2] },
+                    { r, g, b, bl[2], slight_sky[1][1][2] },
+                    face_side.corners[3],
+                });
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 00), Sint16(y * 16 + 00), Sint16(z * 16 + 16), ao[0] },
+                    { r, g, b, bl[0], slight_sky[1][1][2] },
+                    face_side.corners[2],
+                });
+
+                if (max_corner_heights != min_corner_heights)
+                {
+                    vtx_fluid->push_back({
+                        { 1, Sint16(x * 16 + 16), Sint16(y * 16 + ((which_height) ? max_corner_heights : min_corner_heights)), Sint16(z * 16 + 16), ao[3] },
+                        { r, g, b, bl[3], slight_sky[1][1][2] },
+                        face_side_tri.corners[which_height ? 1 : 3],
+                    });
+                    vtx_fluid->push_back({
+                        { 1, Sint16(x * 16 + 00), Sint16(y * 16 + ((!which_height) ? max_corner_heights : min_corner_heights)), Sint16(z * 16 + 16), ao[1] },
+                        { r, g, b, bl[1], slight_sky[1][1][2] },
+                        face_side_tri.corners[which_height ? 2 : 0],
+                    });
+                    vtx_fluid->push_back({
+                        { 1, Sint16(x * 16 + 16), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 16), ao[2] },
+                        { r, g, b, bl[2], slight_sky[1][1][2] },
+                        face_side_tri.corners[3],
+                    });
+                    vtx_fluid->push_back({
+                        { 1, Sint16(x * 16 + 00), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 16), ao[0] },
+                        { r, g, b, bl[0], slight_sky[1][1][2] },
+                        face_side_tri.corners[2],
+                    });
+                }
+            }
+            /* Negative Z */
+            if (mc_id::is_transparent(stypes[1][1][0]) && !IS_SAME_FLUID(stypes[1][1][0], type))
+            {
+                Uint8 ao[] = { 0, 0, 0, 0 };
+
+                Uint8 bl[] = { Uint8(slight_block[1][1][1]), Uint8(slight_block[1][1][1]), Uint8(slight_block[1][1][1]), Uint8(slight_block[1][1][1]) };
+
+                FLUID_CALC_SIDE_HEIGHTS(zero, posx);
+
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 00), Sint16(y * 16 + 00), Sint16(z * 16 + 00), ao[0] },
+                    { r, g, b, bl[0], slight_sky[1][1][0] },
+                    face_side.corners[3],
+                });
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 00), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 00), ao[1] },
+                    { r, g, b, bl[1], slight_sky[1][1][0] },
+                    face_side.corners[1],
+                });
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 00), Sint16(z * 16 + 00), ao[2] },
+                    { r, g, b, bl[2], slight_sky[1][1][0] },
+                    face_side.corners[2],
+                });
+                vtx_fluid->push_back({
+                    { 1, Sint16(x * 16 + 16), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 00), ao[3] },
+                    { r, g, b, bl[3], slight_sky[1][1][0] },
+                    face_side.corners[0],
+                });
+
+                if (max_corner_heights != min_corner_heights)
+                {
+                    vtx_fluid->push_back({
+                        { 1, Sint16(x * 16 + 00), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 00), ao[0] },
+                        { r, g, b, bl[0], slight_sky[1][1][0] },
+                        face_side_tri.corners[3],
+                    });
+                    vtx_fluid->push_back({
+                        { 1, Sint16(x * 16 + 00), Sint16(y * 16 + ((which_height) ? max_corner_heights : min_corner_heights)), Sint16(z * 16 + 00), ao[1] },
+                        { r, g, b, bl[1], slight_sky[1][1][0] },
+                        face_side_tri.corners[which_height ? 1 : 3],
+                    });
+                    vtx_fluid->push_back({
+                        { 1, Sint16(x * 16 + 16), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 00), ao[2] },
+                        { r, g, b, bl[2], slight_sky[1][1][0] },
+                        face_side_tri.corners[2],
+                    });
+                    vtx_fluid->push_back({
+                        { 1, Sint16(x * 16 + 16), Sint16(y * 16 + ((!which_height) ? max_corner_heights : min_corner_heights)), Sint16(z * 16 + 00), ao[3] },
+                        { r, g, b, bl[3], slight_sky[1][1][0] },
+                        face_side_tri.corners[which_height ? 2 : 0],
+                    });
+                }
+            }
+#undef FLUID_CALC_SIDE_HEIGHTS
+        }
+        /* ============ END: IS_FLUID ============ */
+        /* ============ BEGIN: IS_NORMAL ============ */
         else
         {
             /* Positive Y */
@@ -1259,11 +1826,12 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
                 });
             }
         }
+        /* ============ END: IS_NORMAL ============ */
     }
 
     TRACE("Chunk: <%d, %d, %d>, Vertices: %zu, Indices: %zu", chunk_x, chunk_y, chunk_z, vtx.size(), vtx.size() / 4 * 6);
 
-    if (!vtx.size())
+    if (!vtx.size() && !vtx_translucent.size())
     {
         center->index_type = GL_NONE;
         center->index_count = 0;
@@ -1279,14 +1847,18 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
     }
 
+    center->index_type = GL_UNSIGNED_INT;
+    center->index_count = vtx.size() / 4 * 6;
+    center->index_count_translucent = vtx_translucent.size() / 4 * 6;
+
+    for (terrain_vertex_t v : vtx_translucent)
+        vtx.push_back(v);
+
     glBindBuffer(GL_ARRAY_BUFFER, center->vbo);
     glBufferData(GL_ARRAY_BUFFER, vtx.size() * sizeof(vtx[0]), vtx.data(), GL_STATIC_DRAW);
     glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, pos));
     glVertexAttribIPointer(1, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, col));
     glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, tex));
-
-    center->index_type = GL_UNSIGNED_INT;
-    center->index_count = vtx.size() / 4 * 6;
 }
 
 level_t::level_t()

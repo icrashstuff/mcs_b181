@@ -122,8 +122,7 @@ enum terrain_face_id_t
     FACE_LADDER,
     FACE_LAPIS_BLOCK,
     FACE_LAPIS_ORE,
-    FACE_LAVA_FLOW_STRAIGHT,
-    FACE_LAVA_FLOW_DIAGONAL,
+    FACE_LAVA_FLOW,
     FACE_LAVA_STILL,
     FACE_LEAVES_BIRCH_OPAQUE,
     FACE_LEAVES_BIRCH,
@@ -223,8 +222,7 @@ enum terrain_face_id_t
     FACE_TORCH_ON,
     FACE_TRAPDOOR,
     FACE_VINE,
-    FACE_WATER_FLOW_STRAIGHT,
-    FACE_WATER_FLOW_DIAGONAL,
+    FACE_WATER_FLOW,
     FACE_WATER_STILL,
     FACE_WEB,
     FACE_WHEAT_STAGE_0,
@@ -425,10 +423,8 @@ static const char* get_face_id_name(const terrain_face_id_t id)
         return "FACE_LAPIS_BLOCK";
     case FACE_LAPIS_ORE:
         return "FACE_LAPIS_ORE";
-    case FACE_LAVA_FLOW_STRAIGHT:
-        return "FACE_LAVA_FLOW_STRAIGHT";
-    case FACE_LAVA_FLOW_DIAGONAL:
-        return "FACE_LAVA_FLOW_DIAGONAL";
+    case FACE_LAVA_FLOW:
+        return "FACE_LAVA_FLOW";
     case FACE_LAVA_STILL:
         return "FACE_LAVA_STILL";
     case FACE_LEAVES_BIRCH_OPAQUE:
@@ -627,10 +623,8 @@ static const char* get_face_id_name(const terrain_face_id_t id)
         return "FACE_TRAPDOOR";
     case FACE_VINE:
         return "FACE_VINE";
-    case FACE_WATER_FLOW_STRAIGHT:
-        return "FACE_WATER_FLOW_STRAIGHT";
-    case FACE_WATER_FLOW_DIAGONAL:
-        return "FACE_WATER_FLOW_DIAGONAL";
+    case FACE_WATER_FLOW:
+        return "FACE_WATER_FLOW";
     case FACE_WATER_STILL:
         return "FACE_WATER_STILL";
     case FACE_WEB:
@@ -857,9 +851,7 @@ static const char* get_face_fname(const terrain_face_id_t id)
         return "lapis_block.png";
     case FACE_LAPIS_ORE:
         return "lapis_ore.png";
-    case FACE_LAVA_FLOW_STRAIGHT:
-        return "lava_flow.png";
-    case FACE_LAVA_FLOW_DIAGONAL:
+    case FACE_LAVA_FLOW:
         return "lava_flow.png";
     case FACE_LAVA_STILL:
         return "lava_still.png";
@@ -1059,9 +1051,7 @@ static const char* get_face_fname(const terrain_face_id_t id)
         return "trapdoor.png";
     case FACE_VINE:
         return "vine.png";
-    case FACE_WATER_FLOW_STRAIGHT:
-        return "water_flow.png";
-    case FACE_WATER_FLOW_DIAGONAL:
+    case FACE_WATER_FLOW:
         return "water_flow.png";
     case FACE_WATER_STILL:
         return "water_still.png";
@@ -1287,9 +1277,7 @@ static const terrain_face_id_t get_face_from_fname(const char* filename)
     if (len == 13 && *filename == 'l' && strcmp("lapis_ore.png", filename) == 0)
         return FACE_LAPIS_ORE;
     if (len == 13 && *filename == 'l' && strcmp("lava_flow.png", filename) == 0)
-        return FACE_LAVA_FLOW_STRAIGHT;
-    if (len == 13 && *filename == 'l' && strcmp("lava_flow.png", filename) == 0)
-        return FACE_LAVA_FLOW_DIAGONAL;
+        return FACE_LAVA_FLOW;
     if (len == 14 && *filename == 'l' && strcmp("lava_still.png", filename) == 0)
         return FACE_LAVA_STILL;
     if (len == 23 && *filename == 'l' && strcmp("leaves_birch_opaque.png", filename) == 0)
@@ -1489,9 +1477,7 @@ static const terrain_face_id_t get_face_from_fname(const char* filename)
     if (len == 8 && *filename == 'v' && strcmp("vine.png", filename) == 0)
         return FACE_VINE;
     if (len == 14 && *filename == 'w' && strcmp("water_flow.png", filename) == 0)
-        return FACE_WATER_FLOW_STRAIGHT;
-    if (len == 14 && *filename == 'w' && strcmp("water_flow.png", filename) == 0)
-        return FACE_WATER_FLOW_DIAGONAL;
+        return FACE_WATER_FLOW;
     if (len == 15 && *filename == 'w' && strcmp("water_still.png", filename) == 0)
         return FACE_WATER_STILL;
     if (len == 7 && *filename == 'w' && strcmp("web.png", filename) == 0)
@@ -1551,34 +1537,6 @@ static const terrain_face_t get_face_sub_coords(const terrain_face_id_t id)
 {
     switch (id)
     {
-    case FACE_LAVA_FLOW_STRAIGHT:
-        return {
-            glm::vec2(float(0.000000), float(0.000000)),
-            glm::vec2(float(0.000000), float(0.500000)),
-            glm::vec2(float(0.500000), float(0.000000)),
-            glm::vec2(float(0.500000), float(0.500000)),
-        };
-    case FACE_LAVA_FLOW_DIAGONAL:
-        return {
-            glm::vec2(float(0.146447), float(0.500000)),
-            glm::vec2(float(0.500000), float(0.146447)),
-            glm::vec2(float(0.500000), float(0.853553)),
-            glm::vec2(float(0.853553), float(0.500000)),
-        };
-    case FACE_WATER_FLOW_STRAIGHT:
-        return {
-            glm::vec2(float(0.000000), float(0.000000)),
-            glm::vec2(float(0.000000), float(0.500000)),
-            glm::vec2(float(0.500000), float(0.000000)),
-            glm::vec2(float(0.500000), float(0.500000)),
-        };
-    case FACE_WATER_FLOW_DIAGONAL:
-        return {
-            glm::vec2(float(0.500000), float(0.146447)),
-            glm::vec2(float(0.146447), float(0.500000)),
-            glm::vec2(float(0.500000), float(0.853553)),
-            glm::vec2(float(0.853553), float(0.500000)),
-        };
     default:
         return { glm::vec2(0, 0), glm::vec2(1, 0), glm::vec2(0, 1), glm::vec2(1, 1) };
     }

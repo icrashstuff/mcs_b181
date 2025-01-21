@@ -44,10 +44,8 @@ void main()
     if (use_texture == 1)
         out_color *= texture2D(tex_atlas, frag_uv);
 
-    if (out_color.a < 0.25)
+    if (out_color.a < 0.0625)
         discard;
-    else
-        out_color.a = 1.0;
 
     switch (ao_algorithm)
     {

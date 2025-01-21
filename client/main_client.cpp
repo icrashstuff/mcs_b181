@@ -22,6 +22,8 @@
  */
 #include "tetra/tetra.h"
 
+#include <algorithm>
+
 #include <GL/glew.h>
 #include <GL/glu.h>
 #include <SDL3/SDL_opengl.h>
@@ -71,7 +73,9 @@ void compile_shaders()
 
 level_t* level;
 
-// GLuint vao;
+static convar_int_t cvr_world_size("world_size", 6, 1, 32, "Side dimensions of the test world");
+static convar_int_t cvr_world_y_off_pos("world_y_off_pos", 0, 0, 32, "Positive Chunk Y offset of the test world");
+static convar_int_t cvr_world_y_off_neg("world_y_off_neg", 6, 0, 32, "Negative Chunk Y offset of the test world");
 bool initialize_resources()
 {
     /* In the future parsing of one of the indexes at /assets/indexes/ will need to happen here (For sound) */
@@ -82,16 +86,20 @@ bool initialize_resources()
 
     level->lightmap.set_world_time(1000);
 
-    for (int i = 0; i < 36; i++)
+    const int world_size = cvr_world_size.get();
+    for (int i = 0; i < world_size * world_size; i++)
     {
         chunk_t c_old;
-        c_old.generate_from_seed_over(0, i / 6 - 3, i % 6 - 3);
+        if (world_size < 4)
+            c_old.generate_from_seed_over(1, i / world_size - world_size / 2, i % world_size - world_size / 2);
+        else
+            c_old.generate_from_seed_over(1, i / world_size - world_size + 4, i % world_size - world_size + 4);
         for (int j = 0; j < 8; j++)
         {
             chunk_cubic_t* c = new chunk_cubic_t();
-            c->chunk_x = i / 6 - 6;
-            c->chunk_z = i % 6 - 6;
-            c->chunk_y = j - 6;
+            c->chunk_x = i / world_size - world_size;
+            c->chunk_z = i % world_size - world_size;
+            c->chunk_y = j - cvr_world_y_off_neg.get() + cvr_world_y_off_pos.get();
             level->chunks.push_back(c);
             for (int x = 0; x < 16; x++)
                 for (int z = 0; z < 16; z++)
@@ -396,7 +404,8 @@ void normal_loop()
 
     int win_width, win_height;
     SDL_GetWindowSize(tetra::window, &win_width, &win_height);
-    shader->set_projection(glm::perspective(glm::radians(fov), (float)win_width / (float)win_height, 0.03125f, 256.0f));
+    glm::mat4 mat_proj = glm::perspective(glm::radians(fov), (float)win_width / (float)win_height, 0.03125f, 256.0f);
+    shader->set_projection(mat_proj);
 
     glm::vec3 direction;
     direction.x = SDL_cosf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
@@ -404,7 +413,8 @@ void normal_loop()
     direction.z = SDL_sinf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
     camera_front = glm::normalize(direction);
 
-    shader->set_camera(glm::lookAt(camera_pos, camera_pos + camera_front, camera_up));
+    glm::mat4 mat_cam = glm::lookAt(camera_pos, camera_pos + camera_front, camera_up);
+    shader->set_camera(mat_cam);
 
     shader->set_model(glm::mat4(1.0f));
     shader->set_uniform("tex_atlas", 0);
@@ -415,14 +425,35 @@ void normal_loop()
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, level->lightmap.tex_id_linear);
     glActiveTexture(GL_TEXTURE0);
+
+    glm::dvec3 c2pos(int(camera_pos.x) >> 3, int(camera_pos.y) >> 3, int(camera_pos.z) >> 3);
+    std::sort(level->chunks.begin(), level->chunks.end(), [=](chunk_cubic_t* a, chunk_cubic_t* b) {
+        float adist = glm::distance(glm::dvec3(a->chunk_x * 2.0f + 1.0f, a->chunk_y * 2.0f + 1.0f, a->chunk_z * 2.0f + 1.0f), c2pos);
+        float bdist = glm::distance(glm::dvec3(b->chunk_x * 2.0f + 1.0f, b->chunk_y * 2.0f + 1.0f, b->chunk_z * 2.0f + 1.0f), c2pos);
+        return adist > bdist;
+    });
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, level->terrain->tex_id_main);
     for (chunk_cubic_t* c : level->chunks)
     {
-        if (c->index_type == GL_NONE)
+        if (c->index_type == GL_NONE || c->index_count == 0)
             continue;
         glBindVertexArray(c->vao);
         glm::vec3 translate(c->chunk_x * SUBCHUNK_SIZE_X, c->chunk_y * SUBCHUNK_SIZE_Y, c->chunk_z * SUBCHUNK_SIZE_Z);
         shader->set_model(glm::translate(glm::mat4(1.0f), translate));
         glDrawElements(GL_TRIANGLES, c->index_count, c->index_type, 0);
+    }
+
+    for (chunk_cubic_t* c : level->chunks)
+    {
+        if (c->index_type == GL_NONE || c->index_count_translucent == 0)
+            continue;
+        assert(c->index_type == GL_UNSIGNED_INT);
+        glBindVertexArray(c->vao);
+        glm::vec3 translate(c->chunk_x * SUBCHUNK_SIZE_X, c->chunk_y * SUBCHUNK_SIZE_Y, c->chunk_z * SUBCHUNK_SIZE_Z);
+        shader->set_model(glm::translate(glm::mat4(1.0f), translate));
+        glDrawElements(GL_TRIANGLES, c->index_count_translucent, c->index_type, (void*)(c->index_count * 4));
     }
 }
 
@@ -533,8 +564,11 @@ void process_event(SDL_Event& event, bool* done)
         }
         case SDL_SCANCODE_1:
         {
-            glm::vec3 cam_posf = camera_pos + glm::vec3(SDL_cosf(glm::radians(yaw)), SDL_sinf(glm::radians(pitch)), SDL_sinf(glm::radians(yaw))) * 2.0f;
-            glm::ivec3 cam_pos = glm::round(cam_posf);
+            glm::vec3 cam_dir;
+            cam_dir.x = SDL_cosf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
+            cam_dir.y = SDL_sinf(glm::radians(pitch));
+            cam_dir.z = SDL_sinf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
+            glm::ivec3 cam_pos = glm::round(camera_pos + cam_dir * 2.5f);
 
             for (chunk_cubic_t* c : level->chunks)
             {
@@ -627,6 +661,45 @@ void process_event(SDL_Event& event, bool* done)
         }
 }
 
+/* This isn't the best way to do this, but it will do for now */
+static bool render_water_overlay()
+{
+    if (!level)
+        return false;
+
+    glm::ivec3 cam_pos = camera_pos;
+    glm::ivec3 chunk_coords(cam_pos.x >> 4, cam_pos.y >> 4, cam_pos.z >> 4);
+
+    bool found_water = false;
+    for (chunk_cubic_t* c : level->chunks)
+    {
+        if (chunk_coords.x != c->chunk_x || chunk_coords.y != c->chunk_y || chunk_coords.z != c->chunk_z)
+            continue;
+
+        block_id_t type = c->get_type(cam_pos.x & 0x0F, cam_pos.y & 0x0F, cam_pos.z & 0x0F);
+        found_water = (type == BLOCK_ID_WATER_FLOWING) || (type == BLOCK_ID_WATER_SOURCE);
+    }
+    if (!found_water)
+        return false;
+
+    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
+    ImGui::SetNextWindowSize(ImGui::GetMainViewport()->WorkSize, ImGuiCond_Always);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    if (ImGui::Begin("Water", NULL, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground))
+    {
+        mc_id::terrain_face_t face = level->terrain->get_face(mc_id::FACE_WATER_STILL);
+        ImVec2 uv0(face.corners[0].x, face.corners[0].y);
+        ImVec2 uv1(face.corners[3].x, face.corners[3].y);
+        ImGui::Image((void*)(size_t)level->terrain->tex_id_main, ImGui::GetMainViewport()->WorkSize, uv0, uv1);
+    }
+    ImGui::End();
+    ImGui::PopStyleVar();
+
+    return true;
+}
+
+static gui_register_overlay reg_render_water_overlay(render_water_overlay);
+
 static convar_int_t cvr_gui_renderer("gui_renderer", 0, 0, 1, "Show renderer internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 static convar_int_t cvr_gui_lightmap("gui_lightmap", 0, 0, 1, "Show lightmap internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 
@@ -646,6 +719,8 @@ int main(const int argc, const char** argv)
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
+    glEnable(GL_BLEND);
+    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     int done = 0;
     Uint64 last_loop_time = 0;
@@ -749,10 +824,21 @@ int main(const int argc, const char** argv)
 
                 ImGui::Text("Camera: <%.1f, %.1f, %.1f>", camera_pos.x, camera_pos.y, camera_pos.z);
 
+                ImGui::SliderFloat("Camera Pitch", &pitch, -89.0f, 89.0f);
+                ImGui::SliderFloat("Camera Yaw", &yaw, 0.0f, 360.0f);
+                ImGui::InputFloat("Camera X", &camera_pos.x, 1.0f);
+                ImGui::InputFloat("Camera Y", &camera_pos.y, 1.0f);
+                ImGui::InputFloat("Camera Z", &camera_pos.z, 1.0f);
+
                 if (ImGui::Button("Rebuild atlas"))
-                {
                     level->terrain.reset(new texture_terrain_t("/_resources/assets/minecraft/textures/"));
-                }
+                ImGui::SameLine();
+                if (ImGui::Button("Rebuild meshes & atlas"))
+                    level->rebuild_meshes(true);
+                ImGui::SameLine();
+                if (ImGui::Button("Rebuild meshes"))
+                    level->rebuild_meshes(true);
+
                 if (ImGui::Button("Rebuild shaders"))
                     compile_shaders();
 

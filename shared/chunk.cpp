@@ -147,7 +147,7 @@ chunk_t::chunk_t()
     assert(data.size());
     Uint8* ptr = data.data();
     Uint64* rptr = (Uint64*)this;
-    r_state = *(Uint64*)&ptr + *(Uint32*)this + *(Uint64*)&rptr;
+    r_state_spawn = *(Uint64*)&ptr + *(Uint32*)this + *(Uint64*)&rptr;
 }
 
 void chunk_t::correct_lighting(int generator)
@@ -312,9 +312,12 @@ void chunk_t::generate_biome_toppings(const long seed, const int cx, const int c
  */
 void chunk_t::generate_from_seed_over(const long seed, const int cx, const int cz)
 {
-    if (((convar_int_t*)convar_t::get_convar("dev"))->get() && cx == 0 && cz == 0)
+    if (((convar_int_t*)convar_t::get_convar("dev"))->get() && (cx == -1 || cx == 0) && (cz == -1 || cz == 0))
     {
-        generate_special_metadata();
+        if (cz == 0 && cx == 0)
+            generate_special_metadata();
+        else
+            generate_special_fluid(cz, cx);
 
         correct_lighting(0);
         ready = true;
@@ -812,7 +815,7 @@ void chunk_t::generate_ores(long seed, int cx, int cz, param_ore_t* ores, Uint8 
         }
     }
 }
-// generate_from_seed_nether
+
 void chunk_t::generate_from_seed_nether(long seed, int cx, int cz)
 {
     Uint64 seed_r = *(Uint64*)&seed;
@@ -984,12 +987,128 @@ void chunk_t::generate_special_metadata()
             {
                 if (y < BLOCK_ID_MAX)
                 {
-                    if (z == x)
+                    if (x == z)
                     {
                         set_type(x, y, z, y);
                         set_metadata(x, y, z, x);
                     }
                 }
+                set_light_block(x, y, z, 15);
+                set_light_sky(x, y, z, 15);
+            }
+        }
+    }
+}
+
+void chunk_t::generate_special_fluid(bool random_water, bool random_lava)
+{
+    /* This number isn't special */
+    Uint64 r_state_lava = 0x4fd938e2afe43421 + random_water * 0xf35e37b5 + random_lava * 0x379281b2;
+
+    for (int x = 0; x < CHUNK_SIZE_X; x++)
+    {
+        for (int y = 0; y < CHUNK_SIZE_Y; y++)
+        {
+            for (int z = 0; z < CHUNK_SIZE_Z; z++)
+            {
+                if (y < BLOCK_ID_LAVA_FLOWING * 3)
+                {
+                    if (z == 1 && x % 2 == 0 && y % 2 == 0)
+                    {
+                        set_type(x, y, z, y / 2);
+                        set_metadata(x, y, z, x);
+                    }
+                    if (z == 2 && x % 2 == 0 && y % 2 == 0)
+                    {
+                        set_type(x, y, z, y / 2);
+                        set_metadata(x, y, z, 0);
+                    }
+                    if (z == 3 && x % 2 == 1 && y % 2 == 0)
+                    {
+                        set_type(x, y, z, y / 2);
+                        set_metadata(x, y, z, 0);
+                    }
+                    if (z == 4 && x % 2 == 1 && y % 2 == 0)
+                    {
+                        set_type(x, y, z, y / 2);
+                        set_metadata(x, y, z, x);
+                    }
+                    if (z == 6 && y % 2 == 0)
+                    {
+                        set_type(x, y, z, y / 2);
+                        set_metadata(x, y, z, x);
+                    }
+                    if (z == 7 && y % 2 == 0 && x % 2 == 0)
+                    {
+                        set_type(x, y, z, y / 2);
+                        set_metadata(x, y, z, x + 1);
+                    }
+                    if (z == 8 && y % 2 == 0)
+                    {
+                        set_type(x, y, z, y / 2);
+                        set_metadata(x, y, z, x + 1);
+                    }
+                    if (z == 12 && y % 2 == 0)
+                    {
+                        set_type(x, y, z, y / 2);
+                        set_metadata(x, y, z, x * 2);
+                    }
+                    if (z == 13)
+                    {
+                        set_type(x, y + 1, z, y);
+                        set_metadata(x, y, z, x & 0x07);
+                    }
+                    if (z == 14)
+                    {
+                        set_type(x, y, z, y);
+                        set_metadata(x, y, z, x);
+                    }
+                }
+
+                block_id_t type = get_type(x, y, z);
+
+                if (type != BLOCK_ID_LAVA_FLOWING && type != BLOCK_ID_LAVA_SOURCE && type != BLOCK_ID_WATER_FLOWING && type != BLOCK_ID_WATER_SOURCE)
+                {
+                    set_type(x, y, z, BLOCK_ID_AIR);
+                    set_metadata(x, y, z, 0);
+                }
+
+                if ((random_water || random_lava) && y == 36)
+                {
+                    Uint32 dat = SDL_rand_bits_r(&r_state_lava);
+
+                    if (random_lava && random_water)
+                        set_type(x, y, z, BLOCK_ID_LAVA_SOURCE);
+                    else if (random_lava)
+                        set_type(x, y, z, BLOCK_ID_LAVA_SOURCE);
+                    else if (random_water)
+                        set_type(x, y, z, BLOCK_ID_WATER_SOURCE);
+
+                    int xdiff = 8 - SDL_roundf(SDL_fabsf(x - 7.5f));
+                    int zdiff = 8 - SDL_roundf(SDL_fabsf(z - 7.5f));
+
+                    int metadata = SDL_min(xdiff, zdiff);
+
+                    if (metadata == 0)
+                        set_type(x, y, z, BLOCK_ID_GLOWSTONE);
+                    else
+                        set_metadata(x, y, z, metadata);
+                }
+
+                if ((random_water || random_lava) && y > 36 && y % 6 == 0)
+                {
+                    Uint32 dat = SDL_rand_bits_r(&r_state_lava);
+
+                    if (random_lava && ((dat >> 16) % 0xFFFF) > 20000)
+                        set_type(x, y, z, BLOCK_ID_LAVA_SOURCE);
+                    if (random_water && ((dat >> 16) % 0xFFFF) > 40000)
+                        set_type(x, y, z, BLOCK_ID_WATER_SOURCE);
+
+                    set_type(x, y - 1, z, (y / 6));
+
+                    set_metadata(x, y, z, (dat & 0xFFFF) % 9);
+                }
+
                 set_light_block(x, y, z, 15);
                 set_light_sky(x, y, z, 15);
             }
@@ -1005,7 +1124,7 @@ void chunk_t::generate_special_metadata()
 bool chunk_t::find_spawn_point(double& x, double& y, double& z)
 {
     Uint32 pos = ((int)(x * 3) << 24) + ((int)(y * 3) << 12) + (int)(z * 3);
-    pos += SDL_rand_bits_r(&r_state);
+    pos += SDL_rand_bits_r(&r_state_spawn);
 
     int cx_s = (pos >> 16) % CHUNK_SIZE_X;
     int cz_s = pos % CHUNK_SIZE_Z;

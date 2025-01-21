@@ -156,6 +156,8 @@ public:
 
     void generate_special_metadata();
 
+    void generate_special_fluid(bool random_water, bool random_lava);
+
     /**
      * Returns an estimate on of memory footprint of a chunk_t object
      */
@@ -324,7 +326,7 @@ public:
 private:
     void generate_biome_data(const long seed, const int cx, const int cz);
 
-    Uint64 r_state;
+    Uint64 r_state_spawn;
     std::vector<Uint8> data;
     float temperatures[CHUNK_SIZE_X * CHUNK_SIZE_Z];
     float humidties[CHUNK_SIZE_X * CHUNK_SIZE_Z];
