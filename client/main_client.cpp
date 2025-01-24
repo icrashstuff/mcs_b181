@@ -41,11 +41,16 @@
 
 #include "shared/chunk.h"
 #include "shared/ids.h"
+#include "shared/misc.h"
 #include "shared/packet.h"
+
+#include "sdl_net/include/SDL3_net/SDL_net.h"
 
 #include "level.h"
 #include "shaders.h"
 #include "texture_terrain.h"
+
+#include <zlib.h>
 
 static convar_string_t cvr_username("username", "", "Username (duh)", CONVAR_FLAG_SAVE);
 static convar_string_t cvr_dir_assets("dir_assets", "", "Path to assets (ex: \"~/.minecraft/assets/\")", CONVAR_FLAG_SAVE);
@@ -55,7 +60,9 @@ static convar_string_t cvr_dir_game("dir_game", "", "Path to store game files (N
 
 static convar_int_t cvr_autoconnect("dev_autoconnect", 0, 0, 1, "Auto connect to server", CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_DEV_ONLY);
 static convar_string_t cvr_autoconnect_addr(
-    "dev_server_addr", "localhost:25565", "Address of server to autoconnect to when dev_autoconnect is specified", CONVAR_FLAG_DEV_ONLY);
+    "dev_server_addr", "localhost", "Address of server to autoconnect to when dev_autoconnect is specified", CONVAR_FLAG_DEV_ONLY);
+static convar_int_t cvr_autoconnect_port(
+    "dev_server_port", 25565, 0, 65535, "Port of server to autoconnect to when dev_autoconnect is specified", CONVAR_FLAG_DEV_ONLY);
 
 shader_t* shader = NULL;
 
@@ -73,19 +80,144 @@ void compile_shaders()
 
 level_t* level;
 
-static convar_int_t cvr_world_size("world_size", 6, 1, 32, "Side dimensions of the test world");
-static convar_int_t cvr_world_y_off_pos("world_y_off_pos", 0, 0, 32, "Positive Chunk Y offset of the test world");
-static convar_int_t cvr_world_y_off_neg("world_y_off_neg", 6, 0, 32, "Negative Chunk Y offset of the test world");
+struct connection_t
+{
+    enum connection_status_t
+    {
+        CONNECTION_UNSET,
+        CONNECTION_RESOLVING,
+        CONNECTION_RESOLVED,
+        CONNECTION_CONNECTING,
+        CONNECTION_ACTIVE,
+        CONNECTION_DONE,
+        CONNECTION_FAILED,
+    } status
+        = CONNECTION_UNSET;
+
+    SDLNet_StreamSocket* socket = NULL;
+    packet_handler_t pack_handler_client = packet_handler_t(false);
+    std::string status_msg;
+    std::string status_msg_sub;
+    bool in_world = false;
+
+    void set_status(std::string status, std::string sub_status = "")
+    {
+        status_msg = status;
+        status_msg_sub = sub_status;
+    }
+
+    Uint16 port = 0;
+    std::string addr;
+
+    void init(std::string _addr, Uint16 _port)
+    {
+        addr = _addr;
+        port = _port;
+
+        set_status("Resolving address");
+        addr_server = SDLNet_ResolveHostname(cvr_autoconnect_addr.get().c_str());
+        status = CONNECTION_RESOLVING;
+        if (!addr_server)
+        {
+            err_str = std::string("SDLNet_ResolveHostname: ") + SDL_GetError();
+            status = CONNECTION_FAILED;
+            return;
+        }
+    }
+
+    SDLNet_Address* addr_server;
+    std::string err_str;
+
+    Uint64 start_time;
+
+    /**
+     * Steps (if possible) the state as fast a possible to CONNECTION_ACTIVE
+     */
+    void step_to_active()
+    {
+        if (status == CONNECTION_RESOLVING)
+        {
+            int address_status = SDLNet_GetAddressStatus(addr_server);
+
+            if (address_status == 1)
+                status = CONNECTION_RESOLVED;
+            else if (address_status == -1)
+            {
+                err_str = std::string("SDLNet_WaitUntilResolved: ") + SDL_GetError();
+                status = CONNECTION_FAILED;
+            }
+        }
+
+        if (status == CONNECTION_RESOLVED)
+        {
+            socket = SDLNet_CreateClient(addr_server, port);
+            SDLNet_UnrefAddress(addr_server);
+            addr_server = NULL;
+
+            status = CONNECTION_CONNECTING;
+
+            if (!socket)
+            {
+                err_str = std::string("SDLNet_CreateClient: ") + SDL_GetError();
+                status = CONNECTION_FAILED;
+            }
+        }
+
+        if (status == CONNECTION_CONNECTING)
+        {
+            int connection_status = SDLNet_GetConnectionStatus(socket);
+
+            if (connection_status == 1)
+                status = CONNECTION_ACTIVE;
+            else if (connection_status == -1)
+            {
+                err_str = std::string("SDLNet_GetConnectionStatus: ") + SDL_GetError();
+                status = CONNECTION_FAILED;
+            }
+        }
+    }
+
+    ~connection_t()
+    {
+        SDLNet_UnrefAddress(addr_server);
+
+        /* TODO: Store this in a vector of dying sockets to ensure things are properly closed down */
+        SDLNet_DestroyStreamSocket(socket);
+    }
+};
+
+static connection_t* connection = NULL;
+static texture_terrain_t* texture_atlas = NULL;
+
+static convar_int_t cvr_testworld("dev_world", 0, 0, 1, "Init to test world", CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_DEV_ONLY);
+static convar_int_t cvr_world_size("dev_world_size", 6, 1, 32, "Side dimensions of the test world", CONVAR_FLAG_DEV_ONLY);
+static convar_int_t cvr_world_y_off_pos("dev_world_y_off_pos", 0, 0, 32, "Positive Chunk Y offset of the test world", CONVAR_FLAG_DEV_ONLY);
+static convar_int_t cvr_world_y_off_neg("dev_world_y_off_neg", 6, 0, 32, "Negative Chunk Y offset of the test world", CONVAR_FLAG_DEV_ONLY);
+void create_testworld();
 bool initialize_resources()
 {
     /* In the future parsing of one of the indexes at /assets/indexes/ will need to happen here (For sound) */
 
-    level = new level_t();
-    level->terrain = std::make_shared<texture_terrain_t>("/_resources/assets/minecraft/textures/");
+    texture_atlas = new texture_terrain_t("/_resources/assets/minecraft/textures/");
+    level = new level_t(texture_atlas);
     shader = new shader_t("/shaders/terrain.vert", "/shaders/terrain.frag");
 
     level->lightmap.set_world_time(1000);
 
+    connection = new connection_t();
+
+    if (cvr_autoconnect.get())
+        connection->init(cvr_autoconnect_addr.get(), cvr_autoconnect_port.get());
+
+    if (!cvr_autoconnect.get() || cvr_testworld.get())
+        create_testworld();
+
+    compile_shaders();
+
+    return true;
+}
+void create_testworld()
+{
     const int world_size = cvr_world_size.get();
     for (int i = 0; i < world_size * world_size; i++)
     {
@@ -156,16 +288,18 @@ bool initialize_resources()
     }
 
     level->build_dirty_meshes();
-
-    compile_shaders();
-
-    return true;
 }
 
 bool deinitialize_resources()
 {
     delete shader;
     delete level;
+    delete texture_atlas;
+    delete connection;
+    texture_atlas = NULL;
+    connection = NULL;
+    shader = NULL;
+    level = NULL;
     return true;
 }
 
@@ -352,11 +486,329 @@ glm::vec3 camera_pos = glm::vec3(0.0f, 1.5f, 0.0f);
 glm::vec3 camera_front = glm::vec3(0.0f, 0.0f, -1.0f);
 glm::vec3 camera_up = glm::vec3(0.0f, 1.0f, 0.0f);
 
+#pragma GCC push_options
+#pragma GCC optimize("Ofast")
+void decompress_chunk_packet(packet_chunk_t* p, std::vector<Uint8>& buffer)
+{
+    if (p->size_x < 0 || p->size_y < 0 || p->size_z < 0)
+    {
+        dc_log_error("Chunk packet with invalid size of <%d, %d, %d>", p->size_x, p->size_y, p->size_z);
+        return;
+    }
+
+    const int min_block_x = p->block_x;
+    const int min_block_y = p->block_y;
+    const int min_block_z = p->block_z;
+    const int max_block_x = min_block_x + p->size_x;
+    const int max_block_y = min_block_y + p->size_y;
+    const int max_block_z = min_block_z + p->size_z;
+
+    const int min_chunk_x = min_block_x >> 4;
+    const int min_chunk_y = min_block_y >> 4;
+    const int min_chunk_z = min_block_z >> 4;
+    const int max_chunk_x = max_block_x >> 4;
+    const int max_chunk_y = max_block_y >> 4;
+    const int max_chunk_z = max_block_z >> 4;
+
+    const int real_size_x = p->size_x + 1;
+    const int real_size_y = p->size_y + 1;
+    const int real_size_z = p->size_z + 1;
+    const int real_volume = (real_size_x * real_size_y * real_size_z);
+
+    /* Oversize the buffer a small amount in case weirdness occurs  */
+    size_t uncompressed_size = real_size_x * real_size_y * real_size_z * 41 / 16;
+    if (uncompressed_size > buffer.size())
+    {
+        dc_log("Resizing decompression buffer to %zu", uncompressed_size);
+        buffer.resize(uncompressed_size, 0);
+    }
+    Uint8* uncompressed = buffer.data();
+    memset(uncompressed + uncompressed_size, 0, buffer.size() - uncompressed_size);
+
+    int decompress_result = uncompress(uncompressed, &uncompressed_size, p->compressed_data.data(), p->compressed_data.size());
+
+    dc_log("%d %d %d | %d %d %d", min_chunk_x, min_chunk_y, min_chunk_z, max_chunk_x, max_chunk_y, max_chunk_z);
+
+    if (decompress_result != Z_OK)
+    {
+        const char* err_str = "Unknown error";
+        switch (decompress_result)
+        {
+            ENUM_SWITCH_CASE(err_str, Z_OK);
+            ENUM_SWITCH_CASE(err_str, Z_STREAM_END);
+            ENUM_SWITCH_CASE(err_str, Z_NEED_DICT);
+            ENUM_SWITCH_CASE(err_str, Z_ERRNO);
+            ENUM_SWITCH_CASE(err_str, Z_STREAM_ERROR);
+            ENUM_SWITCH_CASE(err_str, Z_DATA_ERROR);
+            ENUM_SWITCH_CASE(err_str, Z_MEM_ERROR);
+            ENUM_SWITCH_CASE(err_str, Z_BUF_ERROR);
+            ENUM_SWITCH_CASE(err_str, Z_VERSION_ERROR);
+        default:
+            break;
+        }
+        dc_log_error("Error %d (%s) decompressing chunk data!", decompress_result, err_str);
+    }
+
+    // TODO: Create nonexistent chunks
+    for (chunk_cubic_t* c : level->chunks)
+    {
+        // if(min_chunk_x <= c->chunk_x || c->chunk_x > max_chunk_x)
+        if (!BETWEEN_INCL(c->chunk_x, min_chunk_x, max_chunk_x))
+            continue;
+        if (!BETWEEN_INCL(c->chunk_y, min_chunk_y, max_chunk_y))
+            continue;
+        if (!BETWEEN_INCL(c->chunk_z, min_chunk_z, max_chunk_z))
+            continue;
+
+        for (int x = 0; x < SUBCHUNK_SIZE_X; x++)
+        {
+            const int block_x = x + ((c->chunk_x) << 4);
+            if (!BETWEEN_INCL(block_x, min_block_x, max_block_x))
+                continue;
+            const int uncompressed_x = block_x - min_block_x;
+
+            for (int z = 0; z < SUBCHUNK_SIZE_Z; z++)
+            {
+                const int block_z = z + ((c->chunk_z) << 4);
+                if (!BETWEEN_INCL(block_z, min_block_z, max_block_z))
+                    continue;
+                const int uncompressed_z = block_z - min_block_z;
+
+                for (int y = 0; y < SUBCHUNK_SIZE_Y; y++)
+                {
+                    const int block_y = y + ((c->chunk_y) << 4);
+                    if (!BETWEEN_INCL(block_y, min_block_y, max_block_y))
+                        continue;
+                    const int uncompressed_y = block_y - min_block_y;
+
+                    size_t index = uncompressed_y + (uncompressed_z * (real_size_y)) + (uncompressed_x * (real_size_y) * (real_size_z));
+                    Uint8 type = uncompressed[index];
+
+                    index += real_volume * 2;
+                    Uint8 meta;
+                    if (index % 2 == 1)
+                        meta = (uncompressed[index / 2] >> 4) & 0x0F;
+                    else
+                        meta = uncompressed[index / 2] & 0x0F;
+
+                    index += real_volume;
+                    Uint8 light_block;
+                    if (index % 2 == 1)
+                        light_block = (uncompressed[index / 2] >> 4) & 0x0F;
+                    else
+                        light_block = uncompressed[index / 2] & 0x0F;
+
+                    index += real_volume;
+                    Uint8 light_sky;
+                    if (index % 2 == 1)
+                        light_sky = (uncompressed[index / 2] >> 4) & 0x0F;
+                    else
+                        light_sky = uncompressed[index / 2] & 0x0F;
+
+                    c->set_type(x, y, z, type);
+                    c->set_metadata(x, y, z, meta);
+                    c->set_light_block(x, y, z, light_block);
+                    c->set_light_sky(x, y, z, light_sky);
+                }
+            }
+        }
+
+        c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
+    }
+}
+#pragma GCC pop_options
+
 void normal_loop()
 {
-    level->terrain->update();
+    if (connection->status == connection_t::CONNECTION_ACTIVE)
+    {
+        static bool sent_init = false;
 
-    level->build_dirty_meshes();
+        if (!sent_init)
+        {
+            packet_handshake_c2s_t pack_handshake;
+
+            pack_handshake.username = cvr_username.get();
+
+            sent_init = send_buffer(connection->socket, pack_handshake.assemble());
+            connection->set_status("connect.connecting");
+        }
+        Uint64 sdl_start_tick = SDL_GetTicks();
+        packet_t* pack_from_server = NULL;
+        while (SDL_GetTicks() - sdl_start_tick < (connection->in_world ? 50 : 150) && connection->status == connection_t::CONNECTION_ACTIVE
+            && (pack_from_server = connection->pack_handler_client.get_next_packet(connection->socket)))
+        {
+#define CAST_PACK_TO_P(type) type* p = (type*)pack_from_server
+            Uint8 pack_type = pack_from_server->id;
+            switch (pack_type)
+            {
+            case PACKET_ID_KEEP_ALIVE:
+            {
+                send_buffer(connection->socket, pack_from_server->assemble());
+                break;
+            }
+            case PACKET_ID_HANDSHAKE:
+            {
+                packet_login_request_c2s_t login_request;
+
+                /* The idea is to maybe implement spectator mode and maybe 1.3+ style plugin channels */
+                const char ext_magic[] = "B181_EXT";
+                const int ext_ver = 0;
+                static_assert(sizeof(ext_magic) == 9, "Client id must be 8 characters (excluding terminator)");
+
+                login_request.unused0 = SDL_Swap64LE(*(jlong*)ext_magic);
+                login_request.unused1 = ext_ver;
+                login_request.protocol_ver = 17;
+                login_request.username = cvr_username.get();
+
+                send_buffer(connection->socket, login_request.assemble());
+                connection->set_status("connect.authorizing");
+                break;
+            }
+            case PACKET_ID_LOGIN_REQUEST:
+            {
+                CAST_PACK_TO_P(packet_login_request_s2c_t);
+
+                level->world_height = p->world_height;
+                if (p->dimension == -1)
+                    level->lightmap.set_preset(lightmap_t::LIGHTMAP_PRESET_NETHER);
+                else
+                    level->lightmap.set_preset(lightmap_t::LIGHTMAP_PRESET_OVERWORLD);
+
+                connection->set_status("multiplayer.downloadingTerrain");
+
+                break;
+            }
+            case PACKET_ID_UPDATE_TIME:
+            {
+                CAST_PACK_TO_P(packet_time_update_t);
+                level->lightmap.set_world_time(p->time);
+                break;
+            }
+            case PACKET_ID_PLAYER_LOOK:
+            {
+                CAST_PACK_TO_P(packet_player_look_t);
+
+                pitch = SDL_clamp(p->pitch, -89.0f, 89.0f);
+                yaw = p->yaw + 90.0f;
+
+                break;
+            }
+            case PACKET_ID_PLAYER_POS:
+            {
+                CAST_PACK_TO_P(packet_player_pos_t);
+
+                camera_pos = { p->x, p->y, p->z };
+
+                break;
+            }
+            case PACKET_ID_PLAYER_POS_LOOK:
+            {
+                CAST_PACK_TO_P(packet_player_pos_look_s2c_t);
+
+                camera_pos = { p->x, p->y, p->z };
+                pitch = SDL_clamp(p->pitch, -89.0f, 89.0f);
+                yaw = p->yaw + 90.0f;
+
+                connection->in_world = true;
+                connection->set_status("");
+
+                break;
+            }
+            case PACKET_ID_CHUNK_CACHE:
+            {
+                CAST_PACK_TO_P(packet_chunk_cache_t);
+
+                if (!p->mode)
+                {
+                    for (std::vector<chunk_cubic_t*>::iterator it = level->chunks.begin(); it != level->chunks.end();)
+                    {
+                        chunk_cubic_t* c = *it;
+                        if (c->chunk_x == p->chunk_x && c->chunk_z == p->chunk_z && 0 <= c->chunk_y && c->chunk_y < 8)
+                            it = level->chunks.erase(it);
+                        else
+                            it = std::next(it);
+                    }
+                }
+                else
+                {
+                    bool exists[8] = { 0 };
+                    for (chunk_cubic_t* c : level->chunks)
+                        if (c->chunk_x == p->chunk_x && c->chunk_z == p->chunk_z && 0 <= c->chunk_y && c->chunk_y < 8)
+                            exists[c->chunk_y] = 1;
+
+                    for (int i = 0; i < 8; i++)
+                    {
+                        if (exists[i])
+                            continue;
+                        chunk_cubic_t* c = new chunk_cubic_t();
+                        c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_NONE;
+                        c->chunk_x = p->chunk_x;
+                        c->chunk_y = i;
+                        c->chunk_z = p->chunk_z;
+                        level->chunks.push_back(c);
+                    }
+                }
+                break;
+            }
+            case PACKET_ID_CHUNK_MAP:
+            {
+                CAST_PACK_TO_P(packet_chunk_t);
+                static std::vector<Uint8> buf;
+                decompress_chunk_packet(p, buf);
+                break;
+            }
+
+            case PACKET_ID_CHAT_MSG:
+            {
+                CAST_PACK_TO_P(packet_chat_message_t);
+                dc_log("[CHAT]: %s", p->msg.c_str());
+                break;
+            }
+
+            case PACKET_ID_KICK:
+            {
+                CAST_PACK_TO_P(packet_kick_t);
+                connection->set_status("disconnect.lost", p->reason);
+                break;
+            }
+            case PACKET_ID_PLAYER_LIST_ITEM:
+            case PACKET_ID_ENT_VELOCITY:
+            case PACKET_ID_ENT_DESTROY:
+            case PACKET_ID_ENT_ENSURE_SPAWN:
+            case PACKET_ID_ENT_MOVE_REL:
+            case PACKET_ID_ENT_LOOK:
+            case PACKET_ID_ENT_LOOK_MOVE_REL:
+            case PACKET_ID_ENT_MOVE_TELEPORT:
+                break;
+            default:
+                dc_log_error("Unknown packet from server with id: 0x%02x", pack_type);
+                break;
+            }
+        }
+    }
+    static Uint64 last_update_tick = 0;
+    if (connection->in_world && SDL_GetTicks() - last_update_tick > 50)
+    {
+        packet_player_pos_look_c2s_t location_response;
+        location_response.x = camera_pos.x;
+        location_response.y = camera_pos.y;
+        location_response.stance = camera_pos.y + 1.0f;
+        location_response.z = camera_pos.z;
+
+        location_response.pitch = -pitch;
+        location_response.yaw = yaw - 90.0f;
+
+        send_buffer(connection->socket, location_response.assemble());
+
+        last_update_tick = SDL_GetTicks();
+
+        level->build_dirty_meshes();
+    }
+
+    level->lightmap.update();
+
+    level->get_terrain()->update();
 
     if (SDL_GetWindowMouseGrab(tetra::window) != mouse_grabbed)
         SDL_SetWindowMouseGrab(tetra::window, mouse_grabbed);
@@ -421,7 +873,7 @@ void normal_loop()
     shader->set_uniform("tex_lightmap", 1);
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, level->terrain->tex_id_main);
+    glBindTexture(GL_TEXTURE_2D, level->get_terrain()->tex_id_main);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, level->lightmap.tex_id_linear);
     glActiveTexture(GL_TEXTURE0);
@@ -434,7 +886,7 @@ void normal_loop()
     });
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, level->terrain->tex_id_main);
+    glBindTexture(GL_TEXTURE_2D, level->get_terrain()->tex_id_main);
     for (chunk_cubic_t* c : level->chunks)
     {
         if (c->index_type == GL_NONE || c->index_count == 0)
@@ -548,7 +1000,7 @@ void process_event(SDL_Event& event, bool* done)
                 if (int(camera_pos.x) >> 4 != c->chunk_x || int(camera_pos.y) >> 4 != c->chunk_y || int(camera_pos.z) >> 4 != c->chunk_z)
                     continue;
                 c->free_gl();
-                c->dirty = 0;
+                c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_NONE;
             }
             break;
         }
@@ -558,7 +1010,7 @@ void process_event(SDL_Event& event, bool* done)
             {
                 if (int(camera_pos.x) >> 4 != c->chunk_x || int(camera_pos.y) >> 4 != c->chunk_y || int(camera_pos.z) >> 4 != c->chunk_z)
                     continue;
-                c->dirty = 1;
+                c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
             }
             break;
         }
@@ -589,8 +1041,7 @@ void process_event(SDL_Event& event, bool* done)
 
                 if (chunk_coords.x - c->chunk_x == diff_x || chunk_coords.y - c->chunk_y == diff_y || chunk_coords.z - c->chunk_z == diff_z)
                     continue;
-
-                c->dirty = 1;
+                c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
             }
             break;
         }
@@ -601,7 +1052,7 @@ void process_event(SDL_Event& event, bool* done)
                 if (SDL_abs((int(camera_pos.x) >> 4) - c->chunk_x) > 1 || SDL_abs((int(camera_pos.y) >> 4) - c->chunk_y) > 1
                     || SDL_abs((int(camera_pos.z) >> 4) - c->chunk_z) > 1)
                     continue;
-                c->dirty = 1;
+                c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
             }
             break;
         }
@@ -673,7 +1124,7 @@ static bool render_water_overlay()
     bool found_water = false;
     for (chunk_cubic_t* c : level->chunks)
     {
-        if (chunk_coords.x != c->chunk_x || chunk_coords.y != c->chunk_y || chunk_coords.z != c->chunk_z)
+        if (!c || chunk_coords.x != c->chunk_x || chunk_coords.y != c->chunk_y || chunk_coords.z != c->chunk_z)
             continue;
 
         block_id_t type = c->get_type(cam_pos.x & 0x0F, cam_pos.y & 0x0F, cam_pos.z & 0x0F);
@@ -687,10 +1138,10 @@ static bool render_water_overlay()
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     if (ImGui::Begin("Water", NULL, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground))
     {
-        mc_id::terrain_face_t face = level->terrain->get_face(mc_id::FACE_WATER_STILL);
+        mc_id::terrain_face_t face = level->get_terrain()->get_face(mc_id::FACE_WATER_STILL);
         ImVec2 uv0(face.corners[0].x, face.corners[0].y);
         ImVec2 uv1(face.corners[3].x, face.corners[3].y);
-        ImGui::Image((void*)(size_t)level->terrain->tex_id_main, ImGui::GetMainViewport()->WorkSize, uv0, uv1);
+        ImGui::Image((void*)(size_t)level->get_terrain()->tex_id_main, ImGui::GetMainViewport()->WorkSize, uv0, uv1);
     }
     ImGui::End();
     ImGui::PopStyleVar();
@@ -699,6 +1150,44 @@ static bool render_water_overlay()
 }
 
 static gui_register_overlay reg_render_water_overlay(render_water_overlay);
+
+static bool render_status_msg()
+{
+    if (!connection)
+        return false;
+
+    if (!connection->status_msg.length())
+        return false;
+
+    ImGui::SetNextWindowPos(ImVec2(ImGui::GetMainViewport()->GetWorkCenter().x, 0), ImGuiCond_Always, ImVec2(0.5f, 0));
+
+    ImVec2 size0 = ImGui::CalcTextSize(connection->status_msg.c_str());
+    ImVec2 size1 = ImGui::CalcTextSize(connection->status_msg_sub.c_str());
+
+    if (connection->status_msg_sub.length())
+        size1.y += ImGui::GetStyle().ItemSpacing.y * 2.0f;
+
+    ImVec2 win_size = ImVec2(SDL_max(size0.x, size1.x) + 10.0f, size0.y + size1.y) + ImGui::GetStyle().WindowPadding * 1.05f;
+
+    ImGui::SetNextWindowSize(win_size, ImGuiCond_Always);
+
+    if (ImGui::Begin("Status MSG", NULL, ImGuiWindowFlags_NoDecoration))
+    {
+        ImGui::PushStyleVar(ImGuiStyleVar_SeparatorTextAlign, ImVec2(0.5f, 0.5f));
+        ImGui::PushStyleVar(ImGuiStyleVar_SeparatorTextBorderSize, 0);
+        ImGui::PushStyleVar(ImGuiStyleVar_SeparatorTextPadding, ImVec2(0, 0));
+        ImGui::SeparatorText(connection->status_msg.c_str());
+        if (connection->status_msg_sub.length())
+            ImGui::SeparatorText(connection->status_msg_sub.c_str());
+        ImGui::PopStyleVar(3);
+    }
+
+    ImGui::End();
+
+    return true;
+}
+
+static gui_register_overlay reg_render_status_msg(render_status_msg);
 
 static convar_int_t cvr_gui_renderer("gui_renderer", 0, 0, 1, "Show renderer internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 static convar_int_t cvr_gui_lightmap("gui_lightmap", 0, 0, 1, "Show lightmap internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
@@ -712,6 +1201,9 @@ int main(const int argc, const char** argv)
         cvr_username.set_default(std::string("Player") + std::to_string(SDL_rand_bits() % 65536));
         cvr_username.set(cvr_username.get_default());
     }
+
+    if (!SDLNet_Init())
+        util::die("SDLNet_Init: %s", SDL_GetError());
 
     tetra::set_render_api(tetra::RENDER_API_GL_CORE, 3, 3);
 
@@ -830,19 +1322,23 @@ int main(const int argc, const char** argv)
                 ImGui::InputFloat("Camera Y", &camera_pos.y, 1.0f);
                 ImGui::InputFloat("Camera Z", &camera_pos.z, 1.0f);
 
-                if (ImGui::Button("Rebuild atlas"))
-                    level->terrain.reset(new texture_terrain_t("/_resources/assets/minecraft/textures/"));
-                ImGui::SameLine();
-                if (ImGui::Button("Rebuild meshes & atlas"))
-                    level->rebuild_meshes(true);
+                if (ImGui::Button("Rebuild atlas & meshes"))
+                {
+                    delete texture_atlas;
+                    texture_atlas = new texture_terrain_t("/_resources/assets/minecraft/textures/");
+                    level->set_terrain(texture_atlas);
+                }
                 ImGui::SameLine();
                 if (ImGui::Button("Rebuild meshes"))
-                    level->rebuild_meshes(true);
+                    level->rebuild_meshes();
+                ImGui::SameLine();
+                if (ImGui::Button("Clear meshes"))
+                    level->clear_mesh(false);
 
                 if (ImGui::Button("Rebuild shaders"))
                     compile_shaders();
 
-                level->terrain->imgui_view();
+                level->get_terrain()->imgui_view();
 
                 ImGui::End();
             }
@@ -856,7 +1352,7 @@ int main(const int argc, const char** argv)
                 ImGui::End();
             }
 
-            level->lightmap.update();
+            connection->step_to_active();
 
             normal_loop();
 
@@ -885,5 +1381,6 @@ int main(const int argc, const char** argv)
     }
 
     tetra::deinit();
+    SDLNet_Quit();
     SDL_Quit();
 }

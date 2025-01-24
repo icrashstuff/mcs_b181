@@ -106,7 +106,7 @@ enum packet_id_t : jubyte
     PACKET_ID_ENT_SPAWN_XP = 0x1a,
 
     /**
-     * Wiki.vg notes this is unused, and all field names are ???, so...
+     * Wiki.vg notes this is as unused, and all field names are ???, so...
      */
     PACKET_ID_STANCE_UPDATE = 0x1b,
 

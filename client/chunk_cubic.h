@@ -41,7 +41,19 @@
 /* TODO-OPT: Spin this out to shared? */
 struct chunk_cubic_t
 {
-    bool dirty = 1;
+    enum dirty_level_t
+    {
+        DIRTY_LEVEL_NONE,
+        /** Internal use only */
+        DIRTY_LEVEL_MESH,
+        /** Internal use only */
+        DIRTY_LEVEL_LIGHT_PASS_EXT_1,
+        /** Internal use only */
+        DIRTY_LEVEL_LIGHT_PASS_EXT_0,
+        /** Set to this if in doubt */
+        DIRTY_LEVEL_LIGHT_PASS_INTERNAL,
+    };
+    dirty_level_t dirty_level = DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
     GLuint vao = 0;
     GLuint vbo = 0;
     /**
@@ -100,7 +112,7 @@ struct chunk_cubic_t
 
     CHUNK_CUBIC_INLINE void set_type(int x, int y, int z, Uint8 type)
     {
-        dirty = true;
+        dirty_level = DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
         assert(x >= 0);
         assert(y >= 0);
         assert(z >= 0);
@@ -135,7 +147,7 @@ struct chunk_cubic_t
 
     CHUNK_CUBIC_INLINE void set_metadata(int x, int y, int z, Uint8 metadata)
     {
-        dirty = true;
+        dirty_level = DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
         assert(x >= 0);
         assert(y >= 0);
         assert(z >= 0);
@@ -181,7 +193,7 @@ struct chunk_cubic_t
 
     CHUNK_CUBIC_INLINE void set_light_block(int x, int y, int z, Uint8 level)
     {
-        dirty = true;
+        dirty_level = DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
         assert(x >= 0);
         assert(y >= 0);
         assert(z >= 0);
@@ -227,7 +239,7 @@ struct chunk_cubic_t
 
     CHUNK_CUBIC_INLINE void set_light_sky(int x, int y, int z, Uint8 level)
     {
-        dirty = true;
+        dirty_level = DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
         assert(x >= 0);
         assert(y >= 0);
         assert(z >= 0);

@@ -76,6 +76,14 @@ typedef double jdouble;
 #define helpful_assert(x, fmt, ...) void(0)
 #endif
 
+#define BETWEEN_EXCL(x, a, b) ((a) < (x) && (x) < (b))
+#define BETWEEN_INCL(x, a, b) ((a) <= (x) && (x) <= (b))
+
+#define ENUM_SWITCH_CASE(OUT_STR, ENUM) \
+    case ENUM:                          \
+        OUT_STR = #ENUM;                \
+        break;
+
 #define MAX_PLAYERS 20
 
 #define WORLD_HEIGHT 128

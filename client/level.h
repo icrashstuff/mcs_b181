@@ -28,39 +28,59 @@
 #include "lightmap.h"
 #include "texture_terrain.h"
 #include <GL/glew.h>
+#include <glm/glm.hpp>
 #include <memory>
 #include <vector>
 
 struct level_t
 {
-    level_t();
+    level_t(texture_terrain_t* terrain = NULL);
 
     ~level_t();
 
     std::vector<chunk_cubic_t*> chunks;
 
     /** Items should probably be removed from terrain **/
-    std::shared_ptr<texture_terrain_t> terrain;
 
     lightmap_t lightmap;
+
+    /* TODO: Use this for sky calculations */
+    int world_height = 0;
 
     GLuint ebo = 0;
 
     /**
      * Builds all dirt meshes
+     * TODO: Throttle rendering based on position
+     * TODO: Wait for either a timeout to pass or all surrounding chunks to be loaded before building
      * TODO: Rebuild clean meshes that surround dirty ones
      */
     void build_dirty_meshes();
 
     /**
-     * Clears chunks (if any), optionally rebuilds the terrain atlas, and then builds all the chunks
+     * Clears chunks meshes without freeing GL resources
      */
-    void rebuild_meshes(bool rebuild_terrain);
+    void rebuild_meshes();
 
     /**
      * Clears all meshes
+     *
+     * @param free_gl Optionally free all OpenGL resources
      */
-    void clear_mesh();
+    void clear_mesh(bool free_gl);
+
+    /**
+     * Switchs terrain texture for level
+     *
+     * NOTE: This will clear all the meshes because the atlas might be structurally different
+     */
+    void set_terrain(texture_terrain_t* _terrain)
+    {
+        terrain = _terrain;
+        clear_mesh(false);
+    }
+
+    inline texture_terrain_t* get_terrain() { return terrain; }
 
     /**
      * Clears all chunks
@@ -83,6 +103,14 @@ struct level_t
      * TODO: Handle light transmission in water/other translucent blocks
      */
     void light_pass(int chunk_x, int chunk_y, int chunk_z, bool local_only);
+
+    /**
+     * In world coordinates
+     */
+    glm::vec3 pos_camera = { 0, 0, 0 };
+
+private:
+    texture_terrain_t* terrain;
 };
 
 #endif

@@ -29,8 +29,6 @@ in float frag_light_sky;
 
 out vec4 out_color;
 
-uniform float daylight = 0.99;
-
 uniform sampler2D tex_atlas;
 uniform sampler2D tex_lightmap;
 

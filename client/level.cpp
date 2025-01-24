@@ -40,12 +40,19 @@
             dc_log(fmt, ##__VA_ARGS__);          \
     } while (0)
 
-void level_t::rebuild_meshes(bool rebuild_terrain)
+void level_t::clear_mesh(bool free_gl)
 {
     for (chunk_cubic_t* c : chunks)
-        c->dirty = true;
+    {
+        if (free_gl)
+            c->free_gl();
+        c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
+    }
+}
 
-    terrain.reset(new texture_terrain_t("/_resources/assets/minecraft/textures/"));
+void level_t::rebuild_meshes()
+{
+    clear_mesh(false);
 
     build_dirty_meshes();
 }
@@ -60,8 +67,9 @@ void level_t::build_dirty_meshes()
     PASS_TIMER_START();
     for (size_t i = 0; i < chunks.size(); i++)
     {
-        if (!chunks[i]->dirty)
+        if (chunks[i]->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL)
             continue;
+        chunks[i]->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0;
         chunks[i]->clear_light_block(0);
         chunks[i]->clear_light_sky(0);
         light_pass(chunks[i]->chunk_x, chunks[i]->chunk_y, chunks[i]->chunk_z, true);
@@ -73,8 +81,9 @@ void level_t::build_dirty_meshes()
     PASS_TIMER_START();
     for (size_t i = 0; i < chunks.size(); i++)
     {
-        if (!chunks[i]->dirty)
+        if (chunks[i]->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0)
             continue;
+        chunks[i]->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_1;
         light_pass(chunks[i]->chunk_x, chunks[i]->chunk_y, chunks[i]->chunk_z, false);
         built++;
     }
@@ -84,8 +93,9 @@ void level_t::build_dirty_meshes()
     PASS_TIMER_START();
     for (size_t i = 0; i < chunks.size(); i++)
     {
-        if (!chunks[i]->dirty)
+        if (chunks[i]->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_1)
             continue;
+        chunks[i]->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
         light_pass(chunks[i]->chunk_x, chunks[i]->chunk_y, chunks[i]->chunk_z, false);
         built++;
     }
@@ -95,10 +105,10 @@ void level_t::build_dirty_meshes()
     PASS_TIMER_START();
     for (size_t i = 0; i < chunks.size(); i++)
     {
-        if (!chunks[i]->dirty)
+        if (chunks[i]->dirty_level != chunk_cubic_t::DIRTY_LEVEL_MESH)
             continue;
+        chunks[i]->dirty_level = chunk_cubic_t::DIRTY_LEVEL_NONE;
         build_mesh(chunks[i]->chunk_x, chunks[i]->chunk_y, chunks[i]->chunk_z);
-        chunks[i]->dirty = 0;
         built++;
     }
     PASS_TIMER_STOP("Built %zu meshes in %.2f ms (%.2f ms per)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
@@ -265,6 +275,12 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
     if (!center)
     {
         dc_log_error("Attempt made to build unloaded chunk at chunk coordinates: %d, %d, %d", chunk_x, chunk_y, chunk_z);
+        return;
+    }
+
+    if (!terrain)
+    {
+        dc_log_error("A texture atlas is required to build a chunk");
         return;
     }
 
@@ -1861,8 +1877,10 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
     glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, tex));
 }
 
-level_t::level_t()
+level_t::level_t(texture_terrain_t* _terrain)
 {
+    terrain = _terrain;
+
     /* Size the buffer for maximum 36 quads for every block, TODO-OPT: Would multiple smaller buffers be better? */
     size_t quads = SUBCHUNK_SIZE_X * SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z * 6 * 6;
     std::vector<Uint32> ind;
@@ -1889,4 +1907,5 @@ level_t::~level_t()
     glDeleteBuffers(1, &ebo);
     for (size_t i = 0; i < chunks.size(); i++)
         delete chunks[i];
+    chunks.resize(0);
 }
