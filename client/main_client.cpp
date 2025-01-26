@@ -513,9 +513,12 @@ void decompress_chunk_packet(packet_chunk_t* p, std::vector<Uint8>& buffer)
 
 void normal_loop()
 {
+
     if (connection->status == connection_t::CONNECTION_ACTIVE)
     {
         static bool sent_init = false;
+        static Uint64 last_update_tick_build = 0;
+        static Uint64 last_update_tick_camera = 0;
 
         if (!sent_init)
         {
@@ -582,8 +585,9 @@ void normal_loop()
             {
                 CAST_PACK_TO_P(packet_player_look_t);
 
-                pitch = SDL_clamp(p->pitch, -89.0f, 89.0f);
+                pitch = SDL_clamp(-p->pitch, -89.0f, 89.0f);
                 yaw = p->yaw + 90.0f;
+                last_update_tick_camera = 0;
 
                 break;
             }
@@ -592,6 +596,7 @@ void normal_loop()
                 CAST_PACK_TO_P(packet_player_pos_t);
 
                 level->camera_pos = { p->x, p->y, p->z };
+                last_update_tick_camera = 0;
 
                 break;
             }
@@ -600,11 +605,12 @@ void normal_loop()
                 CAST_PACK_TO_P(packet_player_pos_look_s2c_t);
 
                 level->camera_pos = { p->x, p->y, p->z };
-                pitch = SDL_clamp(p->pitch, -89.0f, 89.0f);
+                pitch = SDL_clamp(-p->pitch, -89.0f, 89.0f);
                 yaw = p->yaw + 90.0f;
 
                 connection->in_world = true;
                 connection->set_status("");
+                last_update_tick_camera = 0;
 
                 break;
             }
@@ -679,27 +685,29 @@ void normal_loop()
                 break;
             }
         }
-    }
-    static Uint64 last_update_tick = 0;
-    if (SDL_GetTicks() - last_update_tick > 50)
-    {
+
         if (connection->in_world)
         {
-            packet_player_pos_look_c2s_t location_response;
-            location_response.x = level->camera_pos.x;
-            location_response.y = level->camera_pos.y;
-            location_response.stance = level->camera_pos.y + 1.0f;
-            location_response.z = level->camera_pos.z;
+            if (SDL_GetTicks() - last_update_tick_camera > 50)
+            {
+                packet_player_pos_look_c2s_t location_response;
+                location_response.x = level->camera_pos.x;
+                location_response.y = level->camera_pos.y;
+                location_response.stance = level->camera_pos.y + 1.0f;
+                location_response.z = level->camera_pos.z;
 
-            location_response.pitch = -pitch;
-            location_response.yaw = yaw - 90.0f;
+                location_response.pitch = -pitch;
+                location_response.yaw = yaw - 90.0f;
 
-            send_buffer(connection->socket, location_response.assemble());
+                send_buffer(connection->socket, location_response.assemble());
+                last_update_tick_camera = SDL_GetTicks();
+            }
+            if (SDL_GetTicks() - last_update_tick_build > 50)
+            {
+                level->build_dirty_meshes();
+                last_update_tick_build = SDL_GetTicks();
+            }
         }
-
-        last_update_tick = SDL_GetTicks();
-
-        level->build_dirty_meshes();
     }
 
     level->lightmap.update();
