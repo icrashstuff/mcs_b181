@@ -78,7 +78,20 @@ void compile_shaders()
     dc_log("Compiled shaders in %.2f ms", (SDL_GetTicksNS() - tick_shader_start) / 1000000.0);
 }
 
-level_t* level;
+static level_t* level;
+static block_id_t block_hand = BLOCK_ID_STONE;
+static Uint8 block_hand_meta = 0;
+
+struct tentative_block_t
+{
+    Uint64 timestamp = 0;
+    glm::ivec3 pos = { -1, -1, -1 };
+    block_id_t old_type = BLOCK_ID_AIR;
+    Uint8 old_meta = 0;
+    bool fullfilled = 0;
+};
+
+std::vector<tentative_block_t> tentative_blocks;
 
 struct connection_t
 {
@@ -445,7 +458,6 @@ void decompress_chunk_packet(packet_chunk_t* p, std::vector<Uint8>& buffer)
     // TODO: Create nonexistent chunks
     for (chunk_cubic_t* c : level->chunks)
     {
-        // if(min_chunk_x <= c->chunk_x || c->chunk_x > max_chunk_x)
         if (!BETWEEN_INCL(c->pos.x, min_chunk_x, max_chunk_x))
             continue;
         if (!BETWEEN_INCL(c->pos.y, min_chunk_y, max_chunk_y))
@@ -531,7 +543,7 @@ void normal_loop()
         }
         Uint64 sdl_start_tick = SDL_GetTicks();
         packet_t* pack_from_server = NULL;
-        while (SDL_GetTicks() - sdl_start_tick < (connection->in_world ? 50 : 150) && connection->status == connection_t::CONNECTION_ACTIVE
+        while (SDL_GetTicks() - sdl_start_tick < (connection->in_world ? 25 : 150) && connection->status == connection_t::CONNECTION_ACTIVE
             && (pack_from_server = connection->pack_handler_client.get_next_packet(connection->socket)))
         {
 #define CAST_PACK_TO_P(type) type* p = (type*)pack_from_server
@@ -618,12 +630,15 @@ void normal_loop()
             {
                 CAST_PACK_TO_P(packet_chunk_cache_t);
 
+                int max_cy = (level->world_height + SUBCHUNK_SIZE_Y - 1) / SUBCHUNK_SIZE_Y;
+
                 if (!p->mode)
                 {
+
                     for (std::vector<chunk_cubic_t*>::iterator it = level->chunks.begin(); it != level->chunks.end();)
                     {
                         chunk_cubic_t* c = *it;
-                        if (c->pos.x == p->chunk_x && c->pos.z == p->chunk_z && 0 <= c->pos.y && c->pos.y < 8)
+                        if (c->pos.x == p->chunk_x && c->pos.z == p->chunk_z && 0 <= c->pos.y && c->pos.y < max_cy)
                             it = level->chunks.erase(it);
                         else
                             it = std::next(it);
@@ -631,12 +646,13 @@ void normal_loop()
                 }
                 else
                 {
-                    bool exists[8] = { 0 };
+                    std::vector<int> exists;
+                    exists.resize(max_cy);
                     for (chunk_cubic_t* c : level->chunks)
-                        if (c->pos.x == p->chunk_x && c->pos.z == p->chunk_z && 0 <= c->pos.y && c->pos.y < 8)
+                        if (c->pos.x == p->chunk_x && c->pos.z == p->chunk_z && 0 <= c->pos.y && c->pos.y < max_cy)
                             exists[c->pos.y] = 1;
 
-                    for (int i = 0; i < 8; i++)
+                    for (int i = 0; i < max_cy; i++)
                     {
                         if (exists[i])
                             continue;
@@ -650,11 +666,62 @@ void normal_loop()
                 }
                 break;
             }
+            case PACKET_ID_BLOCK_CHANGE:
+            {
+                CAST_PACK_TO_P(packet_block_change_t);
+
+                glm::ivec3 block_pos = { p->block_x, p->block_y, p->block_z };
+                level->set_block(block_pos, p->type, p->metadata);
+
+                /* Mark as fulfilled to delay erasing until after packet handling is finished */
+                for (tentative_block_t& it : tentative_blocks)
+                {
+                    if (it.fullfilled || it.pos != block_pos)
+                        continue;
+                    it.fullfilled = 1;
+                    break;
+                }
+                break;
+            }
+            case PACKET_ID_BLOCK_CHANGE_MULTI:
+            {
+                CAST_PACK_TO_P(packet_block_change_multi_t);
+
+                for (block_change_dat_t b : p->payload)
+                {
+                    glm::ivec3 block_pos = { p->chunk_x * CHUNK_SIZE_X + b.x, b.y, p->chunk_z * CHUNK_SIZE_Z + b.z };
+                    level->set_block(block_pos, b.type, b.metadata);
+
+                    /* Mark as fulfilled to delay erasing until after packet handling is finished */
+                    for (tentative_block_t& it : tentative_blocks)
+                    {
+                        if (it.fullfilled || it.pos != block_pos)
+                            continue;
+                        it.fullfilled = 1;
+                    }
+                }
+                break;
+            }
             case PACKET_ID_CHUNK_MAP:
             {
                 CAST_PACK_TO_P(packet_chunk_t);
                 static std::vector<Uint8> buf;
                 decompress_chunk_packet(p, buf);
+
+                /* Mark as fulfilled to delay erasing until after packet handling is finished */
+                for (tentative_block_t& it : tentative_blocks)
+                {
+                    if (it.fullfilled)
+                        continue;
+                    if (!BETWEEN_INCL(it.pos.x, p->block_x, p->block_x + p->size_x))
+                        continue;
+                    if (!BETWEEN_INCL(it.pos.y, p->block_y, p->block_y + p->size_y))
+                        continue;
+                    if (!BETWEEN_INCL(it.pos.z, p->block_z, p->block_z + p->size_z))
+                        continue;
+                    it.fullfilled = 1;
+                }
+
                 break;
             }
 
@@ -684,6 +751,7 @@ void normal_loop()
                 dc_log_error("Unknown packet from server with id: 0x%02x", pack_type);
                 break;
             }
+            connection->pack_handler_client.free_packet(pack_from_server);
         }
 
         if (connection->in_world)
@@ -713,6 +781,19 @@ void normal_loop()
     level->lightmap.update();
 
     level->get_terrain()->update();
+
+    const Uint64 time_tentative = SDL_GetTicks();
+    for (std::vector<tentative_block_t>::iterator it = tentative_blocks.begin(); it != tentative_blocks.end();)
+    {
+        if (time_tentative - it->timestamp < 5000)
+            it = next(it);
+        else
+        {
+            if (!it->fullfilled)
+                level->set_block(it->pos, it->old_type, it->old_meta);
+            it = tentative_blocks.erase(it);
+        }
+    }
 
     if (SDL_GetWindowMouseGrab(tetra::window) != mouse_grabbed)
         SDL_SetWindowMouseGrab(tetra::window, mouse_grabbed);
@@ -851,31 +932,51 @@ void process_event(SDL_Event& event, bool* done)
             cam_dir.x = SDL_cosf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
             cam_dir.y = SDL_sinf(glm::radians(pitch));
             cam_dir.z = SDL_sinf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
-            glm::ivec3 cam_pos = level->camera_pos + cam_dir * 2.5f;
+            glm::ivec3 cam_pos = level->camera_pos + glm::normalize(cam_dir) * 2.5f;
 
-            for (chunk_cubic_t* c : level->chunks)
+            if (event.button.button == 1)
             {
-                if ((cam_pos >> 4) != c->pos)
-                    continue;
-                if (event.button.button == 1)
-                    c->set_type(cam_pos.x & 0x0F, cam_pos.y & 0x0F, cam_pos.z & 0x0F, BLOCK_ID_AIR);
-                if (event.button.button == 3)
-                    c->set_type(cam_pos.x & 0x0F, cam_pos.y & 0x0F, cam_pos.z & 0x0F, BLOCK_ID_TORCH);
+                tentative_block_t t;
+                t.timestamp = SDL_GetTicks();
+                t.pos = cam_pos;
+                if (level->get_block(t.pos, t.old_type, t.old_meta) && t.old_type != BLOCK_ID_AIR)
+                {
+                    tentative_blocks.push_back(t);
+                    level->set_block(t.pos, BLOCK_ID_AIR, 0);
+
+                    packet_player_dig_t p;
+                    p.status = PLAYER_DIG_STATUS_FINISH_DIG;
+                    p.x = t.pos.x;
+                    p.y = t.pos.y - 1;
+                    p.z = t.pos.z;
+                    p.face = 1;
+                    send_buffer(connection->socket, p.assemble());
+                }
             }
-
-            int diff_x = ((cam_pos.x & 0x0F) < 8) ? -1 : 1;
-            int diff_y = ((cam_pos.y & 0x0F) < 8) ? -1 : 1;
-            int diff_z = ((cam_pos.z & 0x0F) < 8) ? -1 : 1;
-            glm::ivec3 chunk_coords(cam_pos.x >> 4, cam_pos.y >> 4, cam_pos.z >> 4);
-
-            for (chunk_cubic_t* c : level->chunks)
+            if (event.button.button == 2)
             {
-                if (SDL_abs(chunk_coords.x - c->pos.x) > 1 || SDL_abs(chunk_coords.y - c->pos.y) > 1 || SDL_abs(chunk_coords.z - c->pos.z) > 1)
-                    continue;
+                // TODO: Pick block
+            }
+            else if (event.button.button == 3)
+            {
+                tentative_block_t t;
+                t.timestamp = SDL_GetTicks();
+                t.pos = cam_pos;
+                if (level->get_block(t.pos, t.old_type, t.old_meta) && (t.old_type != block_hand || t.old_meta != block_hand_meta))
+                {
+                    tentative_blocks.push_back(t);
+                    level->set_block(t.pos, block_hand, block_hand_meta);
 
-                if (chunk_coords.x - c->pos.x == diff_x || chunk_coords.y - c->pos.y == diff_y || chunk_coords.z - c->pos.z == diff_z)
-                    continue;
-                c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
+                    packet_player_place_t p;
+                    p.x = t.pos.x;
+                    p.y = t.pos.y - 1;
+                    p.z = t.pos.z;
+                    p.direction = 1;
+                    p.block_item_id = block_hand;
+                    p.amount = 0;
+                    p.damage = block_hand_meta;
+                    send_buffer(connection->socket, p.assemble());
+                }
             }
         }
     }
@@ -959,33 +1060,17 @@ void process_event(SDL_Event& event, bool* done)
         }
         case SDL_SCANCODE_1:
         {
-            glm::vec3 cam_dir;
-            cam_dir.x = SDL_cosf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
-            cam_dir.y = SDL_sinf(glm::radians(pitch));
-            cam_dir.z = SDL_sinf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
-            glm::ivec3 cam_pos = glm::round(level->camera_pos + cam_dir * 2.5f);
-
-            for (chunk_cubic_t* c : level->chunks)
-            {
-                if ((cam_pos >> 4) != c->pos)
-                    continue;
-                c->set_type(cam_pos.x & 0x0F, cam_pos.y & 0x0F, cam_pos.z & 0x0F, BLOCK_ID_TORCH);
-            }
-
-            int diff_x = ((cam_pos.x & 0x0F) < 8) ? -1 : 1;
-            int diff_y = ((cam_pos.y & 0x0F) < 8) ? -1 : 1;
-            int diff_z = ((cam_pos.z & 0x0F) < 8) ? -1 : 1;
-            glm::ivec3 chunk_coords(cam_pos.x >> 4, cam_pos.y >> 4, cam_pos.z >> 4);
-
-            for (chunk_cubic_t* c : level->chunks)
-            {
-                if (SDL_abs(chunk_coords.x - c->pos.x) > 1 || SDL_abs(chunk_coords.y - c->pos.y) > 1 || SDL_abs(chunk_coords.z - c->pos.z) > 1)
-                    continue;
-
-                if (chunk_coords.x - c->pos.x == diff_x || chunk_coords.y - c->pos.y == diff_y || chunk_coords.z - c->pos.z == diff_z)
-                    continue;
-                c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
-            }
+            block_hand = BLOCK_ID_STONE;
+            break;
+        }
+        case SDL_SCANCODE_2:
+        {
+            block_hand = BLOCK_ID_COBBLESTONE;
+            break;
+        }
+        case SDL_SCANCODE_3:
+        {
+            block_hand = BLOCK_ID_TORCH;
             break;
         }
         case SDL_SCANCODE_M:

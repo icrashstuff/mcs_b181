@@ -1293,3 +1293,5 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
 
     return packet;
 }
+
+void packet_handler_t::free_packet(packet_t* packet) { delete packet; }

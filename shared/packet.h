@@ -873,9 +873,16 @@ public:
     packet_handler_t(bool is_server = true);
 
     /**
-     * Returns NULL if no packet is available or on error
+     * Get the next finished packet or work on it
+     * Non-Blocking
+     *
+     * WARNING: It is your responsibility to free the returned packet!
+     *
+     * @returns NULL if no packet is available or if an error has occurred
      */
     packet_t* get_next_packet(SDLNet_StreamSocket* sock);
+
+    static void free_packet(packet_t* packet);
 
     /**
      * Returns a non zero length error string when an error occurred

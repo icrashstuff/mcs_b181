@@ -64,6 +64,8 @@ void level_t::build_dirty_meshes()
     Uint64 tick_start;
     Uint64 tick_start_ms = SDL_GetTicks();
 
+    /* Ensure chunk map is correct (TODO: level_t needs a add/remove chunk system) */
+    cmap.clear();
     for (size_t i = 0; i < chunks.size(); i++)
         cmap[chunks[i]->pos] = chunks[i];
 
@@ -1872,6 +1874,105 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
     glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, pos));
     glVertexAttribIPointer(1, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, col));
     glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, tex));
+}
+
+void level_t::set_block(glm::ivec3 pos, block_id_t type, Uint8 metadata)
+{
+    if (type >= BLOCK_ID_MAX)
+    {
+        dc_log_error("Preposterous id field %d:%u at <%d, %d, %d>", type, metadata, pos.x, pos.y, pos.z);
+        return;
+    }
+    if (metadata > 15)
+    {
+        const char* name = mc_id::get_name_from_item_id(type, metadata);
+        dc_log_error("Preposterous metadata field %d(%s):%u at <%d, %d, %d>", type, name, metadata, pos.x, pos.y, pos.z);
+        return;
+    }
+
+    /* Ensure chunk map is correct (TODO: level_t needs a add/remove chunk system) */
+    if (chunks.size() != cmap.size())
+    {
+        cmap.clear();
+        for (chunk_cubic_t* c : chunks)
+            cmap[c->pos] = c;
+    }
+
+    /* Attempt to find chunk */
+    glm::ivec3 chunk_pos = pos >> 4;
+    glm::ivec3 block_pos = pos & 0x0F;
+    auto it = cmap.find(chunk_pos);
+    if (it == cmap.end())
+    {
+        dc_log_error("Unable to find chunk <%d, %d, %d>", chunk_pos.x, chunk_pos.y, chunk_pos.z);
+        return;
+    }
+
+    chunk_cubic_t* c = it->second;
+
+    /* Get existing blocks data to help determine which chunks need rebuilding */
+    block_id_t old_type = c->get_type(block_pos.x, block_pos.y, block_pos.z);
+
+    /* Set type */
+    c->set_type(block_pos.x, block_pos.y, block_pos.z, type);
+    c->set_metadata(block_pos.x, block_pos.y, block_pos.z, metadata);
+
+    /* Surrounding chunks do not need updating if the replacement has an equal effect on lighting */
+    if (mc_id::is_transparent(old_type) == mc_id::is_transparent(type) && mc_id::get_light_level(old_type) == mc_id::get_light_level(type))
+        return;
+
+    int diff_x = ((block_pos.x & 0x0F) < 8) ? -1 : 1;
+    int diff_y = ((block_pos.y & 0x0F) < 8) ? -1 : 1;
+    int diff_z = ((block_pos.z & 0x0F) < 8) ? -1 : 1;
+
+    for (int i = 0; i < 8; i++)
+    {
+        const int ix = (i >> 2) & 1;
+        const int iy = (i >> 1) & 1;
+        const int iz = i & 1;
+
+        c = ((it = cmap.find(chunk_pos + glm::ivec3(diff_x * ix, diff_y * iy, diff_z * iz))) != cmap.end()) ? it->second : NULL;
+
+        chunk_cubic_t::dirty_level_t dirt_face = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
+
+        /* Lower the amount of compute passes */
+        int itotal = ix + iy + iz;
+        if (itotal == 2)
+            dirt_face = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0;
+        else if (itotal == 3)
+            dirt_face = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_1;
+
+        if (c && c->dirty_level < dirt_face)
+            c->dirty_level = dirt_face;
+    }
+}
+
+bool level_t::get_block(glm::ivec3 pos, block_id_t& type, Uint8& metadata)
+{
+    /* Ensure chunk map is correct (TODO: level_t needs a add/remove chunk system) */
+    if (chunks.size() != cmap.size())
+    {
+        cmap.clear();
+        for (chunk_cubic_t* c : chunks)
+            cmap[c->pos] = c;
+    }
+
+    /* Attempt to find chunk */
+    glm::ivec3 chunk_pos = pos >> 4;
+    glm::ivec3 block_pos = pos & 0x0F;
+    auto it = cmap.find(chunk_pos);
+    if (it == cmap.end())
+    {
+        dc_log_error("Unable to find chunk <%d, %d, %d>", chunk_pos.x, chunk_pos.y, chunk_pos.z);
+        return false;
+    }
+
+    chunk_cubic_t* c = it->second;
+
+    type = c->get_type(block_pos.x, block_pos.y, block_pos.z);
+    metadata = c->get_metadata(block_pos.x, block_pos.y, block_pos.z);
+
+    return true;
 }
 
 level_t::level_t(texture_terrain_t* _terrain)

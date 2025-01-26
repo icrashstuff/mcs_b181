@@ -84,6 +84,18 @@ struct level_t
     inline texture_terrain_t* get_terrain() { return terrain; }
 
     /**
+     * Sets the block at the provided position and if necessary marks adjacent chunks for rebuilding/relighting
+     */
+    void set_block(glm::ivec3 pos, block_id_t type, Uint8 metadata);
+
+    /**
+     * Gets the block data at the provided position
+     *
+     * @returns false on block not found, true on block found
+     */
+    bool get_block(glm::ivec3 pos, block_id_t& type, Uint8& metadata);
+
+    /**
      * Clears all chunks
      */
     void clear();

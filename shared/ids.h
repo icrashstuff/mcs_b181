@@ -87,7 +87,7 @@ enum damage_id_t : Uint8
 typedef jshort item_id_t;
 typedef jshort block_id_t;
 
-enum item_id_t_ : item_id_t
+enum item_id_t_ : int
 {
     BLOCK_ID_NONE = -1,
     ITEM_ID_NONE = BLOCK_ID_NONE,
