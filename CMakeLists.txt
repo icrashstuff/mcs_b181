@@ -51,6 +51,7 @@ set(mcs_b181_client_SRC
     shared/misc.cpp
     shared/chunk.cpp
     shared/packet.cpp
+    shared/inventory.cpp
     shared/java_strings.cpp
     shared/simplex_noise/SimplexNoise.cpp
 )

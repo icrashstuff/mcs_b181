@@ -30,6 +30,7 @@
 #include <vector>
 
 #include "ids.h"
+#include "inventory.h"
 #include "misc.h"
 #include "tetra/gui/imgui.h"
 
@@ -647,12 +648,7 @@ struct packet_explosion_t : packet_t
 #define PACK_NEW_STATE_REASON_RAIN_END 2
 #define PACK_NEW_STATE_REASON_CHANGE_MODE 3
 
-struct inventory_item_t
-{
-    short id = -1;
-    short damage = 0;
-    jbyte quantity = 0;
-};
+#define WINDOW_ID_INVENTORY 0
 
 struct packet_window_items_t : packet_t
 {
@@ -660,12 +656,12 @@ struct packet_window_items_t : packet_t
 
     jbyte window_id = 0;
 
-    std::vector<inventory_item_t> payload;
+    std::vector<itemstack_t> payload;
 
-    void payload_from_array(inventory_item_t* arr, Uint32 len)
+    void payload_from_array(itemstack_t* arr, Uint32 len)
     {
         payload.resize(len);
-        memcpy(payload.data(), arr, len * sizeof(inventory_item_t));
+        memcpy(payload.data(), arr, len * sizeof(itemstack_t));
     }
 
     std::vector<Uint8> assemble()
@@ -712,7 +708,7 @@ struct packet_window_click_t : packet_t
     jshort action_num = 0;
     jbool shift = 0;
 
-    inventory_item_t item;
+    itemstack_t item;
 
     std::vector<Uint8> assemble()
     {
@@ -761,7 +757,7 @@ struct packet_window_set_slot_t : packet_t
 
     jbyte window_id = 0;
     jshort slot = 0;
-    inventory_item_t item;
+    itemstack_t item;
 
     std::vector<Uint8> assemble()
     {

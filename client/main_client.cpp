@@ -80,15 +80,12 @@ void compile_shaders()
 }
 
 static level_t* level;
-static block_id_t block_hand = BLOCK_ID_STONE;
-static Uint8 block_hand_meta = 0;
 
 struct tentative_block_t
 {
     Uint64 timestamp = 0;
     glm::ivec3 pos = { -1, -1, -1 };
-    block_id_t old_type = BLOCK_ID_AIR;
-    Uint8 old_meta = 0;
+    itemstack_t old;
     bool fullfilled = 0;
 };
 
@@ -300,6 +297,8 @@ void create_testworld()
         if (c->pos.x == 2 && c->pos.z == 1)
             c->set_type(7, 6, 7, BLOCK_ID_TORCH);
     }
+
+    level->build_dirty_meshes();
 }
 
 bool deinitialize_resources()
@@ -739,6 +738,43 @@ void normal_loop()
                 connection->set_status("disconnect.lost", p->reason);
                 break;
             }
+            case PACKET_ID_WINDOW_SET_ITEMS:
+            {
+                CAST_PACK_TO_P(packet_window_items_t);
+
+                switch (p->window_id)
+                {
+                case WINDOW_ID_INVENTORY:
+                    p->payload.resize(SDL_min(p->payload.size(), SDL_arraysize(level->inventory.items)));
+                    for (size_t i = 0; i < p->payload.size(); i++)
+                        level->inventory.items[i].id = i;
+
+                    break;
+                default:
+                    dc_log_error("Unknown window id %d", p->window_id);
+                    break;
+                }
+
+                break;
+            }
+            case PACKET_ID_WINDOW_SET_SLOT:
+            {
+                CAST_PACK_TO_P(packet_window_set_slot_t);
+
+                switch (p->window_id)
+                {
+                case WINDOW_ID_INVENTORY:
+                    if (p->slot < 0 || IM_ARRAYSIZE(level->inventory.items) < p->slot)
+                        break;
+                    level->inventory.items[p->slot] = p->item;
+                    break;
+                default:
+                    dc_log_error("Unknown window id %d", p->window_id);
+                    break;
+                }
+
+                break;
+            }
             case PACKET_ID_PLAYER_LIST_ITEM:
             case PACKET_ID_ENT_VELOCITY:
             case PACKET_ID_ENT_DESTROY:
@@ -791,7 +827,7 @@ void normal_loop()
         else
         {
             if (!it->fullfilled)
-                level->set_block(it->pos, it->old_type, it->old_meta);
+                level->set_block(it->pos, it->old.id, it->old.damage);
             it = tentative_blocks.erase(it);
         }
     }
@@ -943,17 +979,19 @@ void process_event(SDL_Event& event, bool* done)
                 tentative_block_t t;
                 t.timestamp = SDL_GetTicks();
                 t.pos = cam_pos;
-                if (level->get_block(t.pos, t.old_type, t.old_meta) && t.old_type != BLOCK_ID_AIR)
+                if (level->get_block(t.pos, t.old) && t.old.id != BLOCK_ID_AIR)
                 {
                     tentative_blocks.push_back(t);
                     level->set_block(t.pos, BLOCK_ID_AIR, 0);
 
                     packet_player_dig_t p;
-                    p.status = PLAYER_DIG_STATUS_FINISH_DIG;
                     p.x = t.pos.x;
                     p.y = t.pos.y - 1;
                     p.z = t.pos.z;
                     p.face = 1;
+                    p.status = PLAYER_DIG_STATUS_START_DIG;
+                    send_buffer(connection->socket, p.assemble());
+                    p.status = PLAYER_DIG_STATUS_FINISH_DIG;
                     send_buffer(connection->socket, p.assemble());
                 }
             }
@@ -966,22 +1004,41 @@ void process_event(SDL_Event& event, bool* done)
                 tentative_block_t t;
                 t.timestamp = SDL_GetTicks();
                 t.pos = cam_pos;
-                if (level->get_block(t.pos, t.old_type, t.old_meta) && (t.old_type != block_hand || t.old_meta != block_hand_meta))
+                itemstack_t hand = level->inventory.items[level->inventory.hotbar_sel];
+
+                if (level->get_block(t.pos, t.old) && t.old != hand)
                 {
-                    tentative_blocks.push_back(t);
-                    level->set_block(t.pos, block_hand, block_hand_meta);
+                    if (mc_id::is_block(hand.id))
+                    {
+                        tentative_blocks.push_back(t);
+                        level->set_block(t.pos, hand);
+                    }
 
                     packet_player_place_t p;
                     p.x = t.pos.x;
                     p.y = t.pos.y - 1;
                     p.z = t.pos.z;
                     p.direction = 1;
-                    p.block_item_id = block_hand;
+                    p.block_item_id = hand.id;
                     p.amount = 0;
-                    p.damage = block_hand_meta;
+                    p.damage = hand.damage;
                     send_buffer(connection->socket, p.assemble());
                 }
             }
+        }
+    }
+
+    if (event.type == SDL_EVENT_MOUSE_WHEEL)
+    {
+        if (SDL_fabsf(event.wheel.y) >= 0.99f)
+        {
+            packet_hold_change_t pack;
+            int num_slots = level->inventory.hotbar_max - level->inventory.hotbar_min + 1;
+            pack.slot_id = (level->inventory.hotbar_sel + int(event.wheel.y) - level->inventory.hotbar_min) % num_slots;
+            if (pack.slot_id < 0)
+                pack.slot_id += num_slots;
+            level->inventory.hotbar_sel = level->inventory.hotbar_min + pack.slot_id;
+            send_buffer(connection->socket, pack.assemble());
         }
     }
 
@@ -1062,19 +1119,20 @@ void process_event(SDL_Event& event, bool* done)
             }
             break;
         }
-        case SDL_SCANCODE_1:
+        case SDL_SCANCODE_1: /* Fall through */
+        case SDL_SCANCODE_2: /* Fall through */
+        case SDL_SCANCODE_3: /* Fall through */
+        case SDL_SCANCODE_4: /* Fall through */
+        case SDL_SCANCODE_5: /* Fall through */
+        case SDL_SCANCODE_6: /* Fall through */
+        case SDL_SCANCODE_7: /* Fall through */
+        case SDL_SCANCODE_8: /* Fall through */
+        case SDL_SCANCODE_9:
         {
-            block_hand = BLOCK_ID_STONE;
-            break;
-        }
-        case SDL_SCANCODE_2:
-        {
-            block_hand = BLOCK_ID_COBBLESTONE;
-            break;
-        }
-        case SDL_SCANCODE_3:
-        {
-            block_hand = BLOCK_ID_TORCH;
+            packet_hold_change_t pack;
+            pack.slot_id = event.key.scancode - SDL_SCANCODE_1;
+            level->inventory.hotbar_sel = level->inventory.hotbar_min + pack.slot_id;
+            send_buffer(connection->socket, pack.assemble());
             break;
         }
         case SDL_SCANCODE_M:
@@ -1224,6 +1282,7 @@ static gui_register_overlay reg_render_status_msg(render_status_msg);
 static convar_int_t cvr_gui_renderer("gui_renderer", 0, 0, 1, "Show renderer internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 static convar_int_t cvr_gui_lightmap("gui_lightmap", 0, 0, 1, "Show lightmap internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 static convar_int_t cvr_gui_engine_state("gui_engine_state", 0, 0, 1, "Show engine state menu", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
+static convar_int_t cvr_gui_inventory("gui_inventory", 0, 0, 1, "Show primitive inventory window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 
 bool engine_state_step()
 {
@@ -1513,6 +1572,17 @@ int main(const int argc, const char** argv)
                 ImGui::SetNextWindowSize(viewport->Size * ImVec2(0.425f, 0.8f), ImGuiCond_FirstUseEver);
                 ImGui::BeginCVR("Lightmap", &cvr_gui_lightmap);
                 level->lightmap.imgui_contents();
+                ImGui::End();
+            }
+
+            if (cvr_gui_inventory.get())
+            {
+                ImGui::SetNextWindowPos(viewport->Size * ImVec2(0.0075f, 0.1875f), ImGuiCond_FirstUseEver, ImVec2(0.0, 0.0));
+                ImGui::SetNextWindowSize(viewport->Size * ImVec2(0.425f, 0.8f), ImGuiCond_FirstUseEver);
+                ImGui::BeginCVR("Inventory", &cvr_gui_inventory);
+
+                level->inventory.imgui();
+
                 ImGui::End();
             }
 

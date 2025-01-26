@@ -26,6 +26,7 @@
 
 #include "chunk_cubic.h"
 #include "lightmap.h"
+#include "shared/inventory.h"
 #include "texture_terrain.h"
 #include <GL/glew.h>
 #include <glm/glm.hpp>
@@ -89,11 +90,32 @@ struct level_t
     void set_block(glm::ivec3 pos, block_id_t type, Uint8 metadata);
 
     /**
+     * Sets the block at the provided position and if necessary marks adjacent chunks for rebuilding/relighting
+     */
+    inline void set_block(glm::ivec3 pos, itemstack_t item) { set_block(pos, item.id, item.damage); }
+
+    /**
      * Gets the block data at the provided position
      *
      * @returns false on block not found, true on block found
      */
     bool get_block(glm::ivec3 pos, block_id_t& type, Uint8& metadata);
+
+    /**
+     * Gets the block data at the provided position
+     *
+     * @returns false on block not found, true on block found
+     */
+    bool get_block(glm::ivec3 pos, itemstack_t& item)
+    {
+        block_id_t type;
+        Uint8 metadata;
+        if (!get_block(pos, type, metadata))
+            return false;
+        item.id = type;
+        item.damage = metadata;
+        return true;
+    }
 
     /**
      * Clears all chunks
@@ -104,6 +126,8 @@ struct level_t
     void render();
 
     glm::vec3 camera_pos = { 0, 0, 0 };
+
+    inventory_player_t inventory;
 
 private:
     struct ivec3_comparator_t

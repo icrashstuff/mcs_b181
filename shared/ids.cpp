@@ -549,7 +549,6 @@ Uint8 mc_id::get_max_quantity_for_id(short item_id)
         ADD_NAME(ITEM_ID_ENDER_PEARL, 16);
         ADD_NAME(ITEM_ID_SNOWBALL, 16);
         ADD_NAME(ITEM_ID_EGG, 16);
-        ADD_NAME(ITEM_ID_BUCKET, 1);
         ADD_NAME(ITEM_ID_BUCKET_WATER, 1);
         ADD_NAME(ITEM_ID_BUCKET_LAVA, 1);
     default:

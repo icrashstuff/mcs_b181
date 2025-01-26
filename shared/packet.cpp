@@ -1231,7 +1231,7 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
                 LOG("Payload size: %d", payload_size);
                 for (short i = 0; i < payload_size; i++)
                 {
-                    inventory_item_t t;
+                    itemstack_t t;
                     err += !read_short(buf, pos, &t.id);
                     if (t.id != -1)
                     {
