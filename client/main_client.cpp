@@ -100,10 +100,10 @@ struct connection_t
     std::string status_msg_sub;
     bool in_world = false;
 
-    void set_status(std::string status, std::string sub_status = "")
+    void set_status(std::string _status, std::string _sub_status = "")
     {
-        status_msg = status;
-        status_msg_sub = sub_status;
+        status_msg = _status;
+        status_msg_sub = _sub_status;
     }
 
     Uint16 port = 0;
@@ -229,9 +229,9 @@ void create_testworld()
         for (int j = 0; j < 8; j++)
         {
             chunk_cubic_t* c = new chunk_cubic_t();
-            c->chunk_x = i / world_size - world_size;
-            c->chunk_z = i % world_size - world_size;
-            c->chunk_y = j - cvr_world_y_off_neg.get() + cvr_world_y_off_pos.get();
+            c->pos.x = i / world_size - world_size;
+            c->pos.z = i % world_size - world_size;
+            c->pos.y = j - cvr_world_y_off_neg.get() + cvr_world_y_off_pos.get();
             level->chunks.push_back(c);
             for (int x = 0; x < 16; x++)
                 for (int z = 0; z < 16; z++)
@@ -248,9 +248,9 @@ void create_testworld()
     for (int i = 0; i < 16; i++)
     {
         chunk_cubic_t* c = new chunk_cubic_t();
-        c->chunk_x = i % 4;
-        c->chunk_y = (i / 4) % 4;
-        c->chunk_z = (i / 16);
+        c->pos.x = i % 4;
+        c->pos.y = (i / 4) % 4;
+        c->pos.z = (i / 16);
         level->chunks.push_back(c);
         for (int x = 0; x < 16; x++)
             for (int z = 0; z < 16; z++)
@@ -272,9 +272,9 @@ void create_testworld()
     for (int i = 0; i < 128; i++)
     {
         chunk_cubic_t* c = new chunk_cubic_t();
-        c->chunk_x = (i / 12);
-        c->chunk_y = -2;
-        c->chunk_z = (i % 12);
+        c->pos.x = (i / 12);
+        c->pos.y = -2;
+        c->pos.z = (i % 12);
         level->chunks.push_back(c);
         for (int x = 0; x < 16; x++)
             for (int z = 0; z < 16; z++)
@@ -283,11 +283,9 @@ void create_testworld()
                 c->set_light_sky(x, 5, z, x);
                 c->set_light_block(x, 5, z, z);
             }
-        if (c->chunk_x == 2 && c->chunk_z == 1)
+        if (c->pos.x == 2 && c->pos.z == 1)
             c->set_type(7, 6, 7, BLOCK_ID_TORCH);
     }
-
-    level->build_dirty_meshes();
 }
 
 bool deinitialize_resources()
@@ -338,6 +336,9 @@ enum engine_state_t : int
     ENGINE_STATE_EXIT,
 };
 
+static engine_state_t engine_state_current = ENGINE_STATE_OFFLINE;
+static engine_state_t engine_state_target = ENGINE_STATE_RUNNING;
+
 #define ENUM_SWITCH_NAME(X) \
     case X:                 \
         return #X;
@@ -354,113 +355,6 @@ const char* engine_state_name(engine_state_t state)
     }
     return "Unknown Engine State";
 }
-
-static engine_state_t engine_state_current = ENGINE_STATE_OFFLINE;
-static engine_state_t engine_state_target = ENGINE_STATE_RUNNING;
-
-bool engine_state_step()
-{
-    /* Ensure engine only steps forwards */
-    SDL_assert(engine_state_current <= engine_state_target);
-    if (!(engine_state_current < engine_state_target))
-        return 0;
-
-    switch (engine_state_current)
-    {
-    case ENGINE_STATE_OFFLINE:
-    {
-        if (can_launch_game() && engine_state_target > ENGINE_STATE_CONFIGURE)
-        {
-            engine_state_current = ENGINE_STATE_INITIALIZE;
-            dc_log("Engine state moving to %s", engine_state_name(engine_state_current));
-            return engine_state_step();
-        }
-        else
-        {
-            engine_state_current = ENGINE_STATE_CONFIGURE;
-            dc_log("Engine state moving to %s", engine_state_name(engine_state_current));
-            return 0;
-        }
-    }
-    case ENGINE_STATE_CONFIGURE:
-    {
-        if (engine_state_target == ENGINE_STATE_EXIT)
-            engine_state_current = ENGINE_STATE_EXIT;
-        return 0;
-    }
-    case ENGINE_STATE_INITIALIZE:
-    {
-        PHYSFS_mkdir("/game");
-        if (cvr_dir_game.get().length())
-            PHYSFS_mount(cvr_dir_game.get().c_str(), "/game", 0);
-        if (!PHYSFS_mount(cvr_dir_assets.get().c_str(), "/assets", 0))
-            util::die("Unable to mount assets");
-        if (!PHYSFS_mount(cvr_path_resource_pack.get().c_str(), "/_resources/", 0))
-            util::die("Unable to mount base resource pack");
-
-        initialize_resources();
-        engine_state_current = ENGINE_STATE_RUNNING;
-        dc_log("Engine state moving to %s", engine_state_name(engine_state_current));
-        return engine_state_step();
-    }
-    case ENGINE_STATE_RUNNING:
-        engine_state_current = ENGINE_STATE_SHUTDOWN;
-        return engine_state_step();
-    case ENGINE_STATE_SHUTDOWN:
-        deinitialize_resources();
-        engine_state_current = ENGINE_STATE_EXIT;
-        dc_log("Engine state moving to %s", engine_state_name(engine_state_current));
-        return engine_state_step();
-    case ENGINE_STATE_EXIT:
-        return 0;
-    }
-
-    SDL_assert(0);
-    return 0;
-}
-
-static convar_int_t cvr_gui_engine_state("gui_engine_state", 0, 0, 1, "Show engine state menu", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
-
-static bool engine_state_menu()
-{
-    if (!cvr_gui_engine_state.get())
-        return false;
-
-    ImGui::BeginCVR("Engine State Viewer/Manipulator", &cvr_gui_engine_state);
-
-    if (ImGui::BeginTable("Engine State Table", 3))
-    {
-        float char_width = ImGui::CalcTextSize("ABCDEF").x / 6.0f;
-        ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed, char_width * 15.0f);
-        ImGui::TableSetupColumn("State Name", ImGuiTableColumnFlags_WidthFixed, char_width * 25.0f);
-        ImGui::TableSetupColumn("Manipulate", ImGuiTableColumnFlags_WidthFixed, char_width * 18.0f);
-
-        ImGui::TableHeadersRow();
-
-        ImGui::TableNextRow();
-        ImGui::TableNextColumn();
-        ImGui::TextUnformatted("Current state:");
-        ImGui::TableNextColumn();
-        ImGui::Text("%s", engine_state_name(engine_state_current));
-        ImGui::TableNextColumn();
-        ImGui::InputInt("##Current state", (int*)&engine_state_current);
-
-        ImGui::TableNextRow();
-        ImGui::TableNextColumn();
-        ImGui::TextUnformatted("Target state:");
-        ImGui::TableNextColumn();
-        ImGui::Text("%s", engine_state_name(engine_state_target));
-        ImGui::TableNextColumn();
-        ImGui::InputInt("##Target state", (int*)&engine_state_target);
-
-        ImGui::EndTable();
-    }
-    ImGui::End();
-
-    return cvr_gui_engine_state.get();
-}
-
-static gui_register_menu register_engine_state_menu(engine_state_menu);
 
 float yaw;
 float pitch;
@@ -482,7 +376,6 @@ bool wireframe = 0;
 #define FOV_MIN 75.0f
 float fov = FOV_MIN;
 
-glm::vec3 camera_pos = glm::vec3(0.0f, 1.5f, 0.0f);
 glm::vec3 camera_front = glm::vec3(0.0f, 0.0f, -1.0f);
 glm::vec3 camera_up = glm::vec3(0.0f, 1.0f, 0.0f);
 
@@ -553,30 +446,30 @@ void decompress_chunk_packet(packet_chunk_t* p, std::vector<Uint8>& buffer)
     for (chunk_cubic_t* c : level->chunks)
     {
         // if(min_chunk_x <= c->chunk_x || c->chunk_x > max_chunk_x)
-        if (!BETWEEN_INCL(c->chunk_x, min_chunk_x, max_chunk_x))
+        if (!BETWEEN_INCL(c->pos.x, min_chunk_x, max_chunk_x))
             continue;
-        if (!BETWEEN_INCL(c->chunk_y, min_chunk_y, max_chunk_y))
+        if (!BETWEEN_INCL(c->pos.y, min_chunk_y, max_chunk_y))
             continue;
-        if (!BETWEEN_INCL(c->chunk_z, min_chunk_z, max_chunk_z))
+        if (!BETWEEN_INCL(c->pos.z, min_chunk_z, max_chunk_z))
             continue;
 
         for (int x = 0; x < SUBCHUNK_SIZE_X; x++)
         {
-            const int block_x = x + ((c->chunk_x) << 4);
+            const int block_x = x + ((c->pos.x) << 4);
             if (!BETWEEN_INCL(block_x, min_block_x, max_block_x))
                 continue;
             const int uncompressed_x = block_x - min_block_x;
 
             for (int z = 0; z < SUBCHUNK_SIZE_Z; z++)
             {
-                const int block_z = z + ((c->chunk_z) << 4);
+                const int block_z = z + ((c->pos.z) << 4);
                 if (!BETWEEN_INCL(block_z, min_block_z, max_block_z))
                     continue;
                 const int uncompressed_z = block_z - min_block_z;
 
                 for (int y = 0; y < SUBCHUNK_SIZE_Y; y++)
                 {
-                    const int block_y = y + ((c->chunk_y) << 4);
+                    const int block_y = y + ((c->pos.y) << 4);
                     if (!BETWEEN_INCL(block_y, min_block_y, max_block_y))
                         continue;
                     const int uncompressed_y = block_y - min_block_y;
@@ -698,7 +591,7 @@ void normal_loop()
             {
                 CAST_PACK_TO_P(packet_player_pos_t);
 
-                camera_pos = { p->x, p->y, p->z };
+                level->camera_pos = { p->x, p->y, p->z };
 
                 break;
             }
@@ -706,7 +599,7 @@ void normal_loop()
             {
                 CAST_PACK_TO_P(packet_player_pos_look_s2c_t);
 
-                camera_pos = { p->x, p->y, p->z };
+                level->camera_pos = { p->x, p->y, p->z };
                 pitch = SDL_clamp(p->pitch, -89.0f, 89.0f);
                 yaw = p->yaw + 90.0f;
 
@@ -724,7 +617,7 @@ void normal_loop()
                     for (std::vector<chunk_cubic_t*>::iterator it = level->chunks.begin(); it != level->chunks.end();)
                     {
                         chunk_cubic_t* c = *it;
-                        if (c->chunk_x == p->chunk_x && c->chunk_z == p->chunk_z && 0 <= c->chunk_y && c->chunk_y < 8)
+                        if (c->pos.x == p->chunk_x && c->pos.z == p->chunk_z && 0 <= c->pos.y && c->pos.y < 8)
                             it = level->chunks.erase(it);
                         else
                             it = std::next(it);
@@ -734,8 +627,8 @@ void normal_loop()
                 {
                     bool exists[8] = { 0 };
                     for (chunk_cubic_t* c : level->chunks)
-                        if (c->chunk_x == p->chunk_x && c->chunk_z == p->chunk_z && 0 <= c->chunk_y && c->chunk_y < 8)
-                            exists[c->chunk_y] = 1;
+                        if (c->pos.x == p->chunk_x && c->pos.z == p->chunk_z && 0 <= c->pos.y && c->pos.y < 8)
+                            exists[c->pos.y] = 1;
 
                     for (int i = 0; i < 8; i++)
                     {
@@ -743,9 +636,9 @@ void normal_loop()
                             continue;
                         chunk_cubic_t* c = new chunk_cubic_t();
                         c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_NONE;
-                        c->chunk_x = p->chunk_x;
-                        c->chunk_y = i;
-                        c->chunk_z = p->chunk_z;
+                        c->pos.x = p->chunk_x;
+                        c->pos.y = i;
+                        c->pos.z = p->chunk_z;
                         level->chunks.push_back(c);
                     }
                 }
@@ -788,18 +681,21 @@ void normal_loop()
         }
     }
     static Uint64 last_update_tick = 0;
-    if (connection->in_world && SDL_GetTicks() - last_update_tick > 50)
+    if (SDL_GetTicks() - last_update_tick > 50)
     {
-        packet_player_pos_look_c2s_t location_response;
-        location_response.x = camera_pos.x;
-        location_response.y = camera_pos.y;
-        location_response.stance = camera_pos.y + 1.0f;
-        location_response.z = camera_pos.z;
+        if (connection->in_world)
+        {
+            packet_player_pos_look_c2s_t location_response;
+            location_response.x = level->camera_pos.x;
+            location_response.y = level->camera_pos.y;
+            location_response.stance = level->camera_pos.y + 1.0f;
+            location_response.z = level->camera_pos.z;
 
-        location_response.pitch = -pitch;
-        location_response.yaw = yaw - 90.0f;
+            location_response.pitch = -pitch;
+            location_response.yaw = yaw - 90.0f;
 
-        send_buffer(connection->socket, location_response.assemble());
+            send_buffer(connection->socket, location_response.assemble());
+        }
 
         last_update_tick = SDL_GetTicks();
 
@@ -830,17 +726,17 @@ void normal_loop()
     float camera_speed = 3.5f * delta_time * (held_ctrl ? 4.0f : 1.0f);
 
     if (held_w)
-        camera_pos += camera_speed * glm::vec3(SDL_cosf(glm::radians(yaw)), 0, SDL_sinf(glm::radians(yaw)));
+        level->camera_pos += camera_speed * glm::vec3(SDL_cosf(glm::radians(yaw)), 0, SDL_sinf(glm::radians(yaw)));
     if (held_s)
-        camera_pos -= camera_speed * glm::vec3(SDL_cosf(glm::radians(yaw)), 0, SDL_sinf(glm::radians(yaw)));
+        level->camera_pos -= camera_speed * glm::vec3(SDL_cosf(glm::radians(yaw)), 0, SDL_sinf(glm::radians(yaw)));
     if (held_a)
-        camera_pos -= camera_speed * glm::vec3(-SDL_sinf(glm::radians(yaw)), 0, SDL_cosf(glm::radians(yaw)));
+        level->camera_pos -= camera_speed * glm::vec3(-SDL_sinf(glm::radians(yaw)), 0, SDL_cosf(glm::radians(yaw)));
     if (held_d)
-        camera_pos += camera_speed * glm::vec3(-SDL_sinf(glm::radians(yaw)), 0, SDL_cosf(glm::radians(yaw)));
+        level->camera_pos += camera_speed * glm::vec3(-SDL_sinf(glm::radians(yaw)), 0, SDL_cosf(glm::radians(yaw)));
     if (held_space)
-        camera_pos.y += camera_speed;
+        level->camera_pos.y += camera_speed;
     if (held_shift)
-        camera_pos.y -= camera_speed;
+        level->camera_pos.y -= camera_speed;
 
     if (held_ctrl)
         fov += delta_time * 30.0f;
@@ -865,7 +761,7 @@ void normal_loop()
     direction.z = SDL_sinf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
     camera_front = glm::normalize(direction);
 
-    glm::mat4 mat_cam = glm::lookAt(camera_pos, camera_pos + camera_front, camera_up);
+    glm::mat4 mat_cam = glm::lookAt(level->camera_pos, level->camera_pos + camera_front, camera_up);
     shader->set_camera(mat_cam);
 
     shader->set_model(glm::mat4(1.0f));
@@ -878,10 +774,10 @@ void normal_loop()
     glBindTexture(GL_TEXTURE_2D, level->lightmap.tex_id_linear);
     glActiveTexture(GL_TEXTURE0);
 
-    glm::dvec3 c2pos(int(camera_pos.x) >> 3, int(camera_pos.y) >> 3, int(camera_pos.z) >> 3);
+    glm::dvec3 c2pos(glm::ivec3(level->camera_pos) >> 3);
     std::sort(level->chunks.begin(), level->chunks.end(), [=](chunk_cubic_t* a, chunk_cubic_t* b) {
-        float adist = glm::distance(glm::dvec3(a->chunk_x * 2.0f + 1.0f, a->chunk_y * 2.0f + 1.0f, a->chunk_z * 2.0f + 1.0f), c2pos);
-        float bdist = glm::distance(glm::dvec3(b->chunk_x * 2.0f + 1.0f, b->chunk_y * 2.0f + 1.0f, b->chunk_z * 2.0f + 1.0f), c2pos);
+        float adist = glm::distance(glm::dvec3(a->pos * 2 + glm::ivec3(1, 1, 1)), c2pos);
+        float bdist = glm::distance(glm::dvec3(b->pos * 2 + glm::ivec3(1, 1, 1)), c2pos);
         return adist > bdist;
     });
 
@@ -892,7 +788,7 @@ void normal_loop()
         if (c->index_type == GL_NONE || c->index_count == 0)
             continue;
         glBindVertexArray(c->vao);
-        glm::vec3 translate(c->chunk_x * SUBCHUNK_SIZE_X, c->chunk_y * SUBCHUNK_SIZE_Y, c->chunk_z * SUBCHUNK_SIZE_Z);
+        glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
         shader->set_model(glm::translate(glm::mat4(1.0f), translate));
         glDrawElements(GL_TRIANGLES, c->index_count, c->index_type, 0);
     }
@@ -903,7 +799,7 @@ void normal_loop()
             continue;
         assert(c->index_type == GL_UNSIGNED_INT);
         glBindVertexArray(c->vao);
-        glm::vec3 translate(c->chunk_x * SUBCHUNK_SIZE_X, c->chunk_y * SUBCHUNK_SIZE_Y, c->chunk_z * SUBCHUNK_SIZE_Z);
+        glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
         shader->set_model(glm::translate(glm::mat4(1.0f), translate));
         glDrawElements(GL_TRIANGLES, c->index_count_translucent, c->index_type, (void*)(c->index_count * 4));
     }
@@ -937,7 +833,44 @@ void process_event(SDL_Event& event, bool* done)
 
     static Uint64 last_button_down = -1;
     if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
+    {
         last_button_down = event.common.timestamp;
+
+        if (mouse_grabbed)
+        {
+            // TODO: Add place block function
+            glm::vec3 cam_dir;
+            cam_dir.x = SDL_cosf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
+            cam_dir.y = SDL_sinf(glm::radians(pitch));
+            cam_dir.z = SDL_sinf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
+            glm::ivec3 cam_pos = level->camera_pos + cam_dir * 2.5f;
+
+            for (chunk_cubic_t* c : level->chunks)
+            {
+                if ((cam_pos >> 4) != c->pos)
+                    continue;
+                if (event.button.button == 1)
+                    c->set_type(cam_pos.x & 0x0F, cam_pos.y & 0x0F, cam_pos.z & 0x0F, BLOCK_ID_AIR);
+                if (event.button.button == 3)
+                    c->set_type(cam_pos.x & 0x0F, cam_pos.y & 0x0F, cam_pos.z & 0x0F, BLOCK_ID_TORCH);
+            }
+
+            int diff_x = ((cam_pos.x & 0x0F) < 8) ? -1 : 1;
+            int diff_y = ((cam_pos.y & 0x0F) < 8) ? -1 : 1;
+            int diff_z = ((cam_pos.z & 0x0F) < 8) ? -1 : 1;
+            glm::ivec3 chunk_coords(cam_pos.x >> 4, cam_pos.y >> 4, cam_pos.z >> 4);
+
+            for (chunk_cubic_t* c : level->chunks)
+            {
+                if (SDL_abs(chunk_coords.x - c->pos.x) > 1 || SDL_abs(chunk_coords.y - c->pos.y) > 1 || SDL_abs(chunk_coords.z - c->pos.z) > 1)
+                    continue;
+
+                if (chunk_coords.x - c->pos.x == diff_x || chunk_coords.y - c->pos.y == diff_y || chunk_coords.z - c->pos.z == diff_z)
+                    continue;
+                c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
+            }
+        }
+    }
 
     if (event.type == SDL_EVENT_MOUSE_BUTTON_UP)
         if (event.common.timestamp > last_button_down && event.common.timestamp - last_button_down < (250 * 1000 * 1000))
@@ -995,9 +928,10 @@ void process_event(SDL_Event& event, bool* done)
         }
         case SDL_SCANCODE_P:
         {
+            glm::ivec3 chunk_coords = glm::ivec3(level->camera_pos) >> 4;
             for (chunk_cubic_t* c : level->chunks)
             {
-                if (int(camera_pos.x) >> 4 != c->chunk_x || int(camera_pos.y) >> 4 != c->chunk_y || int(camera_pos.z) >> 4 != c->chunk_z)
+                if (chunk_coords != c->pos)
                     continue;
                 c->free_gl();
                 c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_NONE;
@@ -1008,7 +942,8 @@ void process_event(SDL_Event& event, bool* done)
         {
             for (chunk_cubic_t* c : level->chunks)
             {
-                if (int(camera_pos.x) >> 4 != c->chunk_x || int(camera_pos.y) >> 4 != c->chunk_y || int(camera_pos.z) >> 4 != c->chunk_z)
+                glm::ivec3 chunk_coords = glm::ivec3(level->camera_pos) >> 4;
+                if (chunk_coords != c->pos)
                     continue;
                 c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
             }
@@ -1020,11 +955,11 @@ void process_event(SDL_Event& event, bool* done)
             cam_dir.x = SDL_cosf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
             cam_dir.y = SDL_sinf(glm::radians(pitch));
             cam_dir.z = SDL_sinf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
-            glm::ivec3 cam_pos = glm::round(camera_pos + cam_dir * 2.5f);
+            glm::ivec3 cam_pos = glm::round(level->camera_pos + cam_dir * 2.5f);
 
             for (chunk_cubic_t* c : level->chunks)
             {
-                if (cam_pos.x >> 4 != c->chunk_x || cam_pos.y >> 4 != c->chunk_y || cam_pos.z >> 4 != c->chunk_z)
+                if ((cam_pos >> 4) != c->pos)
                     continue;
                 c->set_type(cam_pos.x & 0x0F, cam_pos.y & 0x0F, cam_pos.z & 0x0F, BLOCK_ID_TORCH);
             }
@@ -1036,10 +971,10 @@ void process_event(SDL_Event& event, bool* done)
 
             for (chunk_cubic_t* c : level->chunks)
             {
-                if (SDL_abs(chunk_coords.x - c->chunk_x) > 1 || SDL_abs(chunk_coords.y - c->chunk_y) > 1 || SDL_abs(chunk_coords.z - c->chunk_z) > 1)
+                if (SDL_abs(chunk_coords.x - c->pos.x) > 1 || SDL_abs(chunk_coords.y - c->pos.y) > 1 || SDL_abs(chunk_coords.z - c->pos.z) > 1)
                     continue;
 
-                if (chunk_coords.x - c->chunk_x == diff_x || chunk_coords.y - c->chunk_y == diff_y || chunk_coords.z - c->chunk_z == diff_z)
+                if (chunk_coords.x - c->pos.x == diff_x || chunk_coords.y - c->pos.y == diff_y || chunk_coords.z - c->pos.z == diff_z)
                     continue;
                 c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
             }
@@ -1047,10 +982,10 @@ void process_event(SDL_Event& event, bool* done)
         }
         case SDL_SCANCODE_M:
         {
+            glm::ivec3 chunk_coords = glm::ivec3(level->camera_pos) >> 4;
             for (chunk_cubic_t* c : level->chunks)
             {
-                if (SDL_abs((int(camera_pos.x) >> 4) - c->chunk_x) > 1 || SDL_abs((int(camera_pos.y) >> 4) - c->chunk_y) > 1
-                    || SDL_abs((int(camera_pos.z) >> 4) - c->chunk_z) > 1)
+                if (SDL_abs(chunk_coords.x - c->pos.x) > 1 || SDL_abs(chunk_coords.y - c->pos.y) > 1 || SDL_abs(chunk_coords.z - c->pos.z) > 1)
                     continue;
                 c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
             }
@@ -1118,13 +1053,13 @@ static bool render_water_overlay()
     if (!level)
         return false;
 
-    glm::ivec3 cam_pos = camera_pos;
-    glm::ivec3 chunk_coords(cam_pos.x >> 4, cam_pos.y >> 4, cam_pos.z >> 4);
+    glm::ivec3 cam_pos = level->camera_pos;
+    glm::ivec3 chunk_coords = cam_pos >> 4;
 
     bool found_water = false;
     for (chunk_cubic_t* c : level->chunks)
     {
-        if (!c || chunk_coords.x != c->chunk_x || chunk_coords.y != c->chunk_y || chunk_coords.z != c->chunk_z)
+        if (!c || chunk_coords != c->pos)
             continue;
 
         block_id_t type = c->get_type(cam_pos.x & 0x0F, cam_pos.y & 0x0F, cam_pos.z & 0x0F);
@@ -1191,6 +1126,109 @@ static gui_register_overlay reg_render_status_msg(render_status_msg);
 
 static convar_int_t cvr_gui_renderer("gui_renderer", 0, 0, 1, "Show renderer internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 static convar_int_t cvr_gui_lightmap("gui_lightmap", 0, 0, 1, "Show lightmap internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
+static convar_int_t cvr_gui_engine_state("gui_engine_state", 0, 0, 1, "Show engine state menu", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
+
+bool engine_state_step()
+{
+    /* Ensure engine only steps forwards */
+    SDL_assert(engine_state_current <= engine_state_target);
+    if (!(engine_state_current < engine_state_target))
+        return 0;
+
+    switch (engine_state_current)
+    {
+    case ENGINE_STATE_OFFLINE:
+    {
+        if (can_launch_game() && engine_state_target > ENGINE_STATE_CONFIGURE)
+        {
+            engine_state_current = ENGINE_STATE_INITIALIZE;
+            dc_log("Engine state moving to %s", engine_state_name(engine_state_current));
+            return engine_state_step();
+        }
+        else
+        {
+            engine_state_current = ENGINE_STATE_CONFIGURE;
+            dc_log("Engine state moving to %s", engine_state_name(engine_state_current));
+            return 0;
+        }
+    }
+    case ENGINE_STATE_CONFIGURE:
+    {
+        if (engine_state_target == ENGINE_STATE_EXIT)
+            engine_state_current = ENGINE_STATE_EXIT;
+        return 0;
+    }
+    case ENGINE_STATE_INITIALIZE:
+    {
+        PHYSFS_mkdir("/game");
+        if (cvr_dir_game.get().length())
+            PHYSFS_mount(cvr_dir_game.get().c_str(), "/game", 0);
+        if (!PHYSFS_mount(cvr_dir_assets.get().c_str(), "/assets", 0))
+            util::die("Unable to mount assets");
+        if (!PHYSFS_mount(cvr_path_resource_pack.get().c_str(), "/_resources/", 0))
+            util::die("Unable to mount base resource pack");
+
+        initialize_resources();
+        engine_state_current = ENGINE_STATE_RUNNING;
+        dc_log("Engine state moving to %s", engine_state_name(engine_state_current));
+        return engine_state_step();
+    }
+    case ENGINE_STATE_RUNNING:
+        engine_state_current = ENGINE_STATE_SHUTDOWN;
+        return engine_state_step();
+    case ENGINE_STATE_SHUTDOWN:
+        deinitialize_resources();
+        engine_state_current = ENGINE_STATE_EXIT;
+        dc_log("Engine state moving to %s", engine_state_name(engine_state_current));
+        return engine_state_step();
+    case ENGINE_STATE_EXIT:
+        return 0;
+    }
+
+    SDL_assert(0);
+    return 0;
+}
+
+static bool engine_state_menu()
+{
+    if (!cvr_gui_engine_state.get())
+        return false;
+
+    ImGui::BeginCVR("Engine State Viewer/Manipulator", &cvr_gui_engine_state);
+
+    if (ImGui::BeginTable("Engine State Table", 3))
+    {
+        float char_width = ImGui::CalcTextSize("ABCDEF").x / 6.0f;
+        ImGui::TableSetupColumn("Field", ImGuiTableColumnFlags_WidthFixed, char_width * 15.0f);
+        ImGui::TableSetupColumn("State Name", ImGuiTableColumnFlags_WidthFixed, char_width * 25.0f);
+        ImGui::TableSetupColumn("Manipulate", ImGuiTableColumnFlags_WidthFixed, char_width * 18.0f);
+
+        ImGui::TableHeadersRow();
+
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::TextUnformatted("Current state:");
+        ImGui::TableNextColumn();
+        ImGui::Text("%s", engine_state_name(engine_state_current));
+        ImGui::TableNextColumn();
+        ImGui::InputInt("##Current state", (int*)&engine_state_current);
+
+        ImGui::TableNextRow();
+        ImGui::TableNextColumn();
+        ImGui::TextUnformatted("Target state:");
+        ImGui::TableNextColumn();
+        ImGui::Text("%s", engine_state_name(engine_state_target));
+        ImGui::TableNextColumn();
+        ImGui::InputInt("##Target state", (int*)&engine_state_target);
+
+        ImGui::EndTable();
+    }
+    ImGui::End();
+
+    return cvr_gui_engine_state.get();
+}
+
+static gui_register_menu register_engine_state_menu(engine_state_menu);
 
 int main(const int argc, const char** argv)
 {
@@ -1314,13 +1352,13 @@ int main(const int argc, const char** argv)
                 ImGui::SetNextWindowSize(ImVec2(520, 480), ImGuiCond_FirstUseEver);
                 ImGui::BeginCVR("Running", &cvr_gui_renderer);
 
-                ImGui::Text("Camera: <%.1f, %.1f, %.1f>", camera_pos.x, camera_pos.y, camera_pos.z);
+                ImGui::Text("Camera: <%.1f, %.1f, %.1f>", level->camera_pos.x, level->camera_pos.y, level->camera_pos.z);
 
                 ImGui::SliderFloat("Camera Pitch", &pitch, -89.0f, 89.0f);
                 ImGui::SliderFloat("Camera Yaw", &yaw, 0.0f, 360.0f);
-                ImGui::InputFloat("Camera X", &camera_pos.x, 1.0f);
-                ImGui::InputFloat("Camera Y", &camera_pos.y, 1.0f);
-                ImGui::InputFloat("Camera Z", &camera_pos.z, 1.0f);
+                ImGui::InputFloat("Camera X", &level->camera_pos.x, 1.0f);
+                ImGui::InputFloat("Camera Y", &level->camera_pos.y, 1.0f);
+                ImGui::InputFloat("Camera Z", &level->camera_pos.z, 1.0f);
 
                 if (ImGui::Button("Rebuild atlas & meshes"))
                 {

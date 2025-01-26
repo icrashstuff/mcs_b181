@@ -23,8 +23,8 @@
 #ifndef MCS_B181_PACKET_H
 #define MCS_B181_PACKET_H
 
+#include "sdl_net/include/SDL3_net/SDL_net.h"
 #include <SDL3/SDL_stdinc.h>
-#include <SDL3_net/SDL_net.h>
 #include <assert.h>
 #include <string>
 #include <vector>

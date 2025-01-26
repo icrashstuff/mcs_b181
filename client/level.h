@@ -29,6 +29,7 @@
 #include "texture_terrain.h"
 #include <GL/glew.h>
 #include <glm/glm.hpp>
+#include <map>
 #include <memory>
 #include <vector>
 
@@ -90,6 +91,30 @@ struct level_t
     // TODO
     void render();
 
+    glm::vec3 camera_pos = { 0, 0, 0 };
+
+private:
+    struct ivec3_comparator_t
+    {
+        bool operator()(const glm::ivec3& a, const glm::ivec3& b)
+        {
+            if (a.x < b.x)
+                return true;
+            if (a.x > b.x)
+                return false;
+
+            if (a.y < b.y)
+                return true;
+            if (a.y > b.y)
+                return false;
+
+            return a.z < b.z;
+        }
+    };
+
+    /** For quick retrieval of chunks */
+    std::map<glm::ivec3, chunk_cubic_t*, ivec3_comparator_t> cmap;
+
     /**
      * Build and or replace the mesh for the corresponding chunk
      */
@@ -104,12 +129,6 @@ struct level_t
      */
     void light_pass(int chunk_x, int chunk_y, int chunk_z, bool local_only);
 
-    /**
-     * In world coordinates
-     */
-    glm::vec3 pos_camera = { 0, 0, 0 };
-
-private:
     texture_terrain_t* terrain;
 };
 

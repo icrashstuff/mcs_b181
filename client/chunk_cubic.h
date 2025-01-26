@@ -23,7 +23,9 @@
 #ifndef TETRA_CLIENT_CHUNK_CUBIC_H
 #define TETRA_CLIENT_CHUNK_CUBIC_H
 
-#include <SDL3/SDL_opengl.h>
+#include <GL/glew.h>
+#include <SDL3/SDL.h>
+#include <glm/glm.hpp>
 
 #include "shared/misc.h"
 
@@ -63,9 +65,9 @@ struct chunk_cubic_t
     size_t index_count = 0;
     size_t index_count_translucent = 0;
 
-    int chunk_x = 0;
-    int chunk_y = 0;
-    int chunk_z = 0;
+    Uint64 time_creation = 0;
+
+    glm::ivec3 pos = { 0, 0, 0 };
 
     std::vector<Uint8> data_buf;
     Uint8* data;
@@ -73,6 +75,7 @@ struct chunk_cubic_t
     chunk_cubic_t()
     {
         data_buf.resize(SUBCHUNK_SIZE_X * SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z * 5 / 2, 0);
+        time_creation = SDL_GetTicks();
         data = data_buf.data();
     }
 
