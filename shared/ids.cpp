@@ -617,6 +617,16 @@ bool mc_id::is_transparent(short block_id)
     }
 }
 
+bool mc_id::is_leaves_style_transparent(short block_id)
+{
+    switch (block_id)
+    {
+        ADD_NAME(BLOCK_ID_LEAVES, 1);
+    default:
+        return false;
+    }
+}
+
 bool mc_id::block_has_collision(short block_id)
 {
     switch (block_id)

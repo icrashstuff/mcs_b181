@@ -1608,7 +1608,7 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
         else
         {
             /* Positive Y */
-            if (mc_id::is_transparent(stypes[1][2][1]) && stypes[1][2][1] != type)
+            if (mc_id::is_transparent(stypes[1][2][1]) && (mc_id::is_leaves_style_transparent(type) || stypes[1][2][1] != type))
             {
                 Uint8 ao[] = {
                     Uint8(UAO([0][2][0]) + UAO([1][2][0]) + UAO([0][2][1])),
@@ -1647,7 +1647,7 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
             }
 
             /* Negative Y */
-            if (mc_id::is_transparent(stypes[1][0][1]) && stypes[1][0][1] != type)
+            if (mc_id::is_transparent(stypes[1][0][1]) && (mc_id::is_leaves_style_transparent(type) || stypes[1][0][1] != type))
             {
                 Uint8 ao[] = {
                     Uint8(UAO([0][0][0]) + UAO([1][0][0]) + UAO([0][0][1])),
@@ -1686,7 +1686,7 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
             }
 
             /* Positive X */
-            if (mc_id::is_transparent(stypes[2][1][1]) && stypes[2][1][1] != type)
+            if (mc_id::is_transparent(stypes[2][1][1]) && (mc_id::is_leaves_style_transparent(type) || stypes[2][1][1] != type))
             {
                 Uint8 ao[] = {
                     Uint8(UAO([2][0][0]) + UAO([2][1][0]) + UAO([2][0][1])),
@@ -1725,7 +1725,7 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
             }
 
             /* Negative X */
-            if (mc_id::is_transparent(stypes[0][1][1]) && stypes[0][1][1] != type)
+            if (mc_id::is_transparent(stypes[0][1][1]) && (mc_id::is_leaves_style_transparent(type) || stypes[0][1][1] != type))
             {
                 Uint8 ao[] = {
                     Uint8(UAO([0][0][0]) + UAO([0][1][0]) + UAO([0][0][1])),
@@ -1764,7 +1764,7 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
             }
 
             /* Positive Z */
-            if (mc_id::is_transparent(stypes[1][1][2]) && stypes[1][1][2] != type)
+            if (mc_id::is_transparent(stypes[1][1][2]) && (mc_id::is_leaves_style_transparent(type) || stypes[1][1][2] != type))
             {
                 Uint8 ao[] = {
                     Uint8(UAO([0][0][2]) + UAO([1][0][2]) + UAO([0][1][2])),
@@ -1803,7 +1803,7 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
             }
 
             /* Negative Z */
-            if (mc_id::is_transparent(stypes[1][1][0]) && stypes[1][1][0] != type)
+            if (mc_id::is_transparent(stypes[1][1][0]) && (mc_id::is_leaves_style_transparent(type) || stypes[1][1][0] != type))
             {
                 Uint8 ao[] = {
                     Uint8(UAO([0][0][0]) + UAO([1][0][0]) + UAO([0][1][0])),

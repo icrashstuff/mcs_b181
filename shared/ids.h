@@ -404,6 +404,8 @@ struct block_return_t
 
 bool is_transparent(short block_id);
 
+bool is_leaves_style_transparent(short block_id);
+
 bool is_translucent(short block_id);
 
 bool can_host_hanging(short block_id);

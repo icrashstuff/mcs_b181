@@ -918,7 +918,7 @@ void process_event(SDL_Event& event, bool* done)
         break;
     }
 
-    if (event.key.scancode == SDL_SCANCODE_F2 && !event.key.repeat)
+    if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.key.scancode == SDL_SCANCODE_F2 && !event.key.repeat)
         take_screenshot = 1;
 
     if (tetra::imgui_ctx_main_wants_input())
