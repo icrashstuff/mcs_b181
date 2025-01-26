@@ -143,12 +143,15 @@ bool imgui_ctx_main_wants_input();
  */
 void show_imgui_ctx_overlay(bool shown);
 
+void set_callback(void (*callback)());
+
 /**
  * Renders the frame, and optionally limits the frame rate if gui_fps_limiter is set
  *
  * @param clear_frame Clear OpenGL color buffer
+ * @param cb_screenshot Callback to be called immediately before SDL_GL_SwapWindow()
  */
-void end_frame(bool clear_frame = true);
+void end_frame(bool clear_frame = true, void (*cb_screenshot)(void) = NULL);
 
 /**
  * Deinit tetra, can only be called once

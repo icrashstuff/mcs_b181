@@ -64,10 +64,11 @@ static convar_string_t cvr_autoconnect_addr(
 static convar_int_t cvr_autoconnect_port(
     "dev_server_port", 25565, 0, 65535, "Port of server to autoconnect to when dev_autoconnect is specified", CONVAR_FLAG_DEV_ONLY);
 
-shader_t* shader = NULL;
+static shader_t* shader = NULL;
 
-int ao_algorithm = 1;
-int use_texture = 1;
+static int ao_algorithm = 1;
+static int use_texture = 1;
+static bool take_screenshot = 0;
 
 void compile_shaders()
 {
@@ -917,6 +918,9 @@ void process_event(SDL_Event& event, bool* done)
         break;
     }
 
+    if (event.key.scancode == SDL_SCANCODE_F2 && !event.key.repeat)
+        take_screenshot = 1;
+
     if (tetra::imgui_ctx_main_wants_input())
         return;
 
@@ -1323,6 +1327,36 @@ static bool engine_state_menu()
 
 static gui_register_menu register_engine_state_menu(engine_state_menu);
 
+static int win_width, win_height;
+void screenshot_callback()
+{
+    if (!take_screenshot)
+        return;
+    take_screenshot = 0;
+
+    glPixelStorei(GL_PACK_ALIGNMENT, 1);
+    Uint8* buf = (Uint8*)malloc(win_width * win_height * 3);
+    glReadPixels(0, 0, win_width, win_height, GL_RGB, GL_UNSIGNED_BYTE, buf);
+
+    SDL_Time cur_time;
+    SDL_GetCurrentTime(&cur_time);
+
+    SDL_DateTime dt;
+    SDL_TimeToDateTime(cur_time, &dt, 1);
+
+    char buf_path[256];
+    snprintf(buf_path, SDL_arraysize(buf_path), "screenshots/Screenshot_%04d-%02d-%02d_%02d.%02d.%02d.%02d.png", dt.year, dt.month, dt.day, dt.hour, dt.minute,
+        dt.second, dt.nanosecond / 10000000);
+
+    stbi_flip_vertically_on_write(true);
+
+    if (PHYSFS_mkdir("screenshots") && !PHYSFS_exists(buf_path))
+        if (stbi_physfs_write_png(buf_path, win_width, win_height, 3, buf, win_width * 3))
+            dc_log("Saved screenshot to %s", buf_path);
+
+    free(buf);
+}
+
 int main(const int argc, const char** argv)
 {
     tetra::init("icrashstuff", "mcs_b181", "mcs_b181_client", argc, argv);
@@ -1359,7 +1393,6 @@ int main(const int argc, const char** argv)
         tetra::start_frame(false);
         Uint64 loop_start_time = SDL_GetTicksNS();
         delta_time = (double)last_loop_time / 1000000000.0;
-        int win_width, win_height;
         SDL_GetWindowSize(tetra::window, &win_width, &win_height);
         glViewport(0, 0, win_width, win_height);
         glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
@@ -1507,7 +1540,7 @@ int main(const int argc, const char** argv)
             break;
         }
 
-        tetra::end_frame(0);
+        tetra::end_frame(0, screenshot_callback);
         last_loop_time = SDL_GetTicksNS() - loop_start_time;
     }
 

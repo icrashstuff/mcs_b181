@@ -409,7 +409,7 @@ bool tetra::imgui_ctx_main_wants_input() { return dev_console::shown || im_ctx_s
 
 void tetra::show_imgui_ctx_overlay(bool shown) { im_ctx_shown_overlay = shown; }
 
-void tetra::end_frame(bool clear_frame)
+void tetra::end_frame(bool clear_frame, void (*cb_screenshot)(void))
 {
     if (!was_init_gui)
         return;
@@ -456,6 +456,9 @@ void tetra::end_frame(bool clear_frame)
     ImGui::SetCurrentContext(im_ctx_main);
 
     calc_dev_font_width("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~");
+
+    if (cb_screenshot)
+        cb_screenshot();
 
     SDL_GL_SwapWindow(window);
 

@@ -571,6 +571,9 @@ void texture_terrain_t::dump_mipmaps()
         dc_log_error("Unable to create screenshots folder! (PhysFS err code: %d)", PHYSFS_getLastErrorCode());
         return;
     }
+
+    stbi_flip_vertically_on_write(false);
+
     for (size_t i = 0; i < raw_mipmaps.size(); i++)
     {
         if (!raw_mipmaps[i])
