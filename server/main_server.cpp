@@ -682,14 +682,14 @@ struct client_t
      * | 36 37 38 39 40 41 42 43 44 |
      * +----------------------------+
      */
-    inventory_item_t inventory[45];
+    itemstack_t inventory[45];
 
     int cur_item_idx = 36;
 
     std::vector<chunk_coords_t> loaded_chunks;
 };
 
-bool add_to_inventory(item_id_t id, short damage, int quantity, inventory_item_t inventory[45])
+bool add_to_inventory(item_id_t id, short damage, int quantity, itemstack_t inventory[45])
 {
     int max_qty = mc_id::get_max_quantity_for_id(id);
     for (int i_ = 0; i_ < 36; i_++)

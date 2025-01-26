@@ -26,6 +26,9 @@
 
 #include "level.h"
 
+#include <algorithm>
+#include <glm/ext/matrix_transform.hpp>
+
 #define PASS_TIMER_START()             \
     do                                 \
     {                                  \
@@ -76,7 +79,6 @@ void level_t::build_dirty_meshes()
         if (chunks[i]->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL)
             continue;
         chunks[i]->clear_light_block(0);
-        chunks[i]->clear_light_sky(0);
         light_pass(chunks[i]->pos.x, chunks[i]->pos.y, chunks[i]->pos.z, true);
         chunks[i]->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0;
         built++;
@@ -1975,10 +1977,158 @@ bool level_t::get_block(glm::ivec3 pos, block_id_t& type, Uint8& metadata)
     return true;
 }
 
-level_t::level_t(texture_terrain_t* _terrain)
+void level_t::set_terrain(texture_terrain_t* _terrain)
 {
     terrain = _terrain;
+    clear_mesh(false);
 
+    if (!terrain)
+        return;
+
+    /* Create missing entity mesh */
+    std::vector<terrain_vertex_t> missing_verts;
+    {
+        Uint8 ao = 0;
+        Uint8 light_block = 15;
+        Uint8 light_sky = 15;
+
+        /**
+         * Ordered +XYZ then -XYZ
+         */
+        mc_id::terrain_face_t faces[6];
+
+        faces[0] = terrain->get_face(mc_id::FACE_WOOL_COLORED_RED);
+        faces[1] = terrain->get_face(mc_id::FACE_WOOL_COLORED_LIME);
+        faces[2] = terrain->get_face(mc_id::FACE_WOOL_COLORED_BLUE);
+        faces[3] = faces[0], faces[4] = faces[1], faces[5] = faces[2];
+
+        Uint8 scale = 1;
+        short coord_min = -127;
+        short coord_max = 128;
+
+        /* Positive Y */
+        {
+            float c = 1.0f;
+            missing_verts.push_back({ { scale, coord_max, coord_max, coord_max, ao }, { c, c, c, light_block, light_sky }, faces[1].corners[0] });
+            missing_verts.push_back({ { scale, coord_max, coord_max, coord_min, ao }, { c, c, c, light_block, light_sky }, faces[1].corners[2] });
+            missing_verts.push_back({ { scale, coord_min, coord_max, coord_max, ao }, { c, c, c, light_block, light_sky }, faces[1].corners[1] });
+            missing_verts.push_back({ { scale, coord_min, coord_max, coord_min, ao }, { c, c, c, light_block, light_sky }, faces[1].corners[3] });
+        }
+
+        /* Negative Y */
+        {
+            float c = 0.5f;
+            missing_verts.push_back({ { scale, coord_min, coord_min, coord_min, ao }, { c, c, c, light_block, light_sky }, faces[4].corners[1] });
+            missing_verts.push_back({ { scale, coord_max, coord_min, coord_min, ao }, { c, c, c, light_block, light_sky }, faces[4].corners[0] });
+            missing_verts.push_back({ { scale, coord_min, coord_min, coord_max, ao }, { c, c, c, light_block, light_sky }, faces[4].corners[3] });
+            missing_verts.push_back({ { scale, coord_max, coord_min, coord_max, ao }, { c, c, c, light_block, light_sky }, faces[4].corners[2] });
+        }
+
+        /* Positive X */
+        {
+            float c = 1.0f;
+            missing_verts.push_back({ { scale, coord_max, coord_min, coord_min, ao }, { c, c, c, light_block, light_sky }, faces[0].corners[3] });
+            missing_verts.push_back({ { scale, coord_max, coord_max, coord_min, ao }, { c, c, c, light_block, light_sky }, faces[0].corners[1] });
+            missing_verts.push_back({ { scale, coord_max, coord_min, coord_max, ao }, { c, c, c, light_block, light_sky }, faces[0].corners[2] });
+            missing_verts.push_back({ { scale, coord_max, coord_max, coord_max, ao }, { c, c, c, light_block, light_sky }, faces[0].corners[0] });
+        }
+
+        /* Negative X */
+        {
+            float c = 0.5f;
+            missing_verts.push_back({ { scale, coord_min, coord_max, coord_max, ao }, { c, c, c, light_block, light_sky }, faces[3].corners[1] });
+            missing_verts.push_back({ { scale, coord_min, coord_max, coord_min, ao }, { c, c, c, light_block, light_sky }, faces[3].corners[0] });
+            missing_verts.push_back({ { scale, coord_min, coord_min, coord_max, ao }, { c, c, c, light_block, light_sky }, faces[3].corners[3] });
+            missing_verts.push_back({ { scale, coord_min, coord_min, coord_min, ao }, { c, c, c, light_block, light_sky }, faces[3].corners[2] });
+        }
+
+        /* Positive Z */
+        {
+            float c = 1.0f;
+            missing_verts.push_back({ { scale, coord_max, coord_max, coord_max, ao }, { c, c, c, light_block, light_sky }, faces[2].corners[1] });
+            missing_verts.push_back({ { scale, coord_min, coord_max, coord_max, ao }, { c, c, c, light_block, light_sky }, faces[2].corners[0] });
+            missing_verts.push_back({ { scale, coord_max, coord_min, coord_max, ao }, { c, c, c, light_block, light_sky }, faces[2].corners[3] });
+            missing_verts.push_back({ { scale, coord_min, coord_min, coord_max, ao }, { c, c, c, light_block, light_sky }, faces[2].corners[2] });
+        }
+
+        /* Negative Z */
+        {
+            float c = 0.5f;
+            missing_verts.push_back({ { scale, coord_min, coord_min, coord_min, ao }, { c, c, c, light_block, light_sky }, faces[5].corners[3] });
+            missing_verts.push_back({ { scale, coord_min, coord_max, coord_min, ao }, { c, c, c, light_block, light_sky }, faces[5].corners[1] });
+            missing_verts.push_back({ { scale, coord_max, coord_min, coord_min, ao }, { c, c, c, light_block, light_sky }, faces[5].corners[2] });
+            missing_verts.push_back({ { scale, coord_max, coord_max, coord_min, ao }, { c, c, c, light_block, light_sky }, faces[5].corners[0] });
+        }
+    }
+    glBindVertexArray(ent_missing_vao);
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    glBindBuffer(GL_ARRAY_BUFFER, ent_missing_vbo);
+    glBufferData(GL_ARRAY_BUFFER, missing_verts.size() * sizeof(missing_verts[0]), missing_verts.data(), GL_STATIC_DRAW);
+    glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, pos));
+    glVertexAttribIPointer(1, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, col));
+    glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, tex));
+    glBindVertexArray(0);
+
+    ent_missing_vert_count = missing_verts.size();
+}
+
+void level_t::render_entities()
+{
+    if (!shader_terrain)
+    {
+        dc_log_error("The terrain shader is required to render entities");
+        return;
+    }
+
+    if (!entities.size())
+        return;
+
+    std::vector<entity_base_t*> entities_sorted;
+
+    entities_sorted.reserve(entities_sorted.size());
+
+    for (auto it : entities)
+        if (it.second)
+            entities_sorted.push_back(it.second);
+
+    /* Sort entities by type then distance */
+    std::sort(entities_sorted.begin(), entities_sorted.end(), [=](entity_base_t* a, entity_base_t* b) -> bool {
+        if (a->id < b->id)
+            return true;
+        if (a->id > b->id)
+            return false;
+
+        float adist = glm::distance(glm::dvec3(a->pos), glm::dvec3(camera_pos));
+        float bdist = glm::distance(glm::dvec3(b->pos), glm::dvec3(camera_pos));
+        return adist > bdist;
+    });
+
+    entity_id_t last_ent = ENT_ID_NONE;
+
+    glUseProgram(shader_terrain->id);
+
+    glBindVertexArray(ent_missing_vao);
+
+    for (entity_base_t* e : entities_sorted)
+    {
+        if (last_ent != e->id)
+        {
+            glBindVertexArray(ent_missing_vao);
+            last_ent = (entity_id_t)e->id;
+        }
+        glm::mat4 model(1.0f);
+        model = glm::translate(model, glm::vec3(e->pos) / 32768.0f);
+        model = glm::scale(model, glm::vec3(1.0f) / 32.0f);
+        model = glm::rotate(model, glm::radians(-e->pitch), glm::vec3(1.0f, 0.0f, 0.0f));
+        model = glm::rotate(model, glm::radians(e->yaw), glm::vec3(0.0f, 1.0f, 0.0f));
+        shader_terrain->set_model(model);
+        glDrawElements(GL_TRIANGLES, ent_missing_vert_count / 4 * 6, GL_UNSIGNED_INT, 0);
+    }
+    glBindVertexArray(0);
+}
+
+level_t::level_t(texture_terrain_t* _terrain)
+{
     /* Size the buffer for maximum 36 quads for every block, TODO-OPT: Would multiple smaller buffers be better? */
     size_t quads = SUBCHUNK_SIZE_X * SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z * 6 * 6;
     std::vector<Uint32> ind;
@@ -1998,12 +2148,32 @@ level_t::level_t(texture_terrain_t* _terrain)
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, ind.size() * sizeof(ind[0]), ind.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
+
+    /* Create missing entity mesh OpenGL resources */
+    glGenVertexArrays(1, &ent_missing_vao);
+    glBindVertexArray(ent_missing_vao);
+
+    glGenBuffers(1, &ent_missing_vbo);
+    glBindBuffer(GL_ARRAY_BUFFER, ent_missing_vbo);
+    glEnableVertexAttribArray(0);
+    glEnableVertexAttribArray(1);
+    glEnableVertexAttribArray(2);
+
+    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+
+    glBindVertexArray(0);
+
+    set_terrain(_terrain);
 }
 
 level_t::~level_t()
 {
+    glBindVertexArray(0);
     glDeleteBuffers(1, &ebo);
-    for (size_t i = 0; i < chunks.size(); i++)
-        delete chunks[i];
-    chunks.resize(0);
+    glDeleteBuffers(1, &ent_missing_vbo);
+    glDeleteVertexArrays(1, &ent_missing_vao);
+    for (chunk_cubic_t* c : chunks)
+        delete c;
+    for (std::pair<int, entity_base_t*> e : entities)
+        delete e.second;
 }

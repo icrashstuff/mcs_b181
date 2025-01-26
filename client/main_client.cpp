@@ -523,6 +523,14 @@ void decompress_chunk_packet(packet_chunk_t* p, std::vector<Uint8>& buffer)
 }
 #pragma GCC pop_options
 
+static entity_base_t* get_ent(jint eid)
+{
+    auto it = level->entities.find(eid);
+    if (it == level->entities.end())
+        it = level->entities.insert(it, std::make_pair(eid, new entity_base_t()));
+    return it->second;
+}
+
 void normal_loop()
 {
 
@@ -547,8 +555,9 @@ void normal_loop()
             && (pack_from_server = connection->pack_handler_client.get_next_packet(connection->socket)))
         {
 #define CAST_PACK_TO_P(type) type* p = (type*)pack_from_server
+#define CAST_ENT_TO_E(type) type* e = (type*)get_ent(p->eid);
             Uint8 pack_type = pack_from_server->id;
-            switch (pack_type)
+            switch ((packet_id_t)pack_type)
             {
             case PACKET_ID_KEEP_ALIVE:
             {
@@ -775,14 +784,131 @@ void normal_loop()
 
                 break;
             }
-            case PACKET_ID_PLAYER_LIST_ITEM:
-            case PACKET_ID_ENT_VELOCITY:
             case PACKET_ID_ENT_DESTROY:
+            {
+                CAST_PACK_TO_P(packet_ent_destroy_t);
+                auto it = level->entities.find(p->eid);
+                if (it != level->entities.end())
+                    level->entities.erase(it);
+                break;
+            }
+            case PACKET_ID_ENT_VELOCITY:
+            {
+                CAST_PACK_TO_P(packet_ent_velocity_t);
+                CAST_ENT_TO_E(entity_base_t);
+                e->vel = { p->vel_x, p->vel_y, p->vel_z };
+                break;
+            }
             case PACKET_ID_ENT_ENSURE_SPAWN:
+            {
+                CAST_PACK_TO_P(packet_ent_create_t);
+                get_ent(p->eid);
+                break;
+            }
+            /* TODO: Handle beyond missing */
+            case PACKET_ID_THUNDERBOLT:
+            {
+                CAST_PACK_TO_P(packet_thunder_t);
+                CAST_ENT_TO_E(entity_base_t);
+                e->id = ENT_ID_THUNDERBOLT;
+                e->pos = glm::ivec3(p->x, p->y, p->z) << 10;
+                break;
+            }
+            /* TODO: Handle beyond missing */
+            case PACKET_ID_ADD_OBJ:
+            {
+                CAST_PACK_TO_P(packet_add_obj_t);
+                CAST_ENT_TO_E(entity_base_t);
+                e->id = entity_base_t::mc_id_to_id(p->obj_type, 1);
+                e->pos = glm::ivec3(p->x, p->y, p->z) << 10;
+                break;
+            }
+            /* TODO: Handle beyond missing */
+            case PACKET_ID_ENT_SPAWN_MOB:
+            {
+                CAST_PACK_TO_P(packet_ent_spawn_mob_t);
+                CAST_ENT_TO_E(entity_base_t);
+                e->id = entity_base_t::mc_id_to_id(p->type, 0);
+                e->pos = glm::ivec3(p->x, p->y, p->z) << 10;
+                e->yaw = p->yaw * 360.0f / 256.0f;
+                e->pitch = p->pitch * 360.0f / 256.0f;
+                break;
+            }
+            /* TODO: Handle beyond missing */
+            case PACKET_ID_ENT_SPAWN_XP:
+            {
+                CAST_PACK_TO_P(packet_ent_spawn_xp_t);
+                CAST_ENT_TO_E(entity_base_t);
+                e->id = ENT_ID_XP;
+                e->pos = glm::ivec3(p->x, p->y, p->z) << 10;
+                break;
+            }
+            /* TODO: Handle beyond missing */
+            case PACKET_ID_ENT_SPAWN_PICKUP:
+            {
+                CAST_PACK_TO_P(packet_ent_spawn_pickup_t);
+                CAST_ENT_TO_E(entity_base_t);
+                e->id = ENT_ID_ITEM;
+                e->pos = glm::ivec3(p->x, p->y, p->z) << 10;
+                e->yaw = p->rotation * 360.0f / 256.0f;
+                e->pitch = p->pitch * 360.0f / 256.0f;
+                break;
+            }
+            /* TODO: Handle beyond missing */
+            case PACKET_ID_ENT_SPAWN_PAINTING:
+            {
+                CAST_PACK_TO_P(packet_ent_spawn_painting_t);
+                CAST_ENT_TO_E(entity_base_t);
+                e->id = ENT_ID_PAINTING;
+                e->pos = (glm::ivec3(p->center_x, p->center_y, p->center_z) * 32 + glm::ivec3(16)) << 10;
+                e->yaw = p->direction * 90.0f;
+                break;
+            }
+            /* TODO: Handle beyond missing */
+            case PACKET_ID_ENT_SPAWN_NAMED:
+            {
+                CAST_PACK_TO_P(packet_ent_spawn_named_t);
+                CAST_ENT_TO_E(entity_base_t);
+                e->id = ENT_ID_ITEM;
+                e->pos = glm::ivec3(p->x, p->y, p->z) << 10;
+                e->yaw = p->rotation * 360.0f / 256.0f;
+                e->pitch = p->pitch * 360.0f / 256.0f;
+                break;
+            }
             case PACKET_ID_ENT_MOVE_REL:
+            {
+                CAST_PACK_TO_P(packet_ent_move_rel_t);
+                CAST_ENT_TO_E(entity_base_t);
+                e->pos += glm::ivec3(p->delta_x, p->delta_y, p->delta_z);
+                break;
+            }
             case PACKET_ID_ENT_LOOK:
+            {
+                CAST_PACK_TO_P(packet_ent_look_t);
+                CAST_ENT_TO_E(entity_base_t);
+                e->yaw = p->yaw * 360.0f / 256.0f;
+                e->pitch = p->pitch * 360.0f / 256.0f;
+                break;
+            }
             case PACKET_ID_ENT_LOOK_MOVE_REL:
+            {
+                CAST_PACK_TO_P(packet_ent_look_move_rel_t);
+                CAST_ENT_TO_E(entity_base_t);
+                e->pos += glm::ivec3(p->delta_x, p->delta_y, p->delta_z);
+                e->yaw = p->yaw * 360.0f / 256.0f;
+                e->pitch = p->pitch * 360.0f / 256.0f;
+                break;
+            }
             case PACKET_ID_ENT_MOVE_TELEPORT:
+            {
+                CAST_PACK_TO_P(packet_ent_teleport_t);
+                CAST_ENT_TO_E(entity_base_t);
+                e->pos = glm::ivec3(p->x, p->y, p->z);
+                e->yaw = p->rotation * 360.0f / 256.0f;
+                e->pitch = p->pitch * 360.0f / 256.0f;
+                break;
+            }
+            case PACKET_ID_PLAYER_LIST_ITEM:
                 break;
             default:
                 dc_log_error("Unknown packet from server with id: 0x%02x", pack_type);
@@ -909,6 +1035,7 @@ void normal_loop()
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, level->get_terrain()->tex_id_main);
+
     for (chunk_cubic_t* c : level->chunks)
     {
         if (c->index_type == GL_NONE || c->index_count == 0)
@@ -918,6 +1045,9 @@ void normal_loop()
         shader->set_model(glm::translate(glm::mat4(1.0f), translate));
         glDrawElements(GL_TRIANGLES, c->index_count, c->index_type, 0);
     }
+
+    level->shader_terrain = shader;
+    level->render_entities();
 
     for (chunk_cubic_t* c : level->chunks)
     {

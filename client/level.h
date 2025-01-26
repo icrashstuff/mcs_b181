@@ -25,7 +25,9 @@
 #define TETRA_CLIENT_LEVEL_H_INCLUDED
 
 #include "chunk_cubic.h"
+#include "entity.h"
 #include "lightmap.h"
+#include "shaders.h"
 #include "shared/inventory.h"
 #include "texture_terrain.h"
 #include <GL/glew.h>
@@ -42,6 +44,8 @@ struct level_t
 
     std::vector<chunk_cubic_t*> chunks;
 
+    std::map<int, entity_base_t*> entities;
+
     /** Items should probably be removed from terrain **/
 
     lightmap_t lightmap;
@@ -50,6 +54,12 @@ struct level_t
     int world_height = 0;
 
     GLuint ebo = 0;
+
+    GLuint ent_missing_vao = 0;
+    GLuint ent_missing_vbo = 0;
+    size_t ent_missing_vert_count = 0;
+
+    shader_t* shader_terrain = NULL;
 
     /**
      * Builds all dirt meshes
@@ -76,11 +86,7 @@ struct level_t
      *
      * NOTE: This will clear all the meshes because the atlas might be structurally different
      */
-    void set_terrain(texture_terrain_t* _terrain)
-    {
-        terrain = _terrain;
-        clear_mesh(false);
-    }
+    void set_terrain(texture_terrain_t* _terrain);
 
     inline texture_terrain_t* get_terrain() { return terrain; }
 
@@ -124,6 +130,13 @@ struct level_t
 
     // TODO
     void render();
+
+    /**
+     * Renders all entities
+     *
+     * This should be placed in-between the solid and translucent rendering passes
+     */
+    void render_entities();
 
     glm::vec3 camera_pos = { 0, 0, 0 };
 
