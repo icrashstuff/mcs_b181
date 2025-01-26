@@ -879,7 +879,7 @@ void normal_loop()
             {
                 CAST_PACK_TO_P(packet_ent_move_rel_t);
                 CAST_ENT_TO_E(entity_base_t);
-                e->pos += glm::ivec3(p->delta_x, p->delta_y, p->delta_z);
+                e->pos += glm::ivec3(p->delta_x, p->delta_y, p->delta_z) << 10;
                 break;
             }
             case PACKET_ID_ENT_LOOK:
@@ -894,7 +894,7 @@ void normal_loop()
             {
                 CAST_PACK_TO_P(packet_ent_look_move_rel_t);
                 CAST_ENT_TO_E(entity_base_t);
-                e->pos += glm::ivec3(p->delta_x, p->delta_y, p->delta_z);
+                e->pos += glm::ivec3(p->delta_x, p->delta_y, p->delta_z) << 10;
                 e->yaw = p->yaw * 360.0f / 256.0f;
                 e->pitch = p->pitch * 360.0f / 256.0f;
                 break;
@@ -903,7 +903,7 @@ void normal_loop()
             {
                 CAST_PACK_TO_P(packet_ent_teleport_t);
                 CAST_ENT_TO_E(entity_base_t);
-                e->pos = glm::ivec3(p->x, p->y, p->z);
+                e->pos = glm::ivec3(p->x, p->y, p->z) << 10;
                 e->yaw = p->rotation * 360.0f / 256.0f;
                 e->pitch = p->pitch * 360.0f / 256.0f;
                 break;
