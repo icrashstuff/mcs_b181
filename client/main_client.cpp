@@ -1084,7 +1084,7 @@ void process_event(SDL_Event& event, bool* done)
         break;
     }
 
-    if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && event.key.scancode == SDL_SCANCODE_F2 && !event.key.repeat)
+    if (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_F2 && !event.key.repeat)
         take_screenshot = 1;
 
     if (tetra::imgui_ctx_main_wants_input())
@@ -1517,7 +1517,8 @@ static bool engine_state_menu()
 static gui_register_menu register_engine_state_menu(engine_state_menu);
 
 static int win_width, win_height;
-void screenshot_callback()
+static void stbi_physfs_write_func(void* context, void* data, int size) { PHYSFS_writeBytes((PHYSFS_File*)context, data, size); }
+static void screenshot_callback()
 {
     if (!take_screenshot)
         return;
@@ -1539,9 +1540,36 @@ void screenshot_callback()
 
     stbi_flip_vertically_on_write(true);
 
-    if (PHYSFS_mkdir("screenshots") && !PHYSFS_exists(buf_path))
-        if (stbi_physfs_write_png(buf_path, win_width, win_height, 3, buf, win_width * 3))
-            dc_log("Saved screenshot to %s", buf_path);
+    if (!PHYSFS_mkdir("screenshots"))
+    {
+        dc_log_error("Error saving screenshot: Unable to create output directory");
+        free(buf);
+        return;
+    }
+
+    if (PHYSFS_exists(buf_path))
+    {
+        dc_log_error("Error saving screenshot: \"%s\" already exists", buf_path);
+        free(buf);
+        return;
+    }
+
+    PHYSFS_File* fd = PHYSFS_openWrite(buf_path);
+
+    if (!fd)
+    {
+        PHYSFS_ErrorCode errcode = PHYSFS_getLastErrorCode();
+        dc_log_error("Error saving screenshot: PHYSFS %d (%s)", errcode, PHYSFS_getErrorByCode(errcode));
+        free(buf);
+        return;
+    }
+
+    int result = stbi_write_png_to_func(stbi_physfs_write_func, fd, win_width, win_height, 3, buf, win_width * 3);
+
+    if (result)
+        dc_log("Saved screenshot to %s", buf_path);
+    else
+        dc_log("Error saving screenshot: stbi_write_png_to_func() returned %d", result);
 
     free(buf);
 }
