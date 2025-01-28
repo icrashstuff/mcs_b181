@@ -423,6 +423,11 @@ float get_food_staturation_ratio(short item_id);
  */
 bool block_has_collision(short block_id);
 
+/**
+ * Get the corresponding light value for a block
+ *
+ * Data pulled from the table at https://minecraft.wiki/w/Light?oldid=161926#Light-emitting_blocks
+ */
 Uint8 get_light_level(short block_id);
 
 /**
