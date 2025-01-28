@@ -37,7 +37,7 @@ static convar_float_t r_light_brightness("r_light_brightness", 0.0, 0.0, 1.0, "L
 
 SDL_FORCE_INLINE float curve(const float base, const float x) { return (glm::pow(base, x) - 1) / (base - 1); }
 
-lightmap_t::lightmap_t(lightmap_preset_t preset)
+lightmap_t::lightmap_t(const lightmap_preset_t preset)
 {
     r_state = SDL_rand_bits() | (Uint64(SDL_rand_bits()) << 32);
 
@@ -65,7 +65,7 @@ lightmap_t::lightmap_t(lightmap_preset_t preset)
     update();
 }
 
-void lightmap_t::set_preset(lightmap_preset_t preset)
+void lightmap_t::set_preset(const lightmap_preset_t preset)
 {
     switch (preset)
     {

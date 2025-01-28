@@ -38,7 +38,7 @@
 
 struct level_t
 {
-    level_t(texture_terrain_t* terrain = NULL);
+    level_t(texture_terrain_t* const terrain = NULL);
 
     ~level_t();
 
@@ -103,40 +103,40 @@ struct level_t
      *
      * @param free_gl Optionally free all OpenGL resources
      */
-    void clear_mesh(bool free_gl);
+    void clear_mesh(const bool free_gl);
 
     /**
      * Switchs terrain texture for level
      *
      * NOTE: This will clear all the meshes because the atlas might be structurally different
      */
-    void set_terrain(texture_terrain_t* _terrain);
+    void set_terrain(texture_terrain_t* const _terrain);
 
     inline texture_terrain_t* get_terrain() { return terrain; }
 
     /**
      * Sets the block at the provided position and if necessary marks adjacent chunks for rebuilding/relighting
      */
-    void set_block(glm::ivec3 pos, block_id_t type, Uint8 metadata);
+    void set_block(const glm::ivec3 pos, const block_id_t type, Uint8 metadata);
 
     /**
      * Sets the block at the provided position and if necessary marks adjacent chunks for rebuilding/relighting
      */
-    inline void set_block(glm::ivec3 pos, itemstack_t item) { set_block(pos, item.id, item.damage); }
+    inline void set_block(const glm::ivec3 pos, const itemstack_t item) { set_block(pos, item.id, item.damage); }
 
     /**
      * Gets the block data at the provided position
      *
      * @returns false on block not found, true on block found
      */
-    bool get_block(glm::ivec3 pos, block_id_t& type, Uint8& metadata);
+    bool get_block(const glm::ivec3 pos, block_id_t& type, Uint8& metadata);
 
     /**
      * Gets the block data at the provided position
      *
      * @returns false on block not found, true on block found
      */
-    inline bool get_block(glm::ivec3 pos, itemstack_t& item)
+    inline bool get_block(const glm::ivec3 pos, itemstack_t& item)
     {
         block_id_t type;
         Uint8 metadata;
@@ -193,7 +193,7 @@ private:
     /**
      * Build and or replace the mesh for the corresponding chunk
      */
-    void build_mesh(int chunk_x, int chunk_y, int chunk_z);
+    void build_mesh(const int chunk_x, const int chunk_y, const int chunk_z);
 
     /**
      * Conduct a lighting pass on corresponding chunk
@@ -202,7 +202,7 @@ private:
      *
      * TODO: Handle light transmission in water/other translucent blocks
      */
-    void light_pass(int chunk_x, int chunk_y, int chunk_z, bool local_only);
+    void light_pass(const int chunk_x, const int chunk_y, const int chunk_z, const bool local_only);
 
     /** Items should probably be removed from terrain **/
     texture_terrain_t* terrain;

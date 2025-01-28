@@ -43,7 +43,7 @@
             dc_log(fmt, ##__VA_ARGS__);          \
     } while (0)
 
-void level_t::clear_mesh(bool free_gl)
+void level_t::clear_mesh(const bool free_gl)
 {
     for (chunk_cubic_t* c : chunks)
     {
@@ -143,7 +143,7 @@ struct chunk_cross_t
     chunk_cross_t() { }
 };
 
-void level_t::light_pass(int chunk_x, int chunk_y, int chunk_z, bool local_only)
+void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z, const bool local_only)
 {
     /** Index: C +XYZ -XYZ */
     chunk_cross_t cross;
@@ -254,7 +254,7 @@ void level_t::light_pass(int chunk_x, int chunk_y, int chunk_z, bool local_only)
 }
 #pragma GCC pop_options
 
-void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
+void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z)
 {
     /** Index: [x+1][y+1][z+1] */
     chunk_cubic_t* rubik[3][3][3];
@@ -1878,7 +1878,7 @@ void level_t::build_mesh(int chunk_x, int chunk_y, int chunk_z)
     glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, tex));
 }
 
-void level_t::set_block(glm::ivec3 pos, block_id_t type, Uint8 metadata)
+void level_t::set_block(const glm::ivec3 pos, const block_id_t type, const Uint8 metadata)
 {
     if (type >= BLOCK_ID_MAX)
     {
@@ -1949,7 +1949,7 @@ void level_t::set_block(glm::ivec3 pos, block_id_t type, Uint8 metadata)
     }
 }
 
-bool level_t::get_block(glm::ivec3 pos, block_id_t& type, Uint8& metadata)
+bool level_t::get_block(const glm::ivec3 pos, block_id_t& type, Uint8& metadata)
 {
     /* Ensure chunk map is correct (TODO: level_t needs a add/remove chunk system) */
     if (chunks.size() != cmap.size())
@@ -1977,7 +1977,7 @@ bool level_t::get_block(glm::ivec3 pos, block_id_t& type, Uint8& metadata)
     return true;
 }
 
-void level_t::set_terrain(texture_terrain_t* _terrain)
+void level_t::set_terrain(texture_terrain_t* const _terrain)
 {
     terrain = _terrain;
     clear_mesh(false);
@@ -2127,7 +2127,7 @@ void level_t::render_entities()
     glBindVertexArray(0);
 }
 
-level_t::level_t(texture_terrain_t* _terrain)
+level_t::level_t(texture_terrain_t* const _terrain)
 {
     /* Size the buffer for maximum 36 quads for every block, TODO-OPT: Would multiple smaller buffers be better? */
     size_t quads = SUBCHUNK_SIZE_X * SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z * 6 * 6;

@@ -113,6 +113,7 @@ typedef double jdouble;
 #define SUBCHUNK_SIZE_X 16
 #define SUBCHUNK_SIZE_Y 16
 #define SUBCHUNK_SIZE_Z 16
+#define SUBCHUNK_SIZE_VOLUME ((SUBCHUNK_SIZE_Y) * (SUBCHUNK_SIZE_Z) * (SUBCHUNK_SIZE_X))
 
 #if (SUBCHUNK_SIZE_X != 16) && (SUBCHUNK_SIZE_Y != 16) && (SUBCHUNK_SIZE_Z != 16)
 #error "Really? You think that things will continue to work?"

@@ -47,7 +47,7 @@ static convar_float_t r_mipmap_bias("r_mipmap_bias", -1.125f, -2.0, 2.0f, "Bias 
 /**
  * Performs a case insensitive check if a string ends with another
  */
-static bool path_ends_width(const char* s, const char* end)
+static bool path_ends_width(const char* const s, const char* const end)
 {
     size_t len = strlen(s);
     size_t len_end = strlen(end);
@@ -62,11 +62,11 @@ static bool path_ends_width(const char* s, const char* end)
     return 1;
 }
 
-texture_terrain_t::texture_terrain_t(std::string path_textures)
+texture_terrain_t::texture_terrain_t(const std::string path_textures)
 {
-    Uint64 start_tick = SDL_GetTicksNS();
+    const Uint64 start_tick = SDL_GetTicksNS();
 
-    std::pair<std::string, bool> paths[] = {
+    const std::pair<std::string, bool> paths[] = {
         { "/blocks/", false },
         { "/block/", false },
         { "/items/", true },
@@ -75,15 +75,15 @@ texture_terrain_t::texture_terrain_t(std::string path_textures)
     std::vector<texture_pre_pack_t> textures;
     for (size_t i_path = 0; i_path < SDL_arraysize(paths); i_path++)
     {
-        bool is_item = paths[i_path].second;
-        std::string s = path_textures + paths[i_path].first;
+        const bool is_item = paths[i_path].second;
+        const std::string s = path_textures + paths[i_path].first;
         char** rc = PHYSFS_enumerateFiles(s.c_str());
 
         for (char** it = rc; *it != NULL; it++)
         {
             if (!path_ends_width(*it, ".png"))
                 continue;
-            std::string tpath((s + *it));
+            const std::string tpath((s + *it));
             texture_pre_pack_t t;
             t.data_stbi = stbi_physfs_load(tpath.c_str(), &t.w, &t.h, NULL, 4);
             t.is_item = is_item;
@@ -203,7 +203,7 @@ texture_terrain_t::texture_terrain_t(std::string path_textures)
         {
             textures[i].data_mipmaped[0].resize(16 * 16 * 4);
 
-            int scale = 16 / textures[i].w;
+            const int scale = 16 / textures[i].w;
 
             for (GLsizei i_w = 0; i_w < 16; i_w++)
             {
@@ -232,8 +232,8 @@ texture_terrain_t::texture_terrain_t(std::string path_textures)
     {
         for (size_t mip_lvl = 1; mip_lvl < SDL_arraysize(textures[0].data_mipmaped); mip_lvl++)
         {
-            int new_w = textures[i].w / (1 << mip_lvl);
-            int new_h = textures[i].h / (1 << mip_lvl);
+            const int new_w = textures[i].w / (1 << mip_lvl);
+            const int new_h = textures[i].h / (1 << mip_lvl);
 
             textures[i].data_mipmaped[mip_lvl].resize(textures[i].data_mipmaped[mip_lvl - 1].size() / 4);
 
@@ -593,13 +593,13 @@ void texture_terrain_t::dump_mipmaps()
     }
 }
 
-static bool DragUint64(
-    const char* label, Uint64* v, float v_speed = 1.0f, Uint64 v_min = 0, Uint64 v_max = 0, const char* format = "%zu", ImGuiSliderFlags flags = 0)
+static bool DragUint64(const char* const label, Uint64* const v, const float v_speed = 1.0f, const Uint64 v_min = 0, const Uint64 v_max = 0,
+    const char* const format = "%zu", const ImGuiSliderFlags flags = 0)
 {
     return ImGui::DragScalar(label, ImGuiDataType_U64, v, v_speed, &v_min, &v_max, format, flags);
 }
 
-static bool slider_tex_parameteri(const char* name, GLenum target, GLenum pname, int min, int max)
+static bool slider_tex_parameteri(const char* name, const GLenum target, const GLenum pname, const int min, const int max)
 {
     GLint params;
     glGetTexParameteriv(target, pname, &params);
@@ -609,7 +609,7 @@ static bool slider_tex_parameteri(const char* name, GLenum target, GLenum pname,
     return true;
 }
 
-static bool slider_tex_parameterf(const char* name, GLenum target, GLenum pname, float min, float max)
+static bool slider_tex_parameterf(const char* name, const GLenum target, const GLenum pname, const float min, const float max)
 {
     GLfloat params;
     glGetTexParameterfv(target, pname, &params);
@@ -724,7 +724,7 @@ texture_terrain_t::~texture_terrain_t()
         free(raw_mipmaps[i]);
 }
 
-void terrain_vertex_t::create_vao(GLuint* vao)
+void terrain_vertex_t::create_vao(GLuint* const vao)
 {
     glGenVertexArrays(1, vao);
     glBindVertexArray(*vao);
@@ -734,7 +734,7 @@ void terrain_vertex_t::create_vao(GLuint* vao)
     glEnableVertexAttribArray(2);
 }
 
-void terrain_vertex_t::create_vbo(GLuint* vbo, GLuint* ebo, const std::vector<terrain_vertex_t>& vtx, const std::vector<Uint8>& ind)
+void terrain_vertex_t::create_vbo(GLuint* const vbo, GLuint* const ebo, const std::vector<terrain_vertex_t>& vtx, const std::vector<Uint8>& ind)
 {
     glGenBuffers(1, vbo);
     glBindBuffer(GL_ARRAY_BUFFER, *vbo);
@@ -750,7 +750,7 @@ void terrain_vertex_t::create_vbo(GLuint* vbo, GLuint* ebo, const std::vector<te
     glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, tex));
 }
 
-void terrain_vertex_t::create_vbo(GLuint* vbo, GLuint* ebo, const std::vector<terrain_vertex_t>& vtx, const std::vector<Uint16>& ind)
+void terrain_vertex_t::create_vbo(GLuint* const vbo, GLuint* const ebo, const std::vector<terrain_vertex_t>& vtx, const std::vector<Uint16>& ind)
 {
     glGenBuffers(1, vbo);
     glBindBuffer(GL_ARRAY_BUFFER, *vbo);
@@ -766,7 +766,7 @@ void terrain_vertex_t::create_vbo(GLuint* vbo, GLuint* ebo, const std::vector<te
     glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, tex));
 }
 
-void terrain_vertex_t::create_vbo(GLuint* vbo, GLuint* ebo, const std::vector<terrain_vertex_t>& vtx, const std::vector<Uint32>& ind)
+void terrain_vertex_t::create_vbo(GLuint* const vbo, GLuint* const ebo, const std::vector<terrain_vertex_t>& vtx, const std::vector<Uint32>& ind)
 {
     glGenBuffers(1, vbo);
     glBindBuffer(GL_ARRAY_BUFFER, *vbo);
@@ -782,7 +782,7 @@ void terrain_vertex_t::create_vbo(GLuint* vbo, GLuint* ebo, const std::vector<te
     glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, tex));
 }
 
-GLenum terrain_vertex_t::create_vbo(GLuint* vbo, GLuint* ebo, const std::vector<terrain_vertex_t>& vtx)
+GLenum terrain_vertex_t::create_vbo(GLuint* const vbo, GLuint* const ebo, const std::vector<terrain_vertex_t>& vtx)
 {
     const size_t quads = vtx.size() / 4;
     const size_t required_indicies = quads * 6;

@@ -36,13 +36,13 @@ public:
         LIGHTMAP_PRESET_NETHER,
         LIGHTMAP_PRESET_END,
     };
-    lightmap_t(lightmap_preset_t preset = LIGHTMAP_PRESET_OVERWORLD);
+    lightmap_t(const lightmap_preset_t preset = LIGHTMAP_PRESET_OVERWORLD);
 
     ~lightmap_t();
 
-    void set_world_time(Uint64 _mc_time) { mc_time = _mc_time; };
+    void set_world_time(const Uint64 _mc_time) { mc_time = _mc_time; };
 
-    void set_preset(lightmap_preset_t preset);
+    void set_preset(const lightmap_preset_t preset);
 
     /**
      * Updates and uploads light map

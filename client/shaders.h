@@ -35,9 +35,9 @@ struct shader_t
      * @param _path_vtx PHYSFS path to the vertex shader source
      * @param _path_frag PHYSFS path to the fragment shader source
      */
-    shader_t(std::string _path_vtx, std::string _path_frag)
+    shader_t(const std::string _path_vtx, const std::string _path_frag)
         : path_vtx(_path_vtx)
-        , path_frag(_path_frag) {};
+        , path_frag(_path_frag) { };
 
     /**
      * Builds and links the shader program specifed by path_vtx and path_frag
@@ -52,61 +52,61 @@ struct shader_t
     GLint loc_camera = -1;
     GLint loc_projection = -1;
 
-    void set_uniform(std::string name, int a)
+    inline void set_uniform(const std::string name, const int a)
     {
         GLint loc = glGetUniformLocation(id, name.c_str());
         if (loc >= 0)
             glUniform1i(loc, a);
     }
 
-    void set_uniform(std::string name, glm::mat4 a)
+    inline void set_uniform(const std::string name, const glm::mat4 a)
     {
         GLint loc = glGetUniformLocation(id, name.c_str());
         if (loc >= 0)
             glUniformMatrix4fv(loc, 1, GL_FALSE, glm::value_ptr(a));
     }
 
-    void set_uniform(std::string name, glm::mat3 a)
+    inline void set_uniform(const std::string name, const glm::mat3 a)
     {
         GLint loc = glGetUniformLocation(id, name.c_str());
         if (loc >= 0)
             glUniformMatrix3fv(loc, 1, GL_FALSE, glm::value_ptr(a));
     }
 
-    void set_uniform(std::string name, glm::vec4 a)
+    inline void set_uniform(const std::string name, const glm::vec4 a)
     {
         GLint loc = glGetUniformLocation(id, name.c_str());
         if (loc >= 0)
             glUniform4fv(loc, 4, glm::value_ptr(a));
     }
 
-    void set_uniform(std::string name, glm::vec3 a)
+    inline void set_uniform(const std::string name, const glm::vec3 a)
     {
         GLint loc = glGetUniformLocation(id, name.c_str());
         if (loc >= 0)
             glUniform3fv(loc, 3, glm::value_ptr(a));
     }
 
-    void set_uniform(std::string name, glm::vec2 a)
+    inline void set_uniform(const std::string name, const glm::vec2 a)
     {
         GLint loc = glGetUniformLocation(id, name.c_str());
         if (loc >= 0)
             glUniform2fv(loc, 2, glm::value_ptr(a));
     }
 
-    void set_model(glm::mat4 mat)
+    inline void set_model(const glm::mat4 mat)
     {
         if (loc_model >= 0)
             glUniformMatrix4fv(loc_model, 1, GL_FALSE, glm::value_ptr(mat));
     }
 
-    void set_camera(glm::mat4 mat)
+    inline void set_camera(const glm::mat4 mat)
     {
         if (loc_camera >= 0)
             glUniformMatrix4fv(loc_camera, 1, GL_FALSE, glm::value_ptr(mat));
     }
 
-    void set_projection(glm::mat4 mat)
+    inline void set_projection(const glm::mat4 mat)
     {
         if (loc_projection >= 0)
             glUniformMatrix4fv(loc_projection, 1, GL_FALSE, glm::value_ptr(mat));

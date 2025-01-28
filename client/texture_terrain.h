@@ -40,7 +40,7 @@ struct terrain_vertex_t
         Uint32 dat = 0;
 
         vtx_pos_ao_t() { }
-        vtx_pos_ao_t(Uint16 multiplier, Sint16 x, Sint16 y, Sint16 z, Uint8 ao)
+        vtx_pos_ao_t(const Uint16 multiplier, Sint16 x, Sint16 y, Sint16 z, const Uint8 ao)
         {
             x *= multiplier;
             z *= multiplier;
@@ -67,7 +67,7 @@ struct terrain_vertex_t
         Uint32 dat = 0;
 
         vtx_coloring_t() { }
-        vtx_coloring_t(float r, float g, float b, Uint8 light_block, Uint8 light_sky)
+        vtx_coloring_t(const float r, const float g, const float b, const Uint8 light_block, const Uint8 light_sky)
         {
             dat = 0;
             assert(light_block <= 0x0F);
@@ -85,13 +85,13 @@ struct terrain_vertex_t
         Uint32 dat = 0;
 
         vtx_texturing_t() { }
-        vtx_texturing_t(float u, float v)
+        vtx_texturing_t(const float u, const float v)
         {
             dat = 0;
             dat |= (Uint16(u * 32768));
             dat |= (Uint16(v * 32768)) << 16;
         }
-        vtx_texturing_t(glm::vec2 uv)
+        vtx_texturing_t(const glm::vec2 uv)
         {
             dat = 0;
             dat |= (Uint16(uv.r * 32768));
@@ -102,18 +102,18 @@ struct terrain_vertex_t
     /**
      * Sets up an appropriate VAO for handling terrain_vertex_t vertices
      */
-    static void create_vao(GLuint* vao);
+    static void create_vao(GLuint* const vao);
 
-    static void create_vbo(GLuint* vbo, GLuint* ebo, const std::vector<terrain_vertex_t>& vtx, const std::vector<Uint8>& ind);
-    static void create_vbo(GLuint* vbo, GLuint* ebo, const std::vector<terrain_vertex_t>& vtx, const std::vector<Uint16>& ind);
-    static void create_vbo(GLuint* vbo, GLuint* ebo, const std::vector<terrain_vertex_t>& vtx, const std::vector<Uint32>& ind);
+    static void create_vbo(GLuint* const vbo, GLuint* const ebo, const std::vector<terrain_vertex_t>& vtx, const std::vector<Uint8>& ind);
+    static void create_vbo(GLuint* const vbo, GLuint* const ebo, const std::vector<terrain_vertex_t>& vtx, const std::vector<Uint16>& ind);
+    static void create_vbo(GLuint* const vbo, GLuint* const ebo, const std::vector<terrain_vertex_t>& vtx, const std::vector<Uint32>& ind);
 
     /**
      * Creates a vbo and ebo for a mesh
      *
      * @return The type used for the indicies or GL_NONE if an empty mesh was provided
      */
-    static GLenum create_vbo(GLuint* vbo, GLuint* ebo, const std::vector<terrain_vertex_t>& vtx);
+    static GLenum create_vbo(GLuint* const vbo, GLuint* const ebo, const std::vector<terrain_vertex_t>& vtx);
 };
 
 /**
@@ -131,7 +131,7 @@ public:
      *
      * @param path_textures PHYSFS path containing either the subdirectories: blocks/items or block/item (probably: "/_resources/assets/minecraft/textures/")
      */
-    texture_terrain_t(std::string path_textures);
+    texture_terrain_t(const std::string path_textures);
 
     ~texture_terrain_t();
 
@@ -141,7 +141,7 @@ public:
      * @param flail If true then the clock flails around, if false then it follows mc_time
      * @param mc_time Current minecraft time (in 20hz ticks)
      */
-    void set_mc_time(bool flail, Uint64 _mc_time) { clock_flail = flail, clock_mc_time = _mc_time; }
+    void set_mc_time(const bool flail, const Uint64 _mc_time) { clock_flail = flail, clock_mc_time = _mc_time; }
 
     /**
      * Set the compass rotation
@@ -149,7 +149,7 @@ public:
      * @param flail If true then the compass flails around, if false then it follows rotation
      * @param rotation Compass direction in degrees
      */
-    void set_compass_rotation(bool flail, float rotation) { compass_flail = flail, compass_rotation = rotation; };
+    void set_compass_rotation(const bool flail, const float rotation) { compass_flail = flail, compass_rotation = rotation; };
 
     /**
      * Update and upload the terrain texture
@@ -170,7 +170,7 @@ public:
     GLuint tex_id_main = 0;
     GLuint tex_id_data = 0;
 
-    mc_id::terrain_face_t get_face(mc_id::terrain_face_id_t id)
+    const inline mc_id::terrain_face_t get_face(const mc_id::terrain_face_id_t id)
     {
         if (id < 0 || id > mc_id::FACE_DEBUG)
             return texture_faces[mc_id::FACE_DEBUG].face;

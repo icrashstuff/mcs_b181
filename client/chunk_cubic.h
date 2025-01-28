@@ -40,6 +40,9 @@
 #endif
 #endif /* CHUNK_CUBIC_INLINE not defined */
 
+#define SUBCHUNK_INDEX_OFFSET(OFF_MULT) (SUBCHUNK_SIZE_VOLUME * (OFF_MULT))
+#define SUBCHUNK_INDEX(X, Y, Z, OFF_MULT) (((Y) + ((Z) * (SUBCHUNK_SIZE_Y)) + ((X) * (SUBCHUNK_SIZE_Y) * (SUBCHUNK_SIZE_Z))) + SUBCHUNK_INDEX_OFFSET(OFF_MULT))
+
 /* TODO-OPT: Spin this out to shared? */
 struct chunk_cubic_t
 {
@@ -65,7 +68,7 @@ struct chunk_cubic_t
     size_t index_count = 0;
     size_t index_count_translucent = 0;
 
-    Uint64 time_creation = 0;
+    const Uint64 time_creation = SDL_GetTicks();
 
     glm::ivec3 pos = { 0, 0, 0 };
 
@@ -74,8 +77,7 @@ struct chunk_cubic_t
 
     chunk_cubic_t()
     {
-        data_buf.resize(SUBCHUNK_SIZE_X * SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z * 5 / 2, 0);
-        time_creation = SDL_GetTicks();
+        data_buf.resize(SUBCHUNK_SIZE_VOLUME * 5 / 2, 0);
         data = data_buf.data();
     }
 
@@ -89,7 +91,7 @@ struct chunk_cubic_t
         glDeleteBuffers(1, &vbo);
     }
 
-    CHUNK_CUBIC_INLINE Uint8 get_type(int x, int y, int z)
+    CHUNK_CUBIC_INLINE Uint8 get_type(const int x, const int y, const int z)
     {
         assert(x >= 0);
         assert(y >= 0);
@@ -98,22 +100,22 @@ struct chunk_cubic_t
         assert(y < SUBCHUNK_SIZE_Y);
         assert(z < SUBCHUNK_SIZE_Z);
 
-        int index = y + (z * (SUBCHUNK_SIZE_Y)) + (x * (SUBCHUNK_SIZE_Y) * (SUBCHUNK_SIZE_Z));
+        const int index = SUBCHUNK_INDEX(x, y, z, 0);
 
         return data[index];
     }
 
-    CHUNK_CUBIC_INLINE Uint8 get_type_fallback(int x, int y, int z, Uint8 fallback)
+    CHUNK_CUBIC_INLINE Uint8 get_type_fallback(const int x, const int y, const int z, const Uint8 fallback)
     {
         if (x < 0 || y < 0 || z < 0 || x >= SUBCHUNK_SIZE_X || y >= SUBCHUNK_SIZE_Y || z >= SUBCHUNK_SIZE_Z)
             return fallback;
 
-        int index = y + (z * (SUBCHUNK_SIZE_Y)) + (x * (SUBCHUNK_SIZE_Y) * (SUBCHUNK_SIZE_Z));
+        const int index = SUBCHUNK_INDEX(x, y, z, 0);
 
         return data[index];
     }
 
-    CHUNK_CUBIC_INLINE void set_type(int x, int y, int z, Uint8 type)
+    CHUNK_CUBIC_INLINE void set_type(const int x, const int y, const int z, const Uint8 type)
     {
         dirty_level = DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
         assert(x >= 0);
@@ -123,7 +125,7 @@ struct chunk_cubic_t
         assert(y < SUBCHUNK_SIZE_Y);
         assert(z < SUBCHUNK_SIZE_Z);
 
-        int index = y + (z * (SUBCHUNK_SIZE_Y)) + (x * (SUBCHUNK_SIZE_Y) * (SUBCHUNK_SIZE_Z));
+        const int index = SUBCHUNK_INDEX(x, y, z, 0);
 
         if (type <= BLOCK_ID_MAX)
             data[index] = type;
@@ -131,7 +133,7 @@ struct chunk_cubic_t
             data[index] = 0;
     }
 
-    CHUNK_CUBIC_INLINE Uint8 get_metadata(int x, int y, int z)
+    CHUNK_CUBIC_INLINE Uint8 get_metadata(const int x, const int y, const int z)
     {
         assert(x >= 0);
         assert(y >= 0);
@@ -140,7 +142,7 @@ struct chunk_cubic_t
         assert(y < SUBCHUNK_SIZE_Y);
         assert(z < SUBCHUNK_SIZE_Z);
 
-        int index = (y + (z * (SUBCHUNK_SIZE_Y)) + (x * (SUBCHUNK_SIZE_Y) * (SUBCHUNK_SIZE_Z))) + SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z * SUBCHUNK_SIZE_X * 2;
+        const int index = SUBCHUNK_INDEX(x, y, z, 2);
 
         if (index % 2 == 1)
             return (data[index / 2] >> 4) & 0x0F;
@@ -148,7 +150,7 @@ struct chunk_cubic_t
             return data[index / 2] & 0x0F;
     }
 
-    CHUNK_CUBIC_INLINE void set_metadata(int x, int y, int z, Uint8 metadata)
+    CHUNK_CUBIC_INLINE void set_metadata(const int x, const int y, const int z, const Uint8 metadata)
     {
         dirty_level = DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
         assert(x >= 0);
@@ -159,7 +161,7 @@ struct chunk_cubic_t
         assert(y < SUBCHUNK_SIZE_Y);
         assert(z < SUBCHUNK_SIZE_Z);
 
-        int index = (y + (z * (SUBCHUNK_SIZE_Y)) + (x * (SUBCHUNK_SIZE_Y) * (SUBCHUNK_SIZE_Z))) + SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z * SUBCHUNK_SIZE_X * 2;
+        const int index = SUBCHUNK_INDEX(x, y, z, 2);
 
         if (index % 2 == 1)
             data[index / 2] = ((metadata & 0x0F) << 4) | (data[index / 2] & 0x0F);
@@ -167,7 +169,7 @@ struct chunk_cubic_t
             data[index / 2] = (metadata & 0x0F) | (data[index / 2] & 0xF0);
     }
 
-    CHUNK_CUBIC_INLINE Uint8 get_light_block(int x, int y, int z)
+    CHUNK_CUBIC_INLINE Uint8 get_light_block(const int x, const int y, const int z)
     {
         assert(x >= 0);
         assert(y >= 0);
@@ -176,7 +178,7 @@ struct chunk_cubic_t
         assert(y < SUBCHUNK_SIZE_Y);
         assert(z < SUBCHUNK_SIZE_Z);
 
-        int index = (y + (z * (SUBCHUNK_SIZE_Y)) + (x * (SUBCHUNK_SIZE_Y) * (SUBCHUNK_SIZE_Z))) + SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z * SUBCHUNK_SIZE_X * 3;
+        const int index = SUBCHUNK_INDEX(x, y, z, 3);
 
         if (index % 2 == 1)
             return (data[index / 2] >> 4) & 0x0F;
@@ -184,17 +186,15 @@ struct chunk_cubic_t
             return data[index / 2] & 0x0F;
     }
 
-    CHUNK_CUBIC_INLINE void clear_light_block(Uint8 clear_level = 0)
+    CHUNK_CUBIC_INLINE void clear_light_block(const Uint8 clear_level = 0)
     {
         assert(clear_level <= 0x0F);
 
-        clear_level = (clear_level & 0x0F) | ((clear_level & 0x0F) << 4);
-
-        Uint8* data_ptr = data + (SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z * SUBCHUNK_SIZE_X * 3 / 2);
-        SDL_memset(data_ptr, clear_level, SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z * SUBCHUNK_SIZE_X / 2);
+        Uint8* data_ptr = data + SUBCHUNK_INDEX_OFFSET(3 / 2);
+        SDL_memset(data_ptr, (clear_level & 0x0F) | ((clear_level & 0x0F) << 4), SUBCHUNK_SIZE_VOLUME / 2);
     }
 
-    CHUNK_CUBIC_INLINE void set_light_block(int x, int y, int z, Uint8 level)
+    CHUNK_CUBIC_INLINE void set_light_block(const int x, const int y, const int z, const Uint8 level)
     {
         dirty_level = DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
         assert(x >= 0);
@@ -205,7 +205,7 @@ struct chunk_cubic_t
         assert(y < SUBCHUNK_SIZE_Y);
         assert(z < SUBCHUNK_SIZE_Z);
 
-        int index = (y + (z * (SUBCHUNK_SIZE_Y)) + (x * (SUBCHUNK_SIZE_Y) * (SUBCHUNK_SIZE_Z))) + SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z * SUBCHUNK_SIZE_X * 3;
+        const int index = SUBCHUNK_INDEX(x, y, z, 3);
 
         if (index % 2 == 1)
             data[index / 2] = ((level & 0x0F) << 4) | (data[index / 2] & 0x0F);
@@ -213,7 +213,7 @@ struct chunk_cubic_t
             data[index / 2] = (level & 0x0F) | (data[index / 2] & 0xF0);
     }
 
-    CHUNK_CUBIC_INLINE Uint8 get_light_sky(int x, int y, int z)
+    CHUNK_CUBIC_INLINE Uint8 get_light_sky(const int x, const int y, const int z)
     {
         assert(x >= 0);
         assert(y >= 0);
@@ -222,7 +222,7 @@ struct chunk_cubic_t
         assert(y < SUBCHUNK_SIZE_Y);
         assert(z < SUBCHUNK_SIZE_Z);
 
-        int index = (y + (z * (SUBCHUNK_SIZE_Y)) + (x * (SUBCHUNK_SIZE_Y) * (SUBCHUNK_SIZE_Z))) + SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z * SUBCHUNK_SIZE_X * 4;
+        const int index = SUBCHUNK_INDEX(x, y, z, 4);
 
         if (index % 2 == 1)
             return (data[index / 2] >> 4) & 0x0F;
@@ -230,17 +230,15 @@ struct chunk_cubic_t
             return data[index / 2] & 0x0F;
     }
 
-    CHUNK_CUBIC_INLINE void clear_light_sky(Uint8 clear_level = 0)
+    CHUNK_CUBIC_INLINE void clear_light_sky(const Uint8 clear_level = 0)
     {
         assert(clear_level <= 0x0F);
 
-        clear_level = (clear_level & 0x0F) | ((clear_level & 0x0F) << 4);
-
-        Uint8* data_ptr = data + (SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z * SUBCHUNK_SIZE_X * 4 / 2);
-        SDL_memset(data_ptr, clear_level, SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z * SUBCHUNK_SIZE_X / 2);
+        Uint8* data_ptr = data + SUBCHUNK_INDEX_OFFSET(4 / 2);
+        SDL_memset(data_ptr, (clear_level & 0x0F) | ((clear_level & 0x0F) << 4), SUBCHUNK_SIZE_VOLUME / 2);
     }
 
-    CHUNK_CUBIC_INLINE void set_light_sky(int x, int y, int z, Uint8 level)
+    CHUNK_CUBIC_INLINE void set_light_sky(const int x, const int y, const int z, const Uint8 level)
     {
         dirty_level = DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
         assert(x >= 0);
@@ -251,7 +249,7 @@ struct chunk_cubic_t
         assert(y < SUBCHUNK_SIZE_Y);
         assert(z < SUBCHUNK_SIZE_Z);
 
-        int index = (y + (z * (SUBCHUNK_SIZE_Y)) + (x * (SUBCHUNK_SIZE_Y) * (SUBCHUNK_SIZE_Z))) + SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z * SUBCHUNK_SIZE_X * 4;
+        const int index = SUBCHUNK_INDEX(x, y, z, 4);
 
         if (index % 2 == 1)
             data[index / 2] = ((level & 0x0F) << 4) | (data[index / 2] & 0x0F);
