@@ -1026,18 +1026,24 @@ void normal_loop()
     glBindTexture(GL_TEXTURE_2D, level->lightmap.tex_id_linear);
     glActiveTexture(GL_TEXTURE0);
 
-    glm::dvec3 c2pos(glm::ivec3(level->camera_pos) >> 3);
+    glm::dvec3 c2pos(glm::ivec3(level->camera_pos) >> 4);
     std::sort(level->chunks.begin(), level->chunks.end(), [=](chunk_cubic_t* a, chunk_cubic_t* b) {
-        float adist = glm::distance(glm::dvec3(a->pos * 2 + glm::ivec3(1, 1, 1)), c2pos);
-        float bdist = glm::distance(glm::dvec3(b->pos * 2 + glm::ivec3(1, 1, 1)), c2pos);
+        float adist = glm::distance(glm::dvec3(a->pos), c2pos);
+        float bdist = glm::distance(glm::dvec3(b->pos), c2pos);
         return adist > bdist;
     });
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, level->get_terrain()->tex_id_main);
 
-    for (chunk_cubic_t* c : level->chunks)
+    shader->set_uniform("allow_translucency", 0);
+
+    /* Draw opaque geometry from front to back to reduce unnecessary filling
+     * This can actually make a performance difference
+     */
+    for (auto it = level->chunks.rbegin(); it != level->chunks.rend(); it = next(it))
     {
+        chunk_cubic_t* c = *it;
         if (c->index_type == GL_NONE || c->index_count == 0)
             continue;
         glBindVertexArray(c->vao);
@@ -1048,6 +1054,8 @@ void normal_loop()
 
     level->shader_terrain = shader;
     level->render_entities();
+
+    shader->set_uniform("allow_translucency", 1);
 
     for (chunk_cubic_t* c : level->chunks)
     {

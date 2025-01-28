@@ -33,17 +33,20 @@ uniform sampler2D tex_atlas;
 uniform sampler2D tex_lightmap;
 
 uniform int ao_algorithm = 1;
-uniform int use_texture = 1;
+uniform bool use_texture = true;
+uniform bool allow_translucency = true;
 
 void main()
 {
     out_color = vec4(frag_color.xyz, 1.0);
 
-    if (use_texture == 1)
+    if (use_texture)
         out_color *= texture2D(tex_atlas, frag_uv);
 
     if (out_color.a < 0.0625)
         discard;
+    else if(!allow_translucency)
+        out_color.a = 1.0;
 
     switch (ao_algorithm)
     {

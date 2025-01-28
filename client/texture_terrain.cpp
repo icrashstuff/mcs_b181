@@ -244,31 +244,40 @@ texture_terrain_t::texture_terrain_t(std::string path_textures)
             {
                 for (GLsizei i_h = 0; i_h < new_h * textures[i].frame_num_individual; i_h++)
                 {
-                    Uint16 r = 0, g = 0, b = 0, a = 0;
-                    r += source[((i_w * 2 + 0) + (i_h * 2 + 0) * new_w * 2) * 4 + 0];
-                    g += source[((i_w * 2 + 0) + (i_h * 2 + 0) * new_w * 2) * 4 + 1];
-                    b += source[((i_w * 2 + 0) + (i_h * 2 + 0) * new_w * 2) * 4 + 2];
-                    a += source[((i_w * 2 + 0) + (i_h * 2 + 0) * new_w * 2) * 4 + 3];
+                    Uint32 r = 0, g = 0, b = 0, a = 0, at = 0;
+                    at = source[((i_w * 2 + 0) + (i_h * 2 + 0) * new_w * 2) * 4 + 3];
+                    r += source[((i_w * 2 + 0) + (i_h * 2 + 0) * new_w * 2) * 4 + 0] * at;
+                    g += source[((i_w * 2 + 0) + (i_h * 2 + 0) * new_w * 2) * 4 + 1] * at;
+                    b += source[((i_w * 2 + 0) + (i_h * 2 + 0) * new_w * 2) * 4 + 2] * at;
+                    a += at;
 
-                    r += source[((i_w * 2 + 1) + (i_h * 2 + 0) * new_w * 2) * 4 + 0];
-                    g += source[((i_w * 2 + 1) + (i_h * 2 + 0) * new_w * 2) * 4 + 1];
-                    b += source[((i_w * 2 + 1) + (i_h * 2 + 0) * new_w * 2) * 4 + 2];
-                    a += source[((i_w * 2 + 1) + (i_h * 2 + 0) * new_w * 2) * 4 + 3];
+                    at = source[((i_w * 2 + 1) + (i_h * 2 + 0) * new_w * 2) * 4 + 3];
+                    r += source[((i_w * 2 + 1) + (i_h * 2 + 0) * new_w * 2) * 4 + 0] * at;
+                    g += source[((i_w * 2 + 1) + (i_h * 2 + 0) * new_w * 2) * 4 + 1] * at;
+                    b += source[((i_w * 2 + 1) + (i_h * 2 + 0) * new_w * 2) * 4 + 2] * at;
+                    a += at;
 
-                    r += source[((i_w * 2 + 0) + (i_h * 2 + 1) * new_w * 2) * 4 + 0];
-                    g += source[((i_w * 2 + 0) + (i_h * 2 + 1) * new_w * 2) * 4 + 1];
-                    b += source[((i_w * 2 + 0) + (i_h * 2 + 1) * new_w * 2) * 4 + 2];
-                    a += source[((i_w * 2 + 0) + (i_h * 2 + 1) * new_w * 2) * 4 + 3];
+                    at = source[((i_w * 2 + 0) + (i_h * 2 + 1) * new_w * 2) * 4 + 3];
+                    r += source[((i_w * 2 + 0) + (i_h * 2 + 1) * new_w * 2) * 4 + 0] * at;
+                    g += source[((i_w * 2 + 0) + (i_h * 2 + 1) * new_w * 2) * 4 + 1] * at;
+                    b += source[((i_w * 2 + 0) + (i_h * 2 + 1) * new_w * 2) * 4 + 2] * at;
+                    a += at;
 
-                    r += source[((i_w * 2 + 1) + (i_h * 2 + 1) * new_w * 2) * 4 + 0];
-                    g += source[((i_w * 2 + 1) + (i_h * 2 + 1) * new_w * 2) * 4 + 1];
-                    b += source[((i_w * 2 + 1) + (i_h * 2 + 1) * new_w * 2) * 4 + 2];
-                    a += source[((i_w * 2 + 1) + (i_h * 2 + 1) * new_w * 2) * 4 + 3];
+                    at = source[((i_w * 2 + 1) + (i_h * 2 + 1) * new_w * 2) * 4 + 3];
+                    r += source[((i_w * 2 + 1) + (i_h * 2 + 1) * new_w * 2) * 4 + 0] * at;
+                    g += source[((i_w * 2 + 1) + (i_h * 2 + 1) * new_w * 2) * 4 + 1] * at;
+                    b += source[((i_w * 2 + 1) + (i_h * 2 + 1) * new_w * 2) * 4 + 2] * at;
+                    a += at;
 
-                    result[(i_w + i_h * new_w) * 4 + 0] = r / 4;
-                    result[(i_w + i_h * new_w) * 4 + 1] = g / 4;
-                    result[(i_w + i_h * new_w) * 4 + 2] = b / 4;
-                    result[(i_w + i_h * new_w) * 4 + 3] = a / 4;
+                    if (a == 0)
+                        ((Uint32*)result)[i_w + i_h * new_w] = 0;
+                    else
+                    {
+                        result[(i_w + i_h * new_w) * 4 + 0] = SDL_clamp(r / a, 0, 0xFF);
+                        result[(i_w + i_h * new_w) * 4 + 1] = SDL_clamp(g / a, 0, 0xFF);
+                        result[(i_w + i_h * new_w) * 4 + 2] = SDL_clamp(b / a, 0, 0xFF);
+                        result[(i_w + i_h * new_w) * 4 + 3] = SDL_clamp(a / 4, 0, 0xFF);
+                    }
                 }
             }
         }
