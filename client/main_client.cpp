@@ -433,7 +433,7 @@ void decompress_chunk_packet(packet_chunk_t* p, std::vector<Uint8>& buffer)
 
     int decompress_result = uncompress(uncompressed, &uncompressed_size, p->compressed_data.data(), p->compressed_data.size());
 
-    dc_log("%d %d %d | %d %d %d", min_chunk_x, min_chunk_y, min_chunk_z, max_chunk_x, max_chunk_y, max_chunk_z);
+    TRACE("%d %d %d | %d %d %d", min_chunk_x, min_chunk_y, min_chunk_z, max_chunk_x, max_chunk_y, max_chunk_z);
 
     if (decompress_result != Z_OK)
     {
