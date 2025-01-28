@@ -69,7 +69,7 @@ add_subdirectory(tetra/)
 function(add_bin_common name)
     add_tetra_executable(${name} "${${name}_SRC}")
 
-    target_compile_options(${name} PUBLIC -Wall -Wextra)
+    target_compile_options(${name} PUBLIC -Wall -Wextra -DSDL_DISABLE_OLD_NAMES=1)
 
     target_link_libraries(${name} ${zlib_LIBRARIES})
     target_compile_options(${name} PUBLIC ${zlib_CFLAGS_OTHER})
