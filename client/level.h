@@ -44,9 +44,33 @@ struct level_t
 
     std::vector<chunk_cubic_t*> chunks;
 
-    std::map<int, entity_base_t*> entities;
+    std::map<eid_t, entity_base_t*> entities;
 
-    /** Items should probably be removed from terrain **/
+    /**
+     * Get the entity with the corresponding EID
+     *
+     * @param eid Id of entity to retreive
+     * @returns The entity with the corresponding EID or NULL if it wasn't found
+     */
+    inline entity_base_t* get_ent(const eid_t eid)
+    {
+        const std::map<eid_t, entity_base_t*>::iterator it = entities.find(eid);
+        return (it == entities.end()) ? NULL : it->second;
+    }
+
+    /**
+     * Get or create the entity with the corresponding EID
+     *
+     * @param eid Id of entity to retrieve/create
+     * @returns The entity found or created with the corresponding EID
+     */
+    inline entity_base_t* get_or_create_ent(const eid_t eid)
+    {
+        std::map<eid_t, entity_base_t*>::iterator it = entities.find(eid);
+        if (it == entities.end())
+            it = entities.insert(it, std::make_pair(eid, new entity_base_t()));
+        return it->second;
+    }
 
     lightmap_t lightmap;
 
@@ -112,7 +136,7 @@ struct level_t
      *
      * @returns false on block not found, true on block found
      */
-    bool get_block(glm::ivec3 pos, itemstack_t& item)
+    inline bool get_block(glm::ivec3 pos, itemstack_t& item)
     {
         block_id_t type;
         Uint8 metadata;
@@ -139,6 +163,8 @@ struct level_t
     void render_entities();
 
     glm::vec3 camera_pos = { 0, 0, 0 };
+    float yaw = 0.0f;
+    float pitch = 0.0f;
 
     inventory_player_t inventory;
 
@@ -178,6 +204,7 @@ private:
      */
     void light_pass(int chunk_x, int chunk_y, int chunk_z, bool local_only);
 
+    /** Items should probably be removed from terrain **/
     texture_terrain_t* terrain;
 };
 

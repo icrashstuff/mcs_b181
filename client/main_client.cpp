@@ -46,11 +46,10 @@
 
 #include "sdl_net/include/SDL3_net/SDL_net.h"
 
+#include "connection.h"
 #include "level.h"
 #include "shaders.h"
 #include "texture_terrain.h"
-
-#include <zlib.h>
 
 static convar_string_t cvr_username("username", "", "Username (duh)", CONVAR_FLAG_SAVE);
 static convar_string_t cvr_dir_assets("dir_assets", "", "Path to assets (ex: \"~/.minecraft/assets/\")", CONVAR_FLAG_SAVE);
@@ -81,122 +80,6 @@ void compile_shaders()
 
 static level_t* level;
 
-struct tentative_block_t
-{
-    Uint64 timestamp = 0;
-    glm::ivec3 pos = { -1, -1, -1 };
-    itemstack_t old;
-    bool fullfilled = 0;
-};
-
-std::vector<tentative_block_t> tentative_blocks;
-
-struct connection_t
-{
-    enum connection_status_t
-    {
-        CONNECTION_UNSET,
-        CONNECTION_RESOLVING,
-        CONNECTION_RESOLVED,
-        CONNECTION_CONNECTING,
-        CONNECTION_ACTIVE,
-        CONNECTION_DONE,
-        CONNECTION_FAILED,
-    } status
-        = CONNECTION_UNSET;
-
-    SDLNet_StreamSocket* socket = NULL;
-    packet_handler_t pack_handler_client = packet_handler_t(false);
-    std::string status_msg;
-    std::string status_msg_sub;
-    bool in_world = false;
-
-    void set_status(std::string _status, std::string _sub_status = "")
-    {
-        status_msg = _status;
-        status_msg_sub = _sub_status;
-    }
-
-    Uint16 port = 0;
-    std::string addr;
-
-    void init(std::string _addr, Uint16 _port)
-    {
-        addr = _addr;
-        port = _port;
-
-        set_status("Resolving address");
-        addr_server = SDLNet_ResolveHostname(cvr_autoconnect_addr.get().c_str());
-        status = CONNECTION_RESOLVING;
-        if (!addr_server)
-        {
-            err_str = std::string("SDLNet_ResolveHostname: ") + SDL_GetError();
-            status = CONNECTION_FAILED;
-            return;
-        }
-    }
-
-    SDLNet_Address* addr_server;
-    std::string err_str;
-
-    Uint64 start_time;
-
-    /**
-     * Steps (if possible) the state as fast a possible to CONNECTION_ACTIVE
-     */
-    void step_to_active()
-    {
-        if (status == CONNECTION_RESOLVING)
-        {
-            int address_status = SDLNet_GetAddressStatus(addr_server);
-
-            if (address_status == 1)
-                status = CONNECTION_RESOLVED;
-            else if (address_status == -1)
-            {
-                err_str = std::string("SDLNet_WaitUntilResolved: ") + SDL_GetError();
-                status = CONNECTION_FAILED;
-            }
-        }
-
-        if (status == CONNECTION_RESOLVED)
-        {
-            socket = SDLNet_CreateClient(addr_server, port);
-            SDLNet_UnrefAddress(addr_server);
-            addr_server = NULL;
-
-            status = CONNECTION_CONNECTING;
-
-            if (!socket)
-            {
-                err_str = std::string("SDLNet_CreateClient: ") + SDL_GetError();
-                status = CONNECTION_FAILED;
-            }
-        }
-
-        if (status == CONNECTION_CONNECTING)
-        {
-            int connection_status = SDLNet_GetConnectionStatus(socket);
-
-            if (connection_status == 1)
-                status = CONNECTION_ACTIVE;
-            else if (connection_status == -1)
-            {
-                err_str = std::string("SDLNet_GetConnectionStatus: ") + SDL_GetError();
-                status = CONNECTION_FAILED;
-            }
-        }
-    }
-
-    ~connection_t()
-    {
-        SDLNet_UnrefAddress(addr_server);
-
-        /* TODO: Store this in a vector of dying sockets to ensure things are properly closed down */
-        SDLNet_DestroyStreamSocket(socket);
-    }
-};
-
 static connection_t* connection = NULL;
 static texture_terrain_t* texture_atlas = NULL;
 
@@ -218,7 +101,7 @@ bool initialize_resources()
     connection = new connection_t();
 
     if (cvr_autoconnect.get())
-        connection->init(cvr_autoconnect_addr.get(), cvr_autoconnect_port.get());
+        connection->init(cvr_autoconnect_addr.get(), cvr_autoconnect_port.get(), cvr_username.get());
 
     if (!cvr_autoconnect.get() || cvr_testworld.get())
         create_testworld();
@@ -369,594 +252,34 @@ const char* engine_state_name(engine_state_t state)
     return "Unknown Engine State";
 }
 
-float yaw;
-float pitch;
+static float delta_time;
 
-float delta_time;
-
-bool held_w = 0;
-bool held_a = 0;
-bool held_s = 0;
-bool held_d = 0;
-bool held_space = 0;
-bool held_shift = 0;
-bool held_ctrl = 0;
-bool mouse_grabbed = 0;
-bool wireframe = 0;
+static bool held_w = 0;
+static bool held_a = 0;
+static bool held_s = 0;
+static bool held_d = 0;
+static bool held_space = 0;
+static bool held_shift = 0;
+static bool held_ctrl = 0;
+static bool mouse_grabbed = 0;
+static bool wireframe = 0;
 #define AO_ALGO_MAX 5
 
 #define FOV_MAX 77.0f
 #define FOV_MIN 75.0f
-float fov = FOV_MIN;
+static float fov = FOV_MIN;
 
-glm::vec3 camera_front = glm::vec3(0.0f, 0.0f, -1.0f);
-glm::vec3 camera_up = glm::vec3(0.0f, 1.0f, 0.0f);
-
-#pragma GCC push_options
-#pragma GCC optimize("Ofast")
-void decompress_chunk_packet(packet_chunk_t* p, std::vector<Uint8>& buffer)
-{
-    if (p->size_x < 0 || p->size_y < 0 || p->size_z < 0)
-    {
-        dc_log_error("Chunk packet with invalid size of <%d, %d, %d>", p->size_x, p->size_y, p->size_z);
-        return;
-    }
-
-    const int min_block_x = p->block_x;
-    const int min_block_y = p->block_y;
-    const int min_block_z = p->block_z;
-    const int max_block_x = min_block_x + p->size_x;
-    const int max_block_y = min_block_y + p->size_y;
-    const int max_block_z = min_block_z + p->size_z;
-
-    const int min_chunk_x = min_block_x >> 4;
-    const int min_chunk_y = min_block_y >> 4;
-    const int min_chunk_z = min_block_z >> 4;
-    const int max_chunk_x = max_block_x >> 4;
-    const int max_chunk_y = max_block_y >> 4;
-    const int max_chunk_z = max_block_z >> 4;
-
-    const int real_size_x = p->size_x + 1;
-    const int real_size_y = p->size_y + 1;
-    const int real_size_z = p->size_z + 1;
-    const int real_volume = (real_size_x * real_size_y * real_size_z);
-
-    /* Oversize the buffer a small amount in case weirdness occurs  */
-    size_t uncompressed_size = real_size_x * real_size_y * real_size_z * 41 / 16;
-    if (uncompressed_size > buffer.size())
-    {
-        dc_log("Resizing decompression buffer to %zu", uncompressed_size);
-        buffer.resize(uncompressed_size, 0);
-    }
-    Uint8* uncompressed = buffer.data();
-    memset(uncompressed + uncompressed_size, 0, buffer.size() - uncompressed_size);
-
-    int decompress_result = uncompress(uncompressed, &uncompressed_size, p->compressed_data.data(), p->compressed_data.size());
-
-    TRACE("%d %d %d | %d %d %d", min_chunk_x, min_chunk_y, min_chunk_z, max_chunk_x, max_chunk_y, max_chunk_z);
-
-    if (decompress_result != Z_OK)
-    {
-        const char* err_str = "Unknown error";
-        switch (decompress_result)
-        {
-            ENUM_SWITCH_CASE(err_str, Z_OK);
-            ENUM_SWITCH_CASE(err_str, Z_STREAM_END);
-            ENUM_SWITCH_CASE(err_str, Z_NEED_DICT);
-            ENUM_SWITCH_CASE(err_str, Z_ERRNO);
-            ENUM_SWITCH_CASE(err_str, Z_STREAM_ERROR);
-            ENUM_SWITCH_CASE(err_str, Z_DATA_ERROR);
-            ENUM_SWITCH_CASE(err_str, Z_MEM_ERROR);
-            ENUM_SWITCH_CASE(err_str, Z_BUF_ERROR);
-            ENUM_SWITCH_CASE(err_str, Z_VERSION_ERROR);
-        default:
-            break;
-        }
-        dc_log_error("Error %d (%s) decompressing chunk data!", decompress_result, err_str);
-    }
-
-    // TODO: Create nonexistent chunks
-    for (chunk_cubic_t* c : level->chunks)
-    {
-        if (!BETWEEN_INCL(c->pos.x, min_chunk_x, max_chunk_x))
-            continue;
-        if (!BETWEEN_INCL(c->pos.y, min_chunk_y, max_chunk_y))
-            continue;
-        if (!BETWEEN_INCL(c->pos.z, min_chunk_z, max_chunk_z))
-            continue;
-
-        for (int x = 0; x < SUBCHUNK_SIZE_X; x++)
-        {
-            const int block_x = x + ((c->pos.x) << 4);
-            if (!BETWEEN_INCL(block_x, min_block_x, max_block_x))
-                continue;
-            const int uncompressed_x = block_x - min_block_x;
-
-            for (int z = 0; z < SUBCHUNK_SIZE_Z; z++)
-            {
-                const int block_z = z + ((c->pos.z) << 4);
-                if (!BETWEEN_INCL(block_z, min_block_z, max_block_z))
-                    continue;
-                const int uncompressed_z = block_z - min_block_z;
-
-                for (int y = 0; y < SUBCHUNK_SIZE_Y; y++)
-                {
-                    const int block_y = y + ((c->pos.y) << 4);
-                    if (!BETWEEN_INCL(block_y, min_block_y, max_block_y))
-                        continue;
-                    const int uncompressed_y = block_y - min_block_y;
-
-                    size_t index = uncompressed_y + (uncompressed_z * (real_size_y)) + (uncompressed_x * (real_size_y) * (real_size_z));
-                    Uint8 type = uncompressed[index];
-
-                    index += real_volume * 2;
-                    Uint8 meta;
-                    if (index % 2 == 1)
-                        meta = (uncompressed[index / 2] >> 4) & 0x0F;
-                    else
-                        meta = uncompressed[index / 2] & 0x0F;
-
-                    index += real_volume;
-                    Uint8 light_block;
-                    if (index % 2 == 1)
-                        light_block = (uncompressed[index / 2] >> 4) & 0x0F;
-                    else
-                        light_block = uncompressed[index / 2] & 0x0F;
-
-                    index += real_volume;
-                    Uint8 light_sky;
-                    if (index % 2 == 1)
-                        light_sky = (uncompressed[index / 2] >> 4) & 0x0F;
-                    else
-                        light_sky = uncompressed[index / 2] & 0x0F;
-
-                    c->set_type(x, y, z, type);
-                    c->set_metadata(x, y, z, meta);
-                    c->set_light_block(x, y, z, light_block);
-                    c->set_light_sky(x, y, z, light_sky);
-                }
-            }
-        }
-
-        c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
-    }
-}
-#pragma GCC pop_options
-
-static entity_base_t* get_ent(jint eid)
-{
-    auto it = level->entities.find(eid);
-    if (it == level->entities.end())
-        it = level->entities.insert(it, std::make_pair(eid, new entity_base_t()));
-    return it->second;
-}
+static glm::vec3 camera_front = glm::vec3(0.0f, 0.0f, -1.0f);
+static glm::vec3 camera_up = glm::vec3(0.0f, 1.0f, 0.0f);
 
 void normal_loop()
 {
-
-    if (connection->status == connection_t::CONNECTION_ACTIVE)
-    {
-        static bool sent_init = false;
-        static Uint64 last_update_tick_build = 0;
-        static Uint64 last_update_tick_camera = 0;
-
-        if (!sent_init)
-        {
-            packet_handshake_c2s_t pack_handshake;
-
-            pack_handshake.username = cvr_username.get();
-
-            sent_init = send_buffer(connection->socket, pack_handshake.assemble());
-            connection->set_status("connect.connecting");
-        }
-        Uint64 sdl_start_tick = SDL_GetTicks();
-        packet_t* pack_from_server = NULL;
-        while (SDL_GetTicks() - sdl_start_tick < (connection->in_world ? 25 : 150) && connection->status == connection_t::CONNECTION_ACTIVE
-            && (pack_from_server = connection->pack_handler_client.get_next_packet(connection->socket)))
-        {
-#define CAST_PACK_TO_P(type) type* p = (type*)pack_from_server
-#define CAST_ENT_TO_E(type) type* e = (type*)get_ent(p->eid);
-            Uint8 pack_type = pack_from_server->id;
-            switch ((packet_id_t)pack_type)
-            {
-            case PACKET_ID_KEEP_ALIVE:
-            {
-                send_buffer(connection->socket, pack_from_server->assemble());
-                break;
-            }
-            case PACKET_ID_HANDSHAKE:
-            {
-                packet_login_request_c2s_t login_request;
-
-                /* The idea is to maybe implement spectator mode and maybe 1.3+ style plugin channels */
-                const char ext_magic[] = "B181_EXT";
-                const int ext_ver = 0;
-                static_assert(sizeof(ext_magic) == 9, "Client id must be 8 characters (excluding terminator)");
-
-                login_request.unused0 = SDL_Swap64LE(*(jlong*)ext_magic);
-                login_request.unused1 = ext_ver;
-                login_request.protocol_ver = 17;
-                login_request.username = cvr_username.get();
-
-                send_buffer(connection->socket, login_request.assemble());
-                connection->set_status("connect.authorizing");
-                break;
-            }
-            case PACKET_ID_LOGIN_REQUEST:
-            {
-                CAST_PACK_TO_P(packet_login_request_s2c_t);
-
-                level->world_height = p->world_height;
-                if (p->dimension == -1)
-                    level->lightmap.set_preset(lightmap_t::LIGHTMAP_PRESET_NETHER);
-                else
-                    level->lightmap.set_preset(lightmap_t::LIGHTMAP_PRESET_OVERWORLD);
-
-                connection->set_status("multiplayer.downloadingTerrain");
-
-                break;
-            }
-            case PACKET_ID_UPDATE_TIME:
-            {
-                CAST_PACK_TO_P(packet_time_update_t);
-                level->lightmap.set_world_time(p->time);
-                break;
-            }
-            case PACKET_ID_PLAYER_LOOK:
-            {
-                CAST_PACK_TO_P(packet_player_look_t);
-
-                pitch = SDL_clamp(-p->pitch, -89.0f, 89.0f);
-                yaw = p->yaw + 90.0f;
-                last_update_tick_camera = 0;
-
-                break;
-            }
-            case PACKET_ID_PLAYER_POS:
-            {
-                CAST_PACK_TO_P(packet_player_pos_t);
-
-                level->camera_pos = { p->x, p->y, p->z };
-                last_update_tick_camera = 0;
-
-                break;
-            }
-            case PACKET_ID_PLAYER_POS_LOOK:
-            {
-                CAST_PACK_TO_P(packet_player_pos_look_s2c_t);
-
-                level->camera_pos = { p->x, p->y, p->z };
-                pitch = SDL_clamp(-p->pitch, -89.0f, 89.0f);
-                yaw = p->yaw + 90.0f;
-
-                connection->in_world = true;
-                connection->set_status("");
-                last_update_tick_camera = 0;
-
-                break;
-            }
-            case PACKET_ID_CHUNK_CACHE:
-            {
-                CAST_PACK_TO_P(packet_chunk_cache_t);
-
-                int max_cy = (level->world_height + SUBCHUNK_SIZE_Y - 1) / SUBCHUNK_SIZE_Y;
-
-                if (!p->mode)
-                {
-
-                    for (std::vector<chunk_cubic_t*>::iterator it = level->chunks.begin(); it != level->chunks.end();)
-                    {
-                        chunk_cubic_t* c = *it;
-                        if (c->pos.x == p->chunk_x && c->pos.z == p->chunk_z && 0 <= c->pos.y && c->pos.y < max_cy)
-                            it = level->chunks.erase(it);
-                        else
-                            it = std::next(it);
-                    }
-                }
-                else
-                {
-                    std::vector<int> exists;
-                    exists.resize(max_cy);
-                    for (chunk_cubic_t* c : level->chunks)
-                        if (c->pos.x == p->chunk_x && c->pos.z == p->chunk_z && 0 <= c->pos.y && c->pos.y < max_cy)
-                            exists[c->pos.y] = 1;
-
-                    for (int i = 0; i < max_cy; i++)
-                    {
-                        if (exists[i])
-                            continue;
-                        chunk_cubic_t* c = new chunk_cubic_t();
-                        c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_NONE;
-                        c->pos.x = p->chunk_x;
-                        c->pos.y = i;
-                        c->pos.z = p->chunk_z;
-                        level->chunks.push_back(c);
-                    }
-                }
-                break;
-            }
-            case PACKET_ID_BLOCK_CHANGE:
-            {
-                CAST_PACK_TO_P(packet_block_change_t);
-
-                glm::ivec3 block_pos = { p->block_x, p->block_y, p->block_z };
-                level->set_block(block_pos, p->type, p->metadata);
-
-                /* Mark as fulfilled to delay erasing until after packet handling is finished */
-                for (tentative_block_t& it : tentative_blocks)
-                {
-                    if (it.fullfilled || it.pos != block_pos)
-                        continue;
-                    it.fullfilled = 1;
-                    break;
-                }
-                break;
-            }
-            case PACKET_ID_BLOCK_CHANGE_MULTI:
-            {
-                CAST_PACK_TO_P(packet_block_change_multi_t);
-
-                for (block_change_dat_t b : p->payload)
-                {
-                    glm::ivec3 block_pos = { p->chunk_x * CHUNK_SIZE_X + b.x, b.y, p->chunk_z * CHUNK_SIZE_Z + b.z };
-                    level->set_block(block_pos, b.type, b.metadata);
-
-                    /* Mark as fulfilled to delay erasing until after packet handling is finished */
-                    for (tentative_block_t& it : tentative_blocks)
-                    {
-                        if (it.fullfilled || it.pos != block_pos)
-                            continue;
-                        it.fullfilled = 1;
-                    }
-                }
-                break;
-            }
-            case PACKET_ID_CHUNK_MAP:
-            {
-                CAST_PACK_TO_P(packet_chunk_t);
-                static std::vector<Uint8> buf;
-                decompress_chunk_packet(p, buf);
-
-                /* Mark as fulfilled to delay erasing until after packet handling is finished */
-                for (tentative_block_t& it : tentative_blocks)
-                {
-                    if (it.fullfilled)
-                        continue;
-                    if (!BETWEEN_INCL(it.pos.x, p->block_x, p->block_x + p->size_x))
-                        continue;
-                    if (!BETWEEN_INCL(it.pos.y, p->block_y, p->block_y + p->size_y))
-                        continue;
-                    if (!BETWEEN_INCL(it.pos.z, p->block_z, p->block_z + p->size_z))
-                        continue;
-                    it.fullfilled = 1;
-                }
-
-                break;
-            }
-
-            case PACKET_ID_CHAT_MSG:
-            {
-                CAST_PACK_TO_P(packet_chat_message_t);
-                dc_log("[CHAT]: %s", p->msg.c_str());
-                break;
-            }
-
-            case PACKET_ID_KICK:
-            {
-                CAST_PACK_TO_P(packet_kick_t);
-                connection->set_status("disconnect.lost", p->reason);
-                break;
-            }
-            case PACKET_ID_WINDOW_SET_ITEMS:
-            {
-                CAST_PACK_TO_P(packet_window_items_t);
-
-                switch (p->window_id)
-                {
-                case WINDOW_ID_INVENTORY:
-                    p->payload.resize(SDL_min(p->payload.size(), SDL_arraysize(level->inventory.items)));
-                    for (size_t i = 0; i < p->payload.size(); i++)
-                        level->inventory.items[i].id = i;
-
-                    break;
-                default:
-                    dc_log_error("Unknown window id %d", p->window_id);
-                    break;
-                }
-
-                break;
-            }
-            case PACKET_ID_WINDOW_SET_SLOT:
-            {
-                CAST_PACK_TO_P(packet_window_set_slot_t);
-
-                switch (p->window_id)
-                {
-                case WINDOW_ID_INVENTORY:
-                    if (p->slot < 0 || IM_ARRAYSIZE(level->inventory.items) < p->slot)
-                        break;
-                    level->inventory.items[p->slot] = p->item;
-                    break;
-                default:
-                    dc_log_error("Unknown window id %d", p->window_id);
-                    break;
-                }
-
-                break;
-            }
-            case PACKET_ID_ENT_DESTROY:
-            {
-                CAST_PACK_TO_P(packet_ent_destroy_t);
-                auto it = level->entities.find(p->eid);
-                if (it != level->entities.end())
-                    level->entities.erase(it);
-                break;
-            }
-            case PACKET_ID_ENT_VELOCITY:
-            {
-                CAST_PACK_TO_P(packet_ent_velocity_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->vel = { p->vel_x, p->vel_y, p->vel_z };
-                break;
-            }
-            case PACKET_ID_ENT_ENSURE_SPAWN:
-            {
-                CAST_PACK_TO_P(packet_ent_create_t);
-                get_ent(p->eid);
-                break;
-            }
-            /* TODO: Handle beyond missing */
-            case PACKET_ID_THUNDERBOLT:
-            {
-                CAST_PACK_TO_P(packet_thunder_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->id = ENT_ID_THUNDERBOLT;
-                e->pos = glm::ivec3(p->x, p->y, p->z) << 10;
-                break;
-            }
-            /* TODO: Handle beyond missing */
-            case PACKET_ID_ADD_OBJ:
-            {
-                CAST_PACK_TO_P(packet_add_obj_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->id = entity_base_t::mc_id_to_id(p->obj_type, 1);
-                e->pos = glm::ivec3(p->x, p->y, p->z) << 10;
-                break;
-            }
-            /* TODO: Handle beyond missing */
-            case PACKET_ID_ENT_SPAWN_MOB:
-            {
-                CAST_PACK_TO_P(packet_ent_spawn_mob_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->id = entity_base_t::mc_id_to_id(p->type, 0);
-                e->pos = glm::ivec3(p->x, p->y, p->z) << 10;
-                e->yaw = p->yaw * 360.0f / 256.0f;
-                e->pitch = p->pitch * 360.0f / 256.0f;
-                break;
-            }
-            /* TODO: Handle beyond missing */
-            case PACKET_ID_ENT_SPAWN_XP:
-            {
-                CAST_PACK_TO_P(packet_ent_spawn_xp_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->id = ENT_ID_XP;
-                e->pos = glm::ivec3(p->x, p->y, p->z) << 10;
-                break;
-            }
-            /* TODO: Handle beyond missing */
-            case PACKET_ID_ENT_SPAWN_PICKUP:
-            {
-                CAST_PACK_TO_P(packet_ent_spawn_pickup_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->id = ENT_ID_ITEM;
-                e->pos = glm::ivec3(p->x, p->y, p->z) << 10;
-                e->yaw = p->rotation * 360.0f / 256.0f;
-                e->pitch = p->pitch * 360.0f / 256.0f;
-                break;
-            }
-            /* TODO: Handle beyond missing */
-            case PACKET_ID_ENT_SPAWN_PAINTING:
-            {
-                CAST_PACK_TO_P(packet_ent_spawn_painting_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->id = ENT_ID_PAINTING;
-                e->pos = (glm::ivec3(p->center_x, p->center_y, p->center_z) * 32 + glm::ivec3(16)) << 10;
-                e->yaw = p->direction * 90.0f;
-                break;
-            }
-            /* TODO: Handle beyond missing */
-            case PACKET_ID_ENT_SPAWN_NAMED:
-            {
-                CAST_PACK_TO_P(packet_ent_spawn_named_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->id = ENT_ID_ITEM;
-                e->pos = glm::ivec3(p->x, p->y, p->z) << 10;
-                e->yaw = p->rotation * 360.0f / 256.0f;
-                e->pitch = p->pitch * 360.0f / 256.0f;
-                break;
-            }
-            case PACKET_ID_ENT_MOVE_REL:
-            {
-                CAST_PACK_TO_P(packet_ent_move_rel_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->pos += glm::ivec3(p->delta_x, p->delta_y, p->delta_z) << 10;
-                break;
-            }
-            case PACKET_ID_ENT_LOOK:
-            {
-                CAST_PACK_TO_P(packet_ent_look_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->yaw = p->yaw * 360.0f / 256.0f;
-                e->pitch = p->pitch * 360.0f / 256.0f;
-                break;
-            }
-            case PACKET_ID_ENT_LOOK_MOVE_REL:
-            {
-                CAST_PACK_TO_P(packet_ent_look_move_rel_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->pos += glm::ivec3(p->delta_x, p->delta_y, p->delta_z) << 10;
-                e->yaw = p->yaw * 360.0f / 256.0f;
-                e->pitch = p->pitch * 360.0f / 256.0f;
-                break;
-            }
-            case PACKET_ID_ENT_MOVE_TELEPORT:
-            {
-                CAST_PACK_TO_P(packet_ent_teleport_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->pos = glm::ivec3(p->x, p->y, p->z) << 10;
-                e->yaw = p->rotation * 360.0f / 256.0f;
-                e->pitch = p->pitch * 360.0f / 256.0f;
-                break;
-            }
-            case PACKET_ID_PLAYER_LIST_ITEM:
-                break;
-            default:
-                dc_log_error("Unknown packet from server with id: 0x%02x", pack_type);
-                break;
-            }
-            connection->pack_handler_client.free_packet(pack_from_server);
-        }
-
-        if (connection->in_world)
-        {
-            if (SDL_GetTicks() - last_update_tick_camera > 50)
-            {
-                packet_player_pos_look_c2s_t location_response;
-                location_response.x = level->camera_pos.x;
-                location_response.y = level->camera_pos.y;
-                location_response.stance = level->camera_pos.y + 1.0f;
-                location_response.z = level->camera_pos.z;
-
-                location_response.pitch = -pitch;
-                location_response.yaw = yaw - 90.0f;
-
-                send_buffer(connection->socket, location_response.assemble());
-                last_update_tick_camera = SDL_GetTicks();
-            }
-            if (SDL_GetTicks() - last_update_tick_build > 50)
-            {
-                level->build_dirty_meshes();
-                last_update_tick_build = SDL_GetTicks();
-            }
-        }
-    }
+    if (connection && level)
+        connection->run(level);
 
     level->lightmap.update();
 
     level->get_terrain()->update();
-
-    const Uint64 time_tentative = SDL_GetTicks();
-    for (std::vector<tentative_block_t>::iterator it = tentative_blocks.begin(); it != tentative_blocks.end();)
-    {
-        if (time_tentative - it->timestamp < 5000)
-            it = next(it);
-        else
-        {
-            if (!it->fullfilled)
-                level->set_block(it->pos, it->old.id, it->old.damage);
-            it = tentative_blocks.erase(it);
-        }
-    }
 
     if (SDL_GetWindowMouseGrab(tetra::window) != mouse_grabbed)
         SDL_SetWindowMouseGrab(tetra::window, mouse_grabbed);
@@ -978,13 +301,13 @@ void normal_loop()
     float camera_speed = 3.5f * delta_time * (held_ctrl ? 4.0f : 1.0f);
 
     if (held_w)
-        level->camera_pos += camera_speed * glm::vec3(SDL_cosf(glm::radians(yaw)), 0, SDL_sinf(glm::radians(yaw)));
+        level->camera_pos += camera_speed * glm::vec3(SDL_cosf(glm::radians(level->yaw)), 0, SDL_sinf(glm::radians(level->yaw)));
     if (held_s)
-        level->camera_pos -= camera_speed * glm::vec3(SDL_cosf(glm::radians(yaw)), 0, SDL_sinf(glm::radians(yaw)));
+        level->camera_pos -= camera_speed * glm::vec3(SDL_cosf(glm::radians(level->yaw)), 0, SDL_sinf(glm::radians(level->yaw)));
     if (held_a)
-        level->camera_pos -= camera_speed * glm::vec3(-SDL_sinf(glm::radians(yaw)), 0, SDL_cosf(glm::radians(yaw)));
+        level->camera_pos -= camera_speed * glm::vec3(-SDL_sinf(glm::radians(level->yaw)), 0, SDL_cosf(glm::radians(level->yaw)));
     if (held_d)
-        level->camera_pos += camera_speed * glm::vec3(-SDL_sinf(glm::radians(yaw)), 0, SDL_cosf(glm::radians(yaw)));
+        level->camera_pos += camera_speed * glm::vec3(-SDL_sinf(glm::radians(level->yaw)), 0, SDL_cosf(glm::radians(level->yaw)));
     if (held_space)
         level->camera_pos.y += camera_speed;
     if (held_shift)
@@ -1008,9 +331,9 @@ void normal_loop()
     shader->set_projection(mat_proj);
 
     glm::vec3 direction;
-    direction.x = SDL_cosf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
-    direction.y = SDL_sinf(glm::radians(pitch));
-    direction.z = SDL_sinf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
+    direction.x = SDL_cosf(glm::radians(level->yaw)) * SDL_cosf(glm::radians(level->pitch));
+    direction.y = SDL_sinf(glm::radians(level->pitch));
+    direction.z = SDL_sinf(glm::radians(level->yaw)) * SDL_cosf(glm::radians(level->pitch));
     camera_front = glm::normalize(direction);
 
     glm::mat4 mat_cam = glm::lookAt(level->camera_pos, level->camera_pos + camera_front, camera_up);
@@ -1107,19 +430,19 @@ void process_event(SDL_Event& event, bool* done)
         {
             // TODO: Add place block function
             glm::vec3 cam_dir;
-            cam_dir.x = SDL_cosf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
-            cam_dir.y = SDL_sinf(glm::radians(pitch));
-            cam_dir.z = SDL_sinf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
+            cam_dir.x = SDL_cosf(glm::radians(level->yaw)) * SDL_cosf(glm::radians(level->pitch));
+            cam_dir.y = SDL_sinf(glm::radians(level->pitch));
+            cam_dir.z = SDL_sinf(glm::radians(level->yaw)) * SDL_cosf(glm::radians(level->pitch));
             glm::ivec3 cam_pos = level->camera_pos + glm::normalize(cam_dir) * 2.5f;
 
             if (event.button.button == 1)
             {
-                tentative_block_t t;
+                connection_t::tentative_block_t t;
                 t.timestamp = SDL_GetTicks();
                 t.pos = cam_pos;
                 if (level->get_block(t.pos, t.old) && t.old.id != BLOCK_ID_AIR)
                 {
-                    tentative_blocks.push_back(t);
+                    connection->tentative_blocks.push_back(t);
                     level->set_block(t.pos, BLOCK_ID_AIR, 0);
 
                     packet_player_dig_t p;
@@ -1139,7 +462,7 @@ void process_event(SDL_Event& event, bool* done)
             }
             else if (event.button.button == 3)
             {
-                tentative_block_t t;
+                connection_t::tentative_block_t t;
                 t.timestamp = SDL_GetTicks();
                 t.pos = cam_pos;
                 itemstack_t hand = level->inventory.items[level->inventory.hotbar_sel];
@@ -1148,7 +471,7 @@ void process_event(SDL_Event& event, bool* done)
                 {
                     if (mc_id::is_block(hand.id))
                     {
-                        tentative_blocks.push_back(t);
+                        connection->tentative_blocks.push_back(t);
                         level->set_block(t.pos, hand);
                     }
 
@@ -1190,15 +513,15 @@ void process_event(SDL_Event& event, bool* done)
 
         if (event.motion.yrel != 0.0f)
         {
-            pitch -= event.motion.yrel * sensitivity;
-            if (pitch > 89.0f)
-                pitch = 89.0f;
-            if (pitch < -89.0f)
-                pitch = -89.0f;
+            level->pitch -= event.motion.yrel * sensitivity;
+            if (level->pitch > 89.0f)
+                level->pitch = 89.0f;
+            if (level->pitch < -89.0f)
+                level->pitch = -89.0f;
         }
 
         if (event.motion.xrel != 0.0f)
-            yaw = SDL_fmodf(yaw + event.motion.xrel * sensitivity, 360.0f);
+            level->yaw = SDL_fmodf(level->yaw + event.motion.xrel * sensitivity, 360.0f);
     }
 
     if (event.type == SDL_EVENT_KEY_DOWN)
@@ -1705,8 +1028,8 @@ int main(const int argc, const char** argv)
 
                 ImGui::Text("Camera: <%.1f, %.1f, %.1f>", level->camera_pos.x, level->camera_pos.y, level->camera_pos.z);
 
-                ImGui::SliderFloat("Camera Pitch", &pitch, -89.0f, 89.0f);
-                ImGui::SliderFloat("Camera Yaw", &yaw, 0.0f, 360.0f);
+                ImGui::SliderFloat("Camera Pitch", &level->pitch, -89.0f, 89.0f);
+                ImGui::SliderFloat("Camera Yaw", &level->yaw, 0.0f, 360.0f);
                 ImGui::InputFloat("Camera X", &level->camera_pos.x, 1.0f);
                 ImGui::InputFloat("Camera Y", &level->camera_pos.y, 1.0f);
                 ImGui::InputFloat("Camera Z", &level->camera_pos.z, 1.0f);
@@ -1751,8 +1074,6 @@ int main(const int argc, const char** argv)
 
                 ImGui::End();
             }
-
-            connection->step_to_active();
 
             normal_loop();
 
