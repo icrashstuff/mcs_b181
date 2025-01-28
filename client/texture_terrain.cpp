@@ -21,9 +21,10 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#include "texture_terrain.h"
-
+#define MCS_B181_CLIENT_TEXTURE_IDS_H_IMPL
 #include "texture_ids.h"
+
+#include "texture_terrain.h"
 
 #define STBRP_STATIC
 #include "tetra/gui/console.h"

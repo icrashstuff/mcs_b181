@@ -59,11 +59,17 @@ struct terrain_face_t
 {
     glm::vec2 corners[4];
 };
+
+#define MCS_B181_CLIENT_TEXTURE_IDS_H_FUNC
+
 """
 
 header_footer = """
 }
-#endif
+
+#undef MCS_B181_CLIENT_TEXTURE_IDS_H_FUNC
+
+#endif /* MCS_B181_CLIENT_TEXTURE_IDS_H */
 """
 
 class texture_t:
@@ -303,7 +309,17 @@ if __name__ == "__main__":
     out("\n\tFACE_COUNT")
     out("};\n")
 
-    out("static const char* get_face_id_name(const terrain_face_id_t id)")
+    out("\n")
+    out("MCS_B181_CLIENT_TEXTURE_IDS_H_FUNC const char* get_face_id_name(const terrain_face_id_t id);")
+    out("MCS_B181_CLIENT_TEXTURE_IDS_H_FUNC const char* get_face_fname(const terrain_face_id_t id);")
+    out("MCS_B181_CLIENT_TEXTURE_IDS_H_FUNC terrain_face_id_t get_face_from_fname(const char* filename);")
+    out("MCS_B181_CLIENT_TEXTURE_IDS_H_FUNC const terrain_face_t get_face_sub_coords(const terrain_face_id_t id);")
+
+    out("\n")
+    out("#ifdef MCS_B181_CLIENT_TEXTURE_IDS_H_IMPL")
+    out("\n")
+
+    out("MCS_B181_CLIENT_TEXTURE_IDS_H_FUNC const char* get_face_id_name(const terrain_face_id_t id)")
     out("{")
     out("\tswitch(id)")
     out("\t{")
@@ -316,7 +332,7 @@ if __name__ == "__main__":
     out("\treturn NULL;")
     out("}\n")
 
-    out("static const char* get_face_fname(const terrain_face_id_t id)")
+    out("MCS_B181_CLIENT_TEXTURE_IDS_H_FUNC const char* get_face_fname(const terrain_face_id_t id)")
     out("{")
     out("\tswitch(id)")
     out("\t{")
@@ -326,7 +342,7 @@ if __name__ == "__main__":
     out("\treturn NULL;")
     out("}\n")
 
-    out("static const terrain_face_id_t get_face_from_fname(const char* filename)")
+    out("MCS_B181_CLIENT_TEXTURE_IDS_H_FUNC terrain_face_id_t get_face_from_fname(const char* filename)")
     out("{")
     out("\tif(filename == NULL) return FACE_DEBUG;")
     out("\tsize_t len = strlen(filename);")
@@ -335,7 +351,7 @@ if __name__ == "__main__":
     out("\treturn FACE_DEBUG;")
     out("}\n")
 
-    out("static const terrain_face_t get_face_sub_coords(const terrain_face_id_t id)")
+    out("MCS_B181_CLIENT_TEXTURE_IDS_H_FUNC const terrain_face_t get_face_sub_coords(const terrain_face_id_t id)")
     out("{")
     out("\tswitch(id)")
     out("\t{")
@@ -351,5 +367,6 @@ if __name__ == "__main__":
     out("\t}")
     out("}\n")
 
+    out("#endif /* MCS_B181_CLIENT_TEXTURE_IDS_H_IMPL */")
 
     out(header_footer)

@@ -37,6 +37,8 @@ struct terrain_face_t
     glm::vec2 corners[4];
 };
 
+#define MCS_B181_CLIENT_TEXTURE_IDS_H_FUNC
+
 enum terrain_face_id_t
 {
 
@@ -255,7 +257,14 @@ enum terrain_face_id_t
     FACE_COUNT
 };
 
-static const char* get_face_id_name(const terrain_face_id_t id)
+MCS_B181_CLIENT_TEXTURE_IDS_H_FUNC const char* get_face_id_name(const terrain_face_id_t id);
+MCS_B181_CLIENT_TEXTURE_IDS_H_FUNC const char* get_face_fname(const terrain_face_id_t id);
+MCS_B181_CLIENT_TEXTURE_IDS_H_FUNC terrain_face_id_t get_face_from_fname(const char* filename);
+MCS_B181_CLIENT_TEXTURE_IDS_H_FUNC const terrain_face_t get_face_sub_coords(const terrain_face_id_t id);
+
+#ifdef MCS_B181_CLIENT_TEXTURE_IDS_H_IMPL
+
+MCS_B181_CLIENT_TEXTURE_IDS_H_FUNC const char* get_face_id_name(const terrain_face_id_t id)
 {
     switch (id)
     {
@@ -685,7 +694,7 @@ static const char* get_face_id_name(const terrain_face_id_t id)
     return NULL;
 }
 
-static const char* get_face_fname(const terrain_face_id_t id)
+MCS_B181_CLIENT_TEXTURE_IDS_H_FUNC const char* get_face_fname(const terrain_face_id_t id)
 {
     switch (id)
     {
@@ -1109,7 +1118,7 @@ static const char* get_face_fname(const terrain_face_id_t id)
     return NULL;
 }
 
-static const terrain_face_id_t get_face_from_fname(const char* filename)
+MCS_B181_CLIENT_TEXTURE_IDS_H_FUNC terrain_face_id_t get_face_from_fname(const char* filename)
 {
     if (filename == NULL)
         return FACE_DEBUG;
@@ -1533,7 +1542,7 @@ static const terrain_face_id_t get_face_from_fname(const char* filename)
     return FACE_DEBUG;
 }
 
-static const terrain_face_t get_face_sub_coords(const terrain_face_id_t id)
+MCS_B181_CLIENT_TEXTURE_IDS_H_FUNC const terrain_face_t get_face_sub_coords(const terrain_face_id_t id)
 {
     switch (id)
     {
@@ -1542,5 +1551,9 @@ static const terrain_face_t get_face_sub_coords(const terrain_face_id_t id)
     }
 }
 
+#endif /* MCS_B181_CLIENT_TEXTURE_IDS_H_IMPL */
 }
-#endif
+
+#undef MCS_B181_CLIENT_TEXTURE_IDS_H_FUNC
+
+#endif /* MCS_B181_CLIENT_TEXTURE_IDS_H */
