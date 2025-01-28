@@ -296,6 +296,9 @@ void normal_loop()
         held_a = 0;
         held_s = 0;
         held_d = 0;
+        held_space = 0;
+        held_shift = 0;
+        held_ctrl = 0;
     }
 
     float camera_speed = 3.5f * delta_time * (held_ctrl ? 4.0f : 1.0f);
