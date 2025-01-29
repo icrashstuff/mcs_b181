@@ -2243,8 +2243,29 @@ void level_t::render(glm::ivec2 win_size)
 
     shader_terrain->set_uniform("allow_translucency", 0);
 
+    struct
+    {
+        GLboolean blend;
+        GLboolean depth_test;
+        GLboolean depth_mask;
+
+        void restore(GLenum pname, GLboolean i)
+        {
+            void (*fun)(GLenum) = i ? glEnable : glDisable;
+            fun(pname);
+        }
+    } prev_gl_state;
+
+    glGetBooleanv(GL_BLEND, &prev_gl_state.blend);
+    glGetBooleanv(GL_DEPTH_TEST, &prev_gl_state.depth_test);
+    glGetBooleanv(GL_DEPTH_WRITEMASK, &prev_gl_state.depth_mask);
+
+    glDisable(GL_BLEND);
+    glEnable(GL_DEPTH_TEST);
+    glDepthMask(GL_TRUE);
+
     /* Draw opaque geometry from front to back to reduce unnecessary filling
-     * This can actually make a performance difference
+     * This can actually make a performance difference (I tested it)
      */
     for (auto it = chunks.rbegin(); it != chunks.rend(); it = next(it))
     {
@@ -2261,6 +2282,14 @@ void level_t::render(glm::ivec2 win_size)
     render_entities();
 
     shader_terrain->set_uniform("allow_translucency", 1);
+    glUseProgram(shader_terrain->id);
+
+    glEnable(GL_BLEND);
+    glEnable(GL_DEPTH_TEST);
+    /* I am not sure why the internet said to disable depth writes for the translucent pass, but my best guess is that
+     * it decreases overhead by stopping translucent stuff from constantly overwriting the buffer
+     */
+    glDepthMask(GL_FALSE);
 
     for (chunk_cubic_t* c : chunks)
     {
@@ -2272,6 +2301,10 @@ void level_t::render(glm::ivec2 win_size)
         shader_terrain->set_model(glm::translate(glm::mat4(1.0f), translate));
         glDrawElements(GL_TRIANGLES, c->index_count_translucent, c->index_type, (void*)(c->index_count * 4));
     }
+
+    prev_gl_state.restore(GL_BLEND, prev_gl_state.blend);
+    prev_gl_state.restore(GL_DEPTH_TEST, prev_gl_state.depth_test);
+    glDepthMask(prev_gl_state.depth_mask);
 }
 
 level_t::level_t(texture_terrain_t* const _terrain)
