@@ -55,6 +55,8 @@ uniform mat4 model;
 uniform mat4 camera;
 uniform mat4 projection;
 
+uniform vec4 tint = vec4(1.0, 1.0, 1.0, 1.0);
+
 void main()
 {
     vec3 pos;
@@ -66,9 +68,9 @@ void main()
 
     frag_ao = float((vtx_pos_ao >> 27) & 3u) / 3.0;
 
-    frag_color.r = float((vtx_coloring) & 255u) / 255.0;
-    frag_color.g = float((vtx_coloring >> 8) & 255u) / 255.0;
-    frag_color.b = float((vtx_coloring >> 16) & 255u) / 255.0;
+    frag_color.r = tint.r * float((vtx_coloring) & 255u) / 255.0;
+    frag_color.g = tint.g * float((vtx_coloring >> 8) & 255u) / 255.0;
+    frag_color.b = tint.b * float((vtx_coloring >> 16) & 255u) / 255.0;
 
     frag_light_block = float((vtx_coloring >> 24) & 15u) / 15.0;
     frag_light_sky = float((vtx_coloring >> 28) & 15u) / 15.0;
