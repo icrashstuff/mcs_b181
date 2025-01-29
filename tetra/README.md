@@ -12,8 +12,14 @@ This repository contains useful components from an abandoned project of mine tha
   - Copyright (c) 2014-2024 Omar Cornut, and others
   - MIT License (full text under gui/imgui-1.19.1/)
 - PhysicsFS (physfs)
-  - Copyright (c) 2001-2022 Ryan C. Gordon <icculus@icculus.org>, and others
+  - Copyright (c) 2001-2024 Ryan C. Gordon <icculus@icculus.org>, and others
   - Zlib License (full text under util/physfs/physfs-74c3054/)
+- stb_image
+  - Copyright (c) 2006 - 2024 Sean Barrett, and others
+  - MIT License or Unlicense Public Domain (full text under util/stb/stb_image.h)
+- stb_image_write
+  - Copyright (c) 2010 - 2024 Sean Barrett, and others
+  - MIT License or Unlicense Public Domain (full text under util/stb/stb_image_write.h)
 
 ## License
 
@@ -21,7 +27,7 @@ This project "tetra" is licensed under the MIT license
 
 The MIT License (SPDX-License-Identifier: MIT)
 
-Copyright (c) 2022, 2024 Ian Hangartner <icrashstuff at outlook dot com>
+Copyright (c) 2022, 2024 - 2025 Ian Hangartner <icrashstuff at outlook dot com>
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
