@@ -170,22 +170,21 @@ void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z
         return;
     }
 
-    for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_X * SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z; dat_it++)
-    {
-        const int y = (dat_it) & 0x0F;
-        const int z = (dat_it >> 4) & 0x0F;
-        const int x = (dat_it >> 8) & 0x0F;
-        cross.c->set_light_block(x, y, z, mc_id::get_light_level(cross.c->get_type(x, y, z)));
-    }
-
-    for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_X * SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z * 16; dat_it++)
+    Uint32 total = 0;
+    Uint8 min_level = 15;
+    Uint8 max_level = 0;
+    /* Initial scan of light levels */
+    for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_VOLUME; dat_it++)
     {
         const int y = (dat_it) & 0x0F;
         const int z = (dat_it >> 4) & 0x0F;
         const int x = (dat_it >> 8) & 0x0F;
 
-        if (!mc_id::is_transparent(cross.c->get_type(x, y, z)))
+        Uint8 type = cross.c->get_type(x, y, z);
+        if (!mc_id::is_transparent(type))
             continue;
+
+        Uint8 lvl = mc_id::get_light_level(type);
 
         /** Index: +XYZ -XYZ */
         Sint8 sur_levels[6] = { 0 };
@@ -230,6 +229,85 @@ void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z
             break;
         case (SUBCHUNK_SIZE_Z - 1):
             sur_levels[2] = cross.pos_z ? (Sint8(cross.pos_z->get_light_block(x, y, 0)) - 1) : 0;
+            sur_levels[5] = Sint8(cross.c->get_light_block(x, y, z - 1)) - 1;
+            break;
+        default:
+            sur_levels[2] = Sint8(cross.c->get_light_block(x, y, z + 1)) - 1;
+            sur_levels[5] = Sint8(cross.c->get_light_block(x, y, z - 1)) - 1;
+            break;
+        }
+
+        lvl = SDL_max(lvl, cross.c->get_light_block(x, y, z));
+        lvl = SDL_max(lvl, sur_levels[0]);
+        lvl = SDL_max(lvl, sur_levels[1]);
+        lvl = SDL_max(lvl, sur_levels[2]);
+        lvl = SDL_max(lvl, sur_levels[3]);
+        lvl = SDL_max(lvl, sur_levels[4]);
+        lvl = SDL_max(lvl, sur_levels[5]);
+
+        cross.c->set_light_block(x, y, z, lvl);
+        min_level = SDL_min(min_level, lvl);
+        max_level = SDL_max(max_level, lvl);
+        total += lvl;
+    }
+
+    /* If the light level is uniform then no propagation is required for a local pass */
+    if (local_only && total % SUBCHUNK_SIZE_VOLUME == 0)
+        return;
+
+    /* Propagate light */
+    for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_VOLUME * (max_level - min_level); dat_it++)
+    {
+        const int y = (dat_it) & 0x0F;
+        const int z = (dat_it >> 4) & 0x0F;
+        const int x = (dat_it >> 8) & 0x0F;
+
+        if (!mc_id::is_transparent(cross.c->get_type(x, y, z)))
+            continue;
+
+        /** Index: +XYZ -XYZ */
+        Sint8 sur_levels[6] = { 0 };
+
+        switch (x)
+        {
+        case 0:
+            sur_levels[0] = Sint8(cross.c->get_light_block(x + 1, y, z)) - 1;
+            sur_levels[3] = 0;
+            break;
+        case (SUBCHUNK_SIZE_X - 1):
+            sur_levels[0] = 0;
+            sur_levels[3] = Sint8(cross.c->get_light_block(x - 1, y, z)) - 1;
+            break;
+        default:
+            sur_levels[0] = Sint8(cross.c->get_light_block(x + 1, y, z)) - 1;
+            sur_levels[3] = Sint8(cross.c->get_light_block(x - 1, y, z)) - 1;
+            break;
+        }
+
+        switch (y)
+        {
+        case 0:
+            sur_levels[1] = Sint8(cross.c->get_light_block(x, y + 1, z)) - 1;
+            sur_levels[4] = 0;
+            break;
+        case (SUBCHUNK_SIZE_Y - 1):
+            sur_levels[1] = 0;
+            sur_levels[4] = Sint8(cross.c->get_light_block(x, y - 1, z)) - 1;
+            break;
+        default:
+            sur_levels[1] = Sint8(cross.c->get_light_block(x, y + 1, z)) - 1;
+            sur_levels[4] = Sint8(cross.c->get_light_block(x, y - 1, z)) - 1;
+            break;
+        }
+
+        switch (z)
+        {
+        case 0:
+            sur_levels[2] = Sint8(cross.c->get_light_block(x, y, z + 1)) - 1;
+            sur_levels[5] = 0;
+            break;
+        case (SUBCHUNK_SIZE_Z - 1):
+            sur_levels[2] = 0;
             sur_levels[5] = Sint8(cross.c->get_light_block(x, y, z - 1)) - 1;
             break;
         default:

@@ -971,12 +971,24 @@ int main(const int argc, const char** argv)
                 ImGui::InputFloat("Camera Y", &level->camera_pos.y, 1.0f);
                 ImGui::InputFloat("Camera Z", &level->camera_pos.z, 1.0f);
 
-                if (ImGui::Button("Rebuild atlas & meshes"))
+                if (ImGui::Button("Rebuild atlas"))
                 {
                     delete texture_atlas;
                     texture_atlas = new texture_terrain_t("/_resources/assets/minecraft/textures/");
                     level->set_terrain(texture_atlas);
                 }
+
+                ImGui::SameLine();
+                if (ImGui::Button("Mark all meshes for relight"))
+                {
+                    for (chunk_cubic_t* c : level->chunks)
+                        c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
+                }
+
+                ImGui::SameLine();
+                if (ImGui::Button("Build dirty meshes"))
+                    level->build_dirty_meshes();
+
                 ImGui::SameLine();
                 if (ImGui::Button("Clear meshes"))
                     level->clear_mesh(false);
