@@ -77,21 +77,21 @@ struct shader_t
     {
         GLint loc = glGetUniformLocation(id, name.c_str());
         if (loc >= 0)
-            glUniform4fv(loc, 4, glm::value_ptr(a));
+            glUniform4f(loc, a.x, a.y, a.z, a.w);
     }
 
     inline void set_uniform(const std::string name, const glm::vec3 a)
     {
         GLint loc = glGetUniformLocation(id, name.c_str());
         if (loc >= 0)
-            glUniform3fv(loc, 3, glm::value_ptr(a));
+            glUniform3f(loc, a.x, a.y, a.z);
     }
 
     inline void set_uniform(const std::string name, const glm::vec2 a)
     {
         GLint loc = glGetUniformLocation(id, name.c_str());
         if (loc >= 0)
-            glUniform2fv(loc, 2, glm::value_ptr(a));
+            glUniform2f(loc, a.x, a.y);
     }
 
     inline void set_model(const glm::mat4 mat)
