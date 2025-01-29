@@ -53,13 +53,6 @@ void level_t::clear_mesh(const bool free_gl)
     }
 }
 
-void level_t::rebuild_meshes()
-{
-    clear_mesh(false);
-
-    build_dirty_meshes();
-}
-
 void level_t::build_dirty_meshes()
 {
     size_t built;
@@ -71,6 +64,10 @@ void level_t::build_dirty_meshes()
     cmap.clear();
     for (size_t i = 0; i < chunks.size(); i++)
         cmap[chunks[i]->pos] = chunks[i];
+
+    /* "Culling" Pass */
+    for (chunk_cubic_t* c : chunks)
+        c->visible = 1;
 
     /* First Light Pass */
     PASS_TIMER_START();
@@ -431,10 +428,10 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
         }
             BLOCK_SIMPLE(BLOCK_ID_BEDROCK, mc_id::FACE_BEDROCK);
 
-            BLOCK_SIMPLE(BLOCK_ID_WATER_FLOWING, mc_id::FACE_WATER_FLOW);
-            BLOCK_SIMPLE(BLOCK_ID_WATER_SOURCE, mc_id::FACE_WATER_STILL);
-            BLOCK_SIMPLE(BLOCK_ID_LAVA_FLOWING, mc_id::FACE_LAVA_FLOW);
-            BLOCK_SIMPLE(BLOCK_ID_LAVA_SOURCE, mc_id::FACE_LAVA_STILL);
+            // BLOCK_SIMPLE(BLOCK_ID_WATER_FLOWING, mc_id::FACE_WATER_FLOW);
+            // BLOCK_SIMPLE(BLOCK_ID_WATER_SOURCE, mc_id::FACE_WATER_STILL);
+            // BLOCK_SIMPLE(BLOCK_ID_LAVA_FLOWING, mc_id::FACE_LAVA_FLOW);
+            // BLOCK_SIMPLE(BLOCK_ID_LAVA_SOURCE, mc_id::FACE_LAVA_STILL);
 
             BLOCK_SIMPLE(BLOCK_ID_SAND, mc_id::FACE_SAND);
             BLOCK_SIMPLE(BLOCK_ID_GRAVEL, mc_id::FACE_GRAVEL);
@@ -2118,13 +2115,85 @@ void level_t::render_entities()
         }
         glm::mat4 model(1.0f);
         model = glm::translate(model, glm::vec3(e->pos) / 32768.0f);
-        model = glm::scale(model, glm::vec3(1.0f) / 32.0f);
+        model = glm::scale(model, glm::vec3(1.0f) / 24.0f);
         model = glm::rotate(model, glm::radians(-e->pitch), glm::vec3(1.0f, 0.0f, 0.0f));
         model = glm::rotate(model, glm::radians(e->yaw), glm::vec3(0.0f, 1.0f, 0.0f));
         shader_terrain->set_model(model);
         glDrawElements(GL_TRIANGLES, ent_missing_vert_count / 4 * 6, GL_UNSIGNED_INT, 0);
     }
     glBindVertexArray(0);
+}
+
+void level_t::render(glm::ivec2 win_size)
+{
+    glUseProgram(shader_terrain->id);
+    glm::mat4 mat_proj = glm::perspective(glm::radians(fov), (float)win_size.x / (float)win_size.y, 0.03125f, 512.0f);
+    shader_terrain->set_projection(mat_proj);
+
+    glm::vec3 direction;
+    direction.x = SDL_cosf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
+    direction.y = SDL_sinf(glm::radians(pitch));
+    direction.z = SDL_sinf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
+    direction = glm::normalize(direction);
+
+    glm::vec3 camera_up(0.0f, 1.0f, 0.0f);
+
+    glm::mat4 mat_cam = glm::lookAt(camera_pos, camera_pos + direction, camera_up);
+    shader_terrain->set_camera(mat_cam);
+
+    shader_terrain->set_model(glm::mat4(1.0f));
+    shader_terrain->set_uniform("tex_atlas", 0);
+    shader_terrain->set_uniform("tex_lightmap", 1);
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, get_terrain()->tex_id_main);
+    glActiveTexture(GL_TEXTURE1);
+    glBindTexture(GL_TEXTURE_2D, lightmap.tex_id_linear);
+    glActiveTexture(GL_TEXTURE0);
+
+    glm::i64vec3 ent_camera_pos = glm::i64vec3(camera_pos) << 15l;
+
+    glm::dvec3 c2pos(glm::ivec3(ent_camera_pos) >> 19);
+    std::sort(chunks.begin(), chunks.end(), [=](chunk_cubic_t* a, chunk_cubic_t* b) {
+        float adist = glm::distance(glm::dvec3(a->pos), c2pos);
+        float bdist = glm::distance(glm::dvec3(b->pos), c2pos);
+        return adist > bdist;
+    });
+
+    glActiveTexture(GL_TEXTURE0);
+    glBindTexture(GL_TEXTURE_2D, get_terrain()->tex_id_main);
+
+    shader_terrain->set_uniform("allow_translucency", 0);
+
+    /* Draw opaque geometry from front to back to reduce unnecessary filling
+     * This can actually make a performance difference
+     */
+    for (auto it = chunks.rbegin(); it != chunks.rend(); it = next(it))
+    {
+        chunk_cubic_t* c = *it;
+        if (c->index_type == GL_NONE || c->index_count == 0 || !c->visible)
+            continue;
+        assert(c->index_type == GL_UNSIGNED_INT);
+        glBindVertexArray(c->vao);
+        glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
+        shader_terrain->set_model(glm::translate(glm::mat4(1.0f), translate));
+        glDrawElements(GL_TRIANGLES, c->index_count, c->index_type, 0);
+    }
+
+    render_entities();
+
+    shader_terrain->set_uniform("allow_translucency", 1);
+
+    for (chunk_cubic_t* c : chunks)
+    {
+        if (c->index_type == GL_NONE || c->index_count_translucent == 0 || !c->visible)
+            continue;
+        assert(c->index_type == GL_UNSIGNED_INT);
+        glBindVertexArray(c->vao);
+        glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
+        shader_terrain->set_model(glm::translate(glm::mat4(1.0f), translate));
+        glDrawElements(GL_TRIANGLES, c->index_count_translucent, c->index_type, (void*)(c->index_count * 4));
+    }
 }
 
 level_t::level_t(texture_terrain_t* const _terrain)

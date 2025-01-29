@@ -59,13 +59,25 @@ struct chunk_cubic_t
         DIRTY_LEVEL_LIGHT_PASS_INTERNAL,
     };
     dirty_level_t dirty_level = DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
+
+    /**
+     * To be filled in by a culling pass
+     */
+    bool visible = 1;
+
     GLuint vao = 0;
     GLuint vbo = 0;
+    GLuint ebo_translucent = 0;
     /**
      * One of GL_UNSIGNED_INT, GL_UNSIGNED_SHORT, GL_UNSIGNED_BYTE, or GL_NONE
      */
     GLenum index_type = GL_NONE;
     size_t index_count = 0;
+
+    /**
+     * One of GL_UNSIGNED_INT, GL_UNSIGNED_SHORT, GL_UNSIGNED_BYTE, or GL_NONE
+     */
+    GLenum index_type_translucent = GL_NONE;
     size_t index_count_translucent = 0;
 
     const Uint64 time_creation = SDL_GetTicks();

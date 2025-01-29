@@ -63,6 +63,8 @@ static convar_string_t cvr_autoconnect_addr(
 static convar_int_t cvr_autoconnect_port(
     "dev_server_port", 25565, 0, 65535, "Port of server to autoconnect to when dev_autoconnect is specified", CONVAR_FLAG_DEV_ONLY);
 
+static convar_float_t cvr_r_fov_base("r_fov_base", 75.0f, 30.0f, 120.0f, "Base FOV", CONVAR_FLAG_SAVE);
+
 static shader_t* shader = NULL;
 
 static int ao_algorithm = 1;
@@ -252,7 +254,7 @@ const char* engine_state_name(engine_state_t state)
     return "Unknown Engine State";
 }
 
-static float delta_time;
+static float delta_time = 0.0f;
 
 static bool held_w = 0;
 static bool held_a = 0;
@@ -265,22 +267,8 @@ static bool mouse_grabbed = 0;
 static bool wireframe = 0;
 #define AO_ALGO_MAX 5
 
-#define FOV_MAX 77.0f
-#define FOV_MIN 75.0f
-static float fov = FOV_MIN;
-
-static glm::vec3 camera_front = glm::vec3(0.0f, 0.0f, -1.0f);
-static glm::vec3 camera_up = glm::vec3(0.0f, 1.0f, 0.0f);
-
 void normal_loop()
 {
-    if (connection && level)
-        connection->run(level);
-
-    level->lightmap.update();
-
-    level->get_terrain()->update();
-
     if (SDL_GetWindowMouseGrab(tetra::window) != mouse_grabbed)
         SDL_SetWindowMouseGrab(tetra::window, mouse_grabbed);
 
@@ -317,82 +305,28 @@ void normal_loop()
         level->camera_pos.y -= camera_speed;
 
     if (held_ctrl)
-        fov += delta_time * 30.0f;
+        level->fov += delta_time * 30.0f;
     else
-        fov -= delta_time * 30.0f;
+        level->fov -= delta_time * 30.0f;
 
-    if (fov > FOV_MAX)
-        fov = FOV_MAX;
-    else if (fov < FOV_MIN)
-        fov = FOV_MIN;
+    float fov_base = cvr_r_fov_base.get();
 
-    glUseProgram(shader->id);
+    if (level->fov > fov_base + 2.0f)
+        level->fov = fov_base + 2.0f;
+    else if (level->fov < fov_base)
+        level->fov = fov_base;
 
-    int win_width, win_height;
-    SDL_GetWindowSize(tetra::window, &win_width, &win_height);
-    glm::mat4 mat_proj = glm::perspective(glm::radians(fov), (float)win_width / (float)win_height, 0.03125f, 256.0f);
-    shader->set_projection(mat_proj);
+    if (connection && level)
+        connection->run(level);
 
-    glm::vec3 direction;
-    direction.x = SDL_cosf(glm::radians(level->yaw)) * SDL_cosf(glm::radians(level->pitch));
-    direction.y = SDL_sinf(glm::radians(level->pitch));
-    direction.z = SDL_sinf(glm::radians(level->yaw)) * SDL_cosf(glm::radians(level->pitch));
-    camera_front = glm::normalize(direction);
+    level->lightmap.update();
 
-    glm::mat4 mat_cam = glm::lookAt(level->camera_pos, level->camera_pos + camera_front, camera_up);
-    shader->set_camera(mat_cam);
-
-    shader->set_model(glm::mat4(1.0f));
-    shader->set_uniform("tex_atlas", 0);
-    shader->set_uniform("tex_lightmap", 1);
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, level->get_terrain()->tex_id_main);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, level->lightmap.tex_id_linear);
-    glActiveTexture(GL_TEXTURE0);
-
-    glm::dvec3 c2pos(glm::ivec3(level->camera_pos) >> 4);
-    std::sort(level->chunks.begin(), level->chunks.end(), [=](chunk_cubic_t* a, chunk_cubic_t* b) {
-        float adist = glm::distance(glm::dvec3(a->pos), c2pos);
-        float bdist = glm::distance(glm::dvec3(b->pos), c2pos);
-        return adist > bdist;
-    });
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, level->get_terrain()->tex_id_main);
-
-    shader->set_uniform("allow_translucency", 0);
-
-    /* Draw opaque geometry from front to back to reduce unnecessary filling
-     * This can actually make a performance difference
-     */
-    for (auto it = level->chunks.rbegin(); it != level->chunks.rend(); it = next(it))
-    {
-        chunk_cubic_t* c = *it;
-        if (c->index_type == GL_NONE || c->index_count == 0)
-            continue;
-        glBindVertexArray(c->vao);
-        glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
-        shader->set_model(glm::translate(glm::mat4(1.0f), translate));
-        glDrawElements(GL_TRIANGLES, c->index_count, c->index_type, 0);
-    }
+    level->get_terrain()->update();
 
     level->shader_terrain = shader;
-    level->render_entities();
-
-    shader->set_uniform("allow_translucency", 1);
-
-    for (chunk_cubic_t* c : level->chunks)
-    {
-        if (c->index_type == GL_NONE || c->index_count_translucent == 0)
-            continue;
-        assert(c->index_type == GL_UNSIGNED_INT);
-        glBindVertexArray(c->vao);
-        glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
-        shader->set_model(glm::translate(glm::mat4(1.0f), translate));
-        glDrawElements(GL_TRIANGLES, c->index_count_translucent, c->index_type, (void*)(c->index_count * 4));
-    }
+    glm::ivec2 win_size;
+    SDL_GetWindowSize(tetra::window, &win_size.x, &win_size.y);
+    level->render(win_size);
 }
 
 void process_event(SDL_Event& event, bool* done)
@@ -1043,9 +977,6 @@ int main(const int argc, const char** argv)
                     texture_atlas = new texture_terrain_t("/_resources/assets/minecraft/textures/");
                     level->set_terrain(texture_atlas);
                 }
-                ImGui::SameLine();
-                if (ImGui::Button("Rebuild meshes"))
-                    level->rebuild_meshes();
                 ImGui::SameLine();
                 if (ImGui::Button("Clear meshes"))
                     level->clear_mesh(false);

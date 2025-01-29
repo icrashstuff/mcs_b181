@@ -86,17 +86,14 @@ struct level_t
     shader_t* shader_terrain = NULL;
 
     /**
-     * Builds all dirt meshes
+     * Runs the culling pass and builds all visible/near visible dirty meshes
+     *
+     * TODO: Honor visibility
      * TODO: Throttle rendering based on position
      * TODO: Wait for either a timeout to pass or all surrounding chunks to be loaded before building
      * TODO: Rebuild clean meshes that surround dirty ones
      */
     void build_dirty_meshes();
-
-    /**
-     * Clears chunks meshes without freeing GL resources
-     */
-    void rebuild_meshes();
 
     /**
      * Clears all meshes
@@ -152,9 +149,21 @@ struct level_t
      */
     void clear();
 
-    // TODO
-    void render();
+    /**
+     * Renders the world and entities
+     *
+     * @param win_size Window size (used for projection matrix)
+     */
+    void render(glm::ivec2 win_size);
 
+    glm::vec3 camera_pos = { 0, 0, 0 };
+    float yaw = 0.0f;
+    float pitch = 0.0f;
+    float fov = 70.0f;
+
+    inventory_player_t inventory;
+
+private:
     /**
      * Renders all entities
      *
@@ -162,13 +171,6 @@ struct level_t
      */
     void render_entities();
 
-    glm::vec3 camera_pos = { 0, 0, 0 };
-    float yaw = 0.0f;
-    float pitch = 0.0f;
-
-    inventory_player_t inventory;
-
-private:
     struct ivec3_comparator_t
     {
         bool operator()(const glm::ivec3& a, const glm::ivec3& b)
