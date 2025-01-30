@@ -243,10 +243,15 @@ void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z
         const int x = (dat_it >> 8) & 0x0F;
 
         Uint8 type = cross.c->get_type(x, y, z);
-        if (!mc_id::is_transparent(type))
-            continue;
 
         Uint8 lvl = mc_id::get_light_level(type);
+
+        if (!mc_id::is_transparent(type))
+        {
+            if (lvl != 0)
+                cross.c->set_light_block(x, y, z, lvl);
+            continue;
+        }
 
         /** Index: +XYZ -XYZ */
         Sint8 sur_levels[6] = { 0 };
