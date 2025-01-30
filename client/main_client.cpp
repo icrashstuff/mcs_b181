@@ -129,7 +129,7 @@ void create_testworld()
             c->pos.x = i / world_size - world_size;
             c->pos.z = i % world_size - world_size;
             c->pos.y = j - cvr_world_y_off_neg.get() + cvr_world_y_off_pos.get();
-            level->chunks.push_back(c);
+            level->add_chunk(c);
             for (int x = 0; x < 16; x++)
                 for (int z = 0; z < 16; z++)
                     for (int y = 0; y < 16; y++)
@@ -148,7 +148,7 @@ void create_testworld()
         c->pos.x = i % 4;
         c->pos.y = (i / 4) % 4;
         c->pos.z = (i / 16);
-        level->chunks.push_back(c);
+        level->add_chunk(c);
         for (int x = 0; x < 16; x++)
             for (int z = 0; z < 16; z++)
                 for (int y = 0; y < 16; y++)
@@ -172,7 +172,7 @@ void create_testworld()
         c->pos.x = (i / 12);
         c->pos.y = -2;
         c->pos.z = (i % 12);
-        level->chunks.push_back(c);
+        level->add_chunk(c);
         for (int x = 0; x < 16; x++)
             for (int z = 0; z < 16; z++)
             {
@@ -511,7 +511,7 @@ void process_event(SDL_Event& event, bool* done)
         case SDL_SCANCODE_P:
         {
             glm::ivec3 chunk_coords = glm::ivec3(level->camera_pos) >> 4;
-            for (chunk_cubic_t* c : level->chunks)
+            for (chunk_cubic_t* c : level->get_chunk_vec())
             {
                 if (chunk_coords != c->pos)
                     continue;
@@ -522,7 +522,7 @@ void process_event(SDL_Event& event, bool* done)
         }
         case SDL_SCANCODE_N:
         {
-            for (chunk_cubic_t* c : level->chunks)
+            for (chunk_cubic_t* c : level->get_chunk_vec())
             {
                 glm::ivec3 chunk_coords = glm::ivec3(level->camera_pos) >> 4;
                 if (chunk_coords != c->pos)
@@ -551,7 +551,7 @@ void process_event(SDL_Event& event, bool* done)
         case SDL_SCANCODE_M:
         {
             glm::ivec3 chunk_coords = glm::ivec3(level->camera_pos) >> 4;
-            for (chunk_cubic_t* c : level->chunks)
+            for (chunk_cubic_t* c : level->get_chunk_vec())
             {
                 if (SDL_abs(chunk_coords.x - c->pos.x) > 1 || SDL_abs(chunk_coords.y - c->pos.y) > 1 || SDL_abs(chunk_coords.z - c->pos.z) > 1)
                     continue;
@@ -996,7 +996,7 @@ int main(const int argc, const char** argv)
                 ImGui::SameLine();
                 if (ImGui::Button("Mark all meshes for relight"))
                 {
-                    for (chunk_cubic_t* c : level->chunks)
+                    for (chunk_cubic_t* c : level->get_chunk_vec())
                         c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
                 }
 

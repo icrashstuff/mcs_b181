@@ -120,11 +120,6 @@ void level_t::build_dirty_meshes()
     Uint64 tick_start;
     const Uint64 tick_func_start_ms = SDL_GetTicks();
 
-    /* Ensure chunk map is correct (TODO: level_t needs a add/remove chunk system) */
-    cmap.clear();
-    for (size_t i = 0; i < chunks.size(); i++)
-        cmap[chunks[i]->pos] = chunks[i];
-
     /* First Light Pass */
     PASS_TIMER_START();
     for (auto it = chunks.rbegin(); it != chunks.rend(); it++)
@@ -2034,14 +2029,6 @@ void level_t::set_block(const glm::ivec3 pos, const block_id_t type, const Uint8
         return;
     }
 
-    /* Ensure chunk map is correct (TODO: level_t needs a add/remove chunk system) */
-    if (chunks.size() != cmap.size())
-    {
-        cmap.clear();
-        for (chunk_cubic_t* c : chunks)
-            cmap[c->pos] = c;
-    }
-
     /* Attempt to find chunk */
     glm::ivec3 chunk_pos = pos >> 4;
     glm::ivec3 block_pos = pos & 0x0F;
@@ -2093,14 +2080,6 @@ void level_t::set_block(const glm::ivec3 pos, const block_id_t type, const Uint8
 
 bool level_t::get_block(const glm::ivec3 pos, block_id_t& type, Uint8& metadata)
 {
-    /* Ensure chunk map is correct (TODO: level_t needs a add/remove chunk system) */
-    if (chunks.size() != cmap.size())
-    {
-        cmap.clear();
-        for (chunk_cubic_t* c : chunks)
-            cmap[c->pos] = c;
-    }
-
     /* Attempt to find chunk */
     glm::ivec3 chunk_pos = pos >> 4;
     glm::ivec3 block_pos = pos & 0x0F;
@@ -2269,9 +2248,9 @@ void level_t::render_entities()
     glBindVertexArray(0);
 }
 
-void level_t::render(glm::ivec2 win_size)
+void level_t::render(const glm::ivec2 win_size)
 {
-    int render_distance = r_render_distance.get();
+    const int render_distance = r_render_distance.get();
 
     cull_chunks(win_size, render_distance);
 
@@ -2370,6 +2349,43 @@ void level_t::render(glm::ivec2 win_size)
     prev_gl_state.restore(GL_BLEND, prev_gl_state.blend);
     prev_gl_state.restore(GL_DEPTH_TEST, prev_gl_state.depth_test);
     glDepthMask(prev_gl_state.depth_mask);
+}
+
+void level_t::remove_chunk(const glm::ivec3 pos)
+{
+    auto it_map = cmap.find(pos);
+
+    chunk_cubic_t* mapped_del = NULL;
+
+    if (it_map != cmap.end())
+    {
+        mapped_del = it_map->second;
+        delete it_map->second;
+        cmap.erase(it_map);
+    }
+
+    for (auto it_vec = chunks.begin(); it_vec != chunks.end();)
+    {
+        if ((*it_vec)->pos != pos)
+            it_vec++;
+        else
+        {
+            if (*it_vec != mapped_del)
+                delete *it_vec;
+            it_vec = chunks.erase(it_vec);
+        }
+    }
+}
+
+void level_t::add_chunk(chunk_cubic_t* const c)
+{
+    if (!c)
+    {
+        dc_log_error("Chunk is NULL!");
+        return;
+    }
+    chunks.push_back(c);
+    cmap[c->pos] = c;
 }
 
 level_t::level_t(texture_terrain_t* const _terrain)

@@ -97,7 +97,7 @@ static void decompress_chunk_packet(level_t* const level, const packet_chunk_t* 
     }
 
     // TODO: Create nonexistent chunks
-    for (chunk_cubic_t* c : level->chunks)
+    for (chunk_cubic_t* c : level->get_chunk_vec())
     {
         if (!BETWEEN_INCL(c->pos.x, min_chunk_x, max_chunk_x))
             continue;
@@ -285,25 +285,18 @@ void connection_t::run(level_t* const level)
             {
                 CAST_PACK_TO_P(packet_chunk_cache_t);
 
-                int max_cy = (level->world_height + SUBCHUNK_SIZE_Y - 1) / SUBCHUNK_SIZE_Y;
+                const int max_cy = (level->world_height + SUBCHUNK_SIZE_Y - 1) / SUBCHUNK_SIZE_Y;
 
                 if (!p->mode)
                 {
-
-                    for (std::vector<chunk_cubic_t*>::iterator it = level->chunks.begin(); it != level->chunks.end();)
-                    {
-                        chunk_cubic_t* c = *it;
-                        if (c->pos.x == p->chunk_x && c->pos.z == p->chunk_z && 0 <= c->pos.y && c->pos.y < max_cy)
-                            it = level->chunks.erase(it);
-                        else
-                            it = std::next(it);
-                    }
+                    for (int i = 0; i < max_cy; i++)
+                        level->remove_chunk(glm::ivec3(p->chunk_x, i, p->chunk_z));
                 }
                 else
                 {
                     std::vector<int> exists;
                     exists.resize(max_cy);
-                    for (chunk_cubic_t* c : level->chunks)
+                    for (chunk_cubic_t* c : level->get_chunk_vec())
                         if (c->pos.x == p->chunk_x && c->pos.z == p->chunk_z && 0 <= c->pos.y && c->pos.y < max_cy)
                             exists[c->pos.y] = 1;
 
@@ -316,7 +309,7 @@ void connection_t::run(level_t* const level)
                         c->pos.x = p->chunk_x;
                         c->pos.y = i;
                         c->pos.z = p->chunk_z;
-                        level->chunks.push_back(c);
+                        level->add_chunk(c);
                     }
                 }
                 break;

@@ -41,11 +41,47 @@
  */
 struct level_t
 {
+    struct ivec3_comparator_t
+    {
+        bool operator()(const glm::ivec3& a, const glm::ivec3& b)
+        {
+            if (a.x < b.x)
+                return true;
+            if (a.x > b.x)
+                return false;
+
+            if (a.y < b.y)
+                return true;
+            if (a.y > b.y)
+                return false;
+
+            return a.z < b.z;
+        }
+    };
+
     level_t(texture_terrain_t* const terrain = NULL);
 
     ~level_t();
 
-    std::vector<chunk_cubic_t*> chunks;
+    /**
+     * Returns the chunk vector for iteration
+     */
+    inline const std::vector<chunk_cubic_t*>& get_chunk_vec() { return chunks; }
+
+    /**
+     * Returns the chunk vector for iteration
+     */
+    inline const std::map<glm::ivec3, chunk_cubic_t*, ivec3_comparator_t>& get_chunk_map() { return cmap; }
+
+    /**
+     * Removes chunk from chunk vector and map, and then deletes it
+     */
+    void remove_chunk(const glm::ivec3 pos);
+
+    /**
+     * Adds chunk to chunk vector and map
+     */
+    void add_chunk(chunk_cubic_t* const c);
 
     std::map<eid_t, entity_base_t*> entities;
 
@@ -147,7 +183,7 @@ struct level_t
      *
      * @param win_size Window size (used for projection matrix)
      */
-    void render(glm::ivec2 win_size);
+    void render(const glm::ivec2 win_size);
 
     glm::vec3 camera_pos = { 0, 0, 0 };
     glm::vec3 camera_direction = { 1, 0, 0 };
@@ -167,26 +203,11 @@ private:
      */
     void render_entities();
 
-    struct ivec3_comparator_t
-    {
-        bool operator()(const glm::ivec3& a, const glm::ivec3& b)
-        {
-            if (a.x < b.x)
-                return true;
-            if (a.x > b.x)
-                return false;
-
-            if (a.y < b.y)
-                return true;
-            if (a.y > b.y)
-                return false;
-
-            return a.z < b.z;
-        }
-    };
-
     /** For quick retrieval of chunks */
     std::map<glm::ivec3, chunk_cubic_t*, ivec3_comparator_t> cmap;
+
+    /* For sorted chunks */
+    std::vector<chunk_cubic_t*> chunks;
 
     /**
      * Runs the culling pass and builds all visible/near visible dirty meshes
