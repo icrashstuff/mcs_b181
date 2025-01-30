@@ -26,6 +26,8 @@
 #include <SDL3/SDL_stdinc.h>
 #include <glm/glm.hpp>
 
+#include "shared/misc.h"
+
 /**
  * This is seperate from minecraft's actual entity id system
  */
@@ -85,6 +87,8 @@ enum entity_id_t : Uint8
     ENT_ID_MAX,
 };
 
+typedef jint eid_t;
+
 struct entity_base_t
 {
     Uint8 id = 0;
@@ -95,7 +99,7 @@ struct entity_base_t
     bool swimming : 1;
     bool on_ground : 1;
 
-    int parent_eid = 0;
+    eid_t parent_eid = 0;
 
     /**
      * Translates a minecraft mob or object ID to an entity_base_t ID
