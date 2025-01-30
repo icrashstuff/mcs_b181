@@ -579,11 +579,6 @@ void connection_t::run(level_t* const level)
                 send_buffer(socket, location_response.assemble());
                 last_update_tick_camera = SDL_GetTicks();
             }
-            if (SDL_GetTicks() - last_update_tick_build > 50)
-            {
-                level->build_dirty_meshes();
-                last_update_tick_build = SDL_GetTicks();
-            }
         }
     }
 
@@ -677,6 +672,20 @@ void connection_t::step_to_active()
             status = CONNECTION_FAILED;
         }
     }
+}
+
+bool connection_t::send_packet(packet_t& pack)
+{
+    if (status == CONNECTION_ACTIVE && socket)
+        return send_buffer(socket, pack.assemble());
+    return false;
+}
+
+bool connection_t::send_packet(packet_t* pack)
+{
+    if (pack && status == CONNECTION_ACTIVE && socket)
+        return send_buffer(socket, pack->assemble());
+    return false;
 }
 
 connection_t::~connection_t()

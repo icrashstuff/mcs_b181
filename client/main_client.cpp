@@ -100,10 +100,11 @@ bool initialize_resources()
 
     level->lightmap.set_world_time(1000);
 
-    connection = new connection_t();
-
     if (cvr_autoconnect.get())
+    {
+        connection = new connection_t();
         connection->init(cvr_autoconnect_addr.get(), cvr_autoconnect_port.get(), cvr_username.get());
+    }
 
     if (!cvr_autoconnect.get() || cvr_testworld.get())
         create_testworld();
@@ -182,6 +183,15 @@ void create_testworld()
         if (c->pos.x == 2 && c->pos.z == 1)
             c->set_type(7, 6, 7, BLOCK_ID_TORCH);
     }
+
+    level->inventory.items[level->inventory.armor_min + 0] = { ITEM_ID_DIAMOND_CAP };
+    level->inventory.items[level->inventory.armor_min + 1] = { ITEM_ID_CHAIN_TUNIC };
+    level->inventory.items[level->inventory.armor_min + 2] = { ITEM_ID_IRON_PANTS };
+    level->inventory.items[level->inventory.armor_min + 3] = { ITEM_ID_GOLD_BOOTS };
+
+    level->inventory.items[level->inventory.hotbar_min + 0] = { BLOCK_ID_DIAMOND };
+    level->inventory.items[level->inventory.hotbar_min + 1] = { BLOCK_ID_TORCH };
+    level->inventory.items[level->inventory.hotbar_min + 2] = { BLOCK_ID_GLOWSTONE };
 }
 
 bool deinitialize_resources()
@@ -377,18 +387,21 @@ void process_event(SDL_Event& event, bool* done)
                 t.pos = cam_pos;
                 if (level->get_block(t.pos, t.old) && t.old.id != BLOCK_ID_AIR)
                 {
-                    connection->tentative_blocks.push_back(t);
                     level->set_block(t.pos, BLOCK_ID_AIR, 0);
 
+                    if (connection)
+                        connection->push_tentative_block(t);
                     packet_player_dig_t p;
                     p.x = t.pos.x;
                     p.y = t.pos.y - 1;
                     p.z = t.pos.z;
                     p.face = 1;
                     p.status = PLAYER_DIG_STATUS_START_DIG;
-                    send_buffer(connection->socket, p.assemble());
+                    if (connection)
+                        connection->send_packet(p);
                     p.status = PLAYER_DIG_STATUS_FINISH_DIG;
-                    send_buffer(connection->socket, p.assemble());
+                    if (connection)
+                        connection->send_packet(p);
                 }
             }
             if (event.button.button == 2)
@@ -406,7 +419,8 @@ void process_event(SDL_Event& event, bool* done)
                 {
                     if (mc_id::is_block(hand.id))
                     {
-                        connection->tentative_blocks.push_back(t);
+                        if (connection)
+                            connection->push_tentative_block(t);
                         level->set_block(t.pos, hand);
                     }
 
@@ -418,7 +432,8 @@ void process_event(SDL_Event& event, bool* done)
                     p.block_item_id = hand.id;
                     p.amount = 0;
                     p.damage = hand.damage;
-                    send_buffer(connection->socket, p.assemble());
+                    if (connection)
+                        connection->send_packet(p);
                 }
             }
         }
@@ -434,7 +449,8 @@ void process_event(SDL_Event& event, bool* done)
             if (pack.slot_id < 0)
                 pack.slot_id += num_slots;
             level->inventory.hotbar_sel = level->inventory.hotbar_min + pack.slot_id;
-            send_buffer(connection->socket, pack.assemble());
+            if (connection)
+                connection->send_packet(pack);
         }
     }
 
@@ -528,7 +544,8 @@ void process_event(SDL_Event& event, bool* done)
             packet_hold_change_t pack;
             pack.slot_id = event.key.scancode - SDL_SCANCODE_1;
             level->inventory.hotbar_sel = level->inventory.hotbar_min + pack.slot_id;
-            send_buffer(connection->socket, pack.assemble());
+            if (connection)
+                connection->send_packet(pack);
             break;
         }
         case SDL_SCANCODE_M:
@@ -608,7 +625,7 @@ static bool render_water_overlay()
     glm::ivec3 chunk_coords = cam_pos >> 4;
 
     bool found_water = false;
-    for (chunk_cubic_t* c : level->chunks)
+    for (chunk_cubic_t* c : level->get_chunk_vec())
     {
         if (!c || chunk_coords != c->pos)
             continue;

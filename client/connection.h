@@ -49,6 +49,18 @@ struct connection_t
         CONNECTION_FAILED,
     };
 
+    /**
+     * Used for retaining old info about blocks that exist/don't exist on the client,
+     * that the server hasn't made clear it's position on
+     */
+    struct tentative_block_t
+    {
+        Uint64 timestamp = 0;
+        glm::ivec3 pos = { -1, -1, -1 };
+        itemstack_t old;
+        bool fullfilled = 0;
+    };
+
     inline connection_status_t get_status() { return status; }
 
     packet_handler_t pack_handler_client = packet_handler_t(false);
@@ -76,6 +88,23 @@ struct connection_t
      */
     void run(level_t* const level);
 
+    /**
+     * Wrapper around send_buffer()
+     * NOTE: Packets are only sent if status == connection_status_t::CONNECTION_ACTIVE
+     */
+    bool send_packet(packet_t& pack);
+
+    /**
+     * Wrapper around send_buffer()
+     * NOTE: Packets are only sent if status == connection_status_t::CONNECTION_ACTIVE
+     */
+    bool send_packet(packet_t* pack);
+
+    /**
+     * Pushes data into the tentative block buffer
+     */
+    void push_tentative_block(tentative_block_t& tblock) { tentative_blocks.push_back(tblock); };
+
     ~connection_t();
 
 private:
@@ -90,29 +119,12 @@ private:
      */
     void step_to_active();
 
-public:
-    /* This field should probably be private */
     SDLNet_StreamSocket* socket = NULL;
 
-private:
     SDLNet_Address* addr_server = NULL;
     Uint16 port = 0;
     std::string addr;
     std::string username;
-
-    /* I am unsure if these fields should be private */
-public:
-    /**
-     * Used for retaining old info about blocks that exist/don't exist on the client,
-     * that the server hasn't made clear it's position on
-     */
-    struct tentative_block_t
-    {
-        Uint64 timestamp = 0;
-        glm::ivec3 pos = { -1, -1, -1 };
-        itemstack_t old;
-        bool fullfilled = 0;
-    };
 
     /**
      * Stores blocks that the client placed/destroyed that the server will hopefully honor,
