@@ -36,6 +36,9 @@
 #include <memory>
 #include <vector>
 
+/**
+ * Handles both level data and the rendering of said level data
+ */
 struct level_t
 {
     level_t(texture_terrain_t* const terrain = NULL);
@@ -84,16 +87,6 @@ struct level_t
     size_t ent_missing_vert_count = 0;
 
     shader_t* shader_terrain = NULL;
-
-    /**
-     * Runs the culling pass and builds all visible/near visible dirty meshes
-     *
-     * TODO: Honor visibility
-     * TODO: Throttle rendering based on position
-     * TODO: Wait for either a timeout to pass or all surrounding chunks to be loaded before building
-     * TODO: Rebuild clean meshes that surround dirty ones
-     */
-    void build_dirty_meshes();
 
     /**
      * Clears all meshes
@@ -157,6 +150,9 @@ struct level_t
     void render(glm::ivec2 win_size);
 
     glm::vec3 camera_pos = { 0, 0, 0 };
+    glm::vec3 camera_direction = { 1, 0, 0 };
+    glm::vec3 camera_right = { 1, 0, 0 };
+    glm::vec3 camera_up = { 0, 1, 0 };
     float yaw = 0.0f;
     float pitch = 0.0f;
     float fov = 70.0f;
@@ -191,6 +187,23 @@ private:
 
     /** For quick retrieval of chunks */
     std::map<glm::ivec3, chunk_cubic_t*, ivec3_comparator_t> cmap;
+
+    /**
+     * Runs the culling pass and builds all visible/near visible dirty meshes
+     *
+     * TODO: Honor visibility for lighting?
+     * TODO: Throttle light?
+     * TODO: Wait for either a timeout to pass or all surrounding chunks to be loaded before building
+     * TODO: Rebuild clean meshes that surround dirty ones
+     */
+    void build_dirty_meshes();
+
+    /**
+     * Culls all chunks that are behind the camera or outside of the render distance
+     *
+     * TODO: An equivalent for entities
+     */
+    void cull_chunks(const glm::ivec2 win_size, const int render_distance);
 
     /**
      * Build and or replace the mesh for the corresponding chunk

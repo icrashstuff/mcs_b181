@@ -182,8 +182,6 @@ void create_testworld()
         if (c->pos.x == 2 && c->pos.z == 1)
             c->set_type(7, 6, 7, BLOCK_ID_TORCH);
     }
-
-    level->build_dirty_meshes();
 }
 
 bool deinitialize_resources()
@@ -985,13 +983,12 @@ int main(const int argc, const char** argv)
                         c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
                 }
 
-                ImGui::SameLine();
-                if (ImGui::Button("Build dirty meshes"))
-                    level->build_dirty_meshes();
-
-                ImGui::SameLine();
                 if (ImGui::Button("Clear meshes"))
                     level->clear_mesh(false);
+
+                ImGui::SameLine();
+                if (ImGui::Button("Clear meshes & GL"))
+                    level->clear_mesh(true);
 
                 if (ImGui::Button("Rebuild shaders"))
                     compile_shaders();

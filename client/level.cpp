@@ -29,6 +29,9 @@
 #include <algorithm>
 #include <glm/ext/matrix_transform.hpp>
 
+#include "tetra/util/convar.h"
+#include <SDL3/SDL.h>
+
 #define PASS_TIMER_START()             \
     do                                 \
     {                                  \
@@ -40,8 +43,11 @@
     {                                            \
         elapsed = SDL_GetTicksNS() - tick_start; \
         if (built)                               \
-            dc_log(fmt, ##__VA_ARGS__);          \
+            TRACE(fmt, ##__VA_ARGS__);           \
     } while (0)
+
+static convar_int_t r_mesh_throttle("r_mesh_throttle", 1, 1, 64, "Maximum number of chunks that can be meshed per frame");
+static convar_int_t r_render_distance("r_render_distance", 8, 1, 64, "Maximum chunk distance that can be viewed at once");
 
 void level_t::clear_mesh(const bool free_gl)
 {
@@ -53,68 +59,124 @@ void level_t::clear_mesh(const bool free_gl)
     }
 }
 
+/* Ideally this would use the Gribb/Hartmann method to extract the planes from a projection/camera matrix to get the plane normals */
+void level_t::cull_chunks(const glm::ivec2 win_size, const int render_distance)
+{
+    camera_direction.x = SDL_cosf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
+    camera_direction.y = SDL_sinf(glm::radians(pitch));
+    camera_direction.z = SDL_sinf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
+    camera_direction = glm::normalize(camera_direction);
+
+    const float half_v = tanf(glm::radians(fov) * .5f);
+    const float half_h = half_v * float(win_size.x) / float(win_size.y);
+    const glm::vec3 cam_right = glm::normalize(glm::cross(glm::vec3(0.0f, -1.0f, 0.0f), camera_direction));
+    const glm::vec3 cam_up = glm::normalize(glm::cross(camera_direction, cam_right));
+
+    glm::vec3 fov_normals[4];
+
+    /* Horizontal Normals */
+    fov_normals[0] = glm::normalize(glm::cross(-camera_direction + cam_right * half_h, cam_up));
+    fov_normals[1] = glm::normalize(glm::cross(+camera_direction + cam_right * half_h, cam_up));
+
+    /* Vertical Normals */
+    fov_normals[2] = glm::normalize(glm::cross(cam_right, -camera_direction + cam_up * half_v));
+    fov_normals[3] = glm::normalize(glm::cross(cam_right, +camera_direction + cam_up * half_v));
+
+    /* Convert camera position to 1/2 chunk coords and translate it to center chunk positions */
+    const glm::ivec3 camera_half_chunk_pos = (glm::ivec3(camera_pos) >> 3) - glm::ivec3(1, 1, 1);
+    const float render_distance_half_chunk = render_distance * 2.0f;
+    const float min_dist = -4.0f;
+
+#define CULL_REJECT_IF(condition) \
+    if (condition)                \
+    {                             \
+        c->visible = 0;           \
+        continue;                 \
+    }
+    for (chunk_cubic_t* c : chunks)
+    {
+        const glm::vec3 chunk_center = glm::vec3((c->pos << 1) - camera_half_chunk_pos);
+
+        /* Beyond render distance culling */
+        CULL_REJECT_IF(glm::length(glm::vec2(chunk_center.x, chunk_center.z)) > render_distance_half_chunk);
+
+        /* Behind the camera culling */
+        CULL_REJECT_IF(glm::dot(camera_direction, chunk_center) < min_dist);
+
+        /* FOV Culling */
+        CULL_REJECT_IF(glm::dot(fov_normals[0], chunk_center) < min_dist);
+        CULL_REJECT_IF(glm::dot(fov_normals[1], chunk_center) < min_dist);
+        CULL_REJECT_IF(glm::dot(fov_normals[2], chunk_center) < min_dist);
+        CULL_REJECT_IF(glm::dot(fov_normals[3], chunk_center) < min_dist);
+        c->visible = 1;
+    }
+#undef CULL_REJECT_IF
+}
+
 void level_t::build_dirty_meshes()
 {
     size_t built;
     Uint64 elapsed;
     Uint64 tick_start;
-    Uint64 tick_start_ms = SDL_GetTicks();
+    const Uint64 tick_func_start_ms = SDL_GetTicks();
 
     /* Ensure chunk map is correct (TODO: level_t needs a add/remove chunk system) */
     cmap.clear();
     for (size_t i = 0; i < chunks.size(); i++)
         cmap[chunks[i]->pos] = chunks[i];
 
-    /* "Culling" Pass */
-    for (chunk_cubic_t* c : chunks)
-        c->visible = 1;
-
     /* First Light Pass */
     PASS_TIMER_START();
-    for (size_t i = 0; i < chunks.size(); i++)
+    for (auto it = chunks.rbegin(); it != chunks.rend(); it++)
     {
-        if (chunks[i]->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL)
+        chunk_cubic_t* c = *it;
+        if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL)
             continue;
-        chunks[i]->clear_light_block(0);
-        light_pass(chunks[i]->pos.x, chunks[i]->pos.y, chunks[i]->pos.z, true);
-        chunks[i]->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0;
+        c->clear_light_block(0);
+        light_pass(c->pos.x, c->pos.y, c->pos.z, true);
+        c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0;
         built++;
     }
     PASS_TIMER_STOP("Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 1)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
 
     /* Second Light Pass */
     PASS_TIMER_START();
-    for (size_t i = 0; i < chunks.size(); i++)
+    for (auto it = chunks.rbegin(); it != chunks.rend(); it++)
     {
-        if (chunks[i]->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0)
+        chunk_cubic_t* c = *it;
+        if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0)
             continue;
-        light_pass(chunks[i]->pos.x, chunks[i]->pos.y, chunks[i]->pos.z, false);
-        chunks[i]->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_1;
+        light_pass(c->pos.x, c->pos.y, c->pos.z, false);
+        c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_1;
         built++;
     }
     PASS_TIMER_STOP("Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 2)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
 
     /* Third Light Pass */
     PASS_TIMER_START();
-    for (size_t i = 0; i < chunks.size(); i++)
+    for (auto it = chunks.rbegin(); it != chunks.rend(); it++)
     {
-        if (chunks[i]->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_1)
+        chunk_cubic_t* c = *it;
+        if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_1)
             continue;
-        light_pass(chunks[i]->pos.x, chunks[i]->pos.y, chunks[i]->pos.z, false);
-        chunks[i]->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
+        light_pass(c->pos.x, c->pos.y, c->pos.z, false);
+        c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
         built++;
     }
     PASS_TIMER_STOP("Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 3)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
 
     /* Mesh Pass */
     PASS_TIMER_START();
-    for (size_t i = 0; i < chunks.size(); i++)
+    int throttle = r_mesh_throttle.get();
+    for (auto it = chunks.rbegin(); it != chunks.rend() && throttle > 0; it++)
     {
-        if (chunks[i]->dirty_level != chunk_cubic_t::DIRTY_LEVEL_MESH)
+        chunk_cubic_t* c = *it;
+        if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_MESH || !c->visible)
             continue;
-        build_mesh(chunks[i]->pos.x, chunks[i]->pos.y, chunks[i]->pos.z);
-        chunks[i]->dirty_level = chunk_cubic_t::DIRTY_LEVEL_NONE;
+        build_mesh(c->pos.x, c->pos.y, c->pos.z);
+        c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_NONE;
         built++;
+        throttle--;
     }
     PASS_TIMER_STOP("Built %zu meshes in %.2f ms (%.2f ms per)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
 }
@@ -2204,19 +2266,17 @@ void level_t::render_entities()
 
 void level_t::render(glm::ivec2 win_size)
 {
+    int render_distance = r_render_distance.get();
+
+    cull_chunks(win_size, render_distance);
+
+    build_dirty_meshes();
+
     glUseProgram(shader_terrain->id);
-    glm::mat4 mat_proj = glm::perspective(glm::radians(fov), (float)win_size.x / (float)win_size.y, 0.03125f, 512.0f);
+    const glm::mat4 mat_proj = glm::perspective(glm::radians(fov), (float)win_size.x / (float)win_size.y, 0.03125f, render_distance * 32.0f);
     shader_terrain->set_projection(mat_proj);
 
-    glm::vec3 direction;
-    direction.x = SDL_cosf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
-    direction.y = SDL_sinf(glm::radians(pitch));
-    direction.z = SDL_sinf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
-    direction = glm::normalize(direction);
-
-    glm::vec3 camera_up(0.0f, 1.0f, 0.0f);
-
-    glm::mat4 mat_cam = glm::lookAt(camera_pos, camera_pos + direction, camera_up);
+    const glm::mat4 mat_cam = glm::lookAt(camera_pos, camera_pos + camera_direction, camera_up);
     shader_terrain->set_camera(mat_cam);
 
     shader_terrain->set_model(glm::mat4(1.0f));
