@@ -748,7 +748,7 @@ Uint8 mc_id::get_light_level(short block_id)
         ADD_NAME(BLOCK_ID_REPEATER_ON, 9);
         ADD_NAME(BLOCK_ID_ORE_REDSTONE_ON, 9);
 
-        ADD_NAME(BLOCK_ID_TORCH_REDSTONE_OFF, 7);
+        ADD_NAME(BLOCK_ID_TORCH_REDSTONE_ON, 7);
 
         ADD_NAME(BLOCK_ID_MUSHROOM_BLAND, 1);
     default:
