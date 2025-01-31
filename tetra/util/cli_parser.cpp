@@ -97,10 +97,9 @@ const char* cli_parser::get_value(const char* name)
 {
     std::map<std::string, const char*>* arg_map = get_arg_map();
 
-    if (arg_map->find(name) == arg_map->end())
-        return NULL;
-    else
-        return arg_map->at(name);
+    auto it = arg_map->find(name);
+
+    return (it == arg_map->end()) ? NULL : it->second;
 }
 
 bool cli_parser::apply_to(convar_t* cvr)
