@@ -53,6 +53,10 @@ void cli_parser::parse(const int argc, const char** argv)
     for (int i = 1; i < argc; i++)
     {
         bool is_convar = (argv[i] != NULL && argv[i][0] == '-');
+
+        if (!is_convar && !looking_for_value)
+            dc_log_warn("Dangling argument at argv[%d]: \"%s\"", i, argv[i]);
+
         if (looking_for_value)
         {
             if (current_name != NULL)
@@ -70,6 +74,7 @@ void cli_parser::parse(const int argc, const char** argv)
             }
             looking_for_value = false;
         }
+
         if (is_convar)
         {
             looking_for_value = true;
