@@ -128,11 +128,27 @@ bool cli_parser::apply_to(convar_t* cvr)
 
 void cli_parser::apply()
 {
+    const std::map<std::string, const char*>* const arg_map = get_arg_map();
+    std::map<std::string, const char*> ignored_arg_map = *arg_map;
+    std::vector<const char*> failed_args;
+
+    /* Apply convars */
     size_t applied = 0;
-    auto convars = convar_t::get_convar_list();
-    for (size_t i = 0; i < convars->size(); i++)
+    for (convar_t* c : *convar_t::get_convar_list())
     {
-        applied += cli_parser::apply_to(convars->at(i));
+        applied += cli_parser::apply_to(c);
+
+        auto it = ignored_arg_map.find(c->get_name());
+        if (it != ignored_arg_map.end())
+            ignored_arg_map.erase(it);
     }
-    dc_log("CLI Applied %zu flags", applied);
+
+    /* Suppress dev convar dragging down counts */
+    if (arg_map->find("dev") != arg_map->end())
+        applied++;
+
+    for (auto it : ignored_arg_map)
+        dc_log_warn("Ignored parameter \"-%s\" \"%s\"", it.first.c_str(), it.second);
+
+    dc_log("CLI Successfully applied %zu/%zu flags (Ignored %zu)", applied, arg_map->size() - ignored_arg_map.size(), ignored_arg_map.size());
 }
