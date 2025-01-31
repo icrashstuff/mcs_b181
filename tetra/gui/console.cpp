@@ -273,7 +273,7 @@ struct AppConsole
             return 0;
         });
 
-        AddCommand("_con_test_log_multiline_error_mult", [=](const int argc, const char* argv[]) -> int {
+        AddCommand("_con_test_log_multiline_error_mult", [=]() -> int {
             char buf[64];
             for (int i = 0; i < IM_ARRAYSIZE(buf); i++)
                 buf[i] = (i % 2 == 0) ? 'X' : '\n';
@@ -803,7 +803,7 @@ struct AppConsole
             if (command_line_str.size() > 4)
                 AddLog("%s", &command_line[5]);
             else
-                AddLog("");
+                AddLog("\n");
         }
         else
         {
