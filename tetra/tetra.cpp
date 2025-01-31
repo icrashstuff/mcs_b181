@@ -74,12 +74,20 @@ static tetra::render_api_t render_api = tetra::RENDER_API_GL_CORE;
 static int render_api_version_major = 3;
 static int render_api_version_minor = 3;
 
-static convar_int_t gfx_debug_gl("gfx_debug_gl", 0, 0, 1, "Sets SDL_GL_CONTEXT_DEBUG_FLAG", CONVAR_FLAG_DEV_ONLY);
+static convar_int_t r_debug_gl("r_debug_gl", 0, 0, 1, "Sets SDL_GL_CONTEXT_DEBUG_FLAG", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 
-static convar_int_t gui_fps_limiter("gui_fps_limiter", 300, 0, SDL_MAX_SINT32 - 1, "Max FPS, 0 to disable", CONVAR_FLAG_SAVE);
-static convar_int_t gui_vsync("gui_vsync", 1, 0, 1, "Enable/Disable vsync", CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_SAVE);
-static convar_int_t gui_adapative_vsync("gui_adapative_vsync", 1, 0, 1, "Enable disable adaptive vsync", CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_SAVE);
-static convar_int_t gui_show_demo_window("gui_show_demo_window", 0, 0, 1, "Show Dear ImGui demo window", CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_DEV_ONLY);
+static convar_int_t cvr_width("width", 1280, -1, SDL_MAX_SINT32, "Initial window width", CONVAR_FLAG_SAVE);
+static convar_int_t cvr_height("height", 720, -1, SDL_MAX_SINT32, "Initial window height", CONVAR_FLAG_SAVE);
+static convar_int_t cvr_resizable("resizable", 1, 0, 1, "Enable/Disable window resizing", CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_SAVE);
+
+static convar_int_t cvr_x("x", -1, -1, SDL_MAX_SINT32, "Initial window position (X coordinate) [-1: Centered]");
+static convar_int_t cvr_y("y", -1, -1, SDL_MAX_SINT32, "Initial window position (Y coordinate) [-1: Centered]");
+static convar_int_t cvr_centered_display("centered_display", 0, 0, SDL_MAX_SINT32, "Display to use for window centering", CONVAR_FLAG_SAVE);
+
+static convar_int_t r_fps_limiter("r_fps_limiter", 300, 0, SDL_MAX_SINT32 - 1, "Max FPS, 0 to disable", CONVAR_FLAG_SAVE);
+static convar_int_t r_vsync("r_vsync", 1, 0, 1, "Enable/Disable vsync", CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_SAVE);
+static convar_int_t r_adapative_vsync("r_adapative_vsync", 1, 0, 1, "Enable disable adaptive vsync", CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_SAVE);
+static convar_int_t gui_demo_window("gui_demo_window", 0, 0, 1, "Show Dear ImGui demo window", CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_DEV_ONLY);
 
 ImFont* dev_console::overlay_font = NULL;
 
@@ -150,30 +158,31 @@ void tetra::init(const char* organization, const char* appname, const char* cfg_
     if (cli_parser::get_value("-help") || cli_parser::get_value("help") || cli_parser::get_value("h"))
     {
         dc_log_internal("Usage: %s [ -convar_name [convar_value], ...]", argv[0]);
-        dc_log_internal("");
-        dc_log_internal("Example:");
-        dc_log_internal("  %s -dev -%s %d", argv[0], gui_vsync.get_name(), gui_vsync.get());
-        dc_log_internal("");
-        dc_log_internal("List of all console variables *without* flag CONVAR_FLAG_DEV_ONLY and associated help text (In no particular order)");
-        dc_log_internal("==================================================================================================================");
+        dc_log_internal("\n");
+        dc_log_internal("Examples:");
+        dc_log_internal("  %s -dev -%s %d", argv[0], r_vsync.get_name(), r_vsync.get());
+        dc_log_internal("  %s -%s %d -%s %d", argv[0], cvr_x.get_name(), cvr_x.get(), cvr_y.get_name(), cvr_y.get());
+        dc_log_internal("\n");
+        dc_log_internal("List of all console variables *without* the flag CONVAR_FLAG_DEV_ONLY and associated help text (In no particular order)");
+        dc_log_internal("=======================================================================================================================");
         std::vector<convar_t*>* cvrs = convar_t::get_convar_list();
         for (size_t i = 0; i < cvrs->size(); i++)
         {
             if (cvrs->at(i)->get_convar_flags() & CONVAR_FLAG_DEV_ONLY)
                 continue;
             cvrs->at(i)->log_help();
-            dc_log_internal("");
+            dc_log_internal("\n");
         }
         if (convar_t::dev())
         {
-            dc_log_internal("List of all console variables with flag CONVAR_FLAG_DEV_ONLY and associated help text (In no particular order)");
-            dc_log_internal("==============================================================================================================");
+            dc_log_internal("List of all console variables with the flag CONVAR_FLAG_DEV_ONLY and associated help text (In no particular order)");
+            dc_log_internal("==================================================================================================================");
             for (size_t i = 0; i < cvrs->size(); i++)
             {
                 if (!(cvrs->at(i)->get_convar_flags() & CONVAR_FLAG_DEV_ONLY))
                     continue;
                 cvrs->at(i)->log_help();
-                dc_log_internal("");
+                dc_log_internal("\n");
             }
         }
         else
@@ -223,7 +232,7 @@ int tetra::init_gui(const char* window_title)
     SDL_GLContextFlag sdl_gl_context_flags = 0;
 #endif
 
-    if (gfx_debug_gl.get())
+    if (r_debug_gl.get())
         sdl_gl_context_flags |= SDL_GL_CONTEXT_DEBUG_FLAG;
 
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_FLAGS, sdl_gl_context_flags);
@@ -242,16 +251,29 @@ int tetra::init_gui(const char* window_title)
     SDL_GL_SetAttribute(SDL_GL_DOUBLEBUFFER, 1);
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
     SDL_GL_SetAttribute(SDL_GL_STENCIL_SIZE, 8);
-    Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_RESIZABLE | SDL_WINDOW_HIDDEN;
+    Uint32 window_flags = SDL_WINDOW_OPENGL | SDL_WINDOW_HIDDEN;
+
+    if (cvr_resizable.get())
+        window_flags |= SDL_WINDOW_RESIZABLE;
 
     if (convar_t::dev())
         window_flags &= ~SDL_WINDOW_RESIZABLE;
 
-    window = SDL_CreateWindow(window_title, 1280, 720, window_flags);
+    window = SDL_CreateWindow(window_title, cvr_width.get(), cvr_height.get(), window_flags);
     if (window == nullptr)
         util::die("Error: SDL_CreateWindow():\n%s\n", SDL_GetError());
 
-    SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
+    int win_x = cvr_x.get();
+    int win_y = cvr_y.get();
+
+    if (win_x == -1)
+        win_x = SDL_WINDOWPOS_CENTERED_DISPLAY(cvr_centered_display.get());
+
+    if (win_y == -1)
+        win_y = SDL_WINDOWPOS_CENTERED_DISPLAY(cvr_centered_display.get());
+
+    SDL_SetWindowPosition(window, win_x, win_y);
+
     gl_context = SDL_GL_CreateContext(window);
     SDL_GL_MakeCurrent(tetra::window, tetra::gl_context);
 
@@ -271,15 +293,17 @@ int tetra::init_gui(const char* window_title)
 
     /* This weirdness is to trick DWM into making the window floating */
     if (convar_t::dev())
-        SDL_SetWindowResizable(window, true);
+        SDL_SetWindowResizable(window, cvr_resizable.get());
+
+    cvr_resizable.set_pre_callback([=](int, int _new) -> bool { return SDL_SetWindowResizable(window, _new); }, false);
 
     gl_context = SDL_GL_CreateContext(window);
 
     SDL_GL_MakeCurrent(window, gl_context);
-    gui_vsync.set_post_callback(
+    r_vsync.set_post_callback(
         [=]() {
-            bool vsync_enable = gui_vsync.get();
-            bool adapative_vsync_enable = gui_adapative_vsync.get();
+            bool vsync_enable = r_vsync.get();
+            bool adapative_vsync_enable = r_adapative_vsync.get();
             if (vsync_enable && adapative_vsync_enable && SDL_GL_SetSwapInterval(-1) == 0)
                 return;
             SDL_GL_SetSwapInterval(vsync_enable);
@@ -416,12 +440,12 @@ void tetra::end_frame(bool clear_frame, void (*cb_screenshot)(void))
 
     ImGuiIO& io = ImGui::GetIO();
 
-    bool open = gui_show_demo_window.get();
+    bool open = gui_demo_window.get();
     if (open)
     {
         ImGui::ShowDemoWindow(&open);
-        if (open != gui_show_demo_window.get())
-            gui_show_demo_window.set(open);
+        if (open != gui_demo_window.get())
+            gui_demo_window.set(open);
     }
 
     gui_registrar::render_menus();
@@ -465,9 +489,9 @@ void tetra::end_frame(bool clear_frame, void (*cb_screenshot)(void))
     Uint64 now = SDL_GetTicks();
     static Uint64 reference_time = 0;
     static Uint64 frames_since_reference = 0;
-    if (gui_fps_limiter.get())
+    if (r_fps_limiter.get())
     {
-        Uint64 elasped_time_ideal = frames_since_reference * 1000 / gui_fps_limiter.get();
+        Uint64 elasped_time_ideal = frames_since_reference * 1000 / r_fps_limiter.get();
         Sint64 delay = reference_time + elasped_time_ideal - now;
         // Reset when difference between the real and ideal worlds gets problematic
         if (delay < -100 || 100 < delay)
