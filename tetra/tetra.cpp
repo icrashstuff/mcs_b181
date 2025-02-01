@@ -297,8 +297,6 @@ int tetra::init_gui(const char* window_title)
 
     cvr_resizable.set_pre_callback([=](int, int _new) -> bool { return SDL_SetWindowResizable(window, _new); }, false);
 
-    gl_context = SDL_GL_CreateContext(window);
-
     SDL_GL_MakeCurrent(window, gl_context);
     r_vsync.set_post_callback(
         [=]() {
