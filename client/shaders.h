@@ -35,9 +35,9 @@ struct shader_t
      * @param _path_vtx PHYSFS path to the vertex shader source
      * @param _path_frag PHYSFS path to the fragment shader source
      */
-    shader_t(const std::string _path_vtx, const std::string _path_frag)
-        : path_vtx(_path_vtx)
-        , path_frag(_path_frag) { };
+    shader_t(const std::string path_vtx, const std::string path_frag);
+
+    ~shader_t();
 
     /**
      * Builds and links the shader program specifed by path_vtx and path_frag
@@ -45,6 +45,11 @@ struct shader_t
      * NOTE: This immediately deletes the shader program (if built)
      */
     void build();
+
+    /**
+     * Rebuilds all shaders in the global shader vector
+     */
+    static void build_all();
 
     GLuint id = 0;
 

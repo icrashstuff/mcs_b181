@@ -22,6 +22,8 @@
  */
 #include <GL/glew.h>
 
+#include <SDL3/SDL.h>
+
 #include "shaders.h"
 
 #include "tetra/gui/console.h"
@@ -170,4 +172,38 @@ void shader_t::build()
     loc_model = glGetUniformLocation(id, "model");
     loc_camera = glGetUniformLocation(id, "camera");
     loc_projection = glGetUniformLocation(id, "projection");
+}
+
+static std::vector<shader_t*> all_shaders;
+
+shader_t::shader_t(const std::string _path_vtx, const std::string _path_frag)
+    : path_vtx(_path_vtx)
+    , path_frag(_path_frag)
+{
+    all_shaders.push_back(this);
+}
+
+shader_t::~shader_t()
+{
+    for (auto it = all_shaders.begin(); it != all_shaders.end();)
+    {
+        if (*it != this)
+            it = next(it);
+        else
+            it = all_shaders.erase(it);
+    }
+}
+
+void shader_t::build_all()
+{
+    Uint64 tick_shader_start = SDL_GetTicksNS();
+    size_t built = 0;
+    for (shader_t* s : all_shaders)
+    {
+        s->build();
+        built++;
+    }
+    double elapsed = (SDL_GetTicksNS() - tick_shader_start) / 1000000.0;
+    if (built)
+        dc_log("Compiled %zu shader%s in %.2f ms (%.2f per)", built, built == 1 ? "" : "s", elapsed, elapsed / double(built));
 }

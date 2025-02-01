@@ -73,11 +73,9 @@ static bool take_screenshot = 0;
 
 void compile_shaders()
 {
-    Uint64 tick_shader_start = SDL_GetTicksNS();
-    shader->build();
+    shader_t::build_all();
     shader->set_uniform("ao_algorithm", ao_algorithm);
     shader->set_uniform("use_texture", use_texture);
-    dc_log("Compiled shaders in %.2f ms", (SDL_GetTicksNS() - tick_shader_start) / 1000000.0);
 }
 
 static level_t* level;
