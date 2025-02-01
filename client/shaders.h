@@ -64,6 +64,13 @@ struct shader_t
             glUniform1i(loc, a);
     }
 
+    inline void set_uniform(const std::string name, const float a)
+    {
+        GLint loc = glGetUniformLocation(id, name.c_str());
+        if (loc >= 0)
+            glUniform1f(loc, a);
+    }
+
     inline void set_uniform(const std::string name, const glm::mat4 a)
     {
         GLint loc = glGetUniformLocation(id, name.c_str());
