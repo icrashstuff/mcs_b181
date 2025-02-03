@@ -57,6 +57,10 @@
 #include "tetra/gui/proggy_tiny.cpp"
 #include "tetra/gui/styles.h"
 
+#include "tetra_internal.h"
+
+bool tetra::is_available_glObjectLabel = 0;
+
 SDL_Window* tetra::window = NULL;
 SDL_GLContext tetra::gl_context = NULL;
 
@@ -75,6 +79,7 @@ static int render_api_version_major = 3;
 static int render_api_version_minor = 3;
 
 static convar_int_t r_debug_gl("r_debug_gl", 0, 0, 1, "Sets SDL_GL_CONTEXT_DEBUG_FLAG", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
+static convar_int_t r_debug_gl_async("r_debug_gl_async", 0, 0, 1, "Enables asynchronous OpenGL debug messages", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 
 static convar_int_t cvr_width("width", 1280, -1, SDL_MAX_SINT32, "Initial window width", CONVAR_FLAG_SAVE);
 static convar_int_t cvr_height("height", 720, -1, SDL_MAX_SINT32, "Initial window height", CONVAR_FLAG_SAVE);
@@ -207,6 +212,32 @@ void tetra::set_render_api(render_api_t api, int major, int minor)
     render_api_version_minor = minor;
 }
 
+/* TODO: Get Object Labels? */
+static void GLAPIENTRY debug_msg_callback(GLenum source, GLenum type, GLuint id, GLenum severity, GLsizei length, const GLchar* message, const void*)
+{
+    if (length >= 0)
+        dc_log_trace("%.*s", length, message);
+    else
+        dc_log_trace("%s", message);
+}
+
+void tetra::gl_obj_label(GLenum identifier, GLuint name, const GLchar* fmt, ...)
+{
+    if (!is_available_glObjectLabel)
+        return;
+
+    /** Spec says the minimum max label length is 256 characters, which seems like a reasonable place to limit this buffer */
+    char label[256];
+    va_list args;
+    va_start(args, fmt);
+
+    vsnprintf(label, SDL_arraysize(label), fmt, args);
+
+    va_end(args);
+
+    glObjectLabel(identifier, name, -1, label);
+}
+
 int tetra::init_gui(const char* window_title)
 {
     if (was_init_gui || !was_init)
@@ -275,7 +306,9 @@ int tetra::init_gui(const char* window_title)
     SDL_SetWindowPosition(window, win_x, win_y);
 
     gl_context = SDL_GL_CreateContext(window);
-    SDL_GL_MakeCurrent(tetra::window, tetra::gl_context);
+
+    glGetIntegerv(GL_MAJOR_VERSION, &render_api_version_major);
+    glGetIntegerv(GL_MINOR_VERSION, &render_api_version_minor);
 
     dc_log("Init GLEW");
     GLenum glewError = glewInit();
@@ -288,6 +321,21 @@ int tetra::init_gui(const char* window_title)
     dc_log("*** GL Renderer:   %s ***", glGetString(GL_RENDERER));
     dc_log("*** GLEW Version:  %s ***", glewGetString(GLEW_VERSION));
     dc_log("*** GLSL Version:  %s ***", glGetString(GL_SHADING_LANGUAGE_VERSION));
+
+    if (r_debug_gl.get() && (render_api_version_major * 10000 + render_api_version_minor) >= 40003 && render_api != RENDER_API_GL_ES)
+    {
+        glEnable(GL_DEBUG_OUTPUT);
+        if (r_debug_gl_async.get())
+            glDisable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+        else
+            glEnable(GL_DEBUG_OUTPUT_SYNCHRONOUS);
+
+        glDebugMessageCallback(debug_msg_callback, NULL);
+
+        is_available_glObjectLabel = true;
+    }
+
+    SDL_GL_MakeCurrent(tetra::window, tetra::gl_context);
 
     SDL_ShowWindow(window);
 
@@ -308,7 +356,7 @@ int tetra::init_gui(const char* window_title)
         },
         true);
 
-    // Setup Dear ImGui context
+    /* Setup Main Dear ImGui context */
     IMGUI_CHECKVERSION();
     im_ctx_main = ImGui::CreateContext();
     ImGuiIO& io = ImGui::GetIO();
@@ -320,9 +368,7 @@ int tetra::init_gui(const char* window_title)
 
     style_colors_rotate_hue(0, 160, 1, 1);
 
-    glGetIntegerv(GL_MAJOR_VERSION, &render_api_version_major);
-    glGetIntegerv(GL_MINOR_VERSION, &render_api_version_minor);
-
+    /* Decide on GLSL version string for ImGui */
     const char* suffix = "";
     char imgui_glsl_version[128];
     int glsl_major = render_api_version_major;
@@ -348,7 +394,7 @@ int tetra::init_gui(const char* window_title)
 
     dc_log_trace("Dear ImGui glsl version string: \"%s\"", imgui_glsl_version);
 
-    // Setup Platform/Renderer backends
+    /* Setup Platform/Renderer backends */
     if (!ImGui_ImplSDL3_InitForOpenGL(window, gl_context))
         util::die("Failed to initialize Dear Imgui SDL2 backend\n");
     if (!ImGui_ImplOpenGL3_Init(imgui_glsl_version))
@@ -358,6 +404,7 @@ int tetra::init_gui(const char* window_title)
     strncpy(dc_overlay_fcfg.Name, "Proggy Tiny 10px", IM_ARRAYSIZE(dc_overlay_fcfg.Name));
     dev_console::overlay_font = io.Fonts->AddFontFromMemoryCompressedBase85TTF(proggy_tiny_compressed_data_base85, 10.0f, &dc_overlay_fcfg);
 
+    /* Setup Overlay Context */
     im_ctx_overlay = ImGui::CreateContext(io.Fonts);
     {
         ImGui::SetCurrentContext(im_ctx_overlay);
