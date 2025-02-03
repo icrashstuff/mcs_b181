@@ -20,7 +20,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#include <GL/glew.h>
+#include "tetra/tetra_gl.h"
 
 #include <SDL3/SDL.h>
 
@@ -144,6 +144,9 @@ void shader_t::build()
         status_vtx = shader_create_compile(&id_vtx, GL_VERTEX_SHADER, fd_vtx);
         status_frag = shader_create_compile(&id_frag, GL_FRAGMENT_SHADER, fd_frag);
 
+        tetra::gl_obj_label(GL_SHADER, id_vtx, "Shader: \"%s\"", path_vtx.c_str());
+        tetra::gl_obj_label(GL_SHADER, id_frag, "Shader: \"%s\"", path_frag.c_str());
+
         PHYSFS_close(fd_vtx);
         PHYSFS_close(fd_frag);
     }
@@ -168,6 +171,8 @@ void shader_t::build()
         glDeleteShader(id_frag);
         return;
     }
+
+    tetra::gl_obj_label(GL_PROGRAM, id, "Program: \"%s\"+\"%s\"", path_vtx.c_str(), path_frag.c_str());
 
     loc_model = glGetUniformLocation(id, "model");
     loc_camera = glGetUniformLocation(id, "camera");
