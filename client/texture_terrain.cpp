@@ -35,6 +35,8 @@
 #include "tetra/util/physfs/physfs.h"
 #include "tetra/util/stbi.h"
 
+#include "tetra/tetra_gl.h"
+
 #include "jzon/Jzon.h"
 
 static convar_int_t r_dump_mipmaps_terrain("r_dump_mipmaps_terrain", 1, 0, 1, "Dump terrain atlas mipmaps to screenshots folder on atlas rebuild",
@@ -423,6 +425,7 @@ texture_terrain_t::texture_terrain_t(const std::string path_textures)
     }
 
     glGenTextures(1, &tex_id_main);
+    tetra::gl_obj_label(GL_TEXTURE, tex_id_main, "[Level][Terrain]: Main Texture");
     glBindTexture(GL_TEXTURE_2D, tex_id_main);
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
