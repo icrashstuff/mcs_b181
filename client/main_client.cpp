@@ -51,6 +51,8 @@
 #include "shaders.h"
 #include "texture_terrain.h"
 
+#include "gui/panorama.h"
+
 static convar_string_t cvr_username("username", "", "Username (duh)", CONVAR_FLAG_SAVE);
 static convar_string_t cvr_dir_assets("dir_assets", "", "Path to assets (ex: \"~/.minecraft/assets/\")", CONVAR_FLAG_SAVE);
 static convar_string_t cvr_path_resource_pack(
@@ -64,6 +66,8 @@ static convar_int_t cvr_autoconnect_port(
     "dev_server_port", 25565, 0, 65535, "Port of server to autoconnect to when dev_autoconnect is specified", CONVAR_FLAG_DEV_ONLY);
 
 static convar_float_t cvr_r_fov_base("r_fov_base", 75.0f, 30.0f, 120.0f, "Base FOV", CONVAR_FLAG_SAVE);
+
+static panorama_t* panorama = NULL;
 
 static shader_t* shader = NULL;
 
@@ -106,6 +110,8 @@ bool initialize_resources()
 
     if (!cvr_autoconnect.get() || cvr_testworld.get())
         create_testworld();
+
+    panorama = new panorama_t();
 
     compile_shaders();
 
@@ -198,6 +204,8 @@ bool deinitialize_resources()
     delete level;
     delete texture_atlas;
     delete connection;
+    delete panorama;
+    panorama = NULL;
     texture_atlas = NULL;
     connection = NULL;
     shader = NULL;
@@ -275,11 +283,24 @@ static bool wireframe = 0;
 
 void normal_loop()
 {
+    ImGui::SetNextWindowSize(ImVec2(580, 480), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(ImVec2(20.0f, ImGui::GetMainViewport()->GetWorkCenter().y), ImGuiCond_FirstUseEver, ImVec2(0.0, 0.5));
+    ImGui::Begin("Render Selector");
+    static bool show_pano = false;
+    static bool show_level = true;
+    ImGui::Checkbox("Show Panorama", &show_pano);
+    ImGui::Checkbox("Show Level", &show_level);
+
+    ImGui::End();
+
     if (SDL_GetWindowMouseGrab(tetra::window) != mouse_grabbed)
         SDL_SetWindowMouseGrab(tetra::window, mouse_grabbed);
 
     if (SDL_GetWindowRelativeMouseMode(tetra::window) != mouse_grabbed)
         SDL_SetWindowRelativeMouseMode(tetra::window, mouse_grabbed);
+
+    if (!show_level)
+        mouse_grabbed = 0;
 
     if ((ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard) && tetra::imgui_ctx_main_wants_input())
         mouse_grabbed = 0;
@@ -332,7 +353,11 @@ void normal_loop()
     level->shader_terrain = shader;
     glm::ivec2 win_size;
     SDL_GetWindowSize(tetra::window, &win_size.x, &win_size.y);
-    level->render(win_size);
+
+    if (show_pano)
+        panorama->render(win_size);
+    if (show_level)
+        level->render(win_size);
 }
 
 void process_event(SDL_Event& event, bool* done)
@@ -692,6 +717,7 @@ static gui_register_overlay reg_render_status_msg(render_status_msg);
 
 static convar_int_t cvr_gui_renderer("gui_renderer", 0, 0, 1, "Show renderer internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 static convar_int_t cvr_gui_lightmap("gui_lightmap", 0, 0, 1, "Show lightmap internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
+static convar_int_t cvr_gui_panorama("gui_panorama", 0, 0, 1, "Show panorama internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 static convar_int_t cvr_gui_engine_state("gui_engine_state", 0, 0, 1, "Show engine state menu", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 static convar_int_t cvr_gui_inventory("gui_inventory", 0, 0, 1, "Show primitive inventory window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 
@@ -874,7 +900,6 @@ int main(const int argc, const char** argv)
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
-    glEnable(GL_BLEND);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     int done = 0;
@@ -1013,7 +1038,16 @@ int main(const int argc, const char** argv)
                 ImGui::End();
             }
 
-            if (cvr_gui_lightmap.get())
+            if (panorama && cvr_gui_panorama.get())
+            {
+                ImGui::SetNextWindowPos(viewport->Size * ImVec2(0.0075f, 0.1875f), ImGuiCond_FirstUseEver, ImVec2(0.0, 0.0));
+                ImGui::SetNextWindowSize(viewport->Size * ImVec2(0.425f, 0.8f), ImGuiCond_FirstUseEver);
+                ImGui::BeginCVR("Panorama", &cvr_gui_panorama);
+                panorama->imgui_widgets();
+                ImGui::End();
+            }
+
+            if (level && cvr_gui_lightmap.get())
             {
                 ImGui::SetNextWindowPos(viewport->Size * ImVec2(0.0075f, 0.1875f), ImGuiCond_FirstUseEver, ImVec2(0.0, 0.0));
                 ImGui::SetNextWindowSize(viewport->Size * ImVec2(0.425f, 0.8f), ImGuiCond_FirstUseEver);
@@ -1022,7 +1056,7 @@ int main(const int argc, const char** argv)
                 ImGui::End();
             }
 
-            if (cvr_gui_inventory.get())
+            if (level && cvr_gui_inventory.get())
             {
                 ImGui::SetNextWindowPos(viewport->Size * ImVec2(0.0075f, 0.1875f), ImGuiCond_FirstUseEver, ImVec2(0.0, 0.0));
                 ImGui::SetNextWindowSize(viewport->Size * ImVec2(0.425f, 0.8f), ImGuiCond_FirstUseEver);

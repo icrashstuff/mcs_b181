@@ -49,6 +49,8 @@ set(mcs_b181_client_SRC
 
     client/jzon/Jzon.cpp
 
+    client/gui/panorama.cpp
+
     shared/ids.cpp
     shared/misc.cpp
     shared/chunk.cpp
@@ -60,6 +62,11 @@ set(mcs_b181_client_SRC
 
 configure_file(client/shaders/terrain.frag shaders/terrain.frag COPYONLY)
 configure_file(client/shaders/terrain.vert shaders/terrain.vert COPYONLY)
+configure_file(client/shaders/pano.frag shaders/pano.frag COPYONLY)
+configure_file(client/shaders/pano.vert shaders/pano.vert COPYONLY)
+configure_file(client/shaders/fbo_blur.frag shaders/fbo_blur.frag COPYONLY)
+configure_file(client/shaders/fbo_out.frag shaders/fbo_out.frag COPYONLY)
+configure_file(client/shaders/fbo.vert shaders/fbo.vert COPYONLY)
 
 set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(sdl_net/)
