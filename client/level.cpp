@@ -32,6 +32,8 @@
 #include "tetra/util/convar.h"
 #include <SDL3/SDL.h>
 
+#include "tetra/tetra_gl.h"
+
 #define PASS_TIMER_START()             \
     do                                 \
     {                                  \
@@ -1993,11 +1995,15 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
     }
 
     if (!center->vao)
+    {
         terrain_vertex_t::create_vao(&center->vao);
+        tetra::gl_obj_label(GL_VERTEX_ARRAY, center->vao, "[Level][Chunk]: <%d, %d, %d>: VAO", center->pos.x, center->pos.y, center->pos.z);
+    }
     glBindVertexArray(center->vao);
     if (!center->vbo)
     {
         glGenBuffers(1, &center->vbo);
+        tetra::gl_obj_label(GL_BUFFER, center->vbo, "[Level][Chunk]: <%d, %d, %d>: VBO", center->pos.x, center->pos.y, center->pos.z);
         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
     }
 
@@ -2406,15 +2412,18 @@ level_t::level_t(texture_terrain_t* const _terrain)
 
     glBindVertexArray(0);
     glGenBuffers(1, &ebo);
+    tetra::gl_obj_label(GL_BUFFER, ebo, "[Level]: EBO (Main)");
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
     glBufferData(GL_ELEMENT_ARRAY_BUFFER, ind.size() * sizeof(ind[0]), ind.data(), GL_STATIC_DRAW);
     glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
 
     /* Create missing entity mesh OpenGL resources */
     glGenVertexArrays(1, &ent_missing_vao);
+    tetra::gl_obj_label(GL_VERTEX_ARRAY, ent_missing_vao, "[Level][Entity]: Missing: VAO");
     glBindVertexArray(ent_missing_vao);
 
     glGenBuffers(1, &ent_missing_vbo);
+    tetra::gl_obj_label(GL_BUFFER, ent_missing_vbo, "[Level][Entity]: Missing: VBO");
     glBindBuffer(GL_ARRAY_BUFFER, ent_missing_vbo);
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
