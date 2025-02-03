@@ -144,8 +144,16 @@ void shader_t::build()
         status_vtx = shader_create_compile(&id_vtx, GL_VERTEX_SHADER, fd_vtx);
         status_frag = shader_create_compile(&id_frag, GL_FRAGMENT_SHADER, fd_frag);
 
-        tetra::gl_obj_label(GL_SHADER, id_vtx, "Shader: \"%s\"", path_vtx.c_str());
-        tetra::gl_obj_label(GL_SHADER, id_frag, "Shader: \"%s\"", path_frag.c_str());
+        if (gl_prefix.length())
+        {
+            tetra::gl_obj_label(GL_SHADER, id_vtx, "%s: Shader Vert", gl_prefix.c_str());
+            tetra::gl_obj_label(GL_SHADER, id_frag, "%s: Shader Frag", gl_prefix.c_str());
+        }
+        else
+        {
+            tetra::gl_obj_label(GL_SHADER, id_vtx, "Shader Vert: \"%s\"", path_vtx.c_str());
+            tetra::gl_obj_label(GL_SHADER, id_frag, "Shader Frag: \"%s\"", path_frag.c_str());
+        }
 
         PHYSFS_close(fd_vtx);
         PHYSFS_close(fd_frag);
@@ -172,7 +180,10 @@ void shader_t::build()
         return;
     }
 
-    tetra::gl_obj_label(GL_PROGRAM, id, "Program: \"%s\"+\"%s\"", path_vtx.c_str(), path_frag.c_str());
+    if (gl_prefix.length())
+        tetra::gl_obj_label(GL_PROGRAM, id, "%s: Program", gl_prefix.c_str());
+    else
+        tetra::gl_obj_label(GL_PROGRAM, id, "Program: \"%s\"+\"%s\"", path_vtx.c_str(), path_frag.c_str());
 
     loc_model = glGetUniformLocation(id, "model");
     loc_camera = glGetUniformLocation(id, "camera");
@@ -181,9 +192,10 @@ void shader_t::build()
 
 static std::vector<shader_t*> all_shaders;
 
-shader_t::shader_t(const std::string _path_vtx, const std::string _path_frag)
+shader_t::shader_t(const std::string _path_vtx, const std::string _path_frag, const std::string _gl_prefix)
     : path_vtx(_path_vtx)
     , path_frag(_path_frag)
+    , gl_prefix(_gl_prefix)
 {
     all_shaders.push_back(this);
 }

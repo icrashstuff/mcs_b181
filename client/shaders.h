@@ -32,10 +32,11 @@
 struct shader_t
 {
     /**
-     * @param _path_vtx PHYSFS path to the vertex shader source
-     * @param _path_frag PHYSFS path to the fragment shader source
+     * @param path_vtx PHYSFS path to the vertex shader source
+     * @param path_frag PHYSFS path to the fragment shader source
+     * @param gl_prefix Prefix used for glObjectLabel(), fmt: "%s: {Shader {Vert,Frag},Program}" (Empty string for path based names)
      */
-    shader_t(const std::string path_vtx, const std::string path_frag);
+    shader_t(const std::string path_vtx, const std::string path_frag, const std::string gl_prefix = "");
 
     ~shader_t();
 
@@ -126,6 +127,7 @@ struct shader_t
 
     std::string path_vtx;
     std::string path_frag;
+    std::string gl_prefix;
 };
 
 #endif
