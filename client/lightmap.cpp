@@ -33,6 +33,8 @@
 
 #include "tetra/util/convar.h"
 
+#include "tetra/tetra_gl.h"
+
 static convar_float_t r_light_brightness("r_light_brightness", 0.0, 0.0, 1.0, "Lightmap base brightness", CONVAR_FLAG_SAVE);
 
 SDL_FORCE_INLINE float curve(const float base, const float x) { return (glm::pow(base, x) - 1) / (base - 1); }
@@ -43,6 +45,9 @@ lightmap_t::lightmap_t(const lightmap_preset_t preset)
 
     glGenTextures(1, &tex_id_linear);
     glGenTextures(1, &tex_id_nearest);
+
+    tetra::gl_obj_label(GL_TEXTURE, tex_id_linear, "[Lightmap]: Texture Linear");
+    tetra::gl_obj_label(GL_TEXTURE, tex_id_nearest, "[Lightmap]: Texture Nearest");
 
     glBindTexture(GL_TEXTURE_2D, tex_id_linear);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
