@@ -46,6 +46,7 @@ set(mcs_b181_client_SRC
     client/entity.cpp
     client/lightmap.cpp
     client/connection.cpp
+    client/game.cpp
 
     client/jzon/Jzon.cpp
 

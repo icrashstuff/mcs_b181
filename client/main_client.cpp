@@ -20,6 +20,9 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+
+#include "game.h"
+
 #include "tetra/tetra.h"
 
 #include <algorithm>
@@ -68,155 +71,48 @@ static convar_int_t cvr_autoconnect_port(
 static convar_float_t cvr_r_fov_base("r_fov_base", 75.0f, 30.0f, 120.0f, "Base FOV", CONVAR_FLAG_SAVE);
 
 static panorama_t* panorama = NULL;
-
-static shader_t* shader = NULL;
-
-static int ao_algorithm = 1;
-static int use_texture = 1;
 static bool take_screenshot = 0;
 
-void compile_shaders()
-{
-    shader_t::build_all();
-    shader->set_uniform("ao_algorithm", ao_algorithm);
-    shader->set_uniform("use_texture", use_texture);
-}
+static void compile_shaders() { shader_t::build_all(); }
 
-static level_t* level;
+static std::vector<game_t*> games;
+static game_t* game_selected = nullptr;
+static game_resources_t* game_resources = nullptr;
 
-static connection_t* connection = NULL;
-static texture_terrain_t* texture_atlas = NULL;
-
-static convar_int_t cvr_testworld("dev_world", 0, 0, 1, "Init to test world", CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_DEV_ONLY);
-static convar_int_t cvr_world_size("dev_world_size", 6, 1, 32, "Side dimensions of the test world", CONVAR_FLAG_DEV_ONLY);
-static convar_int_t cvr_world_y_off_pos("dev_world_y_off_pos", 0, 0, 32, "Positive Chunk Y offset of the test world", CONVAR_FLAG_DEV_ONLY);
-static convar_int_t cvr_world_y_off_neg("dev_world_y_off_neg", 6, 0, 32, "Negative Chunk Y offset of the test world", CONVAR_FLAG_DEV_ONLY);
-void create_testworld();
-bool initialize_resources()
+static bool initialize_resources()
 {
     /* In the future parsing of one of the indexes at /assets/indexes/ will need to happen here (For sound) */
-
-    texture_atlas = new texture_terrain_t("/_resources/assets/minecraft/textures/");
-    level = new level_t(texture_atlas);
-    shader = new shader_t("/shaders/terrain.vert", "/shaders/terrain.frag");
-
-    level->lightmap.set_world_time(1000);
-
-    if (cvr_autoconnect.get())
-    {
-        connection = new connection_t();
-        connection->init(cvr_autoconnect_addr.get(), cvr_autoconnect_port.get(), cvr_username.get());
-    }
-
-    if (!cvr_autoconnect.get() || cvr_testworld.get())
-        create_testworld();
+    game_resources = new game_resources_t();
 
     panorama = new panorama_t();
 
     compile_shaders();
 
+    for (game_t* g : games)
+        if (g)
+            g->reload_resources(game_resources);
+
     return true;
 }
-void create_testworld()
+
+static bool deinitialize_resources()
 {
-    const int world_size = cvr_world_size.get();
-    for (int i = 0; i < world_size * world_size; i++)
-    {
-        chunk_t c_old;
-        if (world_size < 4)
-            c_old.generate_from_seed_over(1, i / world_size - world_size / 2, i % world_size - world_size / 2);
-        else
-            c_old.generate_from_seed_over(1, i / world_size - world_size + 4, i % world_size - world_size + 4);
-        for (int j = 0; j < 8; j++)
-        {
-            chunk_cubic_t* c = new chunk_cubic_t();
-            c->pos.x = i / world_size - world_size;
-            c->pos.z = i % world_size - world_size;
-            c->pos.y = j - cvr_world_y_off_neg.get() + cvr_world_y_off_pos.get();
-            level->add_chunk(c);
-            for (int x = 0; x < 16; x++)
-                for (int z = 0; z < 16; z++)
-                    for (int y = 0; y < 16; y++)
-                    {
-                        c->set_type(x, y, z, c_old.get_type(x, y + j * 16, z));
-                        c->set_metadata(x, y, z, c_old.get_metadata(x, y + j * 16, z));
-                        c->set_light_block(x, y, z, c_old.get_light_block(x, y + j * 16, z));
-                        c->set_light_sky(x, y, z, c_old.get_light_sky(x, y + j * 16, z));
-                    }
-        }
-    }
-
-    for (int i = 0; i < 16; i++)
-    {
-        chunk_cubic_t* c = new chunk_cubic_t();
-        c->pos.x = i % 4;
-        c->pos.y = (i / 4) % 4;
-        c->pos.z = (i / 16);
-        level->add_chunk(c);
-        for (int x = 0; x < 16; x++)
-            for (int z = 0; z < 16; z++)
-                for (int y = 0; y < 16; y++)
-                {
-                    c->set_type(x, y, z, i + 1);
-                    c->set_light_sky(x, y, z, SDL_min((SDL_fabs(x - 7.5) + SDL_fabs(z - 7.5)) * 2.2, 15));
-                }
-
-        for (int x = 4; x < 12; x++)
-            for (int z = 4; z < 12; z++)
-                for (int y = 2; y < 12; y++)
-                    c->set_type(x, y, z, 0);
-        c->set_type(7, 2, 5 + i % 4, BLOCK_ID_GLASS);
-        c->set_type(8, 2, 5 + i % 4, BLOCK_ID_GLASS);
-        c->set_type(7, 2, 7, BLOCK_ID_TORCH);
-    }
-
-    for (int i = 0; i < 128; i++)
-    {
-        chunk_cubic_t* c = new chunk_cubic_t();
-        c->pos.x = (i / 12);
-        c->pos.y = -2;
-        c->pos.z = (i % 12);
-        level->add_chunk(c);
-        for (int x = 0; x < 16; x++)
-            for (int z = 0; z < 16; z++)
-            {
-                c->set_type(x, 5, z, i);
-                c->set_light_sky(x, 5, z, x);
-                c->set_light_block(x, 5, z, z);
-            }
-        if (c->pos.x == 2 && c->pos.z == 1)
-            c->set_type(7, 6, 7, BLOCK_ID_TORCH);
-    }
-
-    level->inventory.items[level->inventory.armor_min + 0] = { ITEM_ID_DIAMOND_CAP };
-    level->inventory.items[level->inventory.armor_min + 1] = { ITEM_ID_CHAIN_TUNIC };
-    level->inventory.items[level->inventory.armor_min + 2] = { ITEM_ID_IRON_PANTS };
-    level->inventory.items[level->inventory.armor_min + 3] = { ITEM_ID_GOLD_BOOTS };
-
-    level->inventory.items[level->inventory.hotbar_min + 0] = { BLOCK_ID_DIAMOND };
-    level->inventory.items[level->inventory.hotbar_min + 1] = { BLOCK_ID_TORCH };
-    level->inventory.items[level->inventory.hotbar_min + 2] = { BLOCK_ID_GLOWSTONE };
-}
-
-bool deinitialize_resources()
-{
-    delete shader;
-    delete level;
-    delete texture_atlas;
-    delete connection;
+    delete game_resources;
     delete panorama;
+
+    for (game_t* g : games)
+        if (g)
+            g->reload_resources(nullptr, true);
+
     panorama = NULL;
-    texture_atlas = NULL;
-    connection = NULL;
-    shader = NULL;
-    level = NULL;
+    game_resources = 0;
     return true;
 }
 
 /**
  * Quick check to see if the game can be launched, intended for validating if the setup screen can be skipped
  */
-bool can_launch_game()
+static bool can_launch_game()
 {
     if (!cvr_username.get().length())
         return 0;
@@ -281,25 +177,84 @@ static bool mouse_grabbed = 0;
 static bool wireframe = 0;
 #define AO_ALGO_MAX 5
 
-void normal_loop()
+static void normal_loop()
 {
-    ImGui::SetNextWindowSize(ImVec2(580, 480), ImGuiCond_FirstUseEver);
-    ImGui::SetNextWindowPos(ImVec2(20.0f, ImGui::GetMainViewport()->GetWorkCenter().y), ImGuiCond_FirstUseEver, ImVec2(0.0, 0.5));
-    ImGui::Begin("Render Selector");
-    static bool show_pano = false;
-    static bool show_level = true;
-    ImGui::Checkbox("Show Panorama", &show_pano);
-    ImGui::Checkbox("Show Level", &show_level);
-
-    ImGui::End();
-
     if (SDL_GetWindowMouseGrab(tetra::window) != mouse_grabbed)
         SDL_SetWindowMouseGrab(tetra::window, mouse_grabbed);
 
     if (SDL_GetWindowRelativeMouseMode(tetra::window) != mouse_grabbed)
         SDL_SetWindowRelativeMouseMode(tetra::window, mouse_grabbed);
 
-    if (!show_level)
+    ImGui::SetNextWindowSize(ImVec2(580, 480), ImGuiCond_FirstUseEver);
+    ImGui::SetNextWindowPos(ImVec2(20.0f, ImGui::GetMainViewport()->GetWorkCenter().y), ImGuiCond_FirstUseEver, ImVec2(0.0, 0.5));
+    ImGui::Begin("Render Selector");
+    static bool show_pano = false;
+    static bool show_level = false;
+    ImGui::Checkbox("Show Panorama", &show_pano);
+    ImGui::Checkbox("Show Level", &show_level);
+
+    if (ImGui::Button("Rebuild resources"))
+    {
+        deinitialize_resources();
+        initialize_resources();
+    }
+
+    static std::string new_username = cvr_username.get();
+    static std::string new_addr = cvr_autoconnect_addr.get();
+    static Uint16 new_port = cvr_autoconnect_port.get();
+    const Uint16 port_step = 1;
+
+    ImGui::InputText("Username", &new_username);
+    ImGui::InputText("Address", &new_addr);
+    ImGui::InputScalar("Port", ImGuiDataType_U16, &new_port, &port_step);
+
+    int do_init_game = 0;
+
+    if (ImGui::Button("Init Game (Server)"))
+        do_init_game = 1;
+    ImGui::SameLine();
+    if (ImGui::Button("Init Game (Test World)"))
+        do_init_game = 2;
+
+    if (do_init_game)
+        games.push_back(new game_t(new_addr, new_port, new_username, do_init_game == 2, game_resources));
+
+    static int game_selected_idx = 0;
+
+    for (auto it = games.begin(); it != games.end();)
+    {
+        ImGui::PushID((*it)->game_id);
+        char text[64];
+        snprintf(text, SDL_arraysize(text), "Game %d", (*it)->game_id);
+        ImGui::RadioButton(text, &game_selected_idx, (*it)->game_id);
+        ImGui::SameLine();
+        if (ImGui::Button("Destroy"))
+        {
+            delete *it;
+            it = games.erase(it);
+        }
+        else
+            it = next(it);
+        ImGui::PopID();
+    }
+
+    game_selected = nullptr;
+
+    for (game_t* g : games)
+        if (g->game_id == game_selected_idx)
+            game_selected = g;
+
+    if (!game_selected && games.size())
+    {
+        game_selected = games[0];
+        game_selected_idx = game_selected->game_id;
+    }
+
+    ImGui::End();
+
+    game_t* game = game_selected;
+
+    if (!show_level || !game)
         mouse_grabbed = 0;
 
     if ((ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard) && tetra::imgui_ctx_main_wants_input())
@@ -317,6 +272,21 @@ void normal_loop()
     }
 
     float camera_speed = 3.5f * delta_time * (held_ctrl ? 4.0f : 1.0f);
+
+    glm::ivec2 win_size;
+    SDL_GetWindowSize(tetra::window, &win_size.x, &win_size.y);
+
+    if (show_pano)
+        panorama->render(win_size);
+
+    for (game_t* g : games)
+        if (g->connection && g->level)
+            g->connection->run(g->level);
+
+    if (!game || !game->level)
+        return;
+
+    level_t* level = game->level;
 
     if (held_w)
         level->camera_pos += camera_speed * glm::vec3(SDL_cosf(glm::radians(level->yaw)), 0, SDL_sinf(glm::radians(level->yaw)));
@@ -343,24 +313,15 @@ void normal_loop()
     else if (level->fov < fov_base)
         level->fov = fov_base;
 
-    if (connection && level)
-        connection->run(level);
-
     level->lightmap.update();
 
     level->get_terrain()->update();
 
-    level->shader_terrain = shader;
-    glm::ivec2 win_size;
-    SDL_GetWindowSize(tetra::window, &win_size.x, &win_size.y);
-
-    if (show_pano)
-        panorama->render(win_size);
     if (show_level)
         level->render(win_size);
 }
 
-void process_event(SDL_Event& event, bool* done)
+static void process_event(SDL_Event& event, bool* done)
 {
     if (tetra::process_event(event))
         *done = true;
@@ -388,6 +349,14 @@ void process_event(SDL_Event& event, bool* done)
 
     if (tetra::imgui_ctx_main_wants_input())
         return;
+
+    game_t* game = game_selected;
+
+    if (!game)
+        return;
+
+    level_t* level = game->level;
+    connection_t* connection = game->connection;
 
     static Uint64 last_button_down = -1;
     if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
@@ -584,16 +553,16 @@ void process_event(SDL_Event& event, bool* done)
         }
         case SDL_SCANCODE_C:
         {
-            ao_algorithm = (ao_algorithm + 1) % (AO_ALGO_MAX + 1);
-            dc_log("Setting ao_algorithm to %d", ao_algorithm);
-            shader->set_uniform("ao_algorithm", ao_algorithm);
+            game_resources->ao_algorithm = (game_resources->ao_algorithm + 1) % (AO_ALGO_MAX + 1);
+            dc_log("Setting ao_algorithm to %d", game_resources->ao_algorithm);
+            game_resources->terrain_shader->set_uniform("ao_algorithm", game_resources->ao_algorithm);
             break;
         }
         case SDL_SCANCODE_X:
         {
-            use_texture = !use_texture;
-            dc_log("Setting use_texture to %d", use_texture);
-            shader->set_uniform("use_texture", use_texture);
+            game_resources->use_texture = !game_resources->use_texture;
+            dc_log("Setting use_texture to %d", game_resources->use_texture);
+            game_resources->terrain_shader->set_uniform("use_texture", game_resources->use_texture);
             break;
         }
         case SDL_SCANCODE_R:
@@ -641,14 +610,14 @@ void process_event(SDL_Event& event, bool* done)
 /* This isn't the best way to do this, but it will do for now */
 static bool render_water_overlay()
 {
-    if (!level)
+    if (!game_selected || !game_selected->level)
         return false;
 
-    glm::ivec3 cam_pos = level->camera_pos;
+    glm::ivec3 cam_pos = game_selected->level->camera_pos;
     glm::ivec3 chunk_coords = cam_pos >> 4;
 
     bool found_water = false;
-    for (chunk_cubic_t* c : level->get_chunk_vec())
+    for (chunk_cubic_t* c : game_selected->level->get_chunk_vec())
     {
         if (!c || chunk_coords != c->pos)
             continue;
@@ -664,10 +633,10 @@ static bool render_water_overlay()
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
     if (ImGui::Begin("Water", NULL, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground))
     {
-        mc_id::terrain_face_t face = level->get_terrain()->get_face(mc_id::FACE_WATER_STILL);
+        mc_id::terrain_face_t face = game_selected->level->get_terrain()->get_face(mc_id::FACE_WATER_STILL);
         ImVec2 uv0(face.corners[0].x, face.corners[0].y);
         ImVec2 uv1(face.corners[3].x, face.corners[3].y);
-        ImGui::Image((void*)(size_t)level->get_terrain()->tex_id_main, ImGui::GetMainViewport()->WorkSize, uv0, uv1);
+        ImGui::Image((void*)(size_t)game_selected->level->get_terrain()->tex_id_main, ImGui::GetMainViewport()->WorkSize, uv0, uv1);
     }
     ImGui::End();
     ImGui::PopStyleVar();
@@ -679,18 +648,18 @@ static gui_register_overlay reg_render_water_overlay(render_water_overlay);
 
 static bool render_status_msg()
 {
-    if (!connection)
+    if (!game_selected || !game_selected->connection)
         return false;
 
-    if (!connection->status_msg.length())
+    if (!game_selected->connection->status_msg.length())
         return false;
 
     ImGui::SetNextWindowPos(ImVec2(ImGui::GetMainViewport()->GetWorkCenter().x, 0), ImGuiCond_Always, ImVec2(0.5f, 0));
 
-    ImVec2 size0 = ImGui::CalcTextSize(connection->status_msg.c_str());
-    ImVec2 size1 = ImGui::CalcTextSize(connection->status_msg_sub.c_str());
+    ImVec2 size0 = ImGui::CalcTextSize(game_selected->connection->status_msg.c_str());
+    ImVec2 size1 = ImGui::CalcTextSize(game_selected->connection->status_msg_sub.c_str());
 
-    if (connection->status_msg_sub.length())
+    if (game_selected->connection->status_msg_sub.length())
         size1.y += ImGui::GetStyle().ItemSpacing.y * 2.0f;
 
     ImVec2 win_size = ImVec2(SDL_max(size0.x, size1.x) + 10.0f, size0.y + size1.y) + ImGui::GetStyle().WindowPadding * 1.05f;
@@ -702,9 +671,9 @@ static bool render_status_msg()
         ImGui::PushStyleVar(ImGuiStyleVar_SeparatorTextAlign, ImVec2(0.5f, 0.5f));
         ImGui::PushStyleVar(ImGuiStyleVar_SeparatorTextBorderSize, 0);
         ImGui::PushStyleVar(ImGuiStyleVar_SeparatorTextPadding, ImVec2(0, 0));
-        ImGui::SeparatorText(connection->status_msg.c_str());
-        if (connection->status_msg_sub.length())
-            ImGui::SeparatorText(connection->status_msg_sub.c_str());
+        ImGui::SeparatorText(game_selected->connection->status_msg.c_str());
+        if (game_selected->connection->status_msg_sub.length())
+            ImGui::SeparatorText(game_selected->connection->status_msg_sub.c_str());
         ImGui::PopStyleVar(3);
     }
 
@@ -721,7 +690,7 @@ static convar_int_t cvr_gui_panorama("gui_panorama", 0, 0, 1, "Show panorama int
 static convar_int_t cvr_gui_engine_state("gui_engine_state", 0, 0, 1, "Show engine state menu", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 static convar_int_t cvr_gui_inventory("gui_inventory", 0, 0, 1, "Show primitive inventory window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 
-bool engine_state_step()
+static bool engine_state_step()
 {
     /* Ensure engine only steps forwards */
     SDL_assert(engine_state_current <= engine_state_target);
@@ -995,8 +964,10 @@ int main(const int argc, const char** argv)
         }
         case ENGINE_STATE_RUNNING:
         {
-            if (cvr_gui_renderer.get())
+            if (game_selected && game_selected->level && cvr_gui_renderer.get())
             {
+                level_t* level = game_selected->level;
+
                 ImGui::SetNextWindowPos(viewport->GetWorkCenter(), ImGuiCond_FirstUseEver, ImVec2(0.5, 0.5));
                 ImGui::SetNextWindowSize(ImVec2(520, 480), ImGuiCond_FirstUseEver);
                 ImGui::BeginCVR("Running", &cvr_gui_renderer);
@@ -1009,11 +980,10 @@ int main(const int argc, const char** argv)
                 ImGui::InputFloat("Camera Y", &level->camera_pos.y, 1.0f);
                 ImGui::InputFloat("Camera Z", &level->camera_pos.z, 1.0f);
 
-                if (ImGui::Button("Rebuild atlas"))
+                if (ImGui::Button("Rebuild resources"))
                 {
-                    delete texture_atlas;
-                    texture_atlas = new texture_terrain_t("/_resources/assets/minecraft/textures/");
-                    level->set_terrain(texture_atlas);
+                    deinitialize_resources();
+                    initialize_resources();
                 }
 
                 ImGui::SameLine();
@@ -1047,8 +1017,10 @@ int main(const int argc, const char** argv)
                 ImGui::End();
             }
 
-            if (level && cvr_gui_lightmap.get())
+            if (game_selected && game_selected->level && cvr_gui_lightmap.get())
             {
+                level_t* level = game_selected->level;
+
                 ImGui::SetNextWindowPos(viewport->Size * ImVec2(0.0075f, 0.1875f), ImGuiCond_FirstUseEver, ImVec2(0.0, 0.0));
                 ImGui::SetNextWindowSize(viewport->Size * ImVec2(0.425f, 0.8f), ImGuiCond_FirstUseEver);
                 ImGui::BeginCVR("Lightmap", &cvr_gui_lightmap);
@@ -1056,8 +1028,10 @@ int main(const int argc, const char** argv)
                 ImGui::End();
             }
 
-            if (level && cvr_gui_inventory.get())
+            if (game_selected && game_selected->level && cvr_gui_inventory.get())
             {
+                level_t* level = game_selected->level;
+
                 ImGui::SetNextWindowPos(viewport->Size * ImVec2(0.0075f, 0.1875f), ImGuiCond_FirstUseEver, ImVec2(0.0, 0.0));
                 ImGui::SetNextWindowSize(viewport->Size * ImVec2(0.425f, 0.8f), ImGuiCond_FirstUseEver);
                 ImGui::BeginCVR("Inventory", &cvr_gui_inventory);
@@ -1092,6 +1066,9 @@ int main(const int argc, const char** argv)
         tetra::end_frame(0, screenshot_callback);
         last_loop_time = SDL_GetTicksNS() - loop_start_time;
     }
+
+    for (game_t* g : games)
+        delete g;
 
     tetra::deinit();
     SDLNet_Quit();
