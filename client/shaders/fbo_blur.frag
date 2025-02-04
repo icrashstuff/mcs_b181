@@ -36,22 +36,22 @@ uniform float gradient_mix = 0.0f;
 /**
  * One dimensional Gaussian blur function
  */
-float gauss(float x, float omega)
+float gauss(float x, float sigma)
 {
-    return inversesqrt(2 * PI * omega * omega) * exp(-(x * x) / (2 * omega * omega));
+    return inversesqrt(2 * PI * sigma * sigma) * exp(-(x * x) / (2 * sigma * sigma));
 }
 
 void main()
 {
     vec2 tsize = textureSize(tex, 0);
 
-    float omega = float(radius) / 3.004;
+    float sigma = float(radius) / 3.004;
     int limit = radius;
 
     vec3 col = vec3(0.0);
     for (int i = -limit; i <= limit; i++)
     {
-        float i_gauss = gauss(i, omega);
+        float i_gauss = gauss(i, sigma);
         vec2 off = vec2(float(i) * blur_x / tsize.x, float(i) * blur_y / tsize.y);
 
         col += vec3(texture(tex, frag_uv.xy + off)) * i_gauss;
