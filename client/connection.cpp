@@ -182,10 +182,6 @@ void connection_t::run(level_t* const level)
 
     if (status == connection_t::CONNECTION_ACTIVE)
     {
-        static bool sent_init = false;
-        static Uint64 last_update_tick_build = 0;
-        static Uint64 last_update_tick_camera = 0;
-
         if (!sent_init)
         {
             packet_handshake_c2s_t pack_handshake;
@@ -200,6 +196,7 @@ void connection_t::run(level_t* const level)
         while (SDL_GetTicks() - sdl_start_tick < (in_world ? 25 : 150) && status == connection_t::CONNECTION_ACTIVE
             && (pack_from_server = pack_handler_client.get_next_packet(socket)))
         {
+
 #define CAST_PACK_TO_P(type) type* p = (type*)pack_from_server
 #define CAST_ENT_TO_E(type) type* e = (type*)level->get_or_create_ent(p->eid);
             Uint8 pack_type = pack_from_server->id;
@@ -630,7 +627,10 @@ void connection_t::step_to_active()
         int address_status = SDLNet_GetAddressStatus(addr_server);
 
         if (address_status == 1)
+        {
+            set_status_msg("Address resolved");
             status = CONNECTION_ADDR_RESOLVED;
+        }
         else if (address_status == -1)
         {
             err_str = std::string("SDLNet_WaitUntilResolved: ") + SDL_GetError();
@@ -644,6 +644,7 @@ void connection_t::step_to_active()
         SDLNet_UnrefAddress(addr_server);
         addr_server = NULL;
 
+        set_status_msg("Connecting");
         status = CONNECTION_CONNECTING;
 
         if (!socket)
@@ -658,7 +659,10 @@ void connection_t::step_to_active()
         int connection_status = SDLNet_GetConnectionStatus(socket);
 
         if (connection_status == 1)
+        {
+            set_status_msg("Connected");
             status = CONNECTION_ACTIVE;
+        }
         else if (connection_status == -1)
         {
             err_str = std::string("SDLNet_GetConnectionStatus: ") + SDL_GetError();

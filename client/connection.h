@@ -35,6 +35,9 @@
  * Connection class
  *
  * The way this fits into the architecture is that the connection is fed a level_t which it will then modify
+ *
+ * WARNING: All connections share a chunk input buffer
+ * WARNING: All connections *MUST* be accessed from the same thread
  */
 struct connection_t
 {
@@ -125,6 +128,10 @@ private:
     Uint16 port = 0;
     std::string addr;
     std::string username;
+
+    bool sent_init = false;
+    Uint64 last_update_tick_build = 0;
+    Uint64 last_update_tick_camera = 0;
 
     /**
      * Stores blocks that the client placed/destroyed that the server will hopefully honor,
