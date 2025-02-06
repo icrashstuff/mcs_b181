@@ -425,8 +425,8 @@ texture_terrain_t::texture_terrain_t(const std::string path_textures)
     }
 
     glGenTextures(1, &tex_id_main);
-    tetra::gl_obj_label(GL_TEXTURE, tex_id_main, "[Level][Terrain]: Main Texture");
     glBindTexture(GL_TEXTURE_2D, tex_id_main);
+    tetra::gl_obj_label(GL_TEXTURE, tex_id_main, "[Level][Terrain]: Main Texture");
 
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);

@@ -160,12 +160,6 @@ panorama_t::panorama_t()
 
     for (int i = 0; i < IM_ARRAYSIZE(fbo); i++)
     {
-        tetra::gl_obj_label(GL_FRAMEBUFFER, fbo[i], "[Panorama]: FBO %d", i);
-        tetra::gl_obj_label(GL_TEXTURE, fbo_tex[i], "[Panorama]: FBO %d: Output", i);
-    }
-
-    for (int i = 0; i < IM_ARRAYSIZE(fbo); i++)
-    {
         glBindFramebuffer(GL_FRAMEBUFFER, fbo[i]);
 
         /* Frame buffer output */
@@ -177,6 +171,12 @@ panorama_t::panorama_t()
         glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
 
         glFramebufferTexture2D(GL_FRAMEBUFFER, GL_COLOR_ATTACHMENT0, GL_TEXTURE_2D, fbo_tex[i], 0);
+    }
+
+    for (int i = 0; i < IM_ARRAYSIZE(fbo); i++)
+    {
+        tetra::gl_obj_label(GL_FRAMEBUFFER, fbo[i], "[Panorama]: FBO %d", i);
+        tetra::gl_obj_label(GL_TEXTURE, fbo_tex[i], "[Panorama]: FBO %d: Output", i);
     }
 
     resize(glm::ivec2(32, 32));
