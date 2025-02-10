@@ -50,6 +50,7 @@ set(mcs_b181_client_SRC
 
     client/jzon/Jzon.cpp
 
+    client/gui/mc_gui.cpp
     client/gui/panorama.cpp
 
     shared/ids.cpp

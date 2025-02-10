@@ -24,12 +24,17 @@
 #include "game.h"
 
 #include "tetra/tetra.h"
+#include "tetra/tetra_gl.h"
 
 #include <algorithm>
 
 #include <GL/glew.h>
 #include <GL/glu.h>
 #include <SDL3/SDL_opengl.h>
+
+#include "tetra/gui/imgui-1.91.1/backends/imgui_impl_opengl3.h"
+#include "tetra/gui/imgui-1.91.1/backends/imgui_impl_sdl3.h"
+#include "tetra/gui/imgui.h"
 
 #include "tetra/gui/console.h"
 #include "tetra/gui/gui_registrar.h"
@@ -54,6 +59,7 @@
 #include "shaders.h"
 #include "texture_terrain.h"
 
+#include "gui/mc_gui.h"
 #include "gui/panorama.h"
 
 static convar_string_t cvr_username("username", "", "Username (duh)", CONVAR_FLAG_SAVE);
@@ -70,6 +76,9 @@ static convar_int_t cvr_autoconnect_port(
 
 static convar_float_t cvr_r_fov_base("r_fov_base", 75.0f, 30.0f, 120.0f, "Base FOV", CONVAR_FLAG_SAVE);
 
+static convar_int_t cvr_mc_gui_style_editor(
+    "mc_gui_style_editor", 0, 0, 1, "Show style editor for the MC GUI system", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
+
 static panorama_t* panorama = NULL;
 static bool take_screenshot = 0;
 
@@ -79,12 +88,19 @@ static std::vector<game_t*> games;
 static game_t* game_selected = nullptr;
 static game_resources_t* game_resources = nullptr;
 
+static ImGuiContext* imgui_ctx_main_menu = NULL;
+
+static mc_gui::mc_gui_ctx mc_gui_global_ctx;
+mc_gui::mc_gui_ctx* mc_gui::global_ctx = &mc_gui_global_ctx;
+
 static bool initialize_resources()
 {
     /* In the future parsing of one of the indexes at /assets/indexes/ will need to happen here (For sound) */
     game_resources = new game_resources_t();
 
     panorama = new panorama_t();
+
+    mc_gui::global_ctx->load_resources();
 
     compile_shaders();
 
@@ -99,6 +115,8 @@ static bool deinitialize_resources()
 {
     delete game_resources;
     delete panorama;
+
+    mc_gui::global_ctx->unload_resources();
 
     for (game_t* g : games)
         if (g)
@@ -177,21 +195,34 @@ static bool mouse_grabbed = 0;
 static bool wireframe = 0;
 #define AO_ALGO_MAX 5
 
+#include "main_client.menu.cpp"
+
 static void normal_loop()
 {
+    bool warp_mouse_to_center = 0;
     if (SDL_GetWindowMouseGrab(tetra::window) != mouse_grabbed)
+    {
+        warp_mouse_to_center = 1;
         SDL_SetWindowMouseGrab(tetra::window, mouse_grabbed);
+    }
 
     if (SDL_GetWindowRelativeMouseMode(tetra::window) != mouse_grabbed)
+    {
+        warp_mouse_to_center = 1;
         SDL_SetWindowRelativeMouseMode(tetra::window, mouse_grabbed);
+    }
+
+    if (warp_mouse_to_center)
+    {
+        ImVec2 center = ImGui::GetMainViewport()->GetWorkCenter();
+        SDL_WarpMouseInWindow(tetra::window, center.x, center.y);
+    }
 
     ImGui::SetNextWindowSize(ImVec2(580, 480), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowPos(ImVec2(20.0f, ImGui::GetMainViewport()->GetWorkCenter().y), ImGuiCond_FirstUseEver, ImVec2(0.0, 0.5));
     ImGui::Begin("Render Selector");
-    static bool show_pano = false;
-    static bool show_level = false;
-    ImGui::Checkbox("Show Panorama", &show_pano);
-    ImGui::Checkbox("Show Level", &show_level);
+    static bool show_level = true;
+    ImGui::Checkbox("Forcibly Show Level", &show_level);
 
     if (ImGui::Button("Rebuild resources"))
     {
@@ -254,11 +285,17 @@ static void normal_loop()
 
     game_t* game = game_selected;
 
-    if (!show_level || !game)
+    if (!show_level || !game_selected)
         mouse_grabbed = 0;
 
     if ((ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard) && tetra::imgui_ctx_main_wants_input())
         mouse_grabbed = 0;
+
+    if (!game || client_menu_manager.stack_size())
+        mouse_grabbed = 0;
+
+    if (game && !client_menu_manager.stack_size() && (!game->connection || game->connection->get_status() == connection_t::CONNECTION_ACTIVE))
+        mouse_grabbed = 1;
 
     if (!mouse_grabbed)
     {
@@ -276,49 +313,105 @@ static void normal_loop()
     glm::ivec2 win_size;
     SDL_GetWindowSize(tetra::window, &win_size.x, &win_size.y);
 
-    if (show_pano)
-        panorama->render(win_size);
-
     for (game_t* g : games)
         if (g->connection && g->level)
             g->connection->run(g->level);
 
-    if (!game || !game->level)
-        return;
+    if (game)
+    {
+        level_t* level = game->level;
 
-    level_t* level = game->level;
+        if (held_w)
+            level->camera_pos += camera_speed * glm::vec3(SDL_cosf(glm::radians(level->yaw)), 0, SDL_sinf(glm::radians(level->yaw)));
+        if (held_s)
+            level->camera_pos -= camera_speed * glm::vec3(SDL_cosf(glm::radians(level->yaw)), 0, SDL_sinf(glm::radians(level->yaw)));
+        if (held_a)
+            level->camera_pos -= camera_speed * glm::vec3(-SDL_sinf(glm::radians(level->yaw)), 0, SDL_cosf(glm::radians(level->yaw)));
+        if (held_d)
+            level->camera_pos += camera_speed * glm::vec3(-SDL_sinf(glm::radians(level->yaw)), 0, SDL_cosf(glm::radians(level->yaw)));
+        if (held_space)
+            level->camera_pos.y += camera_speed;
+        if (held_shift)
+            level->camera_pos.y -= camera_speed;
 
-    if (held_w)
-        level->camera_pos += camera_speed * glm::vec3(SDL_cosf(glm::radians(level->yaw)), 0, SDL_sinf(glm::radians(level->yaw)));
-    if (held_s)
-        level->camera_pos -= camera_speed * glm::vec3(SDL_cosf(glm::radians(level->yaw)), 0, SDL_sinf(glm::radians(level->yaw)));
-    if (held_a)
-        level->camera_pos -= camera_speed * glm::vec3(-SDL_sinf(glm::radians(level->yaw)), 0, SDL_cosf(glm::radians(level->yaw)));
-    if (held_d)
-        level->camera_pos += camera_speed * glm::vec3(-SDL_sinf(glm::radians(level->yaw)), 0, SDL_cosf(glm::radians(level->yaw)));
-    if (held_space)
-        level->camera_pos.y += camera_speed;
-    if (held_shift)
-        level->camera_pos.y -= camera_speed;
+        if (held_ctrl)
+            level->fov += delta_time * 30.0f;
+        else
+            level->fov -= delta_time * 30.0f;
 
-    if (held_ctrl)
-        level->fov += delta_time * 30.0f;
-    else
-        level->fov -= delta_time * 30.0f;
+        float fov_base = cvr_r_fov_base.get();
 
-    float fov_base = cvr_r_fov_base.get();
+        if (level->fov > fov_base + 2.0f)
+            level->fov = fov_base + 2.0f;
+        else if (level->fov < fov_base)
+            level->fov = fov_base;
+    }
 
-    if (level->fov > fov_base + 2.0f)
-        level->fov = fov_base + 2.0f;
-    else if (level->fov < fov_base)
-        level->fov = fov_base;
+    ImGuiContext* last_ctx = ImGui::GetCurrentContext();
+    ImGui::SetCurrentContext(imgui_ctx_main_menu);
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplSDL3_NewFrame();
+    ImGui::NewFrame();
 
-    level->lightmap.update();
+    int& menu_scale = mc_gui::global_ctx->menu_scale;
+    {
+        const glm::ivec2 scales = win_size / menu_scale_step;
+        int new_scale = SDL_max(SDL_min(scales.x, scales.y), 1);
 
-    level->get_terrain()->update();
+        if (cvr_mc_gui_scale.get())
+            new_scale = SDL_min(new_scale, cvr_mc_gui_scale.get());
 
-    if (show_level)
-        level->render(win_size);
+        if (new_scale != menu_scale)
+        {
+            dc_log("New GUI Scale: %d (%d %d)", new_scale, scales.x, scales.y);
+            ImGui::GetIO().FontGlobalScale = new_scale;
+
+            ImGuiStyle& style = ImGui::GetStyle();
+
+            style.ScaleAllSizes(double(new_scale) / double(SDL_max(menu_scale, 1)));
+
+            style.ItemSpacing = ImVec2(4, 8) * new_scale;
+
+            menu_scale = new_scale;
+        }
+    }
+
+    if (convar_t::dev() && cvr_mc_gui_style_editor.get())
+    {
+        ImGui::SetWindowFontScale(1.0f / float(menu_scale));
+        ImGui::ShowStyleEditor();
+    }
+
+    client_menu_manager.set_default(game_selected ? "nomenu" : "menu.title");
+    client_menu_return_t menu_ret = client_menu_manager.run_last_in_stack(win_size);
+
+    /* client_menu_manager.run_last_in_stack() may delete the game */
+    game = game_selected;
+
+    if (menu_ret.allow_world && game)
+    {
+        game->level->lightmap.update();
+        game->level->get_terrain()->update();
+        game->level->render(win_size);
+
+        if (client_menu_manager.stack_size())
+            ImGui::GetBackgroundDrawList()->AddRectFilled(ImVec2(0, 0), ImGui::GetMainViewport()->Size, IM_COL32(32, 32, 32, 255 * 0.5f));
+    }
+
+    if (menu_ret.allow_pano && !game)
+        panorama->render(win_size);
+
+    if (menu_ret.allow_dirt && ((!menu_ret.allow_pano && !game) || (game && !menu_ret.allow_world)))
+    {
+        ImTextureID tex_id = reinterpret_cast<ImTextureID>(mc_gui::global_ctx->tex_id_bg);
+        ImVec2 size = ImGui::GetMainViewport()->Size;
+        ImGui::GetBackgroundDrawList()->AddImage(tex_id, ImVec2(0, 0), size, ImVec2(0, 0), size / (32.0f * float(SDL_max(1, mc_gui::global_ctx->menu_scale))));
+        ImGui::GetBackgroundDrawList()->AddRectFilled(ImVec2(0, 0), size, IM_COL32(0, 0, 0, 255 * 0.75f));
+    }
+
+    ImGui::Render();
+    ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
+    ImGui::SetCurrentContext(last_ctx);
 }
 
 static void process_event(SDL_Event& event, bool* done)
@@ -353,17 +446,45 @@ static void process_event(SDL_Event& event, bool* done)
     game_t* game = game_selected;
 
     if (!game)
+    {
+        ImGuiContext* last_ctx = ImGui::GetCurrentContext();
+        ImGui::SetCurrentContext(imgui_ctx_main_menu);
+        ImGui_ImplSDL3_ProcessEvent(&event);
+        ImGui::SetCurrentContext(last_ctx);
         return;
+    }
 
     level_t* level = game->level;
     connection_t* connection = game->connection;
 
-    static Uint64 last_button_down = -1;
+    /* TODO: Check for in-world */
+    if (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE
+        && (!connection || connection->get_status() == connection_t::CONNECTION_ACTIVE))
+    {
+        if (client_menu_manager.stack_size())
+            client_menu_manager.stack_clear();
+        else
+            client_menu_manager.stack_push("menu.game");
+
+        mouse_grabbed = !client_menu_manager.stack_size();
+
+        dc_log("%d %d", client_menu_manager.stack_size(), mouse_grabbed);
+    }
+
+    if (!mouse_grabbed && client_menu_manager.stack_size())
+    {
+        ImGuiContext* last_ctx = ImGui::GetCurrentContext();
+        ImGui::SetCurrentContext(imgui_ctx_main_menu);
+        ImGui_ImplSDL3_ProcessEvent(&event);
+        ImGui::SetCurrentContext(last_ctx);
+        return;
+    }
+
     if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
     {
-        last_button_down = event.common.timestamp;
-
-        if (mouse_grabbed)
+        if (!mouse_grabbed && !client_menu_manager.stack_size())
+            mouse_grabbed = 1;
+        else if (mouse_grabbed)
         {
             // TODO: Add place block function
             glm::vec3 cam_dir;
@@ -396,7 +517,7 @@ static void process_event(SDL_Event& event, bool* done)
                         connection->send_packet(p);
                 }
             }
-            if (event.button.button == 2)
+            else if (event.button.button == 2)
             {
                 // TODO: Pick block
             }
@@ -445,10 +566,6 @@ static void process_event(SDL_Event& event, bool* done)
                 connection->send_packet(pack);
         }
     }
-
-    if (event.type == SDL_EVENT_MOUSE_BUTTON_UP)
-        if (event.common.timestamp > last_button_down && event.common.timestamp - last_button_down < (250 * 1000 * 1000))
-            mouse_grabbed = true;
 
     if (mouse_grabbed && event.type == SDL_EVENT_MOUSE_MOTION)
     {
@@ -730,7 +847,10 @@ static bool engine_state_step()
         if (!PHYSFS_mount(cvr_path_resource_pack.get().c_str(), "/_resources/", 0))
             util::die("Unable to mount base resource pack");
 
+        mc_gui::init();
+
         initialize_resources();
+
         engine_state_current = ENGINE_STATE_RUNNING;
         dc_log("Engine state moving to %s", engine_state_name(engine_state_current));
         return engine_state_step();
@@ -739,7 +859,11 @@ static bool engine_state_step()
         engine_state_current = ENGINE_STATE_SHUTDOWN;
         return engine_state_step();
     case ENGINE_STATE_SHUTDOWN:
+
         deinitialize_resources();
+
+        mc_gui::deinit();
+
         engine_state_current = ENGINE_STATE_EXIT;
         dc_log("Engine state moving to %s", engine_state_name(engine_state_current));
         return engine_state_step();
