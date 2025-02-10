@@ -145,6 +145,10 @@ public:
 
     inline int get() { return _value; }
 
+    inline int get_min() { return _min; }
+
+    inline int get_max() { return _max; }
+
     inline int get_default() { return _default; }
 
     /**
@@ -208,6 +212,10 @@ public:
         std::function<void()> post_callback = NULL);
 
     inline float get() { return _value; }
+
+    inline float get_min() { return _min; }
+
+    inline float get_max() { return _max; }
 
     inline float get_default() { return _default; }
 
