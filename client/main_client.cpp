@@ -76,6 +76,8 @@ static convar_int_t cvr_autoconnect_port(
 
 static convar_float_t cvr_r_fov_base("r_fov_base", 75.0f, 30.0f, 120.0f, "Base FOV", CONVAR_FLAG_SAVE);
 
+static convar_float_t cvr_r_crosshair_scale("r_crosshair_scale", 1.0f, 0.0f, 64.0f, "Multiplier for crosshair size", CONVAR_FLAG_SAVE);
+
 static convar_int_t cvr_mc_gui_style_editor(
     "mc_gui_style_editor", 0, 0, 1, "Show style editor for the MC GUI system", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 
@@ -387,21 +389,36 @@ static void normal_loop()
 
     /* client_menu_manager.run_last_in_stack() may delete the game */
     game = game_selected;
+    bool in_world = game;
+    if (in_world && game->connection)
+        in_world = game->connection->get_status() == connection_t::CONNECTION_ACTIVE;
 
-    if (menu_ret.allow_world && game)
+    if (menu_ret.allow_world && in_world)
     {
         game->level->lightmap.update();
         game->level->get_terrain()->update();
         game->level->render(win_size);
 
+        /* Render crosshair
+         * NOTE: If a function called by client_menu_manager.run_last_in_stack() adds to
+         * the background draw list then the crosshair will be drawn on top!
+         */
+        const ImVec2 center = ImGui::GetMainViewport()->GetWorkCenter();
+        const float scale = cvr_r_crosshair_scale.get() * mc_gui::global_ctx->menu_scale;
+        const ImVec2 pos0(center - ImVec2(8.0f, 8.0f) * scale);
+        const ImVec2 pos1(center + ImVec2(8.0f, 8.0f) * scale);
+        const ImVec2 uv0(240.0f / 256.0f, 0.0f);
+        const ImVec2 uv1(1.0f, 16.0f / 256.0f);
+        ImGui::GetBackgroundDrawList()->AddImage(reinterpret_cast<ImTextureID>(mc_gui::global_ctx->tex_id_widgets), pos0, pos1, uv0, uv1);
+
         if (client_menu_manager.stack_size())
             ImGui::GetBackgroundDrawList()->AddRectFilled(ImVec2(0, 0), ImGui::GetMainViewport()->Size, IM_COL32(32, 32, 32, 255 * 0.5f));
     }
 
-    if (menu_ret.allow_pano && !game)
+    if (menu_ret.allow_pano && !in_world)
         panorama->render(win_size);
 
-    if (menu_ret.allow_dirt && ((!menu_ret.allow_pano && !game) || (game && !menu_ret.allow_world)))
+    if (menu_ret.allow_dirt && ((!menu_ret.allow_pano && !in_world) || (in_world && !menu_ret.allow_world)))
     {
         ImTextureID tex_id = reinterpret_cast<ImTextureID>(mc_gui::global_ctx->tex_id_bg);
         ImVec2 size = ImGui::GetMainViewport()->Size;
