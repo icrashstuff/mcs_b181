@@ -77,6 +77,7 @@ static convar_int_t cvr_autoconnect_port(
 static convar_float_t cvr_r_fov_base("r_fov_base", 75.0f, 30.0f, 120.0f, "Base FOV", CONVAR_FLAG_SAVE);
 
 static convar_float_t cvr_r_crosshair_scale("r_crosshair_scale", 1.0f, 0.0f, 64.0f, "Multiplier for crosshair size", CONVAR_FLAG_SAVE);
+static convar_int_t cvr_r_crosshair_widgets("r_crosshair_widgets", 0, 0, 1, "Use widgets texture for crosshair", CONVAR_FLAG_SAVE | CONVAR_FLAG_INT_IS_BOOL);
 
 static convar_int_t cvr_mc_gui_style_editor(
     "mc_gui_style_editor", 0, 0, 1, "Show style editor for the MC GUI system", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
@@ -414,12 +415,14 @@ static void normal_loop()
         const ImVec2 pos1(center + ImVec2(8.0f, 8.0f) * scale);
         const ImVec2 uv0(240.0f / 256.0f, 0.0f);
         const ImVec2 uv1(1.0f, 16.0f / 256.0f);
-        bg_draw_list->AddImage(reinterpret_cast<ImTextureID>(mc_gui::global_ctx->tex_id_widgets), pos0, pos1, uv0, uv1);
-
+        if (cvr_r_crosshair_widgets.get())
+            bg_draw_list->AddImage(reinterpret_cast<ImTextureID>(mc_gui::global_ctx->tex_id_widgets), pos0, pos1, uv0, uv1);
+        else
+            bg_draw_list->AddImage(reinterpret_cast<ImTextureID>(mc_gui::global_ctx->tex_id_crosshair), pos0, pos1);
         bg_draw_list->AddCallback(ImDrawCallback_ResetRenderState, NULL);
 
         if (client_menu_manager.stack_size())
-            bg_draw_list->AddRectFilled(ImVec2(0, 0), ImGui::GetMainViewport()->Size, IM_COL32(32, 32, 32, 255 * 0.5f));
+            bg_draw_list->AddRectFilled(ImVec2(-32, -32), ImGui::GetMainViewport()->Size + ImVec2(32, 32), IM_COL32(32, 32, 32, 255 * 0.5f));
     }
 
     if (menu_ret.allow_pano && !in_world)

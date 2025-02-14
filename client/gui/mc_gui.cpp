@@ -31,11 +31,8 @@
 
 #include "tetra/gui/imgui_internal.h"
 
-static GLuint load_gui_texture(std::string path, GLenum edge = GL_CLAMP_TO_EDGE)
+static GLuint load_texture(void* data, int x, int y, std::string label, GLenum edge, GLenum format_color = GL_RGBA, GLenum format_data = GL_UNSIGNED_BYTE)
 {
-    const std::string label = std::string("[Menu]: Texture: ") + path;
-    path = "/_resources/assets/minecraft/textures/gui/" + path;
-
     GLuint ret;
     glGenTextures(1, &ret);
     glBindTexture(GL_TEXTURE_2D, ret);
@@ -47,30 +44,49 @@ static GLuint load_gui_texture(std::string path, GLenum edge = GL_CLAMP_TO_EDGE)
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, edge);
     glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, edge);
 
+    if (data)
+        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, x, y, 0, format_color, format_data, data);
+    else
+    {
+        tetra::gl_obj_label(GL_TEXTURE, ret, (label + " (Missing)").c_str());
+        Uint8* data_missing = new Uint8[64 * 64 * 4];
+        if (data_missing)
+        {
+            for (y = 0; y < 64; y++)
+                for (x = 0; x < 64; x++)
+                {
+                    data_missing[(y * 64 + x) * 4 + 0] = (x % 2 == y % 2) ? 0 : 255;
+                    data_missing[(y * 64 + x) * 4 + 1] = 0;
+                    data_missing[(y * 64 + x) * 4 + 2] = (x % 2 == y % 2) ? 0 : 255;
+                    data_missing[(y * 64 + x) * 4 + 3] = 255;
+                }
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, x, y, 0, GL_RGBA, GL_UNSIGNED_BYTE, data_missing);
+        }
+        else
+        {
+            Uint8 data_missing_missing[] = { 0xC7, 0, 0, 0xC7 };
+            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 2, 2, 0, GL_RGB, GL_UNSIGNED_BYTE_3_3_2, data_missing_missing);
+        }
+        delete[] data_missing;
+    }
+
+    return ret;
+}
+
+static GLuint load_gui_texture(std::string path, GLenum edge = GL_CLAMP_TO_EDGE, std::string prefix = "/_resources/assets/minecraft/textures/gui/")
+{
+    const std::string label = std::string("[Menu]: Texture: ") + path;
+    path = prefix + path;
+
     int x, y, channels;
     Uint8* data_widgets = stbi_physfs_load(path.c_str(), &x, &y, &channels, 4);
 
-    if (data_widgets)
-    {
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, x, y, 0, GL_RGBA, GL_UNSIGNED_BYTE, data_widgets);
-        stbi_image_free(data_widgets);
-    }
-    else
-    {
+    if (!data_widgets)
         dc_log_error("Unable to load texture: \"%s\"", path.c_str());
-        tetra::gl_obj_label(GL_TEXTURE, ret, (label + " (Missing)").c_str());
-        Uint8* data_missing = new Uint8[64 * 64 * 4];
-        for (y = 0; y < 64; y++)
-            for (x = 0; x < 64; x++)
-            {
-                data_missing[(y * 64 + x) * 4 + 0] = (x % 2 == y % 2) ? 0 : 255;
-                data_missing[(y * 64 + x) * 4 + 1] = 0;
-                data_missing[(y * 64 + x) * 4 + 2] = (x % 2 == y % 2) ? 0 : 255;
-                data_missing[(y * 64 + x) * 4 + 3] = 255;
-            }
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, x, y, 0, GL_RGBA, GL_UNSIGNED_BYTE, data_missing);
-        delete[] data_missing;
-    }
+
+    GLuint ret = load_texture(data_widgets, x, y, label, edge);
+
+    stbi_image_free(data_widgets);
 
     return ret;
 }
@@ -113,6 +129,14 @@ void mc_gui::mc_gui_ctx::load_resources()
     tex_id_bg = load_gui_texture("options_background.png", GL_REPEAT);
     tex_id_selectors_resource = load_gui_texture("resource_packs.png");
     tex_id_selectors_server = load_gui_texture("server_selection.png");
+
+    Uint16 data_crosshair[16 * 16] = { 0 };
+    for (int i = 3; i < 12; i++)
+    {
+        data_crosshair[i + 7 * 16] = 0xFFFF;
+        data_crosshair[7 + i * 16] = 0xFFFF;
+    }
+    tex_id_crosshair = load_texture(data_crosshair, 16, 16, "[Menu]: Texture: Crosshair", GL_CLAMP, GL_RGBA, GL_UNSIGNED_SHORT_4_4_4_4);
 }
 
 void mc_gui::mc_gui_ctx::unload_resources()
@@ -139,6 +163,8 @@ void mc_gui::mc_gui_ctx::unload_resources()
     DEL_TEX(tex_id_bg);
     DEL_TEX(tex_id_selectors_resource);
     DEL_TEX(tex_id_selectors_server);
+
+    DEL_TEX(tex_id_crosshair);
 
     translations.clear();
 

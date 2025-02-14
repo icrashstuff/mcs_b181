@@ -36,6 +36,7 @@ namespace mc_gui
 struct mc_gui_ctx
 {
     GLuint tex_id_widgets = 0;
+    GLuint tex_id_crosshair = 0;
     GLuint tex_id_icons = 0;
 
     GLuint tex_id_inventory = 0;
