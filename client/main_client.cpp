@@ -351,8 +351,8 @@ static void normal_loop()
 
     ImGuiContext* last_ctx = ImGui::GetCurrentContext();
     ImGui::SetCurrentContext(imgui_ctx_main_menu);
-    ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
+    ImGui_ImplOpenGL3_NewFrame();
     ImGui::NewFrame();
 
     int& menu_scale = mc_gui::global_ctx->menu_scale;
@@ -393,26 +393,33 @@ static void normal_loop()
     if (in_world && game->connection)
         in_world = game->connection->get_status() == connection_t::CONNECTION_ACTIVE;
 
+    ImDrawList* const bg_draw_list = ImGui::GetBackgroundDrawList();
+
     if (menu_ret.allow_world && in_world)
     {
         game->level->lightmap.update();
         game->level->get_terrain()->update();
         game->level->render(win_size);
 
+        /* This blendfunc causes properly made cursors to contrast with the environment better */
+        bg_draw_list->AddCallback([](const ImDrawList*, const ImDrawCmd*) { glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_ALPHA); }, NULL);
+
         /* Render crosshair
          * NOTE: If a function called by client_menu_manager.run_last_in_stack() adds to
          * the background draw list then the crosshair will be drawn on top!
          */
         const ImVec2 center = ImGui::GetMainViewport()->GetWorkCenter();
-        const float scale = cvr_r_crosshair_scale.get() * mc_gui::global_ctx->menu_scale;
+        const float scale = cvr_r_crosshair_scale.get() * SDL_min(3, mc_gui::global_ctx->menu_scale);
         const ImVec2 pos0(center - ImVec2(8.0f, 8.0f) * scale);
         const ImVec2 pos1(center + ImVec2(8.0f, 8.0f) * scale);
         const ImVec2 uv0(240.0f / 256.0f, 0.0f);
         const ImVec2 uv1(1.0f, 16.0f / 256.0f);
-        ImGui::GetBackgroundDrawList()->AddImage(reinterpret_cast<ImTextureID>(mc_gui::global_ctx->tex_id_widgets), pos0, pos1, uv0, uv1);
+        bg_draw_list->AddImage(reinterpret_cast<ImTextureID>(mc_gui::global_ctx->tex_id_widgets), pos0, pos1, uv0, uv1);
+
+        bg_draw_list->AddCallback(ImDrawCallback_ResetRenderState, NULL);
 
         if (client_menu_manager.stack_size())
-            ImGui::GetBackgroundDrawList()->AddRectFilled(ImVec2(0, 0), ImGui::GetMainViewport()->Size, IM_COL32(32, 32, 32, 255 * 0.5f));
+            bg_draw_list->AddRectFilled(ImVec2(0, 0), ImGui::GetMainViewport()->Size, IM_COL32(32, 32, 32, 255 * 0.5f));
     }
 
     if (menu_ret.allow_pano && !in_world)
@@ -422,8 +429,8 @@ static void normal_loop()
     {
         ImTextureID tex_id = reinterpret_cast<ImTextureID>(mc_gui::global_ctx->tex_id_bg);
         ImVec2 size = ImGui::GetMainViewport()->Size;
-        ImGui::GetBackgroundDrawList()->AddImage(tex_id, ImVec2(0, 0), size, ImVec2(0, 0), size / (32.0f * float(SDL_max(1, mc_gui::global_ctx->menu_scale))));
-        ImGui::GetBackgroundDrawList()->AddRectFilled(ImVec2(0, 0), size, IM_COL32(0, 0, 0, 255 * 0.75f));
+        bg_draw_list->AddImage(tex_id, ImVec2(0, 0), size, ImVec2(0, 0), size / (32.0f * float(SDL_max(1, mc_gui::global_ctx->menu_scale))));
+        bg_draw_list->AddRectFilled(ImVec2(0, 0), size, IM_COL32(0, 0, 0, 255 * 0.75f));
     }
 
     ImGui::Render();
