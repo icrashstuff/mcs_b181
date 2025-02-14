@@ -43,7 +43,7 @@ struct level_t
 {
     struct ivec3_comparator_t
     {
-        bool operator()(const glm::ivec3& a, const glm::ivec3& b)
+        bool operator()(const glm::ivec3& a, const glm::ivec3& b) const
         {
             if (a.x < b.x)
                 return true;
