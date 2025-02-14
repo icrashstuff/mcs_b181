@@ -214,6 +214,7 @@ shader_t::~shader_t()
 void shader_t::build_all()
 {
     Uint64 tick_shader_start = SDL_GetTicksNS();
+    dc_log("Building %zu shaders", all_shaders.size());
     size_t built = 0;
     for (shader_t* s : all_shaders)
     {
@@ -221,6 +222,5 @@ void shader_t::build_all()
         built++;
     }
     double elapsed = (SDL_GetTicksNS() - tick_shader_start) / 1000000.0;
-    if (built)
-        dc_log("Compiled %zu shader%s in %.2f ms (%.2f per)", built, built == 1 ? "" : "s", elapsed, elapsed / double(built));
+    dc_log("Compiled %zu shader%s in %.2f ms (%.2f per)", built, built == 1 ? "" : "s", elapsed, elapsed / double(SDL_max(1, built)));
 }

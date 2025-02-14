@@ -43,7 +43,7 @@ struct shader_t
     /**
      * Builds and links the shader program specifed by path_vtx and path_frag
      *
-     * NOTE: This immediately deletes the shader program (if built)
+     * NOTE: This immediately deletes the pre-existing OpenGL program
      */
     void build();
 
