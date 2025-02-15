@@ -49,6 +49,7 @@ struct mc_gui_ctx
     GLuint tex_id_crafting_table = 0;
 
     GLuint tex_id_bg = 0;
+    GLuint tex_id_water = 0;
     GLuint tex_id_selectors_resource = 0;
     GLuint tex_id_selectors_server = 0;
 

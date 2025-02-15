@@ -127,6 +127,7 @@ void mc_gui::mc_gui_ctx::load_resources()
     tex_id_crafting_table = load_gui_texture("container/crafting_table.png");
 
     tex_id_bg = load_gui_texture("options_background.png", GL_REPEAT);
+    tex_id_water = load_gui_texture("misc/underwater.png", GL_REPEAT, "/_resources/assets/minecraft/textures/");
     tex_id_selectors_resource = load_gui_texture("resource_packs.png");
     tex_id_selectors_server = load_gui_texture("server_selection.png");
 
@@ -161,6 +162,7 @@ void mc_gui::mc_gui_ctx::unload_resources()
     DEL_TEX(tex_id_crafting_table);
 
     DEL_TEX(tex_id_bg);
+    DEL_TEX(tex_id_water);
     DEL_TEX(tex_id_selectors_resource);
     DEL_TEX(tex_id_selectors_server);
 

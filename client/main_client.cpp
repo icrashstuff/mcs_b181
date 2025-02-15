@@ -79,6 +79,8 @@ static convar_float_t cvr_r_fov_base("r_fov_base", 75.0f, 30.0f, 120.0f, "Base F
 static convar_float_t cvr_r_crosshair_scale("r_crosshair_scale", 1.0f, 0.0f, 64.0f, "Multiplier for crosshair size", CONVAR_FLAG_SAVE);
 static convar_int_t cvr_r_crosshair_widgets("r_crosshair_widgets", 0, 0, 1, "Use widgets texture for crosshair", CONVAR_FLAG_SAVE | CONVAR_FLAG_INT_IS_BOOL);
 
+static convar_int_t cvr_r_overlay_inblock("r_overlay_inblock", 1, 0, 1, "Display overlay of block when in a block", CONVAR_FLAG_SAVE | CONVAR_FLAG_INT_IS_BOOL);
+
 static convar_int_t cvr_mc_gui_style_editor(
     "mc_gui_style_editor", 0, 0, 1, "Show style editor for the MC GUI system", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 
@@ -199,6 +201,293 @@ static bool wireframe = 0;
 #define AO_ALGO_MAX 5
 
 #include "main_client.menu.cpp"
+
+#define GLM_TO_IM(A) ImVec2((A).x, (A).y)
+
+/**
+ * Draw world overlays
+ *
+ * @param level Level to draw overlays for (Must not be NULL!)
+ * @param bg_draw_list List to draw to
+ */
+void render_world_overlays(level_t* level, ImDrawList* const bg_draw_list)
+{
+    /* This is a bit much */
+    const glm::vec3 cam_pos = glm::floor(level->camera_pos);
+
+    block_id_t type = BLOCK_ID_AIR;
+    Uint8 metadata = 0;
+
+    auto chunk_map = level->get_chunk_map();
+
+    auto it = chunk_map.find(glm::ivec3(cam_pos) >> 4);
+    if (it != chunk_map.end())
+    {
+        glm::ivec3 coords_rel = glm::ivec3(cam_pos) & 0x0F;
+        block_id_t _type = it->second->get_type(coords_rel.x, coords_rel.y, coords_rel.z);
+        if (_type != BLOCK_ID_AIR && _type != BLOCK_ID_NONE)
+        {
+            type = _type;
+            metadata = it->second->get_metadata(coords_rel.x, coords_rel.y, coords_rel.z);
+        }
+    }
+
+    if (type == BLOCK_ID_AIR || type == BLOCK_ID_NONE)
+        return;
+
+    ImVec2 size = ImGui::GetMainViewport()->Size;
+    ImVec2 pos0(-4, -4);
+    ImVec2 pos1(size + ImVec2(4, 4));
+    ImVec2 uv0(0, 0);
+    ImVec2 uv1(1, 1);
+    ImVec2 center = ImGui::GetMainViewport()->GetCenter();
+    uv0.x = (-size.x / SDL_max(1.0f, size.y)) / 2.0f;
+    uv1.x = -uv0.x;
+
+    uv0.x += level->yaw / 360.0f;
+    uv1.x += level->yaw / 360.0f;
+
+    uv0.y -= level->pitch / 180.0f;
+    uv1.y -= level->pitch / 180.0f;
+
+    if (type == BLOCK_ID_WATER_FLOWING || type == BLOCK_ID_WATER_SOURCE)
+    {
+        ImTextureID tex_id = reinterpret_cast<ImTextureID>(mc_gui::global_ctx->tex_id_water);
+        bg_draw_list->AddRectFilled(ImVec2(-32, -32), ImGui::GetMainViewport()->Size + ImVec2(32, 32), IM_COL32(0, 0, 64, 255 * 0.5f));
+        bg_draw_list->AddImage(tex_id, pos0, pos1, uv0, uv1, IM_COL32(255, 255, 255, 0.125f * 255));
+    }
+    else if (type == BLOCK_ID_LAVA_FLOWING || type == BLOCK_ID_LAVA_SOURCE)
+    {
+        /* In the future this should happen by setting fog intensity to high and fog color to red */
+        bg_draw_list->AddRectFilled(pos0, pos1, IM_COL32(255, 24, 0, 0.5 * 255));
+    }
+    else if (mc_id::is_block(type) && !mc_id::is_transparent(type) && game_resources && game_resources->terrain_atlas)
+    {
+        ImTextureID tex_id = reinterpret_cast<ImTextureID>(game_resources->terrain_atlas);
+        mc_id::terrain_face_t face = game_resources->terrain_atlas->get_face(mc_id::FACE_STONE);
+#define BLOCK_OVERLAY(ID, FACE_ID)                               \
+    case ID:                                                     \
+        face = game_resources->terrain_atlas->get_face(FACE_ID); \
+        break;
+        switch (type)
+        {
+            BLOCK_OVERLAY(BLOCK_ID_STONE, mc_id::FACE_STONE);
+            BLOCK_OVERLAY(BLOCK_ID_GRASS, mc_id::FACE_GRASS_TOP);
+            BLOCK_OVERLAY(BLOCK_ID_DIRT, mc_id::FACE_DIRT);
+            BLOCK_OVERLAY(BLOCK_ID_COBBLESTONE, mc_id::FACE_COBBLESTONE);
+        case BLOCK_ID_WOOD_PLANKS:
+        {
+            /* Multiple plank types are not in Minecraft Beta 1.8.x */
+            switch (metadata)
+            {
+                BLOCK_OVERLAY(WOOD_ID_SPRUCE, mc_id::FACE_PLANKS_SPRUCE);
+                BLOCK_OVERLAY(WOOD_ID_BIRCH, mc_id::FACE_PLANKS_BIRCH);
+            default: /* Fall through */
+                BLOCK_OVERLAY(WOOD_ID_OAK, mc_id::FACE_PLANKS_OAK);
+            }
+            break;
+        }
+            BLOCK_OVERLAY(BLOCK_ID_BEDROCK, mc_id::FACE_BEDROCK);
+
+            BLOCK_OVERLAY(BLOCK_ID_SAND, mc_id::FACE_SAND);
+            BLOCK_OVERLAY(BLOCK_ID_GRAVEL, mc_id::FACE_GRAVEL);
+            BLOCK_OVERLAY(BLOCK_ID_ORE_GOLD, mc_id::FACE_GOLD_ORE);
+            BLOCK_OVERLAY(BLOCK_ID_ORE_IRON, mc_id::FACE_IRON_ORE);
+            BLOCK_OVERLAY(BLOCK_ID_ORE_COAL, mc_id::FACE_COAL_ORE);
+        case BLOCK_ID_LOG:
+        {
+            switch (metadata)
+            {
+                BLOCK_OVERLAY(WOOD_ID_SPRUCE, mc_id::FACE_LOG_SPRUCE);
+                BLOCK_OVERLAY(WOOD_ID_BIRCH, mc_id::FACE_LOG_BIRCH);
+            default: /* Fall through */
+                BLOCK_OVERLAY(WOOD_ID_OAK, mc_id::FACE_LOG_OAK);
+            }
+            break;
+        }
+        case BLOCK_ID_LEAVES:
+        {
+            switch (metadata)
+            {
+                BLOCK_OVERLAY(WOOD_ID_SPRUCE, mc_id::FACE_LEAVES_SPRUCE);
+                BLOCK_OVERLAY(WOOD_ID_BIRCH, mc_id::FACE_LEAVES_BIRCH);
+            default: /* Fall through */
+                BLOCK_OVERLAY(WOOD_ID_OAK, mc_id::FACE_LEAVES_OAK);
+            }
+            break;
+        }
+            BLOCK_OVERLAY(BLOCK_ID_SPONGE, mc_id::FACE_SPONGE);
+            BLOCK_OVERLAY(BLOCK_ID_GLASS, mc_id::FACE_GLASS);
+            BLOCK_OVERLAY(BLOCK_ID_ORE_LAPIS, mc_id::FACE_LAPIS_ORE);
+
+            BLOCK_OVERLAY(BLOCK_ID_LAPIS, mc_id::FACE_LAPIS_BLOCK);
+            BLOCK_OVERLAY(BLOCK_ID_DISPENSER, mc_id::FACE_DISPENSER_FRONT_HORIZONTAL);
+            BLOCK_OVERLAY(BLOCK_ID_SANDSTONE, mc_id::FACE_SANDSTONE_NORMAL)
+            BLOCK_OVERLAY(BLOCK_ID_NOTE_BLOCK, mc_id::FACE_NOTEBLOCK);
+            BLOCK_OVERLAY(BLOCK_ID_BED, mc_id::FACE_BED_HEAD_TOP);
+            BLOCK_OVERLAY(BLOCK_ID_RAIL_POWERED, mc_id::FACE_RAIL_GOLDEN_POWERED);
+            BLOCK_OVERLAY(BLOCK_ID_RAIL_DETECTOR, mc_id::FACE_RAIL_DETECTOR);
+            BLOCK_OVERLAY(BLOCK_ID_PISTON_STICKY, mc_id::FACE_PISTON_TOP_STICKY);
+        case BLOCK_ID_FOLIAGE:
+        {
+            switch (metadata)
+            {
+                BLOCK_OVERLAY(0, mc_id::FACE_DEADBUSH);
+                BLOCK_OVERLAY(1, mc_id::FACE_FERN);
+            default: /* Fall through */
+                BLOCK_OVERLAY(2, mc_id::FACE_TALLGRASS);
+            }
+            break;
+        }
+            BLOCK_OVERLAY(BLOCK_ID_DEAD_BUSH, mc_id::FACE_DEADBUSH);
+            BLOCK_OVERLAY(BLOCK_ID_PISTON, mc_id::FACE_PISTON_TOP_NORMAL);
+            BLOCK_OVERLAY(BLOCK_ID_PISTON_HEAD, mc_id::FACE_PISTON_TOP_NORMAL);
+        case BLOCK_ID_WOOL:
+        {
+            switch (metadata)
+            {
+                BLOCK_OVERLAY(WOOL_ID_WHITE, mc_id::FACE_WOOL_COLORED_WHITE)
+                BLOCK_OVERLAY(WOOL_ID_ORANGE, mc_id::FACE_WOOL_COLORED_ORANGE)
+                BLOCK_OVERLAY(WOOL_ID_MAGENTA, mc_id::FACE_WOOL_COLORED_MAGENTA)
+                BLOCK_OVERLAY(WOOL_ID_LIGHT_BLUE, mc_id::FACE_WOOL_COLORED_LIGHT_BLUE)
+                BLOCK_OVERLAY(WOOL_ID_YELLOW, mc_id::FACE_WOOL_COLORED_YELLOW)
+                BLOCK_OVERLAY(WOOL_ID_LIME, mc_id::FACE_WOOL_COLORED_LIME)
+                BLOCK_OVERLAY(WOOL_ID_PINK, mc_id::FACE_WOOL_COLORED_PINK)
+                BLOCK_OVERLAY(WOOL_ID_GRAY, mc_id::FACE_WOOL_COLORED_GRAY)
+                BLOCK_OVERLAY(WOOL_ID_LIGHT_GRAY, mc_id::FACE_WOOL_COLORED_SILVER)
+                BLOCK_OVERLAY(WOOL_ID_CYAN, mc_id::FACE_WOOL_COLORED_CYAN)
+                BLOCK_OVERLAY(WOOL_ID_PURPLE, mc_id::FACE_WOOL_COLORED_PURPLE)
+                BLOCK_OVERLAY(WOOL_ID_BLUE, mc_id::FACE_WOOL_COLORED_BLUE)
+                BLOCK_OVERLAY(WOOL_ID_BROWN, mc_id::FACE_WOOL_COLORED_BROWN)
+                BLOCK_OVERLAY(WOOL_ID_GREEN, mc_id::FACE_WOOL_COLORED_GREEN)
+                BLOCK_OVERLAY(WOOL_ID_RED, mc_id::FACE_WOOL_COLORED_RED)
+                BLOCK_OVERLAY(WOOL_ID_BLACK, mc_id::FACE_WOOL_COLORED_BLACK)
+            }
+            break;
+        }
+            BLOCK_OVERLAY(BLOCK_ID_FLOWER_YELLOW, mc_id::FACE_FLOWER_DANDELION);
+            BLOCK_OVERLAY(BLOCK_ID_FLOWER_RED, mc_id::FACE_FLOWER_ROSE);
+            BLOCK_OVERLAY(BLOCK_ID_MUSHROOM_BLAND, mc_id::FACE_MUSHROOM_BROWN);
+            BLOCK_OVERLAY(BLOCK_ID_MUSHROOM_RED, mc_id::FACE_MUSHROOM_RED);
+
+            BLOCK_OVERLAY(BLOCK_ID_GOLD, mc_id::FACE_GOLD_BLOCK);
+            BLOCK_OVERLAY(BLOCK_ID_IRON, mc_id::FACE_IRON_BLOCK);
+
+        case BLOCK_ID_SLAB_DOUBLE:
+        case BLOCK_ID_SLAB_SINGLE:
+        {
+            switch (metadata)
+            {
+                BLOCK_OVERLAY(SLAB_ID_SMOOTH, mc_id::FACE_STONE_SLAB_SIDE);
+                BLOCK_OVERLAY(SLAB_ID_SANDSTONE, mc_id::FACE_SANDSTONE_NORMAL);
+                BLOCK_OVERLAY(SLAB_ID_WOOD, mc_id::FACE_PLANKS_OAK);
+                BLOCK_OVERLAY(SLAB_ID_COBBLESTONE, mc_id::FACE_COBBLESTONE);
+                BLOCK_OVERLAY(SLAB_ID_BRICKS, mc_id::FACE_BRICK);
+                BLOCK_OVERLAY(SLAB_ID_BRICKS_STONE, mc_id::FACE_STONEBRICK);
+            default: /* Fall through */
+                BLOCK_OVERLAY(SLAB_ID_SMOOTH_SIDE, mc_id::FACE_STONE_SLAB_TOP);
+            }
+            break;
+        }
+            BLOCK_OVERLAY(BLOCK_ID_BRICKS, mc_id::FACE_BRICK);
+            BLOCK_OVERLAY(BLOCK_ID_TNT, mc_id::FACE_TNT_SIDE);
+            BLOCK_OVERLAY(BLOCK_ID_BOOKSHELF, mc_id::FACE_BOOKSHELF);
+            BLOCK_OVERLAY(BLOCK_ID_COBBLESTONE_MOSSY, mc_id::FACE_COBBLESTONE_MOSSY);
+            BLOCK_OVERLAY(BLOCK_ID_OBSIDIAN, mc_id::FACE_OBSIDIAN);
+
+            BLOCK_OVERLAY(BLOCK_ID_TORCH, mc_id::FACE_TORCH_ON);
+            BLOCK_OVERLAY(BLOCK_ID_FIRE, mc_id::FACE_FIRE_LAYER_0);
+            BLOCK_OVERLAY(BLOCK_ID_SPAWNER, mc_id::FACE_MOB_SPAWNER);
+
+            BLOCK_OVERLAY(BLOCK_ID_STAIRS_WOOD, mc_id::FACE_PLANKS_OAK);
+            BLOCK_OVERLAY(BLOCK_ID_ORE_DIAMOND, mc_id::FACE_DIAMOND_ORE);
+            BLOCK_OVERLAY(BLOCK_ID_DIAMOND, mc_id::FACE_DIAMOND_BLOCK);
+            BLOCK_OVERLAY(BLOCK_ID_CRAFTING_TABLE, mc_id::FACE_CRAFTING_TABLE_SIDE);
+            BLOCK_OVERLAY(BLOCK_ID_DIRT_TILLED, mc_id::FACE_DIRT);
+            BLOCK_OVERLAY(BLOCK_ID_FURNACE_OFF, mc_id::FACE_FURNACE_FRONT_OFF);
+            BLOCK_OVERLAY(BLOCK_ID_FURNACE_ON, mc_id::FACE_FURNACE_FRONT_ON);
+            BLOCK_OVERLAY(BLOCK_ID_DOOR_WOOD, mc_id::FACE_DOOR_WOOD_UPPER);
+            BLOCK_OVERLAY(BLOCK_ID_LADDER, mc_id::FACE_LADDER);
+            BLOCK_OVERLAY(BLOCK_ID_RAIL, mc_id::FACE_RAIL_NORMAL);
+            BLOCK_OVERLAY(BLOCK_ID_STAIRS_COBBLESTONE, mc_id::FACE_COBBLESTONE);
+            BLOCK_OVERLAY(BLOCK_ID_PRESSURE_PLATE_STONE, mc_id::FACE_STONE);
+            BLOCK_OVERLAY(BLOCK_ID_DOOR_IRON, mc_id::FACE_DOOR_IRON_UPPER);
+            BLOCK_OVERLAY(BLOCK_ID_PRESSURE_PLATE_WOOD, mc_id::FACE_PLANKS_OAK);
+            BLOCK_OVERLAY(BLOCK_ID_ORE_REDSTONE_OFF, mc_id::FACE_REDSTONE_ORE);
+            BLOCK_OVERLAY(BLOCK_ID_ORE_REDSTONE_ON, mc_id::FACE_REDSTONE_ORE);
+            BLOCK_OVERLAY(BLOCK_ID_TORCH_REDSTONE_OFF, mc_id::FACE_REDSTONE_TORCH_OFF);
+            BLOCK_OVERLAY(BLOCK_ID_TORCH_REDSTONE_ON, mc_id::FACE_REDSTONE_TORCH_ON);
+            BLOCK_OVERLAY(BLOCK_ID_BUTTON_STONE, mc_id::FACE_STONE);
+            BLOCK_OVERLAY(BLOCK_ID_SNOW, mc_id::FACE_SNOW);
+            BLOCK_OVERLAY(BLOCK_ID_ICE, mc_id::FACE_ICE);
+            BLOCK_OVERLAY(BLOCK_ID_SNOW_BLOCK, mc_id::FACE_SNOW);
+            BLOCK_OVERLAY(BLOCK_ID_CACTUS, mc_id::FACE_CACTUS_SIDE);
+            BLOCK_OVERLAY(BLOCK_ID_CLAY, mc_id::FACE_CLAY);
+            BLOCK_OVERLAY(BLOCK_ID_SUGAR_CANE, mc_id::FACE_REEDS);
+            BLOCK_OVERLAY(BLOCK_ID_JUKEBOX, mc_id::FACE_JUKEBOX_SIDE);
+        case BLOCK_ID_FENCE_WOOD:
+        {
+            /* Multiple fence types are not in Minecraft Beta 1.8.x */
+            switch (metadata)
+            {
+                BLOCK_OVERLAY(WOOD_ID_SPRUCE, mc_id::FACE_PLANKS_SPRUCE);
+                BLOCK_OVERLAY(WOOD_ID_BIRCH, mc_id::FACE_PLANKS_BIRCH);
+            default: /* Fall through */
+                BLOCK_OVERLAY(WOOD_ID_OAK, mc_id::FACE_PLANKS_OAK);
+            }
+            break;
+        }
+            BLOCK_OVERLAY(BLOCK_ID_PUMPKIN, mc_id::FACE_PUMPKIN_FACE_OFF);
+            BLOCK_OVERLAY(BLOCK_ID_NETHERRACK, mc_id::FACE_NETHERRACK);
+            BLOCK_OVERLAY(BLOCK_ID_SOULSAND, mc_id::FACE_SOUL_SAND);
+            BLOCK_OVERLAY(BLOCK_ID_GLOWSTONE, mc_id::FACE_GLOWSTONE);
+            BLOCK_OVERLAY(BLOCK_ID_NETHER_PORTAL, mc_id::FACE_PORTAL);
+            BLOCK_OVERLAY(BLOCK_ID_PUMPKIN_GLOWING, mc_id::FACE_PUMPKIN_FACE_ON)
+            BLOCK_OVERLAY(BLOCK_ID_CAKE, mc_id::FACE_CAKE_TOP);
+            BLOCK_OVERLAY(BLOCK_ID_REPEATER_OFF, mc_id::FACE_REPEATER_OFF);
+            BLOCK_OVERLAY(BLOCK_ID_REPEATER_ON, mc_id::FACE_REPEATER_ON);
+            BLOCK_OVERLAY(BLOCK_ID_CHEST_LOCKED, mc_id::FACE_DEBUG);
+            BLOCK_OVERLAY(BLOCK_ID_TRAPDOOR, mc_id::FACE_TRAPDOOR);
+        case BLOCK_ID_UNKNOWN_STONE:
+        {
+            switch (metadata)
+            {
+                BLOCK_OVERLAY(1, mc_id::FACE_COBBLESTONE);
+                BLOCK_OVERLAY(2, mc_id::FACE_STONEBRICK);
+            default: /* Fall through */
+                BLOCK_OVERLAY(0, mc_id::FACE_STONE);
+            }
+            break;
+        }
+        case BLOCK_ID_BRICKS_STONE:
+        {
+            switch (metadata)
+            {
+                BLOCK_OVERLAY(STONE_BRICK_ID_MOSSY, mc_id::FACE_STONEBRICK_MOSSY);
+                BLOCK_OVERLAY(STONE_BRICK_ID_CRACKED, mc_id::FACE_STONEBRICK_CRACKED);
+            default: /* Fall through */
+                BLOCK_OVERLAY(STONE_BRICK_ID_REGULAR, mc_id::FACE_STONEBRICK);
+            }
+            break;
+        }
+            BLOCK_OVERLAY(BLOCK_ID_MUSHROOM_BLOCK_BLAND, mc_id::FACE_MUSHROOM_BLOCK_SKIN_BROWN);
+            BLOCK_OVERLAY(BLOCK_ID_MUSHROOM_BLOCK_RED, mc_id::FACE_MUSHROOM_BLOCK_SKIN_RED);
+            BLOCK_OVERLAY(BLOCK_ID_IRON_BARS, mc_id::FACE_IRON_BARS);
+            BLOCK_OVERLAY(BLOCK_ID_GLASS_PANE, mc_id::FACE_GLASS);
+            BLOCK_OVERLAY(BLOCK_ID_MELON, mc_id::FACE_MELON_SIDE)
+            BLOCK_OVERLAY(BLOCK_ID_MOSS, mc_id::FACE_VINE);
+            BLOCK_OVERLAY(BLOCK_ID_STAIRS_BRICK, mc_id::FACE_BRICK);
+            BLOCK_OVERLAY(BLOCK_ID_STAIRS_BRICK_STONE, mc_id::FACE_STONEBRICK);
+        }
+        ImVec2 off(SDL_max(center.x, center.y), SDL_max(center.x, center.y));
+
+        if (cvr_r_overlay_inblock.get())
+        {
+            bg_draw_list->AddImage(tex_id, center - off, center + off, GLM_TO_IM(face.corners[1]), GLM_TO_IM((face.corners[2])));
+            bg_draw_list->AddRectFilled(ImVec2(-32, -32), ImGui::GetMainViewport()->Size + ImVec2(32, 32), IM_COL32(0, 0, 0, 255 * 0.5f));
+        }
+    }
+}
 
 static void normal_loop()
 {
@@ -402,6 +691,8 @@ static void normal_loop()
         game->level->get_terrain()->update();
         game->level->render(win_size);
 
+        render_world_overlays(game->level, bg_draw_list);
+
         /* This blendfunc causes properly made cursors to contrast with the environment better */
         bg_draw_list->AddCallback([](const ImDrawList*, const ImDrawCmd*) { glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_ALPHA); }, NULL);
 
@@ -431,9 +722,10 @@ static void normal_loop()
     if (menu_ret.allow_dirt && ((!menu_ret.allow_pano && !in_world) || (in_world && !menu_ret.allow_world)))
     {
         ImTextureID tex_id = reinterpret_cast<ImTextureID>(mc_gui::global_ctx->tex_id_bg);
-        ImVec2 size = ImGui::GetMainViewport()->Size;
-        bg_draw_list->AddImage(tex_id, ImVec2(0, 0), size, ImVec2(0, 0), size / (32.0f * float(SDL_max(1, mc_gui::global_ctx->menu_scale))));
-        bg_draw_list->AddRectFilled(ImVec2(0, 0), size, IM_COL32(0, 0, 0, 255 * 0.75f));
+        ImVec2 pos0 = ImVec2(-32, -32);
+        ImVec2 pos1 = ImGui::GetMainViewport()->Size + ImVec2(32, 32);
+        bg_draw_list->AddImage(tex_id, pos0, pos1, ImVec2(0, 0), pos1 / (32.0f * float(SDL_max(1, mc_gui::global_ctx->menu_scale))));
+        bg_draw_list->AddRectFilled(pos0, pos1, IM_COL32(0, 0, 0, 255 * 0.75f));
     }
 
     ImGui::Render();
@@ -750,45 +1042,6 @@ static void process_event(SDL_Event& event, bool* done)
             break;
         }
 }
-
-/* This isn't the best way to do this, but it will do for now */
-static bool render_water_overlay()
-{
-    if (!game_selected || !game_selected->level)
-        return false;
-
-    glm::ivec3 cam_pos = game_selected->level->camera_pos;
-    glm::ivec3 chunk_coords = cam_pos >> 4;
-
-    bool found_water = false;
-    for (chunk_cubic_t* c : game_selected->level->get_chunk_vec())
-    {
-        if (!c || chunk_coords != c->pos)
-            continue;
-
-        block_id_t type = c->get_type(cam_pos.x & 0x0F, cam_pos.y & 0x0F, cam_pos.z & 0x0F);
-        found_water = (type == BLOCK_ID_WATER_FLOWING) || (type == BLOCK_ID_WATER_SOURCE);
-    }
-    if (!found_water)
-        return false;
-
-    ImGui::SetNextWindowPos(ImVec2(0, 0), ImGuiCond_Always);
-    ImGui::SetNextWindowSize(ImGui::GetMainViewport()->WorkSize, ImGuiCond_Always);
-    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
-    if (ImGui::Begin("Water", NULL, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_NoBackground))
-    {
-        mc_id::terrain_face_t face = game_selected->level->get_terrain()->get_face(mc_id::FACE_WATER_STILL);
-        ImVec2 uv0(face.corners[0].x, face.corners[0].y);
-        ImVec2 uv1(face.corners[3].x, face.corners[3].y);
-        ImGui::Image((void*)(size_t)game_selected->level->get_terrain()->tex_id_main, ImGui::GetMainViewport()->WorkSize, uv0, uv1);
-    }
-    ImGui::End();
-    ImGui::PopStyleVar();
-
-    return true;
-}
-
-static gui_register_overlay reg_render_water_overlay(render_water_overlay);
 
 static bool render_status_msg()
 {
