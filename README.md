@@ -14,6 +14,10 @@ This project makes use of the following external software components:
   - Copyright (C) 1997-2025 Sam Lantinga, and others
   - Zlib License
 
+- ZLib
+  - Copyright (C) 1995-2024 Jean-loup Gailly and Mark Adler
+  - ZLib License
+
 This project vendors and makes use of the following external software components:
 
 - Dear ImGui
