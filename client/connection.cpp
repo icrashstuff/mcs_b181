@@ -723,8 +723,13 @@ bool connection_t::send_packet(packet_t* pack)
 
 connection_t::~connection_t()
 {
+    packet_kick_t pack_disconnect;
+    pack_disconnect.reason = "Quitting";
+    send_packet(pack_disconnect);
+
     SDLNet_UnrefAddress(addr_server);
 
     /* TODO: Store this in a vector of dying sockets to ensure things are properly closed down */
+    SDLNet_WaitUntilStreamSocketDrained(socket, 100);
     SDLNet_DestroyStreamSocket(socket);
 }
