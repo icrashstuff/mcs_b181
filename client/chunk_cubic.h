@@ -84,7 +84,7 @@ struct chunk_cubic_t
 
     glm::ivec3 pos = { 0, 0, 0 };
 
-    Uint8 data[SUBCHUNK_SIZE_VOLUME * 5 / 2];
+    Uint8 data[SUBCHUNK_SIZE_VOLUME * 5 / 2] = { 0 };
 
     chunk_cubic_t() { }
 
