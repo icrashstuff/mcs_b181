@@ -28,6 +28,8 @@
 
 #include "tetra/gui/imgui.h"
 
+#include "client/lang/lang.h"
+
 #include <map>
 #include <string>
 
@@ -61,7 +63,7 @@ struct mc_gui_ctx
 
     ImGuiWindowFlags default_win_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoBackground;
 
-    std::map<std::string, std::string> translations;
+    translation_map_t translations;
 
     void load_resources();
     void unload_resources();

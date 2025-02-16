@@ -96,23 +96,15 @@ void mc_gui::mc_gui_ctx::load_resources()
     unload_resources();
 
     /* Load built in translations */
-    mc_gui::global_ctx->translations["mcs_b181_client.reload_resources"] = "Reload Resources";
-    mc_gui::global_ctx->translations["mcs_b181_client.username"] = "Username";
-    mc_gui::global_ctx->translations["mcs_b181_client.menu.test_world"] = "Test world";
-    mc_gui::global_ctx->translations["mcs_b181_client.placeholder"] = "Nothing to see here :)";
-    mc_gui::global_ctx->translations["mcs_b181_client.mcs_b181_client"] = "mcs_b181_client";
+    translation_map_t built_in;
+    built_in.add_key("mcs_b181_client.reload_resources", "Reload Resources");
+    built_in.add_key("mcs_b181_client.username", "Username");
+    built_in.add_key("mcs_b181_client.menu.test_world", "Test world");
+    built_in.add_key("mcs_b181_client.placeholder", "Nothing to see here :)");
+    built_in.add_key("mcs_b181_client.mcs_b181_client", "mcs_b181_client");
 
-    /* TODO: Load actual translation table */
-    mc_gui::global_ctx->translations["gui.done"] = "Done";
-    mc_gui::global_ctx->translations["options.title"] = "Options";
-    mc_gui::global_ctx->translations["options.on"] = "On";
-    mc_gui::global_ctx->translations["options.off"] = "Off";
-    mc_gui::global_ctx->translations["options.renderDistance"] = "Render Distance";
-    mc_gui::global_ctx->translations["options.guiScale"] = "GUI Scale";
-    mc_gui::global_ctx->translations["options.guiScale.auto"] = "Auto";
-    mc_gui::global_ctx->translations["options.guiScale.small"] = "Small";
-    mc_gui::global_ctx->translations["options.guiScale.normal"] = "Normal";
-    mc_gui::global_ctx->translations["options.guiScale.large"] = "Large";
+    translations = translation_map_t("/_resources/assets/minecraft/lang/en_US.lang");
+    translations.import_keys(built_in, false);
 
     tex_id_widgets = load_gui_texture("widgets.png");
     tex_id_icons = load_gui_texture("icons.png");
@@ -168,7 +160,7 @@ void mc_gui::mc_gui_ctx::unload_resources()
 
     DEL_TEX(tex_id_crosshair);
 
-    translations.clear();
+    translations = translation_map_t();
 
 #undef DEL_TEX
 }
@@ -193,16 +185,16 @@ void mc_gui::render_text_clipped(const ImVec2& pos_min, const ImVec2& pos_max, c
 }
 
 /* Slightly modified version of ImGui::ButtonEx */
-ImGuiButtonFlags mc_gui::button(const char* label, const ImVec2& size_arg, ImGuiButtonFlags flags)
+ImGuiButtonFlags mc_gui::button(const char* translation_id, const ImVec2& size_arg, ImGuiButtonFlags flags)
 {
     ImGuiWindow* window = ImGui::GetCurrentWindow();
     if (window->SkipItems)
         return false;
-    label = get_translation(label);
+    const char* label = get_translation(translation_id);
 
     ImGuiContext& g = *GImGui;
     const ImGuiStyle& style = g.Style;
-    const ImGuiID id = window->GetID(label);
+    const ImGuiID id = window->GetID(translation_id);
     const ImVec2 label_size = ImGui::CalcTextSize(label, NULL, true);
 
     ImVec2 pos = window->DC.CursorPos;
@@ -345,15 +337,7 @@ void mc_gui::text_unformatted(const char* text, const char* text_end)
     ImGui::TextEx(text, text_end, ImGuiTextFlags_NoWidthForLargeClippedText);
 }
 
-const char* mc_gui::get_translation(const char* translation_id)
-{
-    auto it = global_ctx->translations.find(translation_id);
-
-    if (it != global_ctx->translations.end())
-        return it->second.c_str();
-
-    return translation_id;
-}
+const char* mc_gui::get_translation(const char* translation_id) { return global_ctx->translations.get_translation(translation_id); }
 
 void mc_gui::text_translated(const char* translation_id) { text_unformatted(get_translation(translation_id)); }
 
