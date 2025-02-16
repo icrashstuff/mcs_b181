@@ -2447,3 +2447,17 @@ level_t::~level_t()
     for (std::pair<int, entity_base_t*> e : entities)
         delete e.second;
 }
+
+bool level_t::gamemode_set(int x)
+{
+    if (mc_id::gamemode_is_valid(x))
+    {
+        gamemode = mc_id::gamemode_t(x);
+        return true;
+    }
+    else
+    {
+        dc_log_error("Invalid game mode specified: %d", x);
+        return false;
+    }
+}

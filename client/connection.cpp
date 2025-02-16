@@ -229,6 +229,7 @@ void connection_t::run(level_t* const level)
             {
                 CAST_PACK_TO_P(packet_login_request_s2c_t);
 
+                level->gamemode_set(p->mode);
                 level->world_height = p->world_height;
                 if (p->dimension == -1)
                     level->lightmap.set_preset(lightmap_t::LIGHTMAP_PRESET_NETHER);
@@ -236,6 +237,41 @@ void connection_t::run(level_t* const level)
                     level->lightmap.set_preset(lightmap_t::LIGHTMAP_PRESET_OVERWORLD);
 
                 set_status_msg("multiplayer.downloadingTerrain");
+
+                break;
+            }
+            case PACKET_ID_RESPAWN:
+            {
+                CAST_PACK_TO_P(packet_respawn_t);
+
+                level->gamemode_set(p->mode);
+                level->world_height = p->world_height;
+
+                break;
+            }
+            case PACKET_ID_NEW_STATE:
+            {
+                CAST_PACK_TO_P(packet_new_state_t);
+
+                switch (p->reason)
+                {
+                case PACK_NEW_STATE_REASON_INVALID_BED:
+                    dc_log("Invalid bed");
+                    break;
+                case PACK_NEW_STATE_REASON_RAIN_START:
+                    dc_log("Rain start");
+                    break;
+                case PACK_NEW_STATE_REASON_RAIN_END:
+                    dc_log("Rain end");
+                    break;
+                case PACK_NEW_STATE_REASON_CHANGE_MODE:
+                    if (level->gamemode_set(p->mode))
+                        dc_log("Gamemode updated to %d (%s)", p->mode, mc_id::gamemode_get_trans_id(level->gamemode_get()));
+                    break;
+                default:
+                    dc_log_error("Unknown reason %d (%d) in " SDL_STRINGIFY_ARG(PACKET_ID_NEW_STATE) " (0x%02x)", p->reason, p->mode, p->id);
+                    break;
+                }
 
                 break;
             }

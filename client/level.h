@@ -28,6 +28,7 @@
 #include "entity.h"
 #include "lightmap.h"
 #include "shaders.h"
+#include "shared/ids.h"
 #include "shared/inventory.h"
 #include "texture_terrain.h"
 #include <GL/glew.h>
@@ -116,6 +117,15 @@ struct level_t
     /* TODO: Use this for sky calculations */
     int world_height = 0;
 
+    inline mc_id::gamemode_t gamemode_get() { return gamemode; }
+
+    /**
+     * Set gamemode
+     *
+     * @returns 1 on valid gamemode, 0 on failure
+     */
+    bool gamemode_set(int x);
+
     GLuint ebo = 0;
 
     GLuint ent_missing_vao = 0;
@@ -196,6 +206,8 @@ struct level_t
     inventory_player_t inventory;
 
 private:
+    mc_id::gamemode_t gamemode = mc_id::GAMEMODE_SPECTATOR;
+
     /**
      * Renders all entities
      *

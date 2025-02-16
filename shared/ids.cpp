@@ -809,3 +809,18 @@ float mc_id::get_food_staturation_ratio(short item_id)
         return 0;
     }
 }
+
+const char* mc_id::gamemode_get_trans_id(gamemode_t x)
+{
+    switch (x)
+    {
+        ADD_NAME(GAMEMODE_SURVIVAL, "gameMode.survival");
+        ADD_NAME(GAMEMODE_CREATIVE, "gameMode.creative");
+        ADD_NAME(GAMEMODE_ADVENTURE, "gameMode.adventure");
+        ADD_NAME(GAMEMODE_SPECTATOR, "gameMode.spectator");
+    }
+
+    return "Unknown game mode";
+}
+
+bool mc_id::gamemode_is_valid(int a) { return GAMEMODE_SURVIVAL <= a && a <= GAMEMODE_SPECTATOR; }

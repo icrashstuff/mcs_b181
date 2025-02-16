@@ -385,6 +385,18 @@ enum mob_type_t : jbyte
 
 namespace mc_id
 {
+enum gamemode_t
+{
+    GAMEMODE_SURVIVAL = 0,
+    GAMEMODE_CREATIVE = 1,
+    GAMEMODE_ADVENTURE = 2,
+    GAMEMODE_SPECTATOR = 3,
+};
+
+bool gamemode_is_valid(int x);
+
+const char* gamemode_get_trans_id(gamemode_t x);
+
 const char* get_name_vehicle(jbyte id);
 
 const char* get_name_mob(jbyte id);

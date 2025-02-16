@@ -481,7 +481,7 @@ void render_world_overlays(level_t* level, ImDrawList* const bg_draw_list)
         }
         ImVec2 off(SDL_max(center.x, center.y), SDL_max(center.x, center.y));
 
-        if (cvr_r_overlay_inblock.get())
+        if (cvr_r_overlay_inblock.get() && level->gamemode_get() != mc_id::GAMEMODE_SPECTATOR)
         {
             bg_draw_list->AddImage(tex_id, center - off, center + off, GLM_TO_IM(face.corners[1]), GLM_TO_IM((face.corners[2])));
             bg_draw_list->AddRectFilled(ImVec2(-32, -32), ImGui::GetMainViewport()->Size + ImVec2(32, 32), IM_COL32(0, 0, 0, 255 * 0.5f));
