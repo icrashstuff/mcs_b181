@@ -2503,14 +2503,18 @@ int main(const int argc, const char** argv)
                 case PACKET_ID_KICK:
                 {
                     CAST_PACK_TO_P(packet_kick_t);
-                    client->sock = NULL;
                     if (p->reason != "Quitting")
-                    {
                         LOG("Client kicked server with unknown message \"%s\"", p->reason.c_str());
-                    }
 
-                    if (client->username.length() == 0)
-                        break;
+                    if (client->username.length())
+                        LOG("Player \"%s\" disconnected", client->username.c_str());
+                    else
+                    {
+                        SDLNet_Address* client_addr = SDLNet_GetStreamSocketAddress(client->sock);
+                        LOG("Client: %s:%u disconnected", SDLNet_GetAddressString(client_addr), SDLNet_GetStreamSocketPort(client->sock));
+                        SDLNet_UnrefAddress(client_addr);
+                    }
+                    client->sock = NULL;
                     break;
                 }
                 default:
