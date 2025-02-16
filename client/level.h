@@ -84,6 +84,15 @@ struct level_t
      */
     void add_chunk(chunk_cubic_t* const c);
 
+    /**
+     * Get chunk
+     */
+    inline chunk_cubic_t* get_chunk(const glm::ivec3 pos)
+    {
+        decltype(cmap)::iterator it = cmap.find(pos);
+        return (it == cmap.end()) ? NULL : it->second;
+    }
+
     std::map<eid_t, entity_base_t*> entities;
 
     /**
