@@ -84,14 +84,9 @@ struct chunk_cubic_t
 
     glm::ivec3 pos = { 0, 0, 0 };
 
-    std::vector<Uint8> data_buf;
-    Uint8* data;
+    Uint8 data[SUBCHUNK_SIZE_VOLUME * 5 / 2];
 
-    chunk_cubic_t()
-    {
-        data_buf.resize(SUBCHUNK_SIZE_VOLUME * 5 / 2, 0);
-        data = data_buf.data();
-    }
+    chunk_cubic_t() { }
 
     ~chunk_cubic_t() { free_gl(); }
 
