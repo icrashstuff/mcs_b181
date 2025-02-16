@@ -125,7 +125,7 @@ bool panorama_t::resize(const glm::ivec2 win_size)
     last_win_size = win_size;
 
     const int x = average_tex_width;
-    const int y = win_size.y * average_tex_width / win_size.x;
+    const int y = win_size.y * average_tex_width / SDL_max(win_size.x, 1);
 
     GLenum fbo_status[SDL_arraysize(fbo)] = {};
     for (int i = 0; i < IM_ARRAYSIZE(fbo); i++)
@@ -291,7 +291,7 @@ void panorama_t::imgui_widgets()
     ImGui::SliderFloat("Zero-Point: Roll", &zero_roll, -89, 89, "%.3f deg");
 
     const int x = average_tex_width;
-    const int y = last_win_size.y * average_tex_width / last_win_size.x;
+    const int y = last_win_size.y * average_tex_width / SDL_max(last_win_size.x, 1);
     ImGui::Image((ImTextureID)(uintptr_t)fbo_tex[0], ImVec2(x, y), ImVec2(0, 1), ImVec2(1, 0));
     ImGui::Image((ImTextureID)(uintptr_t)fbo_tex[1], ImVec2(x, y), ImVec2(0, 1), ImVec2(1, 0));
 }

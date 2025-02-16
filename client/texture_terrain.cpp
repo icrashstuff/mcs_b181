@@ -93,7 +93,7 @@ texture_terrain_t::texture_terrain_t(const std::string path_textures)
             t.name = *it;
 
             /** TODO: Check for .mcmeta files */
-            if (t.h > t.w && t.h % t.w == 0)
+            if (t.h > t.w && t.h % t.w == 0 && t.w && t.h)
             {
                 t.animated = 1;
                 t.frame_num_individual = t.h / t.w;
