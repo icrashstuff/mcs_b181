@@ -1275,6 +1275,39 @@ int main(const int argc, const char** argv)
     glEnable(GL_CULL_FACE);
     glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
+    dev_console::add_command("chat", [=](int argc, const char** argv) -> int {
+        if (!game_selected)
+        {
+            dc_log_error("No game loaded");
+            return 1;
+        }
+
+        if (!game_selected->connection)
+        {
+            dc_log_error("Game is not external");
+            return 1;
+        }
+
+        packet_chat_message_t pack_msg;
+
+        for (int i = 1; i < argc; i++)
+        {
+            pack_msg.msg += std::string(argv[i]);
+            if (i != 1)
+                pack_msg.msg += " ";
+        }
+
+        dc_log("Sending message \"%s\"", pack_msg.msg.c_str());
+
+        if (!game_selected->connection->send_packet(pack_msg))
+        {
+            dc_log("Failed to send message!");
+            return 1;
+        }
+
+        return 0;
+    });
+
     int done = 0;
     Uint64 last_loop_time = 0;
     delta_time = 0;
