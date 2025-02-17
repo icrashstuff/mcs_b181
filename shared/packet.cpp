@@ -32,7 +32,7 @@
 #include "misc.h"
 #include "packet.h"
 
-void assemble_string16(std::vector<Uint8>& dat, std::string str)
+void assemble_string16(std::vector<Uint8>& dat, const std::string str)
 {
     /* TODO: Find somewhere else to test the utf8 <-> ucs2 code */
     std::u16string str_ucs2 = UTF8_to_UCS2(UCS2_to_UTF8(UTF8_to_UCS2(str.c_str()).c_str()).c_str());
@@ -46,20 +46,20 @@ void assemble_string16(std::vector<Uint8>& dat, std::string str)
     memcpy(dat.data() + loc, str_ucs2.data(), str_ucs2.size() * 2);
 }
 
-void assemble_bytes(std::vector<Uint8>& dat, Uint8* in, size_t len)
+void assemble_bytes(std::vector<Uint8>& dat, const Uint8* in, const size_t len)
 {
     size_t loc = dat.size();
     dat.resize(dat.size() + len);
     memcpy(dat.data() + loc, in, len);
 }
 
-void assemble_bool(std::vector<Uint8>& dat, bool in) { dat.push_back(in ? 1 : 0); }
+void assemble_bool(std::vector<Uint8>& dat, const bool in) { dat.push_back(in ? 1 : 0); }
 
-void assemble_ubyte(std::vector<Uint8>& dat, Uint8 in) { dat.push_back(*(Uint8*)&in); }
+void assemble_ubyte(std::vector<Uint8>& dat, const Uint8 in) { dat.push_back(*(Uint8*)&in); }
 
-void assemble_byte(std::vector<Uint8>& dat, Sint8 in) { dat.push_back(*(Uint8*)&in); }
+void assemble_byte(std::vector<Uint8>& dat, const Sint8 in) { dat.push_back(*(Uint8*)&in); }
 
-void assemble_short(std::vector<Uint8>& dat, Sint16 in)
+void assemble_short(std::vector<Uint8>& dat, const Sint16 in)
 {
     Uint16 temp = SDL_Swap16BE(*(Uint16*)&in);
     size_t loc = dat.size();
@@ -67,7 +67,7 @@ void assemble_short(std::vector<Uint8>& dat, Sint16 in)
     memcpy(dat.data() + loc, &temp, sizeof(temp));
 }
 
-void assemble_int(std::vector<Uint8>& dat, Sint32 in)
+void assemble_int(std::vector<Uint8>& dat, const Sint32 in)
 {
     Uint32 temp = SDL_Swap32BE(*(Uint32*)&in);
     size_t loc = dat.size();
@@ -75,7 +75,7 @@ void assemble_int(std::vector<Uint8>& dat, Sint32 in)
     memcpy(dat.data() + loc, &temp, sizeof(temp));
 }
 
-void assemble_long(std::vector<Uint8>& dat, Sint64 in)
+void assemble_long(std::vector<Uint8>& dat, const Sint64 in)
 {
     Uint64 temp = SDL_Swap64BE(*(Uint64*)&in);
     size_t loc = dat.size();
@@ -83,7 +83,7 @@ void assemble_long(std::vector<Uint8>& dat, Sint64 in)
     memcpy(dat.data() + loc, &temp, sizeof(temp));
 }
 
-void assemble_float(std::vector<Uint8>& dat, float in)
+void assemble_float(std::vector<Uint8>& dat, const float in)
 {
     Uint32 temp = SDL_Swap32BE(*(Uint32*)&in);
     size_t loc = dat.size();
@@ -91,7 +91,7 @@ void assemble_float(std::vector<Uint8>& dat, float in)
     memcpy(dat.data() + loc, &temp, sizeof(temp));
 }
 
-void assemble_double(std::vector<Uint8>& dat, double in)
+void assemble_double(std::vector<Uint8>& dat, const double in)
 {
     Uint64 temp = SDL_Swap64BE(*(Uint64*)&in);
     size_t loc = dat.size();
@@ -99,14 +99,14 @@ void assemble_double(std::vector<Uint8>& dat, double in)
     memcpy(dat.data() + loc, &temp, sizeof(temp));
 }
 
-bool send_buffer(SDLNet_StreamSocket* sock, std::vector<Uint8> dat)
+bool send_buffer(SDLNet_StreamSocket* const sock, const std::vector<Uint8>& dat)
 {
     if (dat.size())
         TRACE("Packet 0x%02x", dat[0]);
     return SDLNet_WriteToStreamSocket(sock, dat.data(), dat.size());
 }
 
-bool send_chat(SDLNet_StreamSocket* sock, const char* fmt, ...)
+bool send_chat(SDLNet_StreamSocket* const sock, const char* fmt, ...)
 {
     char buf[119];
 
@@ -121,7 +121,7 @@ bool send_chat(SDLNet_StreamSocket* sock, const char* fmt, ...)
     return send_buffer(sock, chat.assemble());
 }
 
-bool consume_bytes(SDLNet_StreamSocket* sock, int len)
+bool consume_bytes(SDLNet_StreamSocket* const sock, const int len)
 {
     Uint8 buf_fixed[1];
     for (int i = 0; i < len; i++)
@@ -130,7 +130,7 @@ bool consume_bytes(SDLNet_StreamSocket* sock, int len)
     return 1;
 }
 
-bool read_ubyte(SDLNet_StreamSocket* sock, Uint8* out)
+bool read_ubyte(SDLNet_StreamSocket* const sock, Uint8* const out)
 {
     Uint8 buf_fixed[sizeof(*out)];
     if (SDLNet_ReadFromStreamSocket(sock, buf_fixed, ARR_SIZE(buf_fixed)) != ARR_SIZE(buf_fixed))
@@ -142,7 +142,7 @@ bool read_ubyte(SDLNet_StreamSocket* sock, Uint8* out)
     return 1;
 }
 
-bool read_byte(SDLNet_StreamSocket* sock, Sint8* out)
+bool read_byte(SDLNet_StreamSocket* const sock, Sint8* const out)
 {
     Uint8 buf_fixed[sizeof(*out)];
     if (SDLNet_ReadFromStreamSocket(sock, buf_fixed, ARR_SIZE(buf_fixed)) != ARR_SIZE(buf_fixed))
@@ -154,7 +154,7 @@ bool read_byte(SDLNet_StreamSocket* sock, Sint8* out)
     return 1;
 }
 
-bool read_short(SDLNet_StreamSocket* sock, Sint16* out)
+bool read_short(SDLNet_StreamSocket* const sock, Sint16* const out)
 {
     Uint8 buf_fixed[sizeof(*out)];
     if (SDLNet_ReadFromStreamSocket(sock, buf_fixed, ARR_SIZE(buf_fixed)) != ARR_SIZE(buf_fixed))
@@ -166,7 +166,7 @@ bool read_short(SDLNet_StreamSocket* sock, Sint16* out)
     return 1;
 }
 
-bool read_int(SDLNet_StreamSocket* sock, Sint32* out)
+bool read_int(SDLNet_StreamSocket* const sock, Sint32* const out)
 {
     Uint8 buf_fixed[sizeof(*out)];
     if (SDLNet_ReadFromStreamSocket(sock, buf_fixed, ARR_SIZE(buf_fixed)) != ARR_SIZE(buf_fixed))
@@ -178,7 +178,7 @@ bool read_int(SDLNet_StreamSocket* sock, Sint32* out)
     return 1;
 }
 
-bool read_long(SDLNet_StreamSocket* sock, Sint64* out)
+bool read_long(SDLNet_StreamSocket* const sock, Sint64* const out)
 {
     Uint8 buf_fixed[sizeof(*out)];
     if (SDLNet_ReadFromStreamSocket(sock, buf_fixed, ARR_SIZE(buf_fixed)) != ARR_SIZE(buf_fixed))
@@ -190,7 +190,7 @@ bool read_long(SDLNet_StreamSocket* sock, Sint64* out)
     return 1;
 }
 
-bool read_float(SDLNet_StreamSocket* sock, float* out)
+bool read_float(SDLNet_StreamSocket* const sock, float* const out)
 {
     Uint8 buf_fixed[4];
     if (SDLNet_ReadFromStreamSocket(sock, buf_fixed, ARR_SIZE(buf_fixed)) != ARR_SIZE(buf_fixed))
@@ -205,7 +205,7 @@ bool read_float(SDLNet_StreamSocket* sock, float* out)
     return 1;
 }
 
-bool read_double(SDLNet_StreamSocket* sock, double* out)
+bool read_double(SDLNet_StreamSocket* const sock, double* const out)
 {
     Uint8 buf_fixed[8];
     if (SDLNet_ReadFromStreamSocket(sock, buf_fixed, ARR_SIZE(buf_fixed)) != ARR_SIZE(buf_fixed))
@@ -220,7 +220,7 @@ bool read_double(SDLNet_StreamSocket* sock, double* out)
     return 1;
 }
 
-bool read_string16(SDLNet_StreamSocket* sock, std::string& out)
+bool read_string16(SDLNet_StreamSocket* const sock, std::string& out)
 {
     Uint8 buf_fixed[2];
     if (SDLNet_ReadFromStreamSocket(sock, buf_fixed, 2) != 2)
@@ -248,7 +248,7 @@ bool read_string16(SDLNet_StreamSocket* sock, std::string& out)
         }                                                                           \
     } while (0)
 
-SDL_FORCE_INLINE bool read_ubyte(std::vector<Uint8>& dat, size_t& pos, Uint8* out)
+SDL_FORCE_INLINE bool read_ubyte(const std::vector<Uint8>& dat, size_t& pos, Uint8* const out)
 {
     BAIL_READ(1);
 
@@ -259,7 +259,7 @@ SDL_FORCE_INLINE bool read_ubyte(std::vector<Uint8>& dat, size_t& pos, Uint8* ou
     return 1;
 }
 
-SDL_FORCE_INLINE bool read_byte(std::vector<Uint8>& dat, size_t& pos, Sint8* out)
+SDL_FORCE_INLINE bool read_byte(const std::vector<Uint8>& dat, size_t& pos, Sint8* const out)
 {
     BAIL_READ(1);
 
@@ -270,7 +270,7 @@ SDL_FORCE_INLINE bool read_byte(std::vector<Uint8>& dat, size_t& pos, Sint8* out
     return 1;
 }
 
-SDL_FORCE_INLINE bool read_short(std::vector<Uint8>& dat, size_t& pos, Sint16* out)
+SDL_FORCE_INLINE bool read_short(const std::vector<Uint8>& dat, size_t& pos, Sint16* const out)
 {
     BAIL_READ(2);
 
@@ -281,7 +281,7 @@ SDL_FORCE_INLINE bool read_short(std::vector<Uint8>& dat, size_t& pos, Sint16* o
     return 1;
 }
 
-SDL_FORCE_INLINE bool read_int(std::vector<Uint8>& dat, size_t& pos, Sint32* out)
+SDL_FORCE_INLINE bool read_int(const std::vector<Uint8>& dat, size_t& pos, Sint32* const out)
 {
     BAIL_READ(4);
 
@@ -292,7 +292,7 @@ SDL_FORCE_INLINE bool read_int(std::vector<Uint8>& dat, size_t& pos, Sint32* out
     return 1;
 }
 
-SDL_FORCE_INLINE bool read_long(std::vector<Uint8>& dat, size_t& pos, Sint64* out)
+SDL_FORCE_INLINE bool read_long(const std::vector<Uint8>& dat, size_t& pos, Sint64* const out)
 {
     BAIL_READ(8);
 
@@ -303,7 +303,7 @@ SDL_FORCE_INLINE bool read_long(std::vector<Uint8>& dat, size_t& pos, Sint64* ou
     return 1;
 }
 
-SDL_FORCE_INLINE bool read_float(std::vector<Uint8>& dat, size_t& pos, float* out)
+SDL_FORCE_INLINE bool read_float(const std::vector<Uint8>& dat, size_t& pos, float* const out)
 {
     BAIL_READ(4);
 
@@ -316,7 +316,7 @@ SDL_FORCE_INLINE bool read_float(std::vector<Uint8>& dat, size_t& pos, float* ou
     return 1;
 }
 
-SDL_FORCE_INLINE bool read_double(std::vector<Uint8>& dat, size_t& pos, double* out)
+SDL_FORCE_INLINE bool read_double(const std::vector<Uint8>& dat, size_t& pos, double* const out)
 {
     BAIL_READ(8);
 
@@ -329,7 +329,7 @@ SDL_FORCE_INLINE bool read_double(std::vector<Uint8>& dat, size_t& pos, double* 
     return 1;
 }
 
-SDL_FORCE_INLINE bool read_string16(std::vector<Uint8>& dat, size_t& pos, std::string& out)
+SDL_FORCE_INLINE bool read_string16(const std::vector<Uint8>& dat, size_t& pos, std::string& out)
 {
     BAIL_READ(2);
 
@@ -342,7 +342,7 @@ SDL_FORCE_INLINE bool read_string16(std::vector<Uint8>& dat, size_t& pos, std::s
     return 1;
 }
 
-SDL_FORCE_INLINE bool read_bytes(std::vector<Uint8>& dat, size_t& pos, size_t len, Uint8* out)
+SDL_FORCE_INLINE bool read_bytes(const std::vector<Uint8>& dat, size_t& pos, size_t len, Uint8* const out)
 {
     BAIL_READ(len);
 
@@ -352,7 +352,7 @@ SDL_FORCE_INLINE bool read_bytes(std::vector<Uint8>& dat, size_t& pos, size_t le
     return 1;
 }
 
-static void dump_buffer(std::vector<Uint8>& buf)
+static void dump_buffer(const std::vector<Uint8>& buf)
 {
     printf("\n\n\n=== %zu ===\n", buf.size());
     for (size_t i = 0; i < buf.size(); i++)
@@ -371,7 +371,7 @@ static void dump_buffer(std::vector<Uint8>& buf)
     printf("\n");
 }
 
-SDL_FORCE_INLINE bool read_metadata(std::vector<Uint8>& dat, size_t& pos, std::vector<Uint8>& out)
+SDL_FORCE_INLINE bool read_metadata(const std::vector<Uint8>& dat, size_t& pos, std::vector<Uint8>& out)
 {
     BAIL_READ(1);
 
@@ -477,7 +477,7 @@ SDL_FORCE_INLINE bool read_metadata(std::vector<Uint8>& dat, size_t& pos, std::v
 #define PACK_NAME(x)    \
     case PACKET_ID_##x: \
         return #x
-const char* packet_t::get_name_for_id(Uint8 _id)
+const char* packet_t::get_name_for_id(const Uint8 _id)
 {
     switch (_id)
     {
@@ -554,7 +554,7 @@ const char* packet_t::get_name_for_id(Uint8 _id)
 #define PACK_VALID(x)   \
     case PACKET_ID_##x: \
         return true
-bool packet_t::is_valid_id(Uint8 _id)
+bool packet_t::is_valid_id(const Uint8 _id)
 {
     switch (_id)
     {
@@ -630,7 +630,7 @@ bool packet_t::is_valid_id(Uint8 _id)
 
 const char* packet_t::get_name() { return get_name_for_id(id); }
 
-packet_handler_t::packet_handler_t(bool is_server_)
+packet_handler_t::packet_handler_t(const bool is_server_)
 {
     is_server = is_server_;
     buf.reserve(1024);
@@ -640,7 +640,7 @@ packet_handler_t::packet_handler_t(bool is_server_)
     packet_type = 16384;
 }
 
-packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* sock)
+packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* const sock)
 {
     if (err_str.length() > 0)
         return NULL;

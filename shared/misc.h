@@ -141,15 +141,15 @@ struct range_t
  * Format size with one of the following units: [bytes, KB, MB, GB, TB]
  * @param rate Append "/s" to the end of unit
  */
-std::string format_memory(size_t size, bool rate = false);
+std::string format_memory(const size_t size, const bool rate = false);
 
 /**
  * Take a cmd and split it into separate string components
  */
-bool argv_from_str(std::vector<std::string>& argv, std::string cmdline, bool parse_quotes = false, size_t max_argc = -1);
+bool argv_from_str(std::vector<std::string>& argv, const std::string cmdline, const bool parse_quotes = false, const size_t max_argc = -1);
 
-bool long_from_str(std::string str, long& out);
-bool int_from_str(std::string str, int& out);
+bool long_from_str(const std::string str, long& out);
+bool int_from_str(const std::string str, int& out);
 
 #define ROTATE_UINT64(x, amount) (((((Uint64)(x)) << (64 - ((amount) % 64))) | (((Uint64)(x)) >> ((amount) % 64))) & 0xFFFFFFFFFFFFFFFF)
 

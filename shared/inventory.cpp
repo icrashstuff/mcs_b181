@@ -91,7 +91,7 @@ static int inv_item_qsort_compare(void* _sort_descending, const void* _a, const 
         return 0;
 }
 
-bool itemstack_t::sort_stacks(itemstack_t* items, int start, int end, bool sort_descending)
+bool itemstack_t::sort_stacks(itemstack_t* items, const int start, const int end, const bool sort_descending)
 {
     int nmeb = end - start + 1;
 

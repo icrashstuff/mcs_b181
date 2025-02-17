@@ -50,7 +50,7 @@ struct itemstack_t
      *
      * @returns True if items were moved, False otherwise
      */
-    static bool sort_stacks(itemstack_t* items, int start, int end, bool sort_descending = true);
+    static bool sort_stacks(itemstack_t* items, const int start, const int end, const bool sort_descending = true);
 };
 
 inline bool operator<(itemstack_t& lhs, itemstack_t& rhs)

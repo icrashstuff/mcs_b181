@@ -26,7 +26,7 @@
 
 #include <SDL3/SDL.h>
 
-std::string UCS2_to_UTF8(const Uint16* str, int len)
+std::string UCS2_to_UTF8(const Uint16* const str, const int len)
 {
     std::string out;
     for (int i = 0; str[i] != 0 && (len == -1 || i < len); i++)

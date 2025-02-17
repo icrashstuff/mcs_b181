@@ -34,47 +34,47 @@
 #include "misc.h"
 #include "tetra/gui/imgui.h"
 
-void assemble_string16(std::vector<Uint8>& dat, std::string str);
+void assemble_string16(std::vector<Uint8>& dat, const std::string str);
 
-void assemble_bool(std::vector<Uint8>& dat, bool in);
+void assemble_bool(std::vector<Uint8>& dat, const bool in);
 
-void assemble_bytes(std::vector<Uint8>& dat, Uint8* in, size_t len);
+void assemble_bytes(std::vector<Uint8>& dat, const Uint8* in, const size_t len);
 
-void assemble_ubyte(std::vector<Uint8>& dat, Uint8 in);
+void assemble_ubyte(std::vector<Uint8>& dat, const Uint8 in);
 
-void assemble_byte(std::vector<Uint8>& dat, Sint8 in);
+void assemble_byte(std::vector<Uint8>& dat, const Sint8 in);
 
-void assemble_short(std::vector<Uint8>& dat, Sint16 in);
+void assemble_short(std::vector<Uint8>& dat, const Sint16 in);
 
-void assemble_int(std::vector<Uint8>& dat, Sint32 in);
+void assemble_int(std::vector<Uint8>& dat, const Sint32 in);
 
-void assemble_long(std::vector<Uint8>& dat, Sint64 in);
+void assemble_long(std::vector<Uint8>& dat, const Sint64 in);
 
-void assemble_float(std::vector<Uint8>& dat, float in);
+void assemble_float(std::vector<Uint8>& dat, const float in);
 
-void assemble_double(std::vector<Uint8>& dat, double in);
+void assemble_double(std::vector<Uint8>& dat, const double in);
 
-bool send_buffer(SDLNet_StreamSocket* sock, std::vector<Uint8> dat);
+bool send_buffer(SDLNet_StreamSocket* const sock, const std::vector<Uint8>& dat);
 
-bool send_chat(SDLNet_StreamSocket* sock, const char* fmt, ...);
+bool send_chat(SDLNet_StreamSocket* const sock, const char* fmt, ...);
 
-bool consume_bytes(SDLNet_StreamSocket* sock, int len);
+bool consume_bytes(SDLNet_StreamSocket* const sock, const int len);
 
-bool read_ubyte(SDLNet_StreamSocket* sock, Uint8* out);
+bool read_ubyte(SDLNet_StreamSocket* const sock, Uint8* const out);
 
-bool read_byte(SDLNet_StreamSocket* sock, Sint8* out);
+bool read_byte(SDLNet_StreamSocket* const sock, Sint8* const out);
 
-bool read_short(SDLNet_StreamSocket* sock, Sint16* out);
+bool read_short(SDLNet_StreamSocket* const sock, Sint16* const out);
 
-bool read_int(SDLNet_StreamSocket* sock, Sint32* out);
+bool read_int(SDLNet_StreamSocket* const sock, Sint32* const out);
 
-bool read_long(SDLNet_StreamSocket* sock, Sint64* out);
+bool read_long(SDLNet_StreamSocket* const sock, Sint64* const out);
 
-bool read_float(SDLNet_StreamSocket* sock, float* out);
+bool read_float(SDLNet_StreamSocket* const sock, float* const out);
 
-bool read_double(SDLNet_StreamSocket* sock, double* out);
+bool read_double(SDLNet_StreamSocket* const sock, double* const out);
 
-bool read_string16(SDLNet_StreamSocket* sock, std::string& out);
+bool read_string16(SDLNet_StreamSocket* const sock, std::string& out);
 
 enum packet_id_t : jubyte
 {
@@ -214,12 +214,12 @@ struct packet_t
     /**
      * Get the name for the corresponding packet id
      */
-    static const char* get_name_for_id(Uint8 pack_id);
+    static const char* get_name_for_id(const Uint8 pack_id);
 
     /**
      * Returns true if the id is a valid, false otherwise
      */
-    static bool is_valid_id(Uint8 pack_id);
+    static bool is_valid_id(const Uint8 pack_id);
 
     /**
      * Returns the size of the packet_t struct, not the actual packet when sent
@@ -866,7 +866,7 @@ public:
      *
      * @param is_server Determines how some packets are parsed (server vs. client)
      */
-    packet_handler_t(bool is_server = true);
+    packet_handler_t(const bool is_server = true);
 
     /**
      * Get the next finished packet or work on it
@@ -876,9 +876,9 @@ public:
      *
      * @returns NULL if no packet is available or if an error has occurred
      */
-    packet_t* get_next_packet(SDLNet_StreamSocket* sock);
+    packet_t* get_next_packet(SDLNet_StreamSocket* const sock);
 
-    static void free_packet(packet_t* packet);
+    static void free_packet(packet_t* const packet);
 
     /**
      * Returns a non zero length error string when an error occurred
