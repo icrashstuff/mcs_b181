@@ -30,6 +30,7 @@
 
 #include <SDL3/SDL.h>
 #include <string.h>
+#include <vector>
 
 /**
  * Connection class
@@ -64,14 +65,42 @@ struct connection_t
         bool fullfilled = 0;
     };
 
-    inline connection_status_t get_status() { return status; }
+    inline connection_status_t get_status() const { return status; }
 
     /**
      * in_world means that the world has been loaded enough for interaction to commence
      *
      * @returns in_world
      */
-    inline bool get_in_world() { return in_world; }
+    inline bool get_in_world() const { return in_world; }
+
+    inline const std::string& get_username() const { return username; }
+
+    inline jint get_max_players() const { return max_players; }
+
+    class player_list_data_t
+    {
+        jshort buf[32] = { 0 };
+        int filled = 0;
+        int pos = 0;
+
+    public:
+        void push(const jshort x)
+        {
+            buf[++pos %= SDL_arraysize(buf)] = x;
+            filled = SDL_min(int(SDL_arraysize(buf)), filled + 1);
+        }
+
+        inline jshort average() const
+        {
+            int total = 0, i = 0;
+            for (; i < filled; i++)
+                total += buf[i];
+            return total / SDL_max(1, i);
+        }
+    };
+
+    inline const std::vector<std::pair<std::string, player_list_data_t>>& get_player_list() const { return player_list; }
 
     packet_handler_t pack_handler_client = packet_handler_t(false);
     std::string status_msg;
@@ -121,6 +150,10 @@ private:
     connection_status_t status = CONNECTION_UNINITIALIZED;
 
     bool in_world = false;
+
+    jint max_players;
+
+    std::vector<std::pair<std::string, player_list_data_t>> player_list;
 
     /**
      * Steps (if possible) the state as fast a possible to CONNECTION_ACTIVE

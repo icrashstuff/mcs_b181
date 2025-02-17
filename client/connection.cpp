@@ -254,6 +254,7 @@ void connection_t::run(level_t* const level)
 
                 level->gamemode_set(p->mode);
                 level->world_height = p->world_height;
+                max_players = p->max_players;
                 if (p->dimension == -1)
                     level->lightmap.set_preset(lightmap_t::LIGHTMAP_PRESET_NETHER);
                 else
@@ -626,7 +627,34 @@ void connection_t::run(level_t* const level)
                 break;
             }
             case PACKET_ID_PLAYER_LIST_ITEM:
+            {
+                CAST_PACK_TO_P(packet_play_list_item_t);
+
+                auto it = player_list.begin();
+                for (; it != player_list.end(); it++)
+                    if (it->first == p->username)
+                        break;
+
+                if (!p->online)
+                {
+                    if (it != player_list.end())
+                        player_list.erase(it);
+                }
+                else
+                {
+                    if (it == player_list.end())
+                    {
+                        if (p->username == username)
+                            it = player_list.insert(player_list.begin(), std::make_pair(p->username, player_list_data_t {}));
+                        else
+                            it = player_list.insert(player_list.end(), std::make_pair(p->username, player_list_data_t {}));
+                    }
+
+                    it->second.push(p->ping);
+                }
+
                 break;
+            }
             default:
                 dc_log_error("Unknown packet from server with id: 0x%02x", pack_type);
                 break;

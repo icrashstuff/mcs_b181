@@ -196,6 +196,7 @@ static bool held_d = 0;
 static bool held_space = 0;
 static bool held_shift = 0;
 static bool held_ctrl = 0;
+static bool held_tab = 1;
 static bool mouse_grabbed = 0;
 static bool wireframe = 0;
 #define AO_ALGO_MAX 5
@@ -598,6 +599,7 @@ static void normal_loop()
         held_space = 0;
         held_shift = 0;
         held_ctrl = 0;
+        held_tab = 0;
     }
 
     float camera_speed = 3.5f * delta_time * (held_ctrl ? 4.0f : 1.0f);
@@ -944,6 +946,9 @@ static void process_event(SDL_Event& event, bool* done)
         case SDL_SCANCODE_LCTRL:
             held_ctrl = 1;
             break;
+        case SDL_SCANCODE_TAB:
+            held_tab = 1;
+            break;
         case SDL_SCANCODE_B:
         {
             wireframe = !wireframe;
@@ -1051,6 +1056,9 @@ static void process_event(SDL_Event& event, bool* done)
             break;
         case SDL_SCANCODE_LCTRL:
             held_ctrl = 0;
+            break;
+        case SDL_SCANCODE_TAB:
+            held_tab = 0;
             break;
         default:
             break;

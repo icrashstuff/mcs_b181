@@ -21,6 +21,8 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+#include <algorithm>
+
 struct client_menu_return_t
 {
     /** If this is true the current window will be popped from the stack */
@@ -191,6 +193,142 @@ static client_menu_return_t do_main_menu(mc_gui::mc_gui_ctx* ctx)
     mc_gui::text_translated("mcs_b181_client.mcs_b181_client");
     ImGui::End();
     ImGui::PopStyleVar();
+
+    return ret;
+}
+
+static void do_in_game_menu__player_list(mc_gui::mc_gui_ctx* const ctx, connection_t* const connection)
+{
+    if (!held_tab)
+        return;
+
+    const int old_menu_scale = ctx->menu_scale;
+    float font_scale = 1.0f / float(old_menu_scale);
+    ctx->menu_scale = 1;
+
+    float max_width_name = ImGui::CalcTextSize("X").x * 16.0f * font_scale;
+    auto list = connection->get_player_list();
+
+    for (auto it : list)
+    {
+        float width = ImGui::CalcTextSize(it.first.c_str()).x * font_scale;
+        max_width_name = SDL_max(max_width_name, width);
+    }
+
+    jint num_players = connection->get_max_players();
+    const int columns = num_players / 20 + 1;
+    num_players = (num_players / columns) * columns;
+    const float text_height = ImGui::GetTextLineHeight() * font_scale;
+    const float line_height = ctx->menu_scale;
+    const ImVec2 line_offset = ImVec2(1.0f, 1.0f) * line_height * 0.5f;
+    const float spacer_width = ctx->menu_scale;
+    const ImVec2 img_size(text_height, text_height);
+    const ImVec2 conn_size(ctx->menu_scale * 10, text_height);
+    ImVec2 item_size(0, text_height + line_height);
+    item_size.x += spacer_width + img_size.x;
+    item_size.x += spacer_width + max_width_name;
+    item_size.x += spacer_width + conn_size.x;
+    item_size.x += spacer_width;
+
+    ImVec2 window_size = item_size * ImVec2(columns, (num_players + columns - 1) / columns) + line_offset * 2.0f;
+    ImVec2 window_pos = { SDL_floorf(ImGui::GetMainViewport()->GetWorkCenter().x - line_height), 0.0f };
+
+    ImGui::SetNextWindowSize(window_size + line_offset, ImGuiCond_Always);
+    ImGui::SetNextWindowPos(window_pos, ImGuiCond_Always, ImVec2(0.5f, -0.05f));
+
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
+    ImGui::Begin("Player List", NULL, ImGuiWindowFlags_NoDecoration);
+
+    window_size = ImGui::GetWindowSize();
+    window_pos = ImGui::GetWindowPos();
+
+    ImGui::SetWindowFontScale(font_scale);
+
+    ImDrawList* draw_list = ImGui::GetWindowDrawList();
+
+    Uint32 line_col = IM_COL32(255, 255, 255, 192);
+
+    ImVec2 cursor = window_pos;
+
+    const ImVec2 points_ul[] = {
+        line_offset + ImVec2 { window_pos.x, window_pos.y + window_size.y },
+        line_offset + ImVec2 { window_pos.x, window_pos.y },
+        line_offset + ImVec2 { window_pos.x + window_size.x, window_pos.y },
+    };
+    draw_list->AddPolyline(points_ul, IM_ARRAYSIZE(points_ul), line_col, ImDrawFlags_RoundCornersNone, line_height * 0.5f);
+
+    auto it = list.begin();
+    for (jint i = 0; i < num_players; i++)
+    {
+        cursor = ImVec2(window_pos.x + item_size.x * float(i % columns), window_pos.y + item_size.y * float(i / columns));
+
+        const ImVec2 points[] = {
+            line_offset + ImVec2 { cursor.x, item_size.y + cursor.y },
+            line_offset + ImVec2 { item_size.x + cursor.x, item_size.y + cursor.y },
+            line_offset + ImVec2 { item_size.x + cursor.x, cursor.y },
+        };
+        draw_list->AddPolyline(points, IM_ARRAYSIZE(points), line_col, ImDrawFlags_RoundCornersNone, line_height * 0.5f);
+
+        cursor += line_offset * 2.0f;
+
+        if (it == list.end())
+            continue;
+
+        draw_list->AddImage(reinterpret_cast<ImTextureID>(ctx->tex_id_bg), cursor, cursor + img_size);
+
+        cursor.x += img_size.x + spacer_width;
+
+        Uint32 col_text = ImGui::GetColorU32(ImGuiCol_Text);
+        ImVec4 col_shadow = ImGui::ColorConvertU32ToFloat4(col_text);
+        col_shadow.x *= 0.25f;
+        col_shadow.y *= 0.25f;
+        col_shadow.z *= 0.25f;
+
+        draw_list->AddText(cursor + ImVec2(1, 1) * ctx->menu_scale, ImGui::ColorConvertFloat4ToU32(col_shadow), it->first.c_str());
+        draw_list->AddText(cursor, col_text, it->first.c_str());
+
+        cursor.x += max_width_name + spacer_width;
+
+        const int ping = it->second.average();
+        int strength = 5;
+
+        strength -= (ping >= 150);
+        strength -= (ping >= 300);
+        strength -= (ping >= 600);
+        strength -= (ping >= 1000);
+        strength -= (ping < 0) * 5;
+
+        strength = SDL_clamp(strength, 0, 5);
+
+        ImVec2 uv0(00.0f / 256.0f, (56 - strength * 8) / 256.0f);
+        ImVec2 uv1(10.0f / 256.0f, (64 - strength * 8) / 256.0f);
+
+        draw_list->AddImage(reinterpret_cast<ImTextureID>(ctx->tex_id_icons), cursor, cursor + conn_size, uv0, uv1);
+
+        it++;
+    }
+
+    ImGui::End();
+    ImGui::PopStyleVar(4);
+
+    ctx->menu_scale = old_menu_scale;
+}
+
+static client_menu_return_t do_in_game_menu(mc_gui::mc_gui_ctx* ctx)
+{
+    client_menu_return_t ret;
+
+    ret.allow_pano = 0;
+    ret.allow_world = 1;
+
+    if (!game_selected)
+        return ret;
+
+    if (game_selected->connection)
+        do_in_game_menu__player_list(ctx, game_selected->connection);
 
     return ret;
 }
@@ -512,6 +650,8 @@ static void init()
     ImGui::SetCurrentContext(last_ctx);
 
     client_menu_manager = client_menu_manager_t();
+
+    client_menu_manager.add_menu("in_game", do_in_game_menu);
 
     client_menu_manager.add_menu("loading", do_loading_menu);
 
