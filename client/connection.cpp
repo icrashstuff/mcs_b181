@@ -164,6 +164,24 @@ static void decompress_chunk_packet(level_t* const level, const packet_chunk_t* 
 }
 #pragma GCC pop_options
 
+void connection_t::handle_inactive()
+{
+    if (status < CONNECTION_ACTIVE)
+        return;
+
+    if (status == CONNECTION_ACTIVE)
+    {
+        std::string s = pack_handler_client.get_error();
+
+        if (!s.length())
+            return;
+
+        set_status_msg("disconnect.lost", "packet_handler_t::get_error(): " + s);
+
+        status = CONNECTION_FAILED;
+    }
+}
+
 void connection_t::run(level_t* const level)
 {
     if (status != CONNECTION_ACTIVE)
@@ -183,6 +201,8 @@ void connection_t::run(level_t* const level)
 
     step_to_active();
 
+    handle_inactive();
+
     if (status == connection_t::CONNECTION_ACTIVE)
     {
         if (!sent_init)
@@ -192,7 +212,7 @@ void connection_t::run(level_t* const level)
             pack_handshake.username = username;
 
             sent_init = send_buffer(socket, pack_handshake.assemble());
-            set_status_msg("connect.connecting");
+            set_status_msg("connect.authorizing");
         }
         Uint64 sdl_start_tick = SDL_GetTicks();
         packet_t* pack_from_server = NULL;
@@ -440,7 +460,8 @@ void connection_t::run(level_t* const level)
             case PACKET_ID_KICK:
             {
                 CAST_PACK_TO_P(packet_kick_t);
-                set_status_msg("disconnect.lost", p->reason);
+                set_status_msg("disconnect.disconnected", p->reason);
+                status = CONNECTION_DONE;
                 break;
             }
             case PACKET_ID_WINDOW_SET_ITEMS:
@@ -665,12 +686,12 @@ bool connection_t::init(const std::string _addr, const Uint16 _port, const std::
     port = _port;
     username = _username;
 
-    set_status_msg("Resolving address");
+    set_status_msg("connect.connecting");
     addr_server = SDLNet_ResolveHostname(addr.c_str());
     status = CONNECTION_ADDR_RESOLVING;
     if (!addr_server)
     {
-        err_str = std::string("SDLNet_ResolveHostname: ") + SDL_GetError();
+        set_status_msg("connect.failed", std::string("SDLNet_ResolveHostname: ") + SDL_GetError());
         status = CONNECTION_FAILED;
         return false;
     }
@@ -688,12 +709,12 @@ void connection_t::step_to_active()
 
         if (address_status == 1)
         {
-            set_status_msg("Address resolved");
+            set_status_msg("connect.connecting");
             status = CONNECTION_ADDR_RESOLVED;
         }
         else if (address_status == -1)
         {
-            err_str = std::string("SDLNet_WaitUntilResolved: ") + SDL_GetError();
+            set_status_msg("connect.failed", std::string("SDLNet_WaitUntilResolved: ") + SDL_GetError());
             status = CONNECTION_FAILED;
         }
     }
@@ -704,12 +725,12 @@ void connection_t::step_to_active()
         SDLNet_UnrefAddress(addr_server);
         addr_server = NULL;
 
-        set_status_msg("Connecting");
+        set_status_msg("connect.connecting");
         status = CONNECTION_CONNECTING;
 
         if (!socket)
         {
-            err_str = std::string("SDLNet_CreateClient: ") + SDL_GetError();
+            set_status_msg("connect.failed", std::string("SDLNet_CreateClient: ") + SDL_GetError());
             status = CONNECTION_FAILED;
         }
     }
@@ -720,12 +741,12 @@ void connection_t::step_to_active()
 
         if (connection_status == 1)
         {
-            set_status_msg("Connected");
+            set_status_msg("connect.connecting");
             status = CONNECTION_ACTIVE;
         }
         else if (connection_status == -1)
         {
-            err_str = std::string("SDLNet_GetConnectionStatus: ") + SDL_GetError();
+            set_status_msg("connect.failed", std::string("SDLNet_GetConnectionStatus: ") + SDL_GetError());
             status = CONNECTION_FAILED;
         }
     }

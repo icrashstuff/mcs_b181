@@ -87,8 +87,6 @@ struct connection_t
      */
     bool init(const std::string address, const Uint16 port, const std::string username);
 
-    std::string err_str;
-
     Uint64 start_time = 0;
 
     /**
@@ -118,7 +116,7 @@ struct connection_t
     ~connection_t();
 
 private:
-    void set_status_msg(const std::string _status, const std::string _sub_status = "");
+    void set_status_msg(const std::string translation_id, const std::string _sub_status = "");
 
     connection_status_t status = CONNECTION_UNINITIALIZED;
 
@@ -128,6 +126,11 @@ private:
      * Steps (if possible) the state as fast a possible to CONNECTION_ACTIVE
      */
     void step_to_active();
+
+    /**
+     * Handles the socket dying
+     */
+    void handle_inactive();
 
     SDLNet_StreamSocket* socket = NULL;
 
