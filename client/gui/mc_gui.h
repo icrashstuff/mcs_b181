@@ -37,23 +37,23 @@ namespace mc_gui
 {
 struct mc_gui_ctx
 {
-    GLuint tex_id_widgets = 0;
-    GLuint tex_id_crosshair = 0;
-    GLuint tex_id_icons = 0;
+    ImTextureID tex_id_widgets = 0;
+    ImTextureID tex_id_crosshair = 0;
+    ImTextureID tex_id_icons = 0;
 
-    GLuint tex_id_inventory = 0;
-    GLuint tex_id_creative_tab_search = 0;
-    GLuint tex_id_creative_tab_inv = 0;
-    GLuint tex_id_creative_tabs = 0;
-    GLuint tex_id_creative_tab_items = 0;
-    GLuint tex_id_chest_generic = 0;
-    GLuint tex_id_furnace = 0;
-    GLuint tex_id_crafting_table = 0;
+    ImTextureID tex_id_inventory = 0;
+    ImTextureID tex_id_creative_tab_search = 0;
+    ImTextureID tex_id_creative_tab_inv = 0;
+    ImTextureID tex_id_creative_tabs = 0;
+    ImTextureID tex_id_creative_tab_items = 0;
+    ImTextureID tex_id_chest_generic = 0;
+    ImTextureID tex_id_furnace = 0;
+    ImTextureID tex_id_crafting_table = 0;
 
-    GLuint tex_id_bg = 0;
-    GLuint tex_id_water = 0;
-    GLuint tex_id_selectors_resource = 0;
-    GLuint tex_id_selectors_server = 0;
+    ImTextureID tex_id_bg = 0;
+    ImTextureID tex_id_water = 0;
+    ImTextureID tex_id_selectors_resource = 0;
+    ImTextureID tex_id_selectors_server = 0;
 
     int menu_scale = 0;
 

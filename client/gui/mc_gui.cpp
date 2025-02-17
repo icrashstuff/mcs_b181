@@ -31,7 +31,7 @@
 
 #include "tetra/gui/imgui_internal.h"
 
-static GLuint load_texture(void* data, int x, int y, std::string label, GLenum edge, GLenum format_color = GL_RGBA, GLenum format_data = GL_UNSIGNED_BYTE)
+static ImTextureID load_texture(void* data, int x, int y, std::string label, GLenum edge, GLenum format_color = GL_RGBA, GLenum format_data = GL_UNSIGNED_BYTE)
 {
     GLuint ret;
     glGenTextures(1, &ret);
@@ -70,10 +70,10 @@ static GLuint load_texture(void* data, int x, int y, std::string label, GLenum e
         delete[] data_missing;
     }
 
-    return ret;
+    return reinterpret_cast<ImTextureID>(ret);
 }
 
-static GLuint load_gui_texture(std::string path, GLenum edge = GL_CLAMP_TO_EDGE, std::string prefix = "/_resources/assets/minecraft/textures/gui/")
+static ImTextureID load_gui_texture(std::string path, GLenum edge = GL_CLAMP_TO_EDGE, std::string prefix = "/_resources/assets/minecraft/textures/gui/")
 {
     const std::string label = std::string("[Menu]: Texture: ") + path;
     path = prefix + path;
@@ -84,7 +84,7 @@ static GLuint load_gui_texture(std::string path, GLenum edge = GL_CLAMP_TO_EDGE,
     if (!data_widgets)
         dc_log_error("Unable to load texture: \"%s\"", path.c_str());
 
-    GLuint ret = load_texture(data_widgets, x, y, label, edge);
+    ImTextureID ret = load_texture(data_widgets, x, y, label, edge);
 
     stbi_image_free(data_widgets);
 
@@ -134,11 +134,11 @@ void mc_gui::mc_gui_ctx::load_resources()
 
 void mc_gui::mc_gui_ctx::unload_resources()
 {
-#define DEL_TEX(TEX_ID)               \
-    do                                \
-    {                                 \
-        glDeleteTextures(1, &TEX_ID); \
-        TEX_ID = 0;                   \
+#define DEL_TEX(TEX_ID)                        \
+    do                                         \
+    {                                          \
+        glDeleteTextures(1, (GLuint*)&TEX_ID); \
+        TEX_ID = 0;                            \
     } while (0)
 
     DEL_TEX(tex_id_widgets);
