@@ -66,6 +66,13 @@ struct connection_t
 
     inline connection_status_t get_status() { return status; }
 
+    /**
+     * in_world means that the world has been loaded enough for interaction to commence
+     *
+     * @returns in_world
+     */
+    inline bool get_in_world() { return in_world; }
+
     packet_handler_t pack_handler_client = packet_handler_t(false);
     std::string status_msg;
     std::string status_msg_sub;

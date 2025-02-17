@@ -586,7 +586,7 @@ static void normal_loop()
     if (!game || client_menu_manager.stack_size())
         mouse_grabbed = 0;
 
-    if (game && !client_menu_manager.stack_size() && (!game->connection || game->connection->get_status() == connection_t::CONNECTION_ACTIVE))
+    if (game && !client_menu_manager.stack_size() && (!game->connection || game->connection->get_in_world()))
         mouse_grabbed = 1;
 
     if (!mouse_grabbed)
@@ -681,7 +681,7 @@ static void normal_loop()
     game = game_selected;
     bool in_world = game;
     if (in_world && game->connection)
-        in_world = game->connection->get_status() == connection_t::CONNECTION_ACTIVE;
+        in_world = game->connection->get_in_world();
 
     ImDrawList* const bg_draw_list = ImGui::GetBackgroundDrawList();
 
@@ -775,10 +775,11 @@ static void process_event(SDL_Event& event, bool* done)
 
     level_t* level = game->level;
     connection_t* connection = game->connection;
+    bool in_world = game;
+    if (in_world && connection)
+        in_world = connection->get_in_world();
 
-    /* TODO: Check for in-world */
-    if (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE
-        && (!connection || connection->get_status() == connection_t::CONNECTION_ACTIVE))
+    if (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_ESCAPE && in_world)
     {
         if (client_menu_manager.stack_size())
             client_menu_manager.stack_clear();

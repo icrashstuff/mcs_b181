@@ -166,6 +166,9 @@ static void decompress_chunk_packet(level_t* const level, const packet_chunk_t* 
 
 void connection_t::run(level_t* const level)
 {
+    if (status != CONNECTION_ACTIVE)
+        in_world = false;
+
     if (status == connection_status_t::CONNECTION_UNINITIALIZED)
     {
         dc_log_error("Connection must be initialized before running");
