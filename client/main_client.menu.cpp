@@ -58,7 +58,13 @@ public:
     int stack_size() { return stack.size(); }
 
     /** Set the default menu to be used when stack.size() == 0 */
-    void set_default(std::string name) { default_menu = name; }
+    void set_default(std::string name)
+    {
+        if (default_menu == name)
+            return;
+        stack_clear();
+        default_menu = name;
+    }
 
     client_menu_return_t run_last_in_stack(glm::ivec2 win_size)
     {
@@ -185,6 +191,77 @@ static client_menu_return_t do_main_menu(mc_gui::mc_gui_ctx* ctx)
     mc_gui::text_translated("mcs_b181_client.mcs_b181_client");
     ImGui::End();
     ImGui::PopStyleVar();
+
+    return ret;
+}
+
+/**
+ * Display loading screens
+ */
+static client_menu_return_t do_loading_menu(mc_gui::mc_gui_ctx* ctx)
+{
+    client_menu_return_t ret;
+
+    ret.allow_pano = 0;
+
+    if (!game_selected)
+    {
+        ret.close = 1;
+        return ret;
+    }
+
+    connection_t* connection = game_selected->connection;
+    if (!connection)
+    {
+        ret.close = 1;
+        return ret;
+    }
+
+    ret.allow_world = connection->get_in_world();
+
+    if (ret.allow_world)
+        return ret;
+
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetWorkCenter(), ImGuiCond_Always, ImVec2(0.5, 1.0));
+    ImGui::Begin("Upper", NULL, ctx->default_win_flags);
+
+    mc_gui::text_translated(game_selected->connection->status_msg.c_str());
+
+    ImGui::End();
+
+    ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetWorkCenter(), ImGuiCond_Always, ImVec2(0.5, 0.0));
+    ImGui::Begin("Lower", NULL, ctx->default_win_flags);
+
+    ImGui::PushTextWrapPos(ImGui::GetMainViewport()->Size.x * 0.95f);
+    mc_gui::text_translated(game_selected->connection->status_msg_sub.c_str());
+    ImGui::PopTextWrapPos();
+
+    ImGui::End();
+
+    if (connection->get_status() != connection_t::CONNECTION_ACTIVE)
+    {
+        ImGui::SetNextWindowPos(get_viewport_centered_lower_quarter(), ImGuiCond_Always, ImVec2(0.5, 0.0));
+        ImGui::Begin("menu.gui.cancel", NULL, ctx->default_win_flags);
+
+        if (mc_gui::button_big(connection->get_status() < connection_t::CONNECTION_ACTIVE ? "gui.cancel" : "gui.toMenu"))
+        {
+            for (auto it = games.begin(); it != games.end();)
+            {
+                if (*it == game_selected)
+                {
+                    delete *it;
+                    game_selected = NULL;
+                    it = games.erase(it);
+                }
+                else
+                    it = next(it);
+            }
+
+            ret.clear_stack = 1;
+        }
+
+        ImGui::End();
+    }
 
     return ret;
 }
@@ -435,6 +512,8 @@ static void init()
     ImGui::SetCurrentContext(last_ctx);
 
     client_menu_manager = client_menu_manager_t();
+
+    client_menu_manager.add_menu("loading", do_loading_menu);
 
     client_menu_manager.add_menu("menu.game", do_game_menu);
     client_menu_manager.add_menu("menu.title", do_main_menu);

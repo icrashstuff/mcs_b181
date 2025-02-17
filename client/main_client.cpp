@@ -674,7 +674,19 @@ static void normal_loop()
         ImGui::ShowStyleEditor();
     }
 
-    client_menu_manager.set_default(game_selected ? "nomenu" : "menu.title");
+    if (!game) /* No game */
+        client_menu_manager.set_default("menu.title");
+    else if (game->connection) /* External world */
+    {
+        if (game->connection->get_in_world())
+            client_menu_manager.set_default("in_game");
+        else
+            client_menu_manager.set_default("loading");
+    }
+    else /* Test world */
+    {
+        client_menu_manager.set_default("in_game");
+    }
     client_menu_return_t menu_ret = client_menu_manager.run_last_in_stack(win_size);
 
     /* client_menu_manager.run_last_in_stack() may delete the game */
@@ -791,7 +803,8 @@ static void process_event(SDL_Event& event, bool* done)
         dc_log("%d %d", client_menu_manager.stack_size(), mouse_grabbed);
     }
 
-    if (!mouse_grabbed && client_menu_manager.stack_size())
+    /* The only way for the mouse to be grabbed is in normal_loop() */
+    if (!mouse_grabbed)
     {
         ImGuiContext* last_ctx = ImGui::GetCurrentContext();
         ImGui::SetCurrentContext(imgui_ctx_main_menu);
@@ -800,11 +813,11 @@ static void process_event(SDL_Event& event, bool* done)
         return;
     }
 
+    /* Mouse is guaranteed to be grabbed at this point */
+
     if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
     {
-        if (!mouse_grabbed && !client_menu_manager.stack_size())
-            mouse_grabbed = 1;
-        else if (mouse_grabbed)
+        if (mouse_grabbed)
         {
             // TODO: Add place block function
             glm::vec3 cam_dir;
@@ -1043,44 +1056,6 @@ static void process_event(SDL_Event& event, bool* done)
             break;
         }
 }
-
-static bool render_status_msg()
-{
-    if (!game_selected || !game_selected->connection)
-        return false;
-
-    if (!game_selected->connection->status_msg.length())
-        return false;
-
-    ImGui::SetNextWindowPos(ImVec2(ImGui::GetMainViewport()->GetWorkCenter().x, 0), ImGuiCond_Always, ImVec2(0.5f, 0));
-
-    ImVec2 size0 = ImGui::CalcTextSize(game_selected->connection->status_msg.c_str());
-    ImVec2 size1 = ImGui::CalcTextSize(game_selected->connection->status_msg_sub.c_str());
-
-    if (game_selected->connection->status_msg_sub.length())
-        size1.y += ImGui::GetStyle().ItemSpacing.y * 2.0f;
-
-    ImVec2 win_size = ImVec2(SDL_max(size0.x, size1.x) + 10.0f, size0.y + size1.y) + ImGui::GetStyle().WindowPadding * 1.05f;
-
-    ImGui::SetNextWindowSize(win_size, ImGuiCond_Always);
-
-    if (ImGui::Begin("Status MSG", NULL, ImGuiWindowFlags_NoDecoration))
-    {
-        ImGui::PushStyleVar(ImGuiStyleVar_SeparatorTextAlign, ImVec2(0.5f, 0.5f));
-        ImGui::PushStyleVar(ImGuiStyleVar_SeparatorTextBorderSize, 0);
-        ImGui::PushStyleVar(ImGuiStyleVar_SeparatorTextPadding, ImVec2(0, 0));
-        ImGui::SeparatorText(game_selected->connection->status_msg.c_str());
-        if (game_selected->connection->status_msg_sub.length())
-            ImGui::SeparatorText(game_selected->connection->status_msg_sub.c_str());
-        ImGui::PopStyleVar(3);
-    }
-
-    ImGui::End();
-
-    return true;
-}
-
-static gui_register_overlay reg_render_status_msg(render_status_msg);
 
 static convar_int_t cvr_gui_renderer("gui_renderer", 0, 0, 1, "Show renderer internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 static convar_int_t cvr_gui_lightmap("gui_lightmap", 0, 0, 1, "Show lightmap internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
