@@ -2461,3 +2461,43 @@ bool level_t::gamemode_set(int x)
         return false;
     }
 }
+
+level_t::dimension_switch_result level_t::dimension_switch(const int dim)
+{
+    if (!mc_id::dimension_is_valid(dim))
+    {
+        dc_log_error("Invalid dimension specified: %d", dim);
+        return DIM_SWITCH_INVALID_DIM;
+    }
+
+    const mc_id::dimension_t new_dim = mc_id::dimension_t(dim);
+
+    if (new_dim == dimension)
+        return DIM_SWITCH_ALREADY_IN_USE;
+
+    dc_log("Switching dimension from %d to %d", dimension, new_dim);
+
+    dimension = new_dim;
+
+    chunks.clear();
+    cmap.clear();
+
+    /* TODO: In the future if the player is stored here, they shouldn't be deleted */
+    entities.clear();
+
+    switch (dimension)
+    {
+    case mc_id::DIMENSION_END:
+        lightmap.set_preset(lightmap_t::LIGHTMAP_PRESET_END);
+        break;
+    case mc_id::DIMENSION_NETHER:
+        lightmap.set_preset(lightmap_t::LIGHTMAP_PRESET_NETHER);
+        break;
+    case mc_id::DIMENSION_OVERWORLD: /* Fall-through */
+    default:
+        lightmap.set_preset(lightmap_t::LIGHTMAP_PRESET_OVERWORLD);
+        break;
+    }
+
+    return DIM_SWITCH_SUCCESSFUL;
+}

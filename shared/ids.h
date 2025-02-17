@@ -393,9 +393,20 @@ enum gamemode_t
     GAMEMODE_SPECTATOR = 3,
 };
 
+enum dimension_t : jbyte
+{
+    DIMENSION_NETHER = -1,
+    DIMENSION_OVERWORLD = 0,
+
+    /** I'm not sure if this is the correct ID */
+    DIMENSION_END = 1,
+};
+
 bool gamemode_is_valid(int x);
 
 const char* gamemode_get_trans_id(gamemode_t x);
+
+bool dimension_is_valid(int x);
 
 const char* get_name_vehicle(jbyte id);
 

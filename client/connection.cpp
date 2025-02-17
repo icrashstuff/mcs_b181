@@ -244,6 +244,27 @@ void connection_t::run(level_t* const level)
             {
                 CAST_PACK_TO_P(packet_respawn_t);
 
+                const level_t::dimension_switch_result switch_result = level->dimension_switch(p->dimension);
+
+                switch (switch_result)
+                {
+                case level_t::DIM_SWITCH_ALREADY_IN_USE:
+                {
+                    break;
+                }
+                case level_t::DIM_SWITCH_INVALID_DIM:
+                {
+                    status = CONNECTION_FAILED;
+                    break;
+                }
+                case level_t::DIM_SWITCH_SUCCESSFUL:
+                {
+                    in_world = 0;
+                    set_status_msg("multiplayer.downloadingTerrain");
+                    break;
+                }
+                }
+
                 level->gamemode_set(p->mode);
                 level->world_height = p->world_height;
 

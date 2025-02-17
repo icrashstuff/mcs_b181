@@ -135,6 +135,26 @@ struct level_t
      */
     bool gamemode_set(int x);
 
+    inline mc_id::dimension_t dimension_get() const { return dimension; }
+
+    enum dimension_switch_result
+    {
+        DIM_SWITCH_SUCCESSFUL = 0,
+        DIM_SWITCH_INVALID_DIM = 1,
+        DIM_SWITCH_ALREADY_IN_USE = 2,
+    };
+
+    /**
+     * Switch dimension
+     *
+     * If x != dimension, then this will clear all entities and chunks, and change the light map
+     *
+     * @param dim Dimension to switch to
+     *
+     * @returns 0 on success, 1 on invalid dimension, or 2 on dimension is already used
+     */
+    dimension_switch_result dimension_switch(const int dim);
+
     GLuint ebo = 0;
 
     GLuint ent_missing_vao = 0;
@@ -216,6 +236,8 @@ struct level_t
 
 private:
     mc_id::gamemode_t gamemode = mc_id::GAMEMODE_SPECTATOR;
+
+    mc_id::dimension_t dimension = mc_id::DIMENSION_OVERWORLD;
 
     /**
      * Renders all entities

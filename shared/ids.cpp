@@ -824,3 +824,5 @@ const char* mc_id::gamemode_get_trans_id(gamemode_t x)
 }
 
 bool mc_id::gamemode_is_valid(int a) { return GAMEMODE_SURVIVAL <= a && a <= GAMEMODE_SPECTATOR; }
+
+bool mc_id::dimension_is_valid(int a) { return DIMENSION_NETHER == a || a == DIMENSION_OVERWORLD; }
