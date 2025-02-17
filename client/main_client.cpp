@@ -1294,7 +1294,7 @@ int main(const int argc, const char** argv)
         for (int i = 1; i < argc; i++)
         {
             pack_msg.msg += std::string(argv[i]);
-            if (i != 1)
+            if (i != argc - 1)
                 pack_msg.msg += " ";
         }
 
