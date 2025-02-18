@@ -503,7 +503,7 @@ static client_menu_return_t do_menu_options(mc_gui::mc_gui_ctx* ctx)
         strncpy(temp, cvr_username.get().c_str(), SDL_arraysize(temp));
 
         const char* translation = mc_gui::get_translation("mcs_b181_client.username");
-        float translation_width = ImGui::CalcTextSize(translation).x;
+        float translation_width = ImGui::CalcTextSize(translation).x + ImGui::GetStyle().ItemSpacing.x * 2.0f;
         ImGui::SetNextItemWidth(SDL_max(ctx->get_width_large() - translation_width, ctx->get_width_large() / 2));
         if (ImGui::InputText(translation, temp, SDL_arraysize(temp)))
             cvr_username.set(temp);
