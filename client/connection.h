@@ -116,8 +116,6 @@ struct connection_t
      */
     bool init(const std::string address, const Uint16 port, const std::string username);
 
-    Uint64 start_time = 0;
-
     /**
      * Runs the connection
      *
@@ -151,7 +149,7 @@ private:
 
     bool in_world = false;
 
-    jint max_players;
+    jint max_players = 0;
 
     std::vector<std::pair<std::string, player_list_data_t>> player_list;
 
