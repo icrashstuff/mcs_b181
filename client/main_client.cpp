@@ -900,7 +900,7 @@ static void process_event(SDL_Event& event, bool* done)
         {
             packet_hold_change_t pack;
             int num_slots = level->inventory.hotbar_max - level->inventory.hotbar_min + 1;
-            pack.slot_id = (level->inventory.hotbar_sel + int(event.wheel.y) - level->inventory.hotbar_min) % num_slots;
+            pack.slot_id = (level->inventory.hotbar_sel - int(event.wheel.y) - level->inventory.hotbar_min) % num_slots;
             if (pack.slot_id < 0)
                 pack.slot_id += num_slots;
             level->inventory.hotbar_sel = level->inventory.hotbar_min + pack.slot_id;
