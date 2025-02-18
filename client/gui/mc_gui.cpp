@@ -129,7 +129,7 @@ void mc_gui::mc_gui_ctx::load_resources()
         data_crosshair[i + 7 * 16] = 0xFFFF;
         data_crosshair[7 + i * 16] = 0xFFFF;
     }
-    tex_id_crosshair = load_texture(data_crosshair, 16, 16, "[Menu]: Texture: Crosshair", GL_CLAMP, GL_RGBA, GL_UNSIGNED_SHORT_4_4_4_4);
+    tex_id_crosshair = load_texture(data_crosshair, 16, 16, "[Menu]: Texture: Crosshair", GL_CLAMP_TO_EDGE, GL_RGBA, GL_UNSIGNED_SHORT_4_4_4_4);
 }
 
 void mc_gui::mc_gui_ctx::unload_resources()
