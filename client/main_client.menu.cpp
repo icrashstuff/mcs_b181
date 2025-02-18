@@ -42,6 +42,15 @@ static convar_int_t cvr_mc_hotbar_show_name {
     CONVAR_FLAG_SAVE,
 };
 
+static convar_int_t cvr_mc_force_survival_hotbar {
+    "mc_force_survival_hotbar",
+    false,
+    false,
+    true,
+    "Show survival hotbar elements in non-survival gamemodes",
+    CONVAR_FLAG_SAVE,
+};
+
 struct client_menu_return_t
 {
     /** If this is true the current window will be popped from the stack */
@@ -427,8 +436,6 @@ static void render_item_stack(ImDrawList* const draw_list, const int menu_scale,
     char buf[16];
     snprintf(buf, SDL_arraysize(buf), "%d", item.quantity);
 
-    const ImVec2 cursor = pos1 - ImGui::CalcTextSize(buf);
-
     mc_gui::add_text(draw_list, pos1 - ImGui::CalcTextSize(buf), buf);
 }
 
@@ -451,6 +458,9 @@ static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
 
     /** Highest Y value of the hotbar */
     const float hotbar_upper_y = view_size.y - hotbar_sel_size.y;
+
+    const float column_x_left = view_center.x - hotbar_size.x / 2.0f;
+    const float column_x_right = view_center.x + hotbar_size.x / 2.0f;
 
     inventory_player_t& inv = game_selected->level->inventory;
 
@@ -510,6 +520,91 @@ static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
     }
 
     float lowest_y_value_so_far = hotbar_upper_y;
+
+    bool show_survival_widgets = 0;
+
+    switch (game_selected->level->gamemode_get())
+    {
+    case mc_id::GAMEMODE_SPECTATOR: /* Fall-through */
+    case mc_id::GAMEMODE_CREATIVE: /* Fall-through */
+        show_survival_widgets = cvr_mc_force_survival_hotbar.get();
+        break;
+    case mc_id::GAMEMODE_ADVENTURE: /* Fall-through */
+    case mc_id::GAMEMODE_SURVIVAL: /* Fall-through */
+    default:
+        show_survival_widgets = 1;
+        break;
+    }
+
+    /* Experience bar + Text */
+    if (show_survival_widgets)
+    {
+        lowest_y_value_so_far -= pixel;
+
+        /* TODO: I have not verified if this math is correct */
+        const Sint64 xp_val = SDL_GetTicks();
+        const Sint64 xp_level = SDL_sqrt(xp_val / 5);
+        const Sint64 xp_level_current = xp_val - (xp_level * xp_level * 5);
+        const Sint64 xp_level_max = 10 * xp_level;
+
+        const double percentage = double(xp_level_current) / double(xp_level_max);
+
+        /* Bar Background */
+        const ImVec2 bar_tsize(182, 5);
+        const ImVec2 bar_tpos(0, 64);
+
+        const ImVec2 bar_uv0 = bar_tpos / 256.0f;
+        const ImVec2 bar_uv1 = (bar_tpos + bar_tsize) / 256.0f;
+
+        const ImVec2 bar_pos0 {
+            view_center.x - bar_tsize.x * pixel * 0.5f,
+            lowest_y_value_so_far - bar_tsize.y * pixel,
+        };
+        const ImVec2 bar_pos1 = bar_pos0 + bar_tsize * pixel;
+
+        draw_list->AddImage(ctx->tex_id_icons, bar_pos0, bar_pos1, bar_uv0, bar_uv1);
+
+        /* Bar fill */
+        const ImVec2 bar_filled_pos0 = bar_pos0;
+        const ImVec2 bar_filled_pos1 { glm::mix(bar_pos0.x, bar_pos1.x, percentage), bar_pos1.y };
+
+        const ImVec2 bar_filled_uv0 = bar_uv0 + ImVec2(0.0f, bar_tsize.y / 256.0f);
+        const ImVec2 bar_filled_uv1 { glm::mix(bar_uv0.x, bar_uv1.x, percentage), bar_uv1.y + bar_tsize.y / 256.0f };
+
+        draw_list->AddImage(ctx->tex_id_icons, bar_filled_pos0, bar_filled_pos1, bar_filled_uv0, bar_filled_uv1);
+
+        lowest_y_value_so_far = bar_pos0.y;
+
+        /* Experience Level Text */
+        char buf[32] = "";
+        snprintf(buf, SDL_arraysize(buf), "%ld", xp_level);
+        char* buf_end = buf + strlen(buf);
+
+        const ImVec2 text_size = ImGui::CalcTextSize(buf);
+        const ImVec2 cursor = ImVec2(view_center.x, (bar_pos0.y + bar_pos1.y) * 0.5f) - text_size * ImVec2(0.5f, 1.0f);
+
+        ImVec4 _col_text = ImGui::ColorConvertU32ToFloat4(ImGui::GetColorU32(ImGuiCol_Text));
+        _col_text.x *= 0.502f;
+        _col_text.z *= 0.125f;
+
+        const Uint32 col_shadow = IM_COL32_BLACK;
+        const Uint32 col_text = ImGui::ColorConvertFloat4ToU32(_col_text);
+
+        draw_list->AddText(cursor + ImVec2(+1, +0) * ctx->menu_scale, col_shadow, buf, buf_end);
+        draw_list->AddText(cursor + ImVec2(+0, +1) * ctx->menu_scale, col_shadow, buf, buf_end);
+        draw_list->AddText(cursor + ImVec2(+0, -1) * ctx->menu_scale, col_shadow, buf, buf_end);
+        draw_list->AddText(cursor + ImVec2(-1, +0) * ctx->menu_scale, col_shadow, buf, buf_end);
+
+        draw_list->AddText(cursor + ImVec2(+1, -1) * ctx->menu_scale, col_shadow, buf, buf_end);
+        draw_list->AddText(cursor + ImVec2(-1, +1) * ctx->menu_scale, col_shadow, buf, buf_end);
+        draw_list->AddText(cursor + ImVec2(-1, -1) * ctx->menu_scale, col_shadow, buf, buf_end);
+        draw_list->AddText(cursor + ImVec2(-1, -1) * ctx->menu_scale, col_shadow, buf, buf_end);
+
+        draw_list->AddText(cursor, col_text, buf, buf_end);
+
+        /* This is temporary */
+        lowest_y_value_so_far = cursor.y - pixel * 2.0f;
+    }
 
     /* Item Name */
     if (cvr_mc_hotbar_show_name.get())
