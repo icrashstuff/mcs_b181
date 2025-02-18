@@ -48,10 +48,14 @@ class client_menu_manager_t
 {
     std::vector<std::string> stack;
     std::string default_menu;
-    std::map<std::string, std::function<client_menu_return_t(mc_gui::mc_gui_ctx* ctx)>> menus;
+    std::map<std::string, std::function<client_menu_return_t(mc_gui::mc_gui_ctx* ctx, ImDrawList*)>> menus;
 
 public:
-    void add_menu(std::string name, std::function<client_menu_return_t(mc_gui::mc_gui_ctx* ctx)> func) { menus[name] = func; }
+    void add_menu(std::string name, std::function<client_menu_return_t(mc_gui::mc_gui_ctx* ctx, ImDrawList*)> func) { menus[name] = func; }
+    void add_menu(std::string name, std::function<client_menu_return_t(mc_gui::mc_gui_ctx* ctx)> func)
+    {
+        add_menu(name, [=](mc_gui::mc_gui_ctx* ctx, ImDrawList*) -> client_menu_return_t { return func(ctx); });
+    }
 
     void stack_clear() { stack.clear(); }
 
@@ -68,7 +72,10 @@ public:
         default_menu = name;
     }
 
-    client_menu_return_t run_last_in_stack(glm::ivec2 win_size)
+    /**
+     * @param draw_list This will be passed to the menu to use instead of ImGui::GetBackgroundDrawList()
+     */
+    client_menu_return_t run_last_in_stack(glm::ivec2 win_size, ImDrawList* drawlist)
     {
         std::string to_render = default_menu;
         if (stack.size())
@@ -92,7 +99,7 @@ public:
         ImGui::PushID(to_render.c_str());
 
         if (it != menus.end())
-            ret = it->second(mc_gui::global_ctx);
+            ret = it->second(mc_gui::global_ctx, drawlist);
 
         ImGui::PopID();
 
@@ -317,7 +324,7 @@ static void do_in_game_menu__player_list(mc_gui::mc_gui_ctx* const ctx, connecti
     ctx->menu_scale = old_menu_scale;
 }
 
-static client_menu_return_t do_in_game_menu(mc_gui::mc_gui_ctx* ctx)
+static client_menu_return_t do_in_game_menu(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
 {
     client_menu_return_t ret;
 

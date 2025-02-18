@@ -689,15 +689,20 @@ static void normal_loop()
     {
         client_menu_manager.set_default("in_game");
     }
-    client_menu_return_t menu_ret = client_menu_manager.run_last_in_stack(win_size);
+
+    ImDrawList* const bg_draw_list = ImGui::GetBackgroundDrawList();
+
+    bg_draw_list->ChannelsSplit(2);
+    bg_draw_list->ChannelsSetCurrent(1);
+
+    client_menu_return_t menu_ret = client_menu_manager.run_last_in_stack(win_size, bg_draw_list);
+    bg_draw_list->ChannelsSetCurrent(0);
 
     /* client_menu_manager.run_last_in_stack() may delete the game */
     game = game_selected;
     bool in_world = game;
     if (in_world && game->connection)
         in_world = game->connection->get_in_world();
-
-    ImDrawList* const bg_draw_list = ImGui::GetBackgroundDrawList();
 
     if (menu_ret.allow_world && in_world)
     {
@@ -741,6 +746,8 @@ static void normal_loop()
         bg_draw_list->AddImage(tex_id, pos0, pos1, ImVec2(0, 0), pos1 / (32.0f * float(SDL_max(1, mc_gui::global_ctx->menu_scale))));
         bg_draw_list->AddRectFilled(pos0, pos1, IM_COL32(0, 0, 0, 255 * 0.75f));
     }
+
+    bg_draw_list->ChannelsMerge();
 
     ImGui::Render();
     ImGui_ImplOpenGL3_RenderDrawData(ImGui::GetDrawData());
