@@ -98,14 +98,28 @@ static ImGuiContext* imgui_ctx_main_menu = NULL;
 static mc_gui::mc_gui_ctx mc_gui_global_ctx;
 mc_gui::mc_gui_ctx* mc_gui::global_ctx = &mc_gui_global_ctx;
 
+namespace mc_gui
+{
+static void init();
+static void deinit();
+}
+
+static bool deinitialize_resources();
 static bool initialize_resources()
 {
+    deinitialize_resources();
+
     /* In the future parsing of one of the indexes at /assets/indexes/ will need to happen here (For sound) */
     game_resources = new game_resources_t();
 
     panorama = new panorama_t();
 
     mc_gui::global_ctx->load_resources();
+
+    /* Ideally we would just reload the font here rather than completely restarting the mc_gui/ImGui context.
+     * But for some reason I gave up trying to figure out, only reloading the font resulted in a all black texture
+     * (Hours wasted: 2) */
+    mc_gui::init();
 
     compile_shaders();
 
@@ -122,6 +136,8 @@ static bool deinitialize_resources()
     delete panorama;
 
     mc_gui::global_ctx->unload_resources();
+
+    mc_gui::deinit();
 
     for (game_t* g : games)
         if (g)
@@ -199,6 +215,7 @@ static bool held_ctrl = 0;
 static bool held_tab = 1;
 static bool mouse_grabbed = 0;
 static bool wireframe = 0;
+static bool reload_resources = 0;
 #define AO_ALGO_MAX 5
 
 #include "main_client.menu.cpp"
@@ -518,10 +535,7 @@ static void normal_loop()
     ImGui::Checkbox("Forcibly Show Level", &show_level);
 
     if (ImGui::Button("Rebuild resources"))
-    {
-        deinitialize_resources();
-        initialize_resources();
-    }
+        reload_resources = 1;
 
     static std::string new_username = cvr_username.get();
     static std::string new_addr = cvr_autoconnect_addr.get();
@@ -1118,8 +1132,6 @@ static bool engine_state_step()
         if (!PHYSFS_mount(cvr_path_resource_pack.get().c_str(), "/_resources/", 0))
             util::die("Unable to mount base resource pack");
 
-        mc_gui::init();
-
         initialize_resources();
 
         engine_state_current = ENGINE_STATE_RUNNING;
@@ -1132,8 +1144,6 @@ static bool engine_state_step()
     case ENGINE_STATE_SHUTDOWN:
 
         deinitialize_resources();
-
-        mc_gui::deinit();
 
         engine_state_current = ENGINE_STATE_EXIT;
         dc_log("Engine state moving to %s", engine_state_name(engine_state_current));
@@ -1310,6 +1320,14 @@ int main(const int argc, const char** argv)
             process_event(event, &should_cleanup);
         if (should_cleanup)
             engine_state_target = ENGINE_STATE_EXIT;
+
+        if (reload_resources)
+        {
+            deinitialize_resources();
+            initialize_resources();
+            reload_resources = 0;
+        }
+
         tetra::start_frame(false);
         Uint64 loop_start_time = SDL_GetTicksNS();
         delta_time = (double)last_loop_time / 1000000000.0;

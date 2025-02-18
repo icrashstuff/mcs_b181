@@ -474,10 +474,7 @@ static client_menu_return_t do_menu_options(mc_gui::mc_gui_ctx* ctx)
         ret.name_to_open = "menu.options.controls";
 
     if (convar_t::dev() && mc_gui::button_big("mcs_b181_client.reload_resources"))
-    {
-        deinitialize_resources();
-        initialize_resources();
-    }
+        reload_resources = 1;
 
     if (convar_t::dev())
     {
@@ -634,6 +631,8 @@ static void init()
         if (!ImGui_ImplOpenGL3_Init("#version 330 core"))
             util::die("Failed to initialize Dear Imgui OpenGL3 backend\n");
 
+        global_ctx->load_font_ascii(ImGui::GetIO().Fonts);
+
         ImGuiStyle& style = ImGui::GetStyle();
 
         for (int i = 0; i < ImGuiCol_COUNT; i++)
@@ -655,6 +654,11 @@ static void init()
         style.Colors[ImGuiCol_ButtonActive].z *= 0.9f;
     }
     ImGui::SetCurrentContext(last_ctx);
+
+    static bool manager_initialized = 0;
+    if (manager_initialized)
+        return;
+    manager_initialized = 1;
 
     client_menu_manager = client_menu_manager_t();
 

@@ -91,6 +91,108 @@ static ImTextureID load_gui_texture(std::string path, GLenum edge = GL_CLAMP_TO_
     return ret;
 }
 
+/* This function is a bit convoluted, and might not work on big endian systems */
+void mc_gui::mc_gui_ctx::load_font_ascii(ImFontAtlas* font_atlas)
+{
+    font_atlas->Clear();
+    font_atlas->Flags |= ImFontAtlasFlags_NoMouseCursors;
+
+    int tex_x, tex_y, tex_channels;
+    Uint8* tex_data = stbi_physfs_load("/_resources/assets/minecraft/textures/font/ascii.png", &tex_x, &tex_y, &tex_channels, 4);
+
+    if (!tex_data)
+        return;
+
+    int font_scale = tex_x / 128;
+    int font_size = 8 * font_scale;
+
+    static const ImWchar empty_glyph_range[] = { 0, 0 };
+
+    ImFontConfig fcfg;
+    fcfg.SizePixels = font_size;
+    fcfg.GlyphRanges = empty_glyph_range;
+
+    ImFont* font = font_atlas->AddFontDefault(&fcfg);
+
+    struct mc_glyph_row
+    {
+        int row;
+        int ids[16];
+        ImWchar c[IM_ARRAYSIZE(ids)];
+        int widths[16];
+
+        mc_glyph_row(const Uint64 _widths, const wchar_t _c[IM_ARRAYSIZE(c)], const int _row)
+        {
+            for (int i = 0; i < IM_ARRAYSIZE(c); i++)
+                c[i] = _c[i], widths[i] = (_widths >> (60 - i * 4)) & 0x0F; /* TODO: Does this work on big-endian processors? */
+            row = _row;
+        }
+    } glyphs[] = {
+        /*  0123456789ABCDEF    01 23456789ABCDEF */
+        { 0x314FFFFF444F1F1F, L" !\"#$%&'()*+,-./", 2 },
+        /*  0123456789ABCDEF    0123456789ABCDEF */
+        { 0xFFFFFFFFFF114F4F, L"0123456789:;<=>?", 3 },
+        { 0x6FFFFFFFF3FFFFFF, L"@ABCDEFGHIJKLMNO", 4 },
+        /*  0123456789ABCDEF    0123456789AB CDEF */
+        { 0xFFFFFFFFFFF3F3FF, L"PQRSTUVWXYZ[\\]^_", 5 },
+        /*  0123456789ABCDEF    0123456789ABCDEF */
+        { 0x2FFFFFFFF1F42FFF, L"'abcdefghijklmno", 6 },
+        { 0xFFFF3FFFFFF4146F, L"pqrstuvwxyz{|}~⌂", 7 },
+        { 0xFFFFFFFFFFF3F2FF, L"ÇüéâäàåçêëèïîìÄÅ", 8 },
+        { 0xFFFFFFFFFFFFFF3F, L"ÉæÆôöòûùÿÖÜø£Ø×ƒ", 9 },
+        { 0xF2FFFFFFF6FFF1FF, L"áíóúñÑªº¿®¬½¼¡«»", 10 },
+    };
+
+    struct mc_glyph
+    {
+        int x, y, id;
+    } glyph_map[SDL_arraysize(glyphs) * SDL_arraysize(glyphs[0].ids)];
+
+    mc_glyph* glyph_map_it = glyph_map;
+    for (int i = 0; i < IM_ARRAYSIZE(glyphs); i++)
+        for (int j = 0; j < IM_ARRAYSIZE(glyphs[0].c); j++)
+        {
+            int advance = glyphs[i].widths[j];
+            if (advance == 0x0F)
+                advance = 5;
+            advance++;
+            glyph_map_it->x = j * font_size;
+            glyph_map_it->y = glyphs[i].row * font_size;
+            glyph_map_it->id = font_atlas->AddCustomRectFontGlyph(font, glyphs[i].c[j], font_size, font_size, font_scale * advance);
+            glyph_map_it++;
+        }
+
+    font_atlas->Build();
+
+    unsigned char* tex_pixels = nullptr;
+    int tex_width, tex_height;
+    font_atlas->GetTexDataAsRGBA32(&tex_pixels, &tex_width, &tex_height);
+
+    for (int rect_n = 0; rect_n < IM_ARRAYSIZE(glyph_map); rect_n++)
+    {
+        const mc_glyph& glyph = glyph_map[rect_n];
+        if (const ImFontAtlasCustomRect* const rect = font_atlas->GetCustomRectByIndex(glyph.id))
+        {
+            for (int y = 0; y < rect->Height; y++)
+            {
+                Uint32* p = (Uint32*)tex_pixels + (rect->Y + y) * tex_width + (rect->X);
+                Uint8* pixel = tex_data + ((glyph.y + y) * tex_x + (glyph.x)) * 4;
+                for (int x = 0; x < rect->Width; x++)
+                {
+                    *p++ = IM_COL32(pixel[0], pixel[1], pixel[2], pixel[3]);
+                    pixel += 4;
+                }
+            }
+        }
+    }
+
+    font->Scale = 1.0f / float(font_scale);
+    font->Ascent = font_scale * 7;
+    font->Descent = -font_scale;
+
+    stbi_image_free(tex_data);
+}
+
 void mc_gui::mc_gui_ctx::load_resources()
 {
     unload_resources();

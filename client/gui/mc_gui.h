@@ -67,6 +67,8 @@ struct mc_gui_ctx
 
     void load_resources();
     void unload_resources();
+
+    static void load_font_ascii(ImFontAtlas* atlas);
 };
 
 enum widget_size_t
