@@ -223,6 +223,10 @@ static void do_in_game_menu__player_list(mc_gui::mc_gui_ctx* const ctx, connecti
     }
 
     jint num_players = connection->get_max_players();
+
+    if (num_players == 0)
+        return;
+
     const int columns = num_players / 20 + 1;
     num_players = (num_players / columns) * columns;
     const float text_height = ImGui::GetTextLineHeight() * font_scale;
