@@ -726,6 +726,8 @@ static void normal_loop()
 
         render_world_overlays(game->level, bg_draw_list);
 
+        render_hotbar(mc_gui::global_ctx, bg_draw_list);
+
         /* This blendfunc causes properly made cursors to contrast with the environment better */
         bg_draw_list->AddCallback([](const ImDrawList*, const ImDrawCmd*) { glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_ALPHA); }, NULL);
 

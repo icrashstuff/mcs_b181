@@ -21,7 +21,26 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+#include "tetra/util/convar.h"
 #include <algorithm>
+
+static convar_int_t cvr_mc_less_than_one_item_quantities {
+    "mc_less_than_one_item_quantities",
+    false,
+    false,
+    true,
+    "Render quantities for items stacks with a quantity of less than 1",
+    CONVAR_FLAG_SAVE,
+};
+
+static convar_int_t cvr_mc_hotbar_show_name {
+    "mc_hotbar_show_name",
+    true,
+    false,
+    true,
+    "Show the name of currently selected item above the hotbar",
+    CONVAR_FLAG_SAVE,
+};
 
 struct client_menu_return_t
 {
@@ -326,6 +345,186 @@ static void do_in_game_menu__player_list(mc_gui::mc_gui_ctx* const ctx, connecti
     ImGui::PopStyleVar(4);
 
     ctx->menu_scale = old_menu_scale;
+}
+
+/**
+ * Render itemstack
+ *
+ * @param draw_list List to draw to
+ * @param menu_scale Menu scale (for text shadow)
+ * @param pos0 Position of upper left corner (in window size coordinates)
+ * @param pos1 Position of lower right corner (in window size coordinates)
+ * @param item Item to render
+ * @param stretch Stretch factors
+ * @param stretch_center Point to stretch away from
+ */
+static void render_item_stack(ImDrawList* const draw_list, const int menu_scale, const ImVec2 pos0, const ImVec2 pos1, const itemstack_t& item,
+    const ImVec2 stretch = ImVec2(1.0f, 1.0f), const ImVec2 stretch_center = ImVec2(0.50f, 0.450f))
+{
+    if (item.id == BLOCK_ID_NONE || item.id == BLOCK_ID_AIR)
+        return;
+
+    const ImVec2 simple_uv0(0, 0);
+    const ImVec2 simple_uv1(1, 1);
+
+    /* TODO: Proper rendering of items/blocks */
+    if (!mc_id::is_block(item.id) || !mc_id::block_has_collision(item.id))
+        draw_list->AddImage(0, pos0, pos1, simple_uv0, simple_uv1);
+    else
+    {
+        const ImVec2 size = pos1 - pos0;
+
+        ImVec2 _left_upper = ImVec2(0.05f, 0.226f);
+        ImVec2 _left_lower = ImVec2(0.05f, 0.773f);
+
+        ImVec2 _mid_upper = ImVec2(0.50f, 0.010f);
+        ImVec2 _mid_mid = ImVec2(0.50f, 0.450f);
+        ImVec2 _mid_lower = ImVec2(0.50f, 0.990f);
+
+        ImVec2 _right_upper = ImVec2(0.95f, 0.230f);
+        ImVec2 _right_lower = ImVec2(0.95f, 0.773f);
+
+#define VEC2_OFFS(b, a) ImVec2(a.x - b.x, a.y - b.y)
+        _left_upper = stretch_center + stretch * VEC2_OFFS(stretch_center, _left_upper);
+        _left_lower = stretch_center + stretch * VEC2_OFFS(stretch_center, _left_lower);
+
+        _mid_upper = stretch_center + stretch * VEC2_OFFS(stretch_center, _mid_upper);
+        _mid_mid = stretch_center + stretch * VEC2_OFFS(stretch_center, _mid_mid);
+        _mid_lower = stretch_center + stretch * VEC2_OFFS(stretch_center, _mid_lower);
+
+        _right_upper = stretch_center + stretch * VEC2_OFFS(stretch_center, _right_upper);
+        _right_lower = stretch_center + stretch * VEC2_OFFS(stretch_center, _right_lower);
+#undef VEC2_OFFS
+
+        const ImVec2 left_upper = pos0 + size * _left_upper;
+        const ImVec2 left_lower = pos0 + size * _left_lower;
+        const ImVec2 mid_upper = pos0 + size * _mid_upper;
+        const ImVec2 mid_mid = pos0 + size * _mid_mid;
+        const ImVec2 mid_lower = pos0 + size * _mid_lower;
+        const ImVec2 right_upper = pos0 + size * _right_upper;
+        const ImVec2 right_lower = pos0 + size * _right_lower;
+
+        const ImTextureID tex_top = mc_gui::global_ctx->tex_id_bg;
+        const ImTextureID tex_left = mc_gui::global_ctx->tex_id_bg;
+        const ImTextureID tex_right = mc_gui::global_ctx->tex_id_bg;
+
+        ImVec2 uv_top[4] = { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 0, 1 } };
+        ImVec2 uv_left[4] = { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 0, 1 } };
+        ImVec2 uv_right[4] = { { 1, 0 }, { 0, 0 }, { 0, 1 }, { 1, 1 } };
+
+        Uint32 col_top = IM_COL32(255, 255, 255, 255);
+        Uint32 col_left = IM_COL32(189, 189, 189, 255);
+        Uint32 col_right = IM_COL32(216, 216, 216, 255);
+
+        draw_list->AddImageQuad(tex_top, left_upper, mid_mid, right_upper, mid_upper, uv_top[0], uv_top[1], uv_top[2], uv_top[3], col_top);
+        draw_list->AddImageQuad(tex_left, left_upper, mid_mid, mid_lower, left_lower, uv_left[0], uv_left[1], uv_left[2], uv_left[3], col_left);
+        draw_list->AddImageQuad(tex_right, right_upper, mid_mid, mid_lower, right_lower, uv_right[0], uv_right[1], uv_right[2], uv_right[3], col_right);
+    }
+
+    if (item.quantity == 1 || (!cvr_mc_less_than_one_item_quantities.get() && item.quantity < 0))
+        return;
+
+    char buf[16];
+    snprintf(buf, SDL_arraysize(buf), "%d", item.quantity);
+
+    const ImVec2 cursor = pos1 - ImGui::CalcTextSize(buf);
+
+    mc_gui::add_text(draw_list, pos1 - ImGui::CalcTextSize(buf), buf);
+}
+
+static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
+{
+    const ImVec2 _hotbar_sel_size(24.0f, 24.0f);
+    const ImVec2 _hotbar_item_size(16.0f, 16.0f);
+    const ImVec2 _hotbar_square_size(20.0f, 20.0f);
+    const ImVec2 _hotbar_size = ImVec2 { _hotbar_square_size.x * 9.0f + 2.0f, _hotbar_square_size.y + 2.0f };
+
+    const float pixel = ctx->menu_scale;
+
+    const ImVec2 hotbar_sel_size = _hotbar_sel_size * pixel;
+    const ImVec2 hotbar_item_size = _hotbar_item_size * pixel;
+    const ImVec2 hotbar_square_size = _hotbar_square_size * pixel;
+    const ImVec2 hotbar_size = _hotbar_size * pixel;
+
+    const ImVec2 view_size = ImGui::GetMainViewport()->Size;
+    const ImVec2 view_center = view_size / 2.0f;
+
+    /** Highest Y value of the hotbar */
+    const float hotbar_upper_y = view_size.y - hotbar_sel_size.y;
+
+    inventory_player_t& inv = game_selected->level->inventory;
+
+    /* Hotbar */
+    {
+        const ImVec2 tsize(_hotbar_size);
+        const ImVec2 tpos(0.0f, 0.0f);
+
+        const ImVec2 uv0 = tpos / 256.0f;
+        const ImVec2 uv1 = (tsize + tpos) / 256.0f;
+
+        const ImVec2 pos0 {
+            (view_size.x - hotbar_size.x) / 2.0f,
+            view_size.y - hotbar_size.y - pixel,
+        };
+        const ImVec2 pos1(pos0.x + hotbar_size.x, view_size.y - pixel);
+
+        draw_list->AddImage(ctx->tex_id_widgets, pos0, pos1, uv0, uv1);
+    }
+
+    /* Hotbar selector */
+    {
+        const ImVec2 tsize(_hotbar_sel_size);
+        const ImVec2 tpos(0.0f, 22.0f);
+
+        const ImVec2 uv0 = tpos / 256.0f;
+        const ImVec2 uv1 = (tsize + tpos) / 256.0f;
+
+        int hot_bar_pos = inv.hotbar_sel - inv.hotbar_min;
+
+        const ImVec2 pos0 {
+            (view_size.x - hotbar_size.x) / 2.0f + hotbar_square_size.x * hot_bar_pos - pixel,
+            hotbar_upper_y,
+        };
+        const ImVec2 pos1(pos0.x + hotbar_sel_size.x, view_size.y);
+
+        draw_list->AddImage(ctx->tex_id_widgets, pos0, pos1, uv0, uv1);
+    }
+
+    /* Hotbar items */
+    for (int i = inv.hotbar_min; i <= inv.hotbar_max; i++)
+    {
+        const float hot_bar_sel = i - inv.hotbar_min;
+
+        const ImVec2 pos0 {
+            (view_size.x - hotbar_size.x) / 2.0f + hotbar_square_size.x * hot_bar_sel + pixel * 3.0f,
+            view_size.y - hotbar_item_size.y - pixel * 4.0f,
+        };
+        const ImVec2 pos1(pos0 + hotbar_item_size);
+
+        // const float squish = (SDL_cosf(float(SDL_GetTicks() % 628) / 100.0f) + 1.0f) * 0.5f + 1.0f;
+        const float squish = 1.0f;
+
+        render_item_stack(draw_list, ctx->menu_scale, pos0, pos1, inv.items[i], ImVec2(1 / SDL_sqrtf(squish), squish), ImVec2(0.5f, 1.0f));
+
+        continue;
+    }
+
+    float lowest_y_value_so_far = hotbar_upper_y;
+
+    /* Item Name */
+    if (cvr_mc_hotbar_show_name.get())
+    {
+        const itemstack_t& item_hand = inv.items[inv.hotbar_sel];
+        const char* name = mc_id::get_name_from_item_id(item_hand.id, item_hand.damage);
+
+        if (name && item_hand.id != BLOCK_ID_NONE && item_hand.id != BLOCK_ID_AIR)
+        {
+            ImVec2 text_size = ImGui::CalcTextSize(name);
+            lowest_y_value_so_far -= pixel;
+            lowest_y_value_so_far -= text_size.y;
+            mc_gui::add_text(draw_list, ImVec2(view_center.x - text_size.x / 2.0f, lowest_y_value_so_far), name);
+        }
+    }
 }
 
 static client_menu_return_t do_in_game_menu(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)

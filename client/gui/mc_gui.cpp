@@ -475,3 +475,14 @@ void mc_gui::textv(const char* fmt, va_list args)
     ImGui::SetCursorPos(pos);
     ImGui::TextEx(text, text_end, ImGuiTextFlags_NoWidthForLargeClippedText);
 }
+
+void mc_gui::add_text(ImDrawList* draw_list, const ImVec2& pos, const char* text_begin, ImU32 col, const char* text_end)
+{
+    ImVec4 col_shadow = ImGui::ColorConvertU32ToFloat4(col);
+    col_shadow.x *= 0.25f;
+    col_shadow.y *= 0.25f;
+    col_shadow.z *= 0.25f;
+
+    draw_list->AddText(pos + ImVec2(+1, +1) * global_ctx->menu_scale, ImGui::ColorConvertFloat4ToU32(col_shadow), text_begin, text_end);
+    draw_list->AddText(pos, col, text_begin, text_end);
+}

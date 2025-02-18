@@ -98,6 +98,9 @@ IMGUI_API void text_unformatted(const char* const text, const char* text_end = N
 IMGUI_API void text_translated(const char* translation_id);
 IMGUI_API void text(const char* fmt, ...) IM_FMTARGS(1);
 IMGUI_API void textv(const char* fmt, va_list args) IM_FMTLIST(1);
+
+/** Add text with a shadow to a drawlist */
+void add_text(ImDrawList* draw_list, const ImVec2& pos, const char* text_begin, ImU32 col = ImGui::GetColorU32(ImGuiCol_Text), const char* text_end = NULL);
 }
 
 #endif
