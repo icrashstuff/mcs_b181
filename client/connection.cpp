@@ -474,8 +474,7 @@ void connection_t::run(level_t* const level)
                 case WINDOW_ID_INVENTORY:
                     p->payload.resize(SDL_min(p->payload.size(), SDL_arraysize(level->inventory.items)));
                     for (size_t i = 0; i < p->payload.size(); i++)
-                        level->inventory.items[i].id = i;
-
+                        level->inventory.items[i] = p->payload[i];
                     break;
                 default:
                     dc_log_error("Unknown window id %d", p->window_id);
