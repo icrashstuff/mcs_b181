@@ -97,6 +97,7 @@ static void decompress_chunk_packet(level_t* const level, const packet_chunk_t* 
     }
 
     // TODO: Create nonexistent chunks
+    /* Copy data */
     for (chunk_cubic_t* c : level->get_chunk_vec())
     {
         if (!BETWEEN_INCL(c->pos.x, min_chunk_x, max_chunk_x))
@@ -160,6 +161,25 @@ static void decompress_chunk_packet(level_t* const level, const packet_chunk_t* 
         }
 
         c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
+    }
+
+    auto map = level->get_chunk_map();
+
+    /* Mark surrounding chunks for re-meshing */
+    for (int x = min_chunk_x - 1; x <= max_chunk_x + 1; x++)
+    {
+        for (int y = min_chunk_y - 1; y <= max_chunk_y + 1; y++)
+        {
+            for (int z = min_chunk_z - 1; z <= max_chunk_z + 1; z++)
+            {
+                if (BETWEEN_INCL(x, min_chunk_x, max_chunk_x) && BETWEEN_INCL(y, min_chunk_y, max_chunk_y) && BETWEEN_INCL(z, min_chunk_z, max_chunk_z))
+                    continue;
+
+                auto it = map.find(glm::ivec3(x, y, z));
+                if (it != map.end())
+                    it->second->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
+            }
+        }
     }
 }
 #pragma GCC pop_options
