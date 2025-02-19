@@ -606,6 +606,101 @@ static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
         lowest_y_value_so_far = cursor.y - pixel * 2.0f;
     }
 
+    float lowest_y_value_so_far_left = lowest_y_value_so_far - pixel;
+    float lowest_y_value_so_far_right = lowest_y_value_so_far - pixel;
+
+    /* Health bar */
+    if (show_survival_widgets)
+    {
+        bool effect_poison = false;
+        bool effect_wither = false;
+        bool effect_absorb = false;
+
+        bool effect_hardcore = false;
+        bool effect_mounted = false;
+
+        int health_max = (SDL_cosf(float(SDL_GetTicks() % 6500) * SDL_PI_F * 2.0f / 6500.0f) + 0.95f) * 5 + 10;
+        int health_cur = health_max * (SDL_cosf(float((SDL_GetTicks() / 500 * 500) % 2500) * SDL_PI_F * 2.0f / 2500.0f) + 0.5f);
+        int health_last = health_cur - ((SDL_GetTicks() / 250) % 3) + 1;
+
+        bool was_updated = health_cur != health_last;
+        bool effect_jiggle = health_cur <= 4;
+
+        const ImVec2 tadvance(8.0f, 10.0f);
+        const ImVec2 tsize_base(9.0f, 9.0f);
+        const float background_count = 4;
+        ImVec2 tpos_background;
+        ImVec2 tpos_fill;
+
+        if (effect_mounted)
+            tpos_background = { 52.0f, 9.0f };
+        else if (effect_hardcore)
+            tpos_background = { 16.0f, 45.0f };
+        else
+            tpos_background = { 16.0f, 0.0f };
+
+        tpos_fill = tpos_background + ImVec2(tsize_base.x * background_count, 0.0f);
+
+        if (was_updated)
+            tpos_background.x += tsize_base.x;
+
+        if (!effect_mounted)
+        {
+            if (effect_wither)
+                tpos_fill.x += tsize_base.x * 4.0f * 2.0f;
+            else if (effect_poison)
+                tpos_fill.x += tsize_base.x * 4.0f * 1.0f;
+            else if (effect_absorb)
+                tpos_fill.x += tsize_base.x * 4.0f * 3.0f;
+            else /* Normal */
+                tpos_fill.x += 0.0f;
+        }
+
+        float new_lowest_y_value_so_far_left = 0.0f;
+        for (int i = 0; i < (health_max + 1) / 2; i++)
+        {
+            const bool empty = i * 2 >= health_cur;
+            const bool empty_missing = i * 2 >= health_last;
+            const bool half = (health_cur - i * 2) == 1;
+            const bool half_missing = (health_last - i * 2) == 1;
+
+            ImVec2 jiggle(0.0f, 0.0f);
+            if (effect_jiggle)
+            {
+                int period = 200;
+                float x = SDL_GetTicks() % period + (i + i / 10) * (period / 3);
+                float jpos = SDL_cosf(x * SDL_PI_F * 2.0f / float(period));
+                jiggle.y = SDL_roundf(jpos) * pixel;
+            }
+
+            ImVec2 pos0(column_x_left, lowest_y_value_so_far_left);
+            pos0 += tadvance * pixel * ImVec2(i % 10, -i / 10);
+            pos0.y -= pixel * 1.0f;
+            pos0 += jiggle;
+            ImVec2 pos1 = pos0 + tsize_base * pixel;
+
+            new_lowest_y_value_so_far_left = pos0.y - jiggle.y;
+
+            ImVec2 bg_uv0 = tpos_background / 256.0f;
+            ImVec2 bg_uv1 = bg_uv0 + tsize_base / 256.0f;
+
+            ImVec2 fg_uv0 = (tpos_fill + ImVec2(half ? tsize_base.x : 0.0f, 0.0f)) / 256.0f;
+            ImVec2 fg_uv1 = fg_uv0 + tsize_base / 256.0f;
+
+            ImVec2 fg_missing_uv0 = (tpos_fill + ImVec2((half_missing ? 3.0f : 2.0f) * tsize_base.x, 0.0f)) / 256.0f;
+            ImVec2 fg_missing_uv1 = fg_missing_uv0 + tsize_base / 256.0f;
+
+            draw_list->AddImage(ctx->tex_id_icons, pos0, pos1, bg_uv0, bg_uv1);
+            if (!empty_missing)
+                draw_list->AddImage(ctx->tex_id_icons, pos0, pos1, fg_missing_uv0, fg_missing_uv1);
+            if (!empty)
+                draw_list->AddImage(ctx->tex_id_icons, pos0, pos1, fg_uv0, fg_uv1);
+        }
+        lowest_y_value_so_far_left = new_lowest_y_value_so_far_left;
+    }
+
+    lowest_y_value_so_far = SDL_min(lowest_y_value_so_far_left, lowest_y_value_so_far_right);
+
     /* Item Name */
     if (cvr_mc_hotbar_show_name.get())
     {
