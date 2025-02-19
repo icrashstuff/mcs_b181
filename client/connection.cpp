@@ -175,8 +175,8 @@ static void decompress_chunk_packet(level_t* const level, const packet_chunk_t* 
                 if (BETWEEN_INCL(x, min_chunk_x, max_chunk_x) && BETWEEN_INCL(y, min_chunk_y, max_chunk_y) && BETWEEN_INCL(z, min_chunk_z, max_chunk_z))
                     continue;
 
-                auto it = map.find(glm::ivec3(x, y, z));
-                if (it != map.end())
+                auto it = map->find(glm::ivec3(x, y, z));
+                if (it != map->end())
                     it->second->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
             }
         }

@@ -72,7 +72,7 @@ struct level_t
     /**
      * Returns the chunk vector for iteration
      */
-    inline const std::map<glm::ivec3, chunk_cubic_t*, ivec3_comparator_t>& get_chunk_map() { return cmap; }
+    inline const std::map<glm::ivec3, chunk_cubic_t*, ivec3_comparator_t>* get_chunk_map() const { return &cmap; }
 
     /**
      * Removes chunk from chunk vector and map, and then deletes it

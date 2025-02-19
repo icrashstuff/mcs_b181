@@ -238,8 +238,8 @@ void render_world_overlays(level_t* level, ImDrawList* const bg_draw_list)
 
     auto chunk_map = level->get_chunk_map();
 
-    auto it = chunk_map.find(glm::ivec3(cam_pos) >> 4);
-    if (it != chunk_map.end())
+    auto it = chunk_map->find(glm::ivec3(cam_pos) >> 4);
+    if (it != chunk_map->end())
     {
         glm::ivec3 coords_rel = glm::ivec3(cam_pos) & 0x0F;
         block_id_t _type = it->second->get_type(coords_rel.x, coords_rel.y, coords_rel.z);
