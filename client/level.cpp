@@ -230,6 +230,15 @@ void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z
         return;
     }
 
+    bool is_transparent[256];
+    Uint8 light_levels[256];
+
+    for (int i = 0; i < IM_ARRAYSIZE(is_transparent); i++)
+        is_transparent[i] = mc_id::is_transparent(i);
+
+    for (int i = 0; i < IM_ARRAYSIZE(light_levels); i++)
+        light_levels[i] = mc_id::get_light_level(i);
+
     Uint32 total = 0;
     Uint8 min_level = 15;
     Uint8 max_level = 0;
@@ -242,9 +251,9 @@ void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z
 
         Uint8 type = cross.c->get_type(x, y, z);
 
-        Uint8 lvl = mc_id::get_light_level(type);
+        Uint8 lvl = light_levels[type];
 
-        if (!mc_id::is_transparent(type))
+        if (!is_transparent[type])
         {
             if (lvl != 0)
                 cross.c->set_light_block(x, y, z, lvl);
@@ -327,7 +336,7 @@ void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z
         const int z = (dat_it >> 4) & 0x0F;
         const int x = (dat_it >> 8) & 0x0F;
 
-        if (!mc_id::is_transparent(cross.c->get_type(x, y, z)))
+        if (!is_transparent[cross.c->get_type(x, y, z)])
             continue;
 
         /** Index: +XYZ -XYZ */
