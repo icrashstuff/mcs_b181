@@ -727,6 +727,93 @@ static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
         lowest_y_value_so_far_left = new_lowest_y_value_so_far_left;
     }
 
+    /* Food bar */
+    if (show_survival_widgets)
+    {
+        bool effect_poison = false;
+
+        int food_max = 0;
+        int food_cur = 0;
+        int food_last = 0;
+
+        if (cvr_mc_hotbar_test.get())
+        {
+            float amp = cvr_mc_hotbar_test_intensity.get();
+            food_max = (SDL_cosf(float(SDL_GetTicks() + 4500 % 8500) * SDL_PI_F * 2.0f / 8500.0f) + 0.95f) * 6 * amp + 11;
+            food_cur = food_max * (SDL_cosf(float((SDL_GetTicks() & ~0xFF) % 3500) * SDL_PI_F * 2.0f / 3500.0f) + 0.5f);
+            food_last = food_cur - ((SDL_GetTicks() & ~0xFF) % 3) + 1;
+        }
+
+        float food_satur_cur = 0.0f;
+        float food_satur_last = 0.0f;
+
+        bool was_updated = food_cur != food_last || SDL_fabsf(food_satur_cur - food_satur_last) > 0.25f;
+        bool effect_jiggle = food_cur <= 4;
+
+        const ImVec2 tadvance(8.0f, 10.0f);
+        const ImVec2 tsize_base(9.0f, 9.0f);
+        const float background_count = 4;
+        ImVec2 tpos_background;
+        ImVec2 tpos_fill;
+
+        tpos_background = { 16.0f, 27.0f };
+
+        tpos_fill = tpos_background + ImVec2(tsize_base.x * background_count, 0.0f);
+
+        if (was_updated)
+            tpos_background.x += tsize_base.x;
+
+        if (effect_poison)
+            tpos_fill.x += tsize_base.x * 4.0f * 1.0f;
+        else /* Normal */
+            tpos_fill.x += 0.0f;
+
+        float new_lowest_y_value_so_far_right = 0.0f;
+        for (int i = 0; i < (food_max + 1) / 2; i++)
+        {
+            const bool empty = i * 2 >= food_cur;
+            const bool empty_missing = i * 2 >= food_last;
+            const bool half = (food_cur - i * 2) == 1;
+            const bool half_missing = (food_last - i * 2) == 1;
+
+            ImVec2 jiggle(0.0f, 0.0f);
+            if (effect_jiggle)
+            {
+                int period = 200;
+                float x = SDL_GetTicks() % period + (i + i / 10) * (period / 3);
+                float jpos = SDL_cosf(x * SDL_PI_F * 2.0f / float(period));
+                jiggle.y = SDL_roundf(jpos) * pixel;
+            }
+
+            ImVec2 pos0 {
+                column_x_right - tsize_base.x * pixel,
+                lowest_y_value_so_far_right,
+            };
+            pos0 += tadvance * pixel * ImVec2(-i % 10, -i / 10);
+            pos0.y -= pixel * 1.0f;
+            pos0 += jiggle;
+            ImVec2 pos1 = pos0 + tsize_base * pixel;
+
+            new_lowest_y_value_so_far_right = pos0.y - jiggle.y;
+
+            ImVec2 bg_uv0 = tpos_background / 256.0f;
+            ImVec2 bg_uv1 = bg_uv0 + tsize_base / 256.0f;
+
+            ImVec2 fg_uv0 = (tpos_fill + ImVec2(half ? tsize_base.x : 0.0f, 0.0f)) / 256.0f;
+            ImVec2 fg_uv1 = fg_uv0 + tsize_base / 256.0f;
+
+            ImVec2 fg_missing_uv0 = (tpos_fill + ImVec2((half_missing ? 3.0f : 2.0f) * tsize_base.x, 0.0f)) / 256.0f;
+            ImVec2 fg_missing_uv1 = fg_missing_uv0 + tsize_base / 256.0f;
+
+            draw_list->AddImage(ctx->tex_id_icons, pos0, pos1, bg_uv0, bg_uv1);
+            if (!empty_missing)
+                draw_list->AddImage(ctx->tex_id_icons, pos0, pos1, fg_missing_uv0, fg_missing_uv1);
+            if (!empty)
+                draw_list->AddImage(ctx->tex_id_icons, pos0, pos1, fg_uv0, fg_uv1);
+        }
+        lowest_y_value_so_far_right = new_lowest_y_value_so_far_right;
+    }
+
     lowest_y_value_so_far = SDL_min(lowest_y_value_so_far_left, lowest_y_value_so_far_right);
 
     /* Item Name */
