@@ -217,7 +217,7 @@ static void decompress_chunk_packet(level_t* const level, const packet_chunk_t* 
                     continue;
 
                 auto it = map->find(glm::ivec3(x, y, z));
-                if (it != map->end())
+                if (it != map->end() && it->second->dirty_level < chunk_cubic_t::DIRTY_LEVEL_MESH)
                     it->second->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
             }
         }
