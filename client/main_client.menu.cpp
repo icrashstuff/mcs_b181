@@ -43,12 +43,30 @@ static convar_int_t cvr_mc_hotbar_show_name {
 };
 
 static convar_int_t cvr_mc_force_survival_hotbar {
-    "mc_force_survival_hotbar",
+    "mc_hotbar_force_survival",
     false,
     false,
     true,
     "Show survival hotbar elements in non-survival gamemodes",
-    CONVAR_FLAG_SAVE,
+    CONVAR_FLAG_SAVE | CONVAR_FLAG_DEV_ONLY,
+};
+
+static convar_int_t cvr_mc_hotbar_test {
+    "mc_hotbar_test",
+    false,
+    false,
+    true,
+    "Runs hotbar element values through ranges to test layout and scaling",
+    CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_SAVE,
+};
+
+static convar_float_t cvr_mc_hotbar_test_intensity {
+    "mc_hotbar_test_intensity",
+    1.0f,
+    0.01f,
+    100.0f,
+    "Intensity of tests that are enabled by mc_hotbar_test",
+    CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_SAVE,
 };
 
 struct client_menu_return_t
@@ -542,7 +560,9 @@ static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
         lowest_y_value_so_far -= pixel;
 
         /* TODO: I have not verified if this math is correct */
-        const Sint64 xp_val = SDL_GetTicks();
+        Sint64 xp_val = 0;
+        if (cvr_mc_hotbar_test.get())
+            xp_val = SDL_GetTicks() * Uint64(cvr_mc_hotbar_test_intensity.get() * 16.0f) >> 5;
         const Sint64 xp_level = SDL_sqrt(xp_val / 5);
         const Sint64 xp_level_current = xp_val - (xp_level * xp_level * 5);
         const Sint64 xp_level_max = 10 * xp_level;
@@ -619,9 +639,17 @@ static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
         bool effect_hardcore = false;
         bool effect_mounted = false;
 
-        int health_max = (SDL_cosf(float(SDL_GetTicks() % 6500) * SDL_PI_F * 2.0f / 6500.0f) + 0.95f) * 5 + 10;
-        int health_cur = health_max * (SDL_cosf(float((SDL_GetTicks() / 500 * 500) % 2500) * SDL_PI_F * 2.0f / 2500.0f) + 0.5f);
-        int health_last = health_cur - ((SDL_GetTicks() / 250) % 3) + 1;
+        int health_max = 0;
+        int health_cur = 0;
+        int health_last = 0;
+
+        if (cvr_mc_hotbar_test.get())
+        {
+            float amp = cvr_mc_hotbar_test_intensity.get();
+            health_max = (SDL_cosf(float(SDL_GetTicks() % 6500) * SDL_PI_F * 2.0f / 6500.0f) + 0.95f) * 5 * amp + 10;
+            health_cur = health_max * (SDL_cosf(float((SDL_GetTicks() / 500 * 500) % 2500) * SDL_PI_F * 2.0f / 2500.0f) + 0.5f);
+            health_last = health_cur - ((SDL_GetTicks() / 250) % 3) + 1;
+        }
 
         bool was_updated = health_cur != health_last;
         bool effect_jiggle = health_cur <= 4;
