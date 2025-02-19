@@ -57,6 +57,10 @@ static void decompress_chunk_packet(level_t* const level, const packet_chunk_t* 
     const int max_chunk_y = max_block_y >> 4;
     const int max_chunk_z = max_block_z >> 4;
 
+    const int dimension_chunk_x = max_chunk_x - min_chunk_x + 1;
+    const int dimension_chunk_y = max_chunk_y - min_chunk_y + 1;
+    const int dimension_chunk_z = max_chunk_z - min_chunk_z + 1;
+
     const int real_size_x = p->size_x + 1;
     const int real_size_y = p->size_y + 1;
     const int real_size_z = p->size_z + 1;
@@ -96,16 +100,55 @@ static void decompress_chunk_packet(level_t* const level, const packet_chunk_t* 
         dc_log_error("Error %d (%s) decompressing chunk data!", decompress_result, err_str);
     }
 
-    // TODO: Create nonexistent chunks
+    auto map = level->get_chunk_map();
+
     /* Copy data */
-    for (chunk_cubic_t* c : level->get_chunk_vec())
+    const int cvol_it_size = dimension_chunk_x * dimension_chunk_y;
+    for (int cvol_it = 0, cvol_it_x = 0, cvol_it_y = 0, cvol_it_z = 0; cvol_it < cvol_it_size; cvol_it++)
     {
-        if (!BETWEEN_INCL(c->pos.x, min_chunk_x, max_chunk_x))
-            continue;
-        if (!BETWEEN_INCL(c->pos.y, min_chunk_y, max_chunk_y))
-            continue;
-        if (!BETWEEN_INCL(c->pos.z, min_chunk_z, max_chunk_z))
-            continue;
+        const int chunk_x = cvol_it_x + min_chunk_x;
+        const int chunk_y = cvol_it_y + min_chunk_y;
+        const int chunk_z = cvol_it_z + min_chunk_z;
+
+        SDL_assert(BETWEEN_INCL(chunk_x, min_chunk_x, max_chunk_x));
+        SDL_assert(BETWEEN_INCL(chunk_y, min_chunk_y, max_chunk_y));
+        SDL_assert(BETWEEN_INCL(chunk_z, min_chunk_z, max_chunk_z));
+
+        cvol_it_x++;
+        if (cvol_it_x >= dimension_chunk_x)
+        {
+            cvol_it_x = 0;
+            cvol_it_y++;
+        }
+        if (cvol_it_y >= dimension_chunk_y)
+        {
+            cvol_it_y = 0;
+            cvol_it_z++;
+        }
+        SDL_assert(cvol_it_x < dimension_chunk_x);
+        SDL_assert(cvol_it_y < dimension_chunk_y);
+        SDL_assert(cvol_it_z < dimension_chunk_z || cvol_it + 1 == cvol_it_size);
+
+        /* Find chunk or create new a one */
+        chunk_cubic_t* c = NULL;
+        {
+            const glm::ivec3 cpos(chunk_x, chunk_y, chunk_z);
+            auto it = map->find(cpos);
+            if (it == map->end())
+            {
+                c = new chunk_cubic_t();
+                c->pos = cpos;
+                level->add_chunk(c);
+            }
+            else
+                c = it->second;
+
+            if (!c)
+            {
+                dc_log_error("Chunk is null at <%d, %d, %d>", cpos.x, cpos.y, cpos.z);
+                continue;
+            }
+        }
 
         for (int x = 0; x < SUBCHUNK_SIZE_X; x++)
         {
@@ -162,8 +205,6 @@ static void decompress_chunk_packet(level_t* const level, const packet_chunk_t* 
 
         c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
     }
-
-    auto map = level->get_chunk_map();
 
     /* Mark surrounding chunks for re-meshing */
     for (int x = min_chunk_x - 1; x <= max_chunk_x + 1; x++)
