@@ -883,6 +883,69 @@ static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
         lowest_y_value_so_far_left = new_lowest_y_value_so_far_left;
     }
 
+    /* Breath bar */
+    if (show_survival_widgets)
+    {
+        int breath_max = 0;
+        int breath_cur = 0;
+        int breath_last = 0;
+
+        if (cvr_mc_hotbar_test.get())
+        {
+            float amp = cvr_mc_hotbar_test_intensity.get();
+            breath_max = SDL_cosf(float(SDL_GetTicks() % 20500) * SDL_PI_F * 2.0f / 20500.0f) * 5.0f * amp + 10.0f * amp;
+            breath_cur = breath_max * (SDL_cosf(float((SDL_GetTicks() & ~0x0F) % 13750) * SDL_PI_F * 2.0f / 13750.0f) + 1.0f);
+            breath_cur -= amp;
+            breath_cur /= 2.0f;
+            breath_last = breath_last * (SDL_cosf(float((SDL_GetTicks() & ~0xFF) % 3750) * SDL_PI_F * 2.0f / 3750.0f) + 1.0f);
+            breath_last -= amp;
+            breath_last /= 2.0f;
+        }
+
+        if (breath_cur >= breath_max)
+            breath_max = 0;
+
+        bool effect_jiggle = false;
+
+        const ImVec2 tadvance(8.0f, 10.0f);
+        const ImVec2 tsize_base(9.0f, 9.0f);
+        const ImVec2 tpos_fill { 16.0f, 18.0f };
+
+        float new_lowest_y_value_so_far_right = lowest_y_value_so_far_right;
+        for (int i = 0; i < (breath_max + 1) / 2; i++)
+        {
+            const bool empty = i * 2 >= breath_cur;
+            const bool half = (empty && i * 2 < breath_last) || (breath_cur - i * 2) == 1;
+
+            ImVec2 jiggle(0.0f, 0.0f);
+            if (effect_jiggle)
+            {
+                int period = 200;
+                float x = SDL_GetTicks() % period + (i + i / 10) * (period / 3);
+                float jpos = SDL_cosf(x * SDL_PI_F * 2.0f / float(period));
+                jiggle.y = SDL_roundf(jpos) * pixel;
+            }
+
+            ImVec2 pos0 {
+                column_x_right - tsize_base.x * pixel,
+                lowest_y_value_so_far_right - tsize_base.y * pixel,
+            };
+            pos0 += tadvance * pixel * ImVec2(-i % 10, -i / 10);
+            pos0.y -= pixel * 1.0f;
+            pos0 += jiggle;
+            ImVec2 pos1 = pos0 + tsize_base * pixel;
+
+            new_lowest_y_value_so_far_right = pos0.y - jiggle.y;
+
+            ImVec2 fg_uv0 = (tpos_fill + ImVec2(half ? tsize_base.x : 0.0f, 0.0f)) / 256.0f;
+            ImVec2 fg_uv1 = fg_uv0 + tsize_base / 256.0f;
+
+            if (!empty || half)
+                draw_list->AddImage(ctx->tex_id_icons, pos0, pos1, fg_uv0, fg_uv1);
+        }
+        lowest_y_value_so_far_right = new_lowest_y_value_so_far_right;
+    }
+
     lowest_y_value_so_far = SDL_min(lowest_y_value_so_far, lowest_y_value_so_far_experience);
     lowest_y_value_so_far = SDL_min(lowest_y_value_so_far, lowest_y_value_so_far_right);
     lowest_y_value_so_far = SDL_min(lowest_y_value_so_far, lowest_y_value_so_far_left);
