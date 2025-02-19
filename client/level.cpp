@@ -185,7 +185,7 @@ void level_t::build_dirty_meshes()
  * Without this debug builds are *very*, *very* slow (~6x slower)
  */
 #pragma GCC push_options
-#pragma GCC optimize("Ofast")
+#pragma GCC optimize("O3")
 
 struct chunk_cross_t
 {

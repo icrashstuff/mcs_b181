@@ -26,7 +26,7 @@
 #include <zlib.h>
 
 #pragma GCC push_options
-#pragma GCC optimize("Ofast")
+#pragma GCC optimize("O3")
 /**
  * Parse/Decompress a chunk packet and write the changes to the level
  *
