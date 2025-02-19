@@ -627,8 +627,8 @@ static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
         lowest_y_value_so_far_experience = cursor.y - pixel * 2.0f;
     }
 
-    float lowest_y_value_so_far_left = lowest_y_value_so_far - pixel * 3.0f;
-    float lowest_y_value_so_far_right = lowest_y_value_so_far - pixel * 3.0f;
+    float lowest_y_value_so_far_left = lowest_y_value_so_far;
+    float lowest_y_value_so_far_right = lowest_y_value_so_far;
 
     /* Health bar */
     if (show_survival_widgets)
@@ -702,7 +702,7 @@ static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
                 jiggle.y = SDL_roundf(jpos) * pixel;
             }
 
-            ImVec2 pos0(column_x_left, lowest_y_value_so_far_left - tsize_base.y - pixel);
+            ImVec2 pos0(column_x_left, lowest_y_value_so_far_left - tsize_base.y * pixel);
             pos0 += tadvance * pixel * ImVec2(i % 10, -i / 10);
             pos0.y -= pixel * 1.0f;
             pos0 += jiggle;
@@ -788,7 +788,7 @@ static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
 
             ImVec2 pos0 {
                 column_x_right - tsize_base.x * pixel,
-                lowest_y_value_so_far_right - tsize_base.y - pixel,
+                lowest_y_value_so_far_right - tsize_base.y * pixel,
             };
             pos0 += tadvance * pixel * ImVec2(-i % 10, -i / 10);
             pos0.y -= pixel * 1.0f;
@@ -847,7 +847,7 @@ static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
 
         tpos_fill.x += 0.0f;
 
-        float new_lowest_y_value_so_far_left = 0.0f;
+        float new_lowest_y_value_so_far_left = lowest_y_value_so_far_left;
         for (int i = 0; i < (armor_max + 1) / 2; i++)
         {
             const bool empty = i * 2 >= armor_cur;
