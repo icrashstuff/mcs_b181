@@ -554,6 +554,8 @@ static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
         break;
     }
 
+    float lowest_y_value_so_far_experience = lowest_y_value_so_far;
+
     /* Experience bar + Text */
     if (show_survival_widgets)
     {
@@ -622,12 +624,11 @@ static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
 
         draw_list->AddText(cursor, col_text, buf, buf_end);
 
-        /* This is temporary */
-        lowest_y_value_so_far = cursor.y - pixel * 2.0f;
+        lowest_y_value_so_far_experience = cursor.y - pixel * 2.0f;
     }
 
-    float lowest_y_value_so_far_left = lowest_y_value_so_far - pixel;
-    float lowest_y_value_so_far_right = lowest_y_value_so_far - pixel;
+    float lowest_y_value_so_far_left = lowest_y_value_so_far - pixel * 3.0f;
+    float lowest_y_value_so_far_right = lowest_y_value_so_far - pixel * 3.0f;
 
     /* Health bar */
     if (show_survival_widgets)
@@ -684,7 +685,7 @@ static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
                 tpos_fill.x += 0.0f;
         }
 
-        float new_lowest_y_value_so_far_left = 0.0f;
+        float new_lowest_y_value_so_far_left = lowest_y_value_so_far_left;
         for (int i = 0; i < (health_max + 1) / 2; i++)
         {
             const bool empty = i * 2 >= health_cur;
@@ -701,7 +702,7 @@ static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
                 jiggle.y = SDL_roundf(jpos) * pixel;
             }
 
-            ImVec2 pos0(column_x_left, lowest_y_value_so_far_left);
+            ImVec2 pos0(column_x_left, lowest_y_value_so_far_left - tsize_base.y - pixel);
             pos0 += tadvance * pixel * ImVec2(i % 10, -i / 10);
             pos0.y -= pixel * 1.0f;
             pos0 += jiggle;
@@ -768,7 +769,7 @@ static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
         else /* Normal */
             tpos_fill.x += 0.0f;
 
-        float new_lowest_y_value_so_far_right = 0.0f;
+        float new_lowest_y_value_so_far_right = lowest_y_value_so_far_right;
         for (int i = 0; i < (food_max + 1) / 2; i++)
         {
             const bool empty = i * 2 >= food_cur;
@@ -787,7 +788,7 @@ static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
 
             ImVec2 pos0 {
                 column_x_right - tsize_base.x * pixel,
-                lowest_y_value_so_far_right,
+                lowest_y_value_so_far_right - tsize_base.y - pixel,
             };
             pos0 += tadvance * pixel * ImVec2(-i % 10, -i / 10);
             pos0.y -= pixel * 1.0f;
@@ -814,7 +815,77 @@ static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
         lowest_y_value_so_far_right = new_lowest_y_value_so_far_right;
     }
 
-    lowest_y_value_so_far = SDL_min(lowest_y_value_so_far_left, lowest_y_value_so_far_right);
+    /* Armor bar */
+    if (show_survival_widgets)
+    {
+        int armor_max = 0;
+        int armor_cur = 0;
+
+        if (cvr_mc_hotbar_test.get())
+        {
+            float amp = cvr_mc_hotbar_test_intensity.get();
+            armor_max = SDL_cosf(float(SDL_GetTicks() % 6500) * SDL_PI_F * 2.0f / 6500.0f) * 5.0f * amp + 10.0f * amp;
+            armor_cur = armor_max * (SDL_cosf(float((SDL_GetTicks() & ~0xFF) % 3750) * SDL_PI_F * 2.0f / 3750.0f) + 1.0f);
+            armor_cur -= amp;
+            armor_cur /= 2.0f;
+        }
+
+        if (armor_cur < 1)
+            armor_max = 0;
+
+        bool effect_jiggle = false;
+
+        const ImVec2 tadvance(8.0f, 10.0f);
+        const ImVec2 tsize_base(9.0f, 9.0f);
+        const float background_count = 1;
+        ImVec2 tpos_background;
+        ImVec2 tpos_fill;
+
+        tpos_background = { 16.0f, 9.0f };
+
+        tpos_fill = tpos_background + ImVec2(tsize_base.x * background_count, 0.0f);
+
+        tpos_fill.x += 0.0f;
+
+        float new_lowest_y_value_so_far_left = 0.0f;
+        for (int i = 0; i < (armor_max + 1) / 2; i++)
+        {
+            const bool empty = i * 2 >= armor_cur;
+            const bool half = (armor_cur - i * 2) == 1;
+
+            ImVec2 jiggle(0.0f, 0.0f);
+            if (effect_jiggle)
+            {
+                int period = 200;
+                float x = SDL_GetTicks() % period + (i + i / 10) * (period / 3);
+                float jpos = SDL_cosf(x * SDL_PI_F * 2.0f / float(period));
+                jiggle.y = SDL_roundf(jpos) * pixel;
+            }
+
+            ImVec2 pos0(column_x_left, lowest_y_value_so_far_left - tsize_base.y * pixel);
+            pos0 += tadvance * pixel * ImVec2(i % 10, -i / 10);
+            pos0.y -= pixel * 1.0f;
+            pos0 += jiggle;
+            ImVec2 pos1 = pos0 + tsize_base * pixel;
+
+            new_lowest_y_value_so_far_left = pos0.y - jiggle.y;
+
+            ImVec2 bg_uv0 = tpos_background / 256.0f;
+            ImVec2 bg_uv1 = bg_uv0 + tsize_base / 256.0f;
+
+            ImVec2 fg_uv0 = (tpos_fill + ImVec2(half ? 0.0f : tsize_base.x, 0.0f)) / 256.0f;
+            ImVec2 fg_uv1 = fg_uv0 + tsize_base / 256.0f;
+
+            draw_list->AddImage(ctx->tex_id_icons, pos0, pos1, bg_uv0, bg_uv1);
+            if (!empty)
+                draw_list->AddImage(ctx->tex_id_icons, pos0, pos1, fg_uv0, fg_uv1);
+        }
+        lowest_y_value_so_far_left = new_lowest_y_value_so_far_left;
+    }
+
+    lowest_y_value_so_far = SDL_min(lowest_y_value_so_far, lowest_y_value_so_far_experience);
+    lowest_y_value_so_far = SDL_min(lowest_y_value_so_far, lowest_y_value_so_far_right);
+    lowest_y_value_so_far = SDL_min(lowest_y_value_so_far, lowest_y_value_so_far_left);
 
     /* Item Name */
     if (cvr_mc_hotbar_show_name.get())
