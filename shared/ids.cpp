@@ -756,6 +756,34 @@ Uint8 mc_id::get_light_level(short block_id)
     }
 }
 
+glm::vec3 mc_id::get_light_color(short block_id)
+{
+    switch (block_id)
+    {
+        ADD_NAME(BLOCK_ID_FIRE, (glm::vec3 { 1.0f, 0.579f, 0.079f }));
+        ADD_NAME(BLOCK_ID_PUMPKIN_GLOWING, (glm::vec3 { 1.0f, 0.981f, 0.291f }));
+        ADD_NAME(BLOCK_ID_LAVA_SOURCE, (glm::vec3 { 1.0f, 0.459f, 0.113f }));
+        ADD_NAME(BLOCK_ID_LAVA_FLOWING, (glm::vec3 { 1.0f, 0.459f, 0.113f }));
+        ADD_NAME(BLOCK_ID_GLOWSTONE, (glm::vec3 { 1.0f, 0.832f, 0.590f }));
+        ADD_NAME(BLOCK_ID_CHEST_LOCKED, (glm::vec3 { 1.0f, 0.715f, 0.031f }));
+
+        ADD_NAME(BLOCK_ID_TORCH, (glm::vec3 { 1.0f, 0.861f, 0.521f }));
+
+        ADD_NAME(BLOCK_ID_FURNACE_ON, (glm::vec3 { 1.0f, 0.641f, 0.024f }));
+
+        ADD_NAME(BLOCK_ID_NETHER_PORTAL, (glm::vec3 { 0.464f, 0.057f, 1.0f }));
+
+        ADD_NAME(BLOCK_ID_REPEATER_ON, (glm::vec3 { 1.0f, 0.25f, 0.25f }));
+        ADD_NAME(BLOCK_ID_ORE_REDSTONE_ON, (glm::vec3 { 1.0f, 0.25f, 0.25f }));
+
+        ADD_NAME(BLOCK_ID_TORCH_REDSTONE_ON, (glm::vec3 { 1.0f, 0.0f, 0.0f }));
+
+        ADD_NAME(BLOCK_ID_MUSHROOM_BLAND, (glm::vec3 { 1.0f, 0.751f, 0.586f }));
+    default:
+        return glm::vec3 { 0.0f, 0.0f, 0.0f };
+    }
+}
+
 Uint8 mc_id::get_food_value(short item_id)
 {
     switch (item_id)

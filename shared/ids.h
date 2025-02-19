@@ -25,6 +25,7 @@
 
 #include "SDL3/SDL_stdinc.h"
 #include "misc.h"
+#include <glm/glm.hpp>
 
 enum damage_id_t : Uint8
 {
@@ -452,6 +453,8 @@ bool block_has_collision(short block_id);
  * Data pulled from the table at https://minecraft.wiki/w/Light?oldid=161926#Light-emitting_blocks
  */
 Uint8 get_light_level(short block_id);
+
+glm::vec3 get_light_color(short block_id);
 
 /**
  * Get the corresponding return data for a block id
