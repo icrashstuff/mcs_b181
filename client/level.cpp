@@ -57,7 +57,8 @@ void level_t::clear_mesh(const bool free_gl)
     {
         if (free_gl)
             c->free_gl();
-        c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
+        if (c->dirty_level < chunk_cubic_t::DIRTY_LEVEL_MESH)
+            c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
     }
 }
 
