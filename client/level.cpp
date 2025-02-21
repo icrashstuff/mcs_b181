@@ -2217,48 +2217,26 @@ void level_t::render_entities()
         return;
     }
 
-    if (!entities.size())
-        return;
+    glm::vec3 camera_pos_capture = camera_pos;
 
-    std::vector<entity_base_t*> entities_sorted;
+    ecs.sort<entity_transform_t>([&camera_pos_capture](const entity_transform_t& a, const entity_transform_t& b) -> bool {
+        const glm::vec3 apos(ECOORD_TO_ABSCOORD(a.x) / 32.0f, ECOORD_TO_ABSCOORD(a.y) / 32.0f, ECOORD_TO_ABSCOORD(a.z) / 32.0f);
+        const glm::vec3 bpos(ECOORD_TO_ABSCOORD(b.x) / 32.0f, ECOORD_TO_ABSCOORD(b.y) / 32.0f, ECOORD_TO_ABSCOORD(b.z) / 32.0f);
 
-    entities_sorted.reserve(entities_sorted.size());
-
-    for (auto it : entities)
-        if (it.second)
-            entities_sorted.push_back(it.second);
-
-    /* Sort entities by type then distance */
-    std::sort(entities_sorted.begin(), entities_sorted.end(), [=](entity_base_t* a, entity_base_t* b) -> bool {
-        if (a->id < b->id)
-            return true;
-        if (a->id > b->id)
-            return false;
-
-        float adist = glm::distance(glm::dvec3(a->pos), glm::dvec3(camera_pos));
-        float bdist = glm::distance(glm::dvec3(b->pos), glm::dvec3(camera_pos));
-        return adist > bdist;
+        const float adist = glm::distance(apos, camera_pos_capture);
+        const float bdist = glm::distance(bpos, camera_pos_capture);
+        return adist < bdist;
     });
-
-    entity_id_t last_ent = ENT_ID_NONE;
 
     glUseProgram(shader_terrain->id);
 
     glBindVertexArray(ent_missing_vao);
 
-    for (entity_base_t* e : entities_sorted)
+    auto view = ecs.view<const entity_id_t, const entity_transform_t>();
+    view.use<const entity_transform_t>();
+    for (auto [entity, id, pos] : view.each())
     {
-        if (last_ent != e->id)
-        {
-            glBindVertexArray(ent_missing_vao);
-            last_ent = (entity_id_t)e->id;
-        }
-        glm::mat4 model(1.0f);
-        model = glm::translate(model, glm::vec3(e->pos) / 32768.0f);
-        model = glm::scale(model, glm::vec3(1.0f) / 24.0f);
-        model = glm::rotate(model, glm::radians(-e->pitch), glm::vec3(1.0f, 0.0f, 0.0f));
-        model = glm::rotate(model, glm::radians(e->yaw), glm::vec3(0.0f, 1.0f, 0.0f));
-        shader_terrain->set_model(model);
+        shader_terrain->set_model(pos.get_mat());
         glDrawElements(GL_TRIANGLES, ent_missing_vert_count / 4 * 6, GL_UNSIGNED_INT, 0);
     }
     glBindVertexArray(0);
@@ -2271,6 +2249,8 @@ void level_t::render(const glm::ivec2 win_size)
     cull_chunks(win_size, render_distance);
 
     build_dirty_meshes();
+
+    tick();
 
     glUseProgram(shader_terrain->id);
     const glm::mat4 mat_proj = glm::perspective(glm::radians(fov), (float)win_size.x / (float)win_size.y, 0.03125f, render_distance * 32.0f);
@@ -2444,6 +2424,10 @@ level_t::level_t(texture_terrain_t* const _terrain)
     glBindVertexArray(0);
 
     set_terrain(_terrain);
+
+    last_tick = SDL_GetTicks() / 50;
+
+    player_eid = ecs.create();
 }
 
 level_t::~level_t()
@@ -2454,8 +2438,6 @@ level_t::~level_t()
     glDeleteVertexArrays(1, &ent_missing_vao);
     for (chunk_cubic_t* c : chunks)
         delete c;
-    for (std::pair<int, entity_base_t*> e : entities)
-        delete e.second;
 }
 
 bool level_t::gamemode_set(int x)
@@ -2493,7 +2475,7 @@ level_t::dimension_switch_result level_t::dimension_switch(const int dim)
     cmap.clear();
 
     /* TODO: In the future if the player is stored here, they shouldn't be deleted */
-    entities.clear();
+    ecs.clear();
 
     switch (dimension)
     {
@@ -2510,4 +2492,40 @@ level_t::dimension_switch_result level_t::dimension_switch(const int dim)
     }
 
     return DIM_SWITCH_SUCCESSFUL;
+}
+
+void level_t::tick()
+{
+    Uint64 start_time = SDL_GetTicks();
+    mc_tick_t cur_tick = start_time / 50;
+
+    int iterations = 0;
+    for (; last_tick < cur_tick && iterations < 250; iterations++)
+    {
+        tick_real();
+        last_tick++;
+    }
+
+    Uint64 diff = SDL_GetTicks() - start_time;
+    if (diff > 250)
+        dc_log_warn("Call to level_t::tick() took more than %lu ms! (%d iterations)", start_time, iterations);
+    if (diff >= 250)
+        dc_log_warn("Call to level_t::tick() maxed out iterations");
+}
+
+void level_t::tick_real()
+{
+    for (auto [entity, counter] : ecs.view<entity_timed_destroy_t>().each())
+    {
+        counter.counter--;
+        if (!counter.server_entity && counter.counter < 0)
+            ecs.destroy(entity);
+    }
+
+    for (auto [entity, transform, velocity] : ecs.view<entity_transform_t, entity_velocity_t>().each())
+    {
+        transform.x += velocity.vel_x / 20;
+        transform.y += velocity.vel_y / 20;
+        transform.z += velocity.vel_z / 20;
+    }
 }

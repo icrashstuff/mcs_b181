@@ -32,6 +32,7 @@
 #include "shared/inventory.h"
 #include "texture_terrain.h"
 #include <GL/glew.h>
+#include <entt/entt.hpp>
 #include <glm/glm.hpp>
 #include <map>
 #include <memory>
@@ -93,33 +94,11 @@ struct level_t
         return (it == cmap.end()) ? NULL : it->second;
     }
 
-    std::map<eid_t, entity_base_t*> entities;
+    entt::registry ecs;
 
-    /**
-     * Get the entity with the corresponding EID
-     *
-     * @param eid Id of entity to retreive
-     * @returns The entity with the corresponding EID or NULL if it wasn't found
-     */
-    inline entity_base_t* get_ent(const eid_t eid)
-    {
-        const std::map<eid_t, entity_base_t*>::iterator it = entities.find(eid);
-        return (it == entities.end()) ? NULL : it->second;
-    }
+    typedef decltype(ecs)::entity_type ent_id_t;
 
-    /**
-     * Get or create the entity with the corresponding EID
-     *
-     * @param eid Id of entity to retrieve/create
-     * @returns The entity found or created with the corresponding EID
-     */
-    inline entity_base_t* get_or_create_ent(const eid_t eid)
-    {
-        std::map<eid_t, entity_base_t*>::iterator it = entities.find(eid);
-        if (it == entities.end())
-            it = entities.insert(it, std::make_pair(eid, new entity_base_t()));
-        return it->second;
-    }
+    ent_id_t player_eid;
 
     lightmap_t lightmap;
 
@@ -218,6 +197,11 @@ struct level_t
     void clear();
 
     /**
+     * Ticks all entities as many times as need
+     */
+    void tick();
+
+    /**
      * Renders the world and entities
      *
      * @param win_size Window size (used for projection matrix)
@@ -238,6 +222,16 @@ private:
     mc_id::gamemode_t gamemode = mc_id::GAMEMODE_SPECTATOR;
 
     mc_id::dimension_t dimension = mc_id::DIMENSION_OVERWORLD;
+
+    /**
+     * Actual tick call
+     */
+    void tick_real();
+
+    /**
+     * Last tick processed, incremented *after* level_t::tick_real() is called
+     */
+    mc_tick_t last_tick;
 
     /**
      * Renders all entities

@@ -243,8 +243,55 @@ void connection_t::handle_inactive()
     }
 }
 
+bool connection_t::get_ent_id_from_server_id(const eid_t sid, level_t::ent_id_t& result)
+{
+    auto id_it = ent_id_map.find(sid);
+    if (id_it == ent_id_map.end())
+    {
+        dc_log_error("Entity with server ID: %d does not exist!", sid);
+        return 0;
+    }
+
+    result = id_it->second;
+
+    return 1;
+}
+
+level_t::ent_id_t connection_t::create_or_replace_ent_from_server_id(decltype(level_t::ecs)& reg, const eid_t id)
+{
+    auto id_it = ent_id_map.find(id);
+    if (id_it != ent_id_map.end())
+    {
+        dc_log_warn("Entity with server ID: %d already exists! Resetting it", id);
+        reg.destroy(id_it->second);
+    }
+
+    auto entity = reg.create();
+
+    if (id_it == ent_id_map.end())
+        ent_id_map.insert(id_it, std::make_pair(id, entity));
+    else
+        id_it->second = entity;
+
+    return entity;
+}
+
+#define ADD_ENT_TO_MAP_OR_RESET_ENT() auto entity = create_or_replace_ent_from_server_id(level->ecs, p->eid);
+
 void connection_t::run(level_t* const level)
 {
+    for (auto it = ent_id_map.begin(); it != ent_id_map.end();)
+    {
+        auto* component = level->ecs.try_get<entity_timed_destroy_t>(it->second);
+        if (component)
+        {
+            if (component->server_entity && component->counter < 0)
+                level->ecs.destroy(it->second);
+        }
+        else
+            it++;
+    }
+
     if (status != CONNECTION_ACTIVE)
         in_world = false;
 
@@ -282,7 +329,7 @@ void connection_t::run(level_t* const level)
         {
 
 #define CAST_PACK_TO_P(type) type* p = (type*)pack_from_server
-#define CAST_ENT_TO_E(type) type* e = (type*)level->get_or_create_ent(p->eid);
+
             Uint8 pack_type = pack_from_server->id;
             switch ((packet_id_t)pack_type)
             {
@@ -312,6 +359,30 @@ void connection_t::run(level_t* const level)
             case PACKET_ID_LOGIN_REQUEST:
             {
                 CAST_PACK_TO_P(packet_login_request_s2c_t);
+
+                player_eid_server = p->player_eid;
+
+                level->ecs.emplace_or_replace<entity_food_t>(level->player_eid,
+                    entity_food_t {
+                        .cur = 20,
+                        .max = 20,
+                        .last = 20,
+                        .satur_cur = 5.0f,
+                        .satur_last = 5.0f,
+                    });
+
+                level->ecs.emplace_or_replace<entity_experience_t>(level->player_eid,
+                    entity_experience_t {
+                        .level = 0,
+                        .progress = 0,
+                    });
+
+                level->ecs.emplace_or_replace<entity_health_t>(level->player_eid,
+                    entity_health_t {
+                        .cur = 20,
+                        .max = 20,
+                        .last = 20,
+                    });
 
                 level->gamemode_set(p->mode);
                 level->world_height = p->world_height;
@@ -565,125 +636,258 @@ void connection_t::run(level_t* const level)
             case PACKET_ID_ENT_DESTROY:
             {
                 CAST_PACK_TO_P(packet_ent_destroy_t);
-                auto it = level->entities.find(p->eid);
-                if (it != level->entities.end())
-                    level->entities.erase(it);
+
+                if (p->eid == player_eid_server)
+                {
+                    dc_log_warn("Server attempted to delete player_eid");
+                }
+
+                auto id_it = ent_id_map.find(p->eid);
+                if (id_it == ent_id_map.end())
+                {
+                    dc_log_error("Entity with server ID: %d does not exist!", p->eid);
+                    break;
+                }
+
+                level->ecs.destroy(id_it->second);
+
+                ent_id_map.erase(id_it);
                 break;
             }
+            /* TODO: Do this properly */
             case PACKET_ID_ENT_VELOCITY:
             {
                 CAST_PACK_TO_P(packet_ent_velocity_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->vel = { p->vel_x, p->vel_y, p->vel_z };
+
+                level_t::ent_id_t entity;
+                if (!get_ent_id_from_server_id(p->eid, entity))
+                    break;
+
+                /* Wiki.vg says that the packet velocity units are believed to be 1/32000 blocks per server tick(200ms) */
+                level->ecs.emplace_or_replace<entity_velocity_t>(entity,
+                    entity_velocity_t {
+                        .vel_x = ABSCOORD_TO_ECOORD(ecoord_abs_t(p->vel_x) * 32) / (8000),
+                        .vel_y = ABSCOORD_TO_ECOORD(ecoord_abs_t(p->vel_y) * 32) / (8000),
+                        .vel_z = ABSCOORD_TO_ECOORD(ecoord_abs_t(p->vel_z) * 32) / (8000),
+                    });
                 break;
             }
             case PACKET_ID_ENT_ENSURE_SPAWN:
             {
                 CAST_PACK_TO_P(packet_ent_create_t);
-                level->get_or_create_ent(p->eid);
+                ADD_ENT_TO_MAP_OR_RESET_ENT();
+                level->ecs.emplace<entity_id_t>(entity, ENT_ID_NONE);
                 break;
             }
             /* TODO: Handle beyond missing */
             case PACKET_ID_THUNDERBOLT:
             {
                 CAST_PACK_TO_P(packet_thunder_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->id = ENT_ID_THUNDERBOLT;
-                e->pos = glm::ivec3(p->x, p->y, p->z) << 10;
+                ADD_ENT_TO_MAP_OR_RESET_ENT();
+
+                level->ecs.emplace<entity_id_t>(entity, ENT_ID_THUNDERBOLT);
+                level->ecs.emplace<entity_transform_t>(entity,
+                    entity_transform_t {
+                        .x = ABSCOORD_TO_ECOORD(p->x),
+                        .y = ABSCOORD_TO_ECOORD(p->y),
+                        .z = ABSCOORD_TO_ECOORD(p->z),
+                        .pitch = 0.0f,
+                        .yaw = 0.0f,
+                        .roll = 0.0f,
+                    });
+
+                level->ecs.emplace<entity_timed_destroy_t>(entity,
+                    entity_timed_destroy_t {
+                        .counter = SDL_rand(30) + 30,
+                        .server_entity = 1,
+                    });
                 break;
             }
             /* TODO: Handle beyond missing */
             case PACKET_ID_ADD_OBJ:
             {
                 CAST_PACK_TO_P(packet_add_obj_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->id = entity_base_t::mc_id_to_id(p->obj_type, 1);
-                e->pos = glm::ivec3(p->x, p->y, p->z) << 10;
+                ADD_ENT_TO_MAP_OR_RESET_ENT();
+
+                level->ecs.emplace<entity_id_t>(entity, entity_id_t(entity_base_t::mc_id_to_id(p->type, 1)));
+                level->ecs.emplace<entity_transform_t>(entity,
+                    entity_transform_t {
+                        .x = ABSCOORD_TO_ECOORD(p->x),
+                        .y = ABSCOORD_TO_ECOORD(p->y),
+                        .z = ABSCOORD_TO_ECOORD(p->z),
+                        .pitch = 0.0f,
+                        .yaw = 0.0f,
+                        .roll = 0.0f,
+                    });
                 break;
             }
             /* TODO: Handle beyond missing */
             case PACKET_ID_ENT_SPAWN_MOB:
             {
                 CAST_PACK_TO_P(packet_ent_spawn_mob_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->id = entity_base_t::mc_id_to_id(p->type, 0);
-                e->pos = glm::ivec3(p->x, p->y, p->z) << 10;
-                e->yaw = p->yaw * 360.0f / 256.0f;
-                e->pitch = p->pitch * 360.0f / 256.0f;
+                ADD_ENT_TO_MAP_OR_RESET_ENT();
+
+                level->ecs.emplace<entity_id_t>(entity, entity_id_t(entity_base_t::mc_id_to_id(p->type, 0)));
+                level->ecs.emplace<entity_transform_t>(entity,
+                    entity_transform_t {
+                        .x = ABSCOORD_TO_ECOORD(p->x),
+                        .y = ABSCOORD_TO_ECOORD(p->y),
+                        .z = ABSCOORD_TO_ECOORD(p->z),
+                        .pitch = p->pitch * 360.0f / 256.0f,
+                        .yaw = p->yaw * 360.0f / 256.0f,
+                        .roll = 0.0f,
+                    });
                 break;
             }
             /* TODO: Handle beyond missing */
             case PACKET_ID_ENT_SPAWN_XP:
             {
                 CAST_PACK_TO_P(packet_ent_spawn_xp_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->id = ENT_ID_XP;
-                e->pos = glm::ivec3(p->x, p->y, p->z) << 10;
+                ADD_ENT_TO_MAP_OR_RESET_ENT();
+
+                level->ecs.emplace<entity_id_t>(entity, ENT_ID_XP);
+                level->ecs.emplace<entity_transform_t>(entity,
+                    entity_transform_t {
+                        .x = ABSCOORD_TO_ECOORD(p->x),
+                        .y = ABSCOORD_TO_ECOORD(p->y),
+                        .z = ABSCOORD_TO_ECOORD(p->z),
+                        .pitch = 0.0f,
+                        .yaw = 0.0f,
+                        .roll = 0.0f,
+                    });
                 break;
             }
             /* TODO: Handle beyond missing */
             case PACKET_ID_ENT_SPAWN_PICKUP:
             {
                 CAST_PACK_TO_P(packet_ent_spawn_pickup_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->id = ENT_ID_ITEM;
-                e->pos = glm::ivec3(p->x, p->y, p->z) << 10;
-                e->yaw = p->rotation * 360.0f / 256.0f;
-                e->pitch = p->pitch * 360.0f / 256.0f;
+                ADD_ENT_TO_MAP_OR_RESET_ENT();
+
+                level->ecs.emplace<entity_id_t>(entity, ENT_ID_ITEM);
+                level->ecs.emplace<entity_transform_t>(entity,
+                    entity_transform_t {
+                        .x = ABSCOORD_TO_ECOORD(p->x),
+                        .y = ABSCOORD_TO_ECOORD(p->y),
+                        .z = ABSCOORD_TO_ECOORD(p->z),
+                        .pitch = p->pitch * 360.0f / 256.0f,
+                        .yaw = p->rotation * 360.0f / 256.0f,
+                        .roll = p->roll * 360.0f / 256.0f,
+                    });
                 break;
             }
             /* TODO: Handle beyond missing */
             case PACKET_ID_ENT_SPAWN_PAINTING:
             {
                 CAST_PACK_TO_P(packet_ent_spawn_painting_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->id = ENT_ID_PAINTING;
-                e->pos = (glm::ivec3(p->center_x, p->center_y, p->center_z) * 32 + glm::ivec3(16)) << 10;
-                e->yaw = p->direction * 90.0f;
+                ADD_ENT_TO_MAP_OR_RESET_ENT();
+
+                level->ecs.emplace<entity_id_t>(entity, ENT_ID_PAINTING);
+                level->ecs.emplace<entity_transform_t>(entity,
+                    entity_transform_t {
+                        .x = ABSCOORD_TO_ECOORD(p->center_x),
+                        .y = ABSCOORD_TO_ECOORD(p->center_y),
+                        .z = ABSCOORD_TO_ECOORD(p->center_z),
+                        .pitch = 0.0f,
+                        .yaw = p->direction * 90.0f,
+                        .roll = 0.0f,
+                    });
                 break;
             }
             /* TODO: Handle beyond missing */
             case PACKET_ID_ENT_SPAWN_NAMED:
             {
                 CAST_PACK_TO_P(packet_ent_spawn_named_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->id = ENT_ID_ITEM;
-                e->pos = glm::ivec3(p->x, p->y, p->z) << 10;
-                e->yaw = p->rotation * 360.0f / 256.0f;
-                e->pitch = p->pitch * 360.0f / 256.0f;
+                ADD_ENT_TO_MAP_OR_RESET_ENT();
+
+                level->ecs.emplace<entity_id_t>(entity, ENT_ID_PLAYER);
+                level->ecs.emplace<entity_transform_t>(entity,
+                    entity_transform_t {
+                        .x = ABSCOORD_TO_ECOORD(p->x),
+                        .y = ABSCOORD_TO_ECOORD(p->y),
+                        .z = ABSCOORD_TO_ECOORD(p->z),
+                        .pitch = p->pitch * 360.0f / 256.0f,
+                        .yaw = p->rotation * 360.0f / 256.0f,
+                        .roll = 0.0f,
+                    });
                 break;
             }
             case PACKET_ID_ENT_MOVE_REL:
             {
                 CAST_PACK_TO_P(packet_ent_move_rel_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->pos += glm::ivec3(p->delta_x, p->delta_y, p->delta_z) << 10;
+
+                level_t::ent_id_t entity;
+                if (!get_ent_id_from_server_id(p->eid, entity))
+                    break;
+
+                if (!level->ecs.all_of<entity_transform_t>(entity))
+                    break;
+
+                level->ecs.patch<entity_transform_t>(entity, [&p](entity_transform_t& transform) {
+                    transform.x += ABSCOORD_TO_ECOORD(p->delta_x);
+                    transform.y += ABSCOORD_TO_ECOORD(p->delta_y);
+                    transform.z += ABSCOORD_TO_ECOORD(p->delta_z);
+                });
+
                 break;
             }
             case PACKET_ID_ENT_LOOK:
             {
                 CAST_PACK_TO_P(packet_ent_look_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->yaw = p->yaw * 360.0f / 256.0f;
-                e->pitch = p->pitch * 360.0f / 256.0f;
+
+                level_t::ent_id_t entity;
+                if (!get_ent_id_from_server_id(p->eid, entity))
+                    break;
+
+                if (!level->ecs.all_of<entity_transform_t>(entity))
+                    break;
+
+                level->ecs.patch<entity_transform_t>(entity, [&p](entity_transform_t& transform) {
+                    transform.pitch = p->pitch * 360.0f / 256.0f;
+                    transform.yaw = p->yaw * 360.0f / 256.0f;
+                });
+
                 break;
             }
             case PACKET_ID_ENT_LOOK_MOVE_REL:
             {
                 CAST_PACK_TO_P(packet_ent_look_move_rel_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->pos += glm::ivec3(p->delta_x, p->delta_y, p->delta_z) << 10;
-                e->yaw = p->yaw * 360.0f / 256.0f;
-                e->pitch = p->pitch * 360.0f / 256.0f;
+
+                level_t::ent_id_t entity;
+                if (!get_ent_id_from_server_id(p->eid, entity))
+                    break;
+
+                if (!level->ecs.all_of<entity_transform_t>(entity))
+                    break;
+
+                level->ecs.patch<entity_transform_t>(entity, [&p](entity_transform_t& transform) {
+                    transform.x += ABSCOORD_TO_ECOORD(p->delta_x);
+                    transform.y += ABSCOORD_TO_ECOORD(p->delta_y);
+                    transform.z += ABSCOORD_TO_ECOORD(p->delta_z);
+                    transform.pitch = p->pitch * 360.0f / 256.0f;
+                    transform.yaw = p->yaw * 360.0f / 256.0f;
+                });
+
                 break;
             }
             case PACKET_ID_ENT_MOVE_TELEPORT:
             {
                 CAST_PACK_TO_P(packet_ent_teleport_t);
-                CAST_ENT_TO_E(entity_base_t);
-                e->pos = glm::ivec3(p->x, p->y, p->z) << 10;
-                e->yaw = p->rotation * 360.0f / 256.0f;
-                e->pitch = p->pitch * 360.0f / 256.0f;
+
+                level_t::ent_id_t entity;
+                if (!get_ent_id_from_server_id(p->eid, entity))
+                    break;
+
+                if (!level->ecs.all_of<entity_transform_t>(entity))
+                    break;
+
+                level->ecs.patch<entity_transform_t>(entity, [&p](entity_transform_t& transform) {
+                    transform.x = ABSCOORD_TO_ECOORD(p->x);
+                    transform.y = ABSCOORD_TO_ECOORD(p->y);
+                    transform.z = ABSCOORD_TO_ECOORD(p->z);
+                    transform.pitch = p->pitch * 360.0f / 256.0f;
+                    transform.yaw = p->rotation * 360.0f / 256.0f;
+                });
+
                 break;
             }
             case PACKET_ID_PLAYER_LIST_ITEM:

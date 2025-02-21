@@ -24,6 +24,7 @@
 #define MCS_B181_CLIENT_ENTITY_H
 
 #include <SDL3/SDL_stdinc.h>
+#include <glm/ext/matrix_transform.hpp>
 #include <glm/glm.hpp>
 
 #include "shared/misc.h"
@@ -89,43 +90,114 @@ enum entity_id_t : Uint8
 
 typedef jint eid_t;
 
+/** Minecraft Tick (50ms)*/
+typedef int mc_tick_t;
+
+/**
+ * Fixed precision number (1/1048576)
+ *
+ * Ranges from -2^43 to 2^43
+ */
+typedef Sint64 ecoord_t;
+
+/**
+ * Fixed precision number (1/32) number used in entity packets
+ *
+ * Ranges from -2^26 to 2^26
+ */
+typedef Sint32 ecoord_abs_t;
+
+#define ABSCOORD_ECOORD_SHIFT (20 - 5)
+
+#define ABSCOORD_TO_ECOORD(X) (ecoord_t(X) << ABSCOORD_ECOORD_SHIFT)
+#define ECOORD_TO_ABSCOORD(X) (ecoord_abs_t(ecoord_t((X)) >> ABSCOORD_ECOORD_SHIFT))
+
 struct entity_base_t
 {
-    Uint8 id = 0;
-
-    bool gravity : 1;
-    bool attached : 1;
-    bool flying : 1;
-    bool swimming : 1;
-    bool on_ground : 1;
-
-    eid_t parent_eid = 0;
-
     /**
      * Translates a minecraft mob or object ID to an entity_base_t ID
      */
     static Uint8 mc_id_to_id(Uint8 id, bool is_object);
+};
 
-    /**
-     * Entity velocity (1/6400) blocks/second
-     */
-    glm::i16vec3 vel;
+struct entity_food_t
+{
+    int cur;
+    int max;
+    int last;
 
-    /**
-     * Entity coordinates (fixed 1/32768 points)
-     */
-    glm::i64vec3 pos;
-    float yaw = 0;
-    float pitch = 0;
+    float satur_cur;
+    float satur_last;
+};
 
-    inline entity_base_t()
-        : gravity(1)
-        , attached(0)
-        , flying(0)
-        , swimming(0)
-        , on_ground(0)
+struct entity_experience_t
+{
+    int level;
+    int progress;
+};
+
+struct entity_health_t
+{
+    int cur;
+    int max;
+    int last;
+};
+
+struct entity_transform_t
+{
+    ecoord_t x;
+    ecoord_t y;
+    ecoord_t z;
+
+    float pitch;
+    float yaw;
+    float roll;
+
+    inline glm::mat4 get_mat() const
     {
+        glm::mat4 model(1.0f);
+        model = glm::translate(model, glm::vec3(ECOORD_TO_ABSCOORD(x), ECOORD_TO_ABSCOORD(y), ECOORD_TO_ABSCOORD(z)) / 32.0f);
+        model = glm::scale(model, glm::vec3(1.0f) / 24.0f);
+        model = glm::rotate(model, glm::radians(-pitch), glm::vec3(1.0f, 0.0f, 0.0f));
+        model = glm::rotate(model, glm::radians(yaw), glm::vec3(0.0f, 1.0f, 0.0f));
+
+        return model;
     }
+};
+
+/**
+ * This is necessary for thunderbolts, because the notchian server doesn't delete them, *sigh*
+ */
+struct entity_timed_destroy_t
+{
+    /**
+     * This counter is decremented by level_t::tick(), if less than 0 than the entity is destroyed
+     */
+    mc_tick_t counter;
+    /**
+     * Whether or not the corresponding entity is owned by the server
+     *
+     * This controls who ultimately deletes the entity
+     * - If true then connection_t::run() destroys the entity
+     * - If false then level_t::tick() destroys the entity
+     */
+    bool server_entity;
+};
+
+struct entity_velocity_t
+{
+    /**
+     * Unit: 1/(2^20) block/second
+     */
+    ecoord_t vel_x;
+    /**
+     * Unit: 1/(2^20) block/second
+     */
+    ecoord_t vel_y;
+    /**
+     * Unit: 1/(2^20) block/second
+     */
+    ecoord_t vel_z;
 };
 
 #endif

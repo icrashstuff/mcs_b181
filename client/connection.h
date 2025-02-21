@@ -154,6 +154,20 @@ private:
     std::vector<std::pair<std::string, player_list_data_t>> player_list;
 
     /**
+     * Map server ids to EnTT ids
+     *
+     * All tools have their purposes, not all problems are nails to be driven by a hammer
+     * https://github.com/skypjack/entt/issues/337#issuecomment-543333372
+     */
+    std::map<eid_t, level_t::ent_id_t> ent_id_map;
+
+    eid_t player_eid_server = -1;
+
+    bool get_ent_id_from_server_id(const eid_t, level_t::ent_id_t& result);
+
+    level_t::ent_id_t create_or_replace_ent_from_server_id(decltype(level_t::ecs)& reg, const eid_t);
+
+    /**
      * Steps (if possible) the state as fast a possible to CONNECTION_ACTIVE
      */
     void step_to_active();

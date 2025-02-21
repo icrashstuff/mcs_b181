@@ -28,6 +28,10 @@ This project vendors and makes use of the following external software components
   - Copyright (c) 2001-2024 Ryan C. Gordon, and others
   - Zlib License (full text under tetra/util/physfs/physfs-74c3054/)
 
+- EnTT
+  - Copyright (c) 2017-2024 Michele Caini, and others
+  - MIT License (full text under client/entt/)
+
 - stb_image
   - Copyright (c) 2006 - 2024 Sean Barrett, and others
   - MIT License or Unlicense Public Domain (full text under tetra/util/stb/stb_image.h)

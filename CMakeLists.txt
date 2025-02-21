@@ -9,8 +9,9 @@ project(mcs_b181 LANGUAGES CXX C)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
-# C++ 14 is solely for binary literals
-set(CMAKE_CXX_STANDARD 14)
+# C++ 14 was for binary literals
+# C++ 17 was for entt
+set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
@@ -77,6 +78,8 @@ add_subdirectory(sdl_net/)
 
 add_subdirectory(tetra/)
 
+add_subdirectory(client/entt)
+
 function(add_bin_common name)
     add_tetra_executable(${name} "${${name}_SRC}")
 
@@ -93,4 +96,5 @@ add_bin_common(mcs_b181_bridge)
 add_bin_common(mcs_b181_client)
 
 target_link_libraries(mcs_b181_client OpenAL::OpenAL)
+target_link_libraries(mcs_b181_client EnTT::EnTT)
 
