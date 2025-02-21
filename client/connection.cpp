@@ -890,6 +890,19 @@ void connection_t::run(level_t* const level)
 
                 break;
             }
+            case PACKET_ID_XP_SET:
+            {
+                CAST_PACK_TO_P(packet_xp_set_t);
+
+                level->ecs.emplace_or_replace<entity_experience_t>(level->player_eid,
+                    entity_experience_t {
+                        .level = p->level,
+                        .progress = p->current_xp,
+                        .total = p->total,
+                    });
+
+                break;
+            }
             case PACKET_ID_PLAYER_LIST_ITEM:
             {
                 CAST_PACK_TO_P(packet_play_list_item_t);

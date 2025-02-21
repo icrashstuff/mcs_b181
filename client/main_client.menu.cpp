@@ -561,15 +561,35 @@ static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
     {
         lowest_y_value_so_far -= pixel;
 
-        /* TODO: I have not verified if this math is correct */
-        Sint64 xp_val = 0;
-        if (cvr_mc_hotbar_test.get())
-            xp_val = SDL_GetTicks() * Uint64(cvr_mc_hotbar_test_intensity.get() * 16.0f) >> 5;
-        const Sint64 xp_level = SDL_sqrt(xp_val / 5);
-        const Sint64 xp_level_current = xp_val - (xp_level * xp_level * 5);
-        const Sint64 xp_level_max = 10 * xp_level;
+        Sint64 xp_level = 0;
+        Sint64 xp_total = 0;
 
-        const double percentage = double(xp_level_current) / double(xp_level_max);
+        entity_experience_t* xp = game_selected->level->ecs.try_get<entity_experience_t>(game_selected->level->player_eid);
+
+        if (xp)
+        {
+            xp_level = xp->level;
+            xp_total = xp->total;
+        }
+
+        if (cvr_mc_hotbar_test.get())
+        {
+            static Uint64 last_level_change = 0;
+            static Sint64 level = SDL_rand_bits();
+            if (SDL_GetTicks() - last_level_change > 150)
+            {
+                last_level_change = SDL_GetTicks();
+                level = SDL_rand_bits();
+            }
+            xp_level = level;
+            xp_total = 5 * (xp_level + xp_level * xp_level) + (xp_level + 1) * 10 * ((SDL_GetTicks() >> 8) % 5) / 4;
+        }
+
+        Sint64 xp_progress_cur = xp_total - 5 * (xp_level + xp_level * xp_level);
+        Sint64 xp_progress_max = xp_level * 10 + 10;
+
+        double percentage = double(xp_progress_cur) / double(xp_progress_max);
+        percentage = SDL_clamp(percentage, 0.0, 1.0);
 
         /* Bar Background */
         const ImVec2 bar_tsize(182, 5);

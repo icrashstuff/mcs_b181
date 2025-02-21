@@ -134,6 +134,7 @@ struct entity_experience_t
 {
     int level;
     int progress;
+    int total;
 };
 
 struct entity_health_t
