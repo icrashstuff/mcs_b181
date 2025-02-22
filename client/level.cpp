@@ -2522,6 +2522,31 @@ void level_t::tick_real()
             ecs.destroy(entity);
     }
 
+    for (auto [entity, health] : ecs.view<entity_health_t>().each())
+    {
+        health.update_effect_counter--;
+        if (health.update_effect_counter < 1)
+        {
+            ecs.patch<entity_health_t>(entity, [](entity_health_t& h) {
+                h.last = h.cur;
+                h.update_effect_counter = 0;
+            });
+        }
+    }
+
+    for (auto [entity, food] : ecs.view<entity_food_t>().each())
+    {
+        food.update_effect_counter--;
+        if (food.update_effect_counter < 1)
+        {
+            ecs.patch<entity_food_t>(entity, [](entity_food_t& f) {
+                f.last = f.cur;
+                f.satur_last = f.satur_cur;
+                f.update_effect_counter = 0;
+            });
+        }
+    }
+
     for (auto [entity, transform, velocity] : ecs.view<entity_transform_t, entity_velocity_t>().each())
     {
         transform.x += velocity.vel_x / 20;

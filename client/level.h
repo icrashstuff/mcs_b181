@@ -201,6 +201,8 @@ struct level_t
      */
     void tick();
 
+    inline mc_tick_t get_last_tick() { return last_tick; };
+
     /**
      * Renders the world and entities
      *

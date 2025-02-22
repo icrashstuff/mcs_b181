@@ -122,6 +122,13 @@ struct entity_base_t
 
 struct entity_food_t
 {
+    /**
+     * Decremented to zero by level_t::tick()
+     *
+     * When it reaches zero the last fields are set to the current values
+     */
+    mc_tick_t update_effect_counter;
+
     int cur;
     int max;
     int last;
@@ -139,6 +146,13 @@ struct entity_experience_t
 
 struct entity_health_t
 {
+    /**
+     * Decremented to zero by level_t::tick()
+     *
+     * When it reaches zero the last field is set to current value
+     */
+    mc_tick_t update_effect_counter;
+
     int cur;
     int max;
     int last;

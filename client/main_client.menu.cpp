@@ -664,6 +664,18 @@ static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
         int health_cur = 0;
         int health_last = 0;
 
+        bool blink = 0;
+
+        entity_health_t* health = game_selected->level->ecs.try_get<entity_health_t>(game_selected->level->player_eid);
+
+        if (health)
+        {
+            health_max = health->max;
+            health_cur = health->cur;
+            health_last = health->last;
+            blink = health->update_effect_counter / 2 % 2;
+        }
+
         if (cvr_mc_hotbar_test.get())
         {
             float amp = cvr_mc_hotbar_test_intensity.get();
@@ -674,6 +686,9 @@ static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
 
         bool was_updated = health_cur != health_last;
         bool effect_jiggle = health_cur <= 4;
+
+        if (blink)
+            was_updated = 0;
 
         const ImVec2 tadvance(8.0f, 10.0f);
         const ImVec2 tsize_base(9.0f, 9.0f);
@@ -757,6 +772,23 @@ static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
         int food_cur = 0;
         int food_last = 0;
 
+        float food_satur_cur = 0.0f;
+        float food_satur_last = 0.0f;
+
+        bool blink = 0;
+
+        entity_food_t* food = game_selected->level->ecs.try_get<entity_food_t>(game_selected->level->player_eid);
+
+        if (food)
+        {
+            food_max = food->max;
+            food_cur = food->cur;
+            food_last = food->last;
+            food_satur_cur = food->satur_cur;
+            food_satur_last = food->satur_last;
+            blink = food->update_effect_counter / 2 % 2;
+        }
+
         if (cvr_mc_hotbar_test.get())
         {
             float amp = cvr_mc_hotbar_test_intensity.get();
@@ -765,11 +797,11 @@ static void render_hotbar(mc_gui::mc_gui_ctx* ctx, ImDrawList* draw_list)
             food_last = food_cur - ((SDL_GetTicks() & ~0xFF) % 3) + 1;
         }
 
-        float food_satur_cur = 0.0f;
-        float food_satur_last = 0.0f;
-
         bool was_updated = food_cur != food_last || SDL_fabsf(food_satur_cur - food_satur_last) > 0.25f;
         bool effect_jiggle = food_cur <= 4;
+
+        if (blink)
+            was_updated = 0;
 
         const ImVec2 tadvance(8.0f, 10.0f);
         const ImVec2 tsize_base(9.0f, 9.0f);

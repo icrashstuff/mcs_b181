@@ -364,6 +364,7 @@ void connection_t::run(level_t* const level)
 
                 level->ecs.emplace_or_replace<entity_food_t>(level->player_eid,
                     entity_food_t {
+                        .update_effect_counter = 0,
                         .cur = 20,
                         .max = 20,
                         .last = 20,
@@ -375,10 +376,12 @@ void connection_t::run(level_t* const level)
                     entity_experience_t {
                         .level = 0,
                         .progress = 0,
+                        .total = 0,
                     });
 
                 level->ecs.emplace_or_replace<entity_health_t>(level->player_eid,
                     entity_health_t {
+                        .update_effect_counter = 0,
                         .cur = 20,
                         .max = 20,
                         .last = 20,
@@ -393,6 +396,46 @@ void connection_t::run(level_t* const level)
                     level->lightmap.set_preset(lightmap_t::LIGHTMAP_PRESET_OVERWORLD);
 
                 set_status_msg("multiplayer.downloadingTerrain");
+
+                break;
+            }
+            case PACKET_ID_UPDATE_HEALTH:
+            {
+                CAST_PACK_TO_P(packet_health_t);
+
+                entity_food_t* old_food = level->ecs.try_get<entity_food_t>(level->player_eid);
+                entity_health_t* old_health = level->ecs.try_get<entity_health_t>(level->player_eid);
+
+                int last_health = p->health;
+                int last_food = p->food;
+                float last_food_statur = p->food_saturation;
+
+                if (old_food)
+                {
+                    last_food = old_food->cur;
+                    last_food_statur = old_food->satur_cur;
+                }
+
+                if (old_health)
+                    last_health = old_health->cur;
+
+                level->ecs.emplace_or_replace<entity_food_t>(level->player_eid,
+                    entity_food_t {
+                        .update_effect_counter = 4,
+                        .cur = p->food,
+                        .max = 20,
+                        .last = last_food,
+                        .satur_cur = p->food_saturation,
+                        .satur_last = last_food_statur,
+                    });
+
+                level->ecs.emplace_or_replace<entity_health_t>(level->player_eid,
+                    entity_health_t {
+                        .update_effect_counter = 4,
+                        .cur = p->health,
+                        .max = 20,
+                        .last = last_health,
+                    });
 
                 break;
             }
