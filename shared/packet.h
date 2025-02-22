@@ -408,7 +408,19 @@ struct packet_ent_spawn_mob_t : packet_t
         assemble_byte(dat, pitch);
         assemble_bytes(dat, metadata.data(), metadata.size());
 
-        assert(dat.size() == 20 + metadata.size());
+        bool append_terminator = 0;
+        if (!metadata.size())
+            append_terminator = 1;
+        else if (metadata[metadata.size() - 1] != 0x7f)
+            append_terminator = 1;
+
+        if (append_terminator)
+        {
+            dc_log_warn("Appending metadata terminator to packet!");
+            assemble_byte(dat, 0x7f);
+        }
+
+        assert(dat.size() == 20 + metadata.size() + append_terminator);
         return dat;
     }
 
