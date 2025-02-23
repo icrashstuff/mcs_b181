@@ -155,6 +155,42 @@ void game_t::create_testworld()
         c->set_type(7, 2, 7, BLOCK_ID_TORCH);
     }
 
+    /* Test light propagation across all 3 axis jumps
+     * Non of the chunks are fully filled to ensure that they don't pull face light values from adjoining ones */
+    {
+        glm::ivec3 pos = { 4, -2, -4 };
+
+        chunk_cubic_t* c = new chunk_cubic_t();
+        c->pos = pos;
+        for (int x = 0; x < 15; x++)
+            for (int z = 0; z < 15; z++)
+                for (int y = 0; y < 15; y++)
+                    c->set_type(x, y, z, BLOCK_ID_GLOWSTONE);
+        level->add_chunk(c);
+
+        c = new chunk_cubic_t();
+        pos.x--;
+        c->pos = pos;
+        c->set_type(7, 6, 7, BLOCK_ID_TNT);
+        level->add_chunk(c);
+
+        c = new chunk_cubic_t();
+        pos.y--;
+        c->pos = pos;
+        c->set_type(7, 6, 7, BLOCK_ID_TNT);
+        level->add_chunk(c);
+
+        c = new chunk_cubic_t();
+        pos.z++;
+        c->pos = pos;
+        level->add_chunk(c);
+
+        for (int x = 1; x < 15; x++)
+            for (int z = 1; z < 15; z++)
+                for (int y = 1; y < 15; y++)
+                    c->set_type(x, y, z, BLOCK_ID_STONE);
+    }
+
     for (int i = 0; i < 128; i++)
     {
         chunk_cubic_t* c = new chunk_cubic_t();

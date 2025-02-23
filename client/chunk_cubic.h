@@ -53,6 +53,8 @@ struct chunk_cubic_t
         /** Internal use only */
         DIRTY_LEVEL_MESH,
         /** Internal use only */
+        DIRTY_LEVEL_LIGHT_PASS_EXT_2,
+        /** Internal use only */
         DIRTY_LEVEL_LIGHT_PASS_EXT_1,
         /** Internal use only */
         DIRTY_LEVEL_LIGHT_PASS_EXT_0,

@@ -166,10 +166,23 @@ void level_t::build_dirty_meshes()
         if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_1)
             continue;
         light_pass(c->pos.x, c->pos.y, c->pos.z, false);
-        c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
+        c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_2;
         built++;
     }
     PASS_TIMER_STOP("Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 3)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
+
+    /* Fourth Light Pass */
+    PASS_TIMER_START();
+    for (auto it = chunks.rbegin(); it != chunks.rend(); it++)
+    {
+        chunk_cubic_t* c = *it;
+        if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_2)
+            continue;
+        light_pass(c->pos.x, c->pos.y, c->pos.z, false);
+        c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
+        built++;
+    }
+    PASS_TIMER_STOP("Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 4)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
 
     /* Mesh Pass */
     PASS_TIMER_START();
