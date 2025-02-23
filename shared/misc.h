@@ -88,8 +88,6 @@ typedef double jdouble;
 
 #define WORLD_HEIGHT 128
 
-#define BLOCK_ID_MAX 110
-
 #define CHUNK_VIEW_DISTANCE 12
 
 #define CHUNK_UNLOAD_DISTANCE (CHUNK_VIEW_DISTANCE + 2)

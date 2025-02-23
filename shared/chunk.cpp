@@ -966,7 +966,7 @@ void chunk_t::generate_special_ascending_type(int max_y)
         {
             for (int z = 0; z < CHUNK_SIZE_Z; z++)
             {
-                if (y < BLOCK_ID_MAX && y < max_y)
+                if (y < BLOCK_ID_NUM_USED && y < max_y)
                 {
                     set_type(x, y, z, y);
                 }
@@ -985,7 +985,7 @@ void chunk_t::generate_special_metadata()
         {
             for (int z = 0; z < CHUNK_SIZE_Z; z++)
             {
-                if (y < BLOCK_ID_MAX)
+                if (y < BLOCK_ID_NUM_USED)
                 {
                     if (x == z)
                     {

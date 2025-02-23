@@ -607,7 +607,7 @@ bool send_chunk(SDLNet_StreamSocket* sock, int chunk_x, int chunk_z, int max_y)
 {
     chunk_t c;
 
-    if (max_y >= BLOCK_ID_MAX)
+    if (max_y >= BLOCK_ID_NUM_USED)
         c.generate_special_metadata();
     else
         c.generate_special_ascending_type(max_y);

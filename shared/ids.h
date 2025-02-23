@@ -218,6 +218,16 @@ enum item_id_t_ : int
     BLOCK_ID_STAIRS_BRICK,
     BLOCK_ID_STAIRS_BRICK_STONE,
 
+    /** Maximum number of used ids */
+    BLOCK_ID_NUM_USED,
+
+    /** Technical limit of block ids */
+    BLOCK_ID_LIMIT = 255,
+
+    /** Size of an array that can hold any block id within the range [0, BLOCK_ID_LIMIT] */
+    BLOCK_ID_ARRAY_SIZE = 256,
+
+    /***/
     ITEM_ID_IRON_SHOVEL = 256,
     ITEM_ID_IRON_PICK,
     ITEM_ID_IRON_AXE,
@@ -426,7 +436,7 @@ struct block_return_t
     Uint8 quantity_max;
 };
 
-SDL_FORCE_INLINE bool is_block(short block_id) { return BETWEEN_EXCL(block_id, BLOCK_ID_NONE, BLOCK_ID_MAX); };
+SDL_FORCE_INLINE bool is_block(short block_id) { return BETWEEN_EXCL(block_id, BLOCK_ID_NONE, BLOCK_ID_NUM_USED); };
 
 bool is_transparent(short block_id);
 

@@ -206,7 +206,7 @@ public:
 
         int index = y + (z * (CHUNK_SIZE_Y)) + (x * (CHUNK_SIZE_Y) * (CHUNK_SIZE_Z));
 
-        if (type <= BLOCK_ID_MAX)
+        if (type <= BLOCK_ID_NUM_USED)
             data[index] = type;
         else
             data[index] = 0;

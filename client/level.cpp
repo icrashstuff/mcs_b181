@@ -2046,7 +2046,7 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
 
 void level_t::set_block(const glm::ivec3 pos, const block_id_t type, const Uint8 metadata)
 {
-    if (type >= BLOCK_ID_MAX)
+    if (!mc_id::is_block(type))
     {
         dc_log_error("Preposterous id field %d:%u at <%d, %d, %d>", type, metadata, pos.x, pos.y, pos.z);
         return;

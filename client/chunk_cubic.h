@@ -27,6 +27,7 @@
 #include <SDL3/SDL.h>
 #include <glm/glm.hpp>
 
+#include "shared/ids.h"
 #include "shared/misc.h"
 
 /* Like SDL_FORCE_INLINE but without static */
@@ -134,7 +135,8 @@ struct chunk_cubic_t
 
         const int index = SUBCHUNK_INDEX(x, y, z, 0);
 
-        if (type <= BLOCK_ID_MAX)
+        /* We don't assert because this function may process uninitialized data */
+        if (type < BLOCK_ID_NUM_USED)
             data[index] = type;
         else
             data[index] = 0;
