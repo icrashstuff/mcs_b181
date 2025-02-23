@@ -281,7 +281,7 @@ void render_world_overlays(level_t* level, ImDrawList* const bg_draw_list)
     }
     else if (mc_id::is_block(type) && !mc_id::is_transparent(type) && game_resources && game_resources->terrain_atlas)
     {
-        ImTextureID tex_id = reinterpret_cast<ImTextureID>(game_resources->terrain_atlas);
+        ImTextureID tex_id = reinterpret_cast<ImTextureID>(game_resources->terrain_atlas->tex_id_main);
         mc_id::terrain_face_t face = game_resources->terrain_atlas->get_face(mc_id::FACE_STONE);
 #define BLOCK_OVERLAY(ID, FACE_ID)                               \
     case ID:                                                     \
