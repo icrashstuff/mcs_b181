@@ -34,6 +34,14 @@
 
 #include "tetra/tetra_gl.h"
 
+#ifndef NDEBUG
+#define FORCE_OPT_LIGHT 1
+#define FORCE_OPT_MESH 1
+#else
+#define FORCE_OPT_LIGHT 0
+#define FORCE_OPT_MESH 0
+#endif
+
 #define PASS_TIMER_START()             \
     do                                 \
     {                                  \
@@ -184,8 +192,10 @@ void level_t::build_dirty_meshes()
  *
  * Without this debug builds are *very*, *very* slow (~6x slower)
  */
+#if (FORCE_OPT_LIGHT)
 #pragma GCC push_options
 #pragma GCC optimize("O3")
+#endif
 
 struct chunk_cross_t
 {
@@ -401,10 +411,14 @@ void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z
         cross.c->set_light_block(x, y, z, lvl);
     }
 }
+#if (FORCE_OPT_LIGHT)
 #pragma GCC pop_options
+#endif
 
+#if (FORCE_OPT_MESH)
 #pragma GCC push_options
 #pragma GCC optimize("Og")
+#endif
 
 void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z)
 {
@@ -2103,7 +2117,10 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
     glVertexAttribIPointer(1, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, col));
     glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, tex));
 }
+
+#if (FORCE_OPT_MESH)
 #pragma GCC pop_options
+#endif
 
 void level_t::set_block(const glm::ivec3 pos, const block_id_t type, const Uint8 metadata)
 {
