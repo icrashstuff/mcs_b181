@@ -192,7 +192,7 @@ struct level_t
     }
 
     /**
-     * Clears all chunks
+     * Clears all chunks and entities
      */
     void clear();
 

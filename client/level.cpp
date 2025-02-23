@@ -2558,6 +2558,16 @@ bool level_t::gamemode_set(int x)
     }
 }
 
+void level_t::clear()
+{
+    chunks.clear();
+    cmap.clear();
+    cmap.clear();
+
+    /* TODO: In the future if the player is stored here, they shouldn't be deleted */
+    ecs.clear();
+}
+
 level_t::dimension_switch_result level_t::dimension_switch(const int dim)
 {
     if (!mc_id::dimension_is_valid(dim))
@@ -2575,11 +2585,7 @@ level_t::dimension_switch_result level_t::dimension_switch(const int dim)
 
     dimension = new_dim;
 
-    chunks.clear();
-    cmap.clear();
-
-    /* TODO: In the future if the player is stored here, they shouldn't be deleted */
-    ecs.clear();
+    clear();
 
     switch (dimension)
     {
