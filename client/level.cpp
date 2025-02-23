@@ -403,6 +403,9 @@ void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z
 }
 #pragma GCC pop_options
 
+#pragma GCC push_options
+#pragma GCC optimize("Og")
+
 void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z)
 {
     /** Index: [x+1][y+1][z+1] */
@@ -2100,6 +2103,7 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
     glVertexAttribIPointer(1, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, col));
     glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, tex));
 }
+#pragma GCC pop_options
 
 void level_t::set_block(const glm::ivec3 pos, const block_id_t type, const Uint8 metadata)
 {
