@@ -113,16 +113,6 @@ struct chunk_cubic_t
         return data[index];
     }
 
-    CHUNK_CUBIC_INLINE Uint8 get_type_fallback(const int x, const int y, const int z, const Uint8 fallback)
-    {
-        if (x < 0 || y < 0 || z < 0 || x >= SUBCHUNK_SIZE_X || y >= SUBCHUNK_SIZE_Y || z >= SUBCHUNK_SIZE_Z)
-            return fallback;
-
-        const int index = SUBCHUNK_INDEX(x, y, z, 0);
-
-        return data[index];
-    }
-
     CHUNK_CUBIC_INLINE void set_type(const int x, const int y, const int z, const Uint8 type)
     {
         dirty_level = DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
