@@ -45,9 +45,9 @@ struct game_resources_t
 
 struct game_t
 {
-    level_t* level;
-    connection_t* connection;
-    const game_resources_t* resources;
+    level_t* level = nullptr;
+    connection_t* connection = nullptr;
+    const game_resources_t* resources = nullptr;
 
     /**
      * Unique object identifier
