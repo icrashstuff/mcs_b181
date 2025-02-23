@@ -448,6 +448,14 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
     for (int i = 0; i < IM_ARRAYSIZE(is_leaves_style_transparent); i++)
         is_leaves_style_transparent[i] = mc_id::is_leaves_style_transparent(i);
 
+    /** Index: [x+1][y+1][z+1] */
+    block_id_t stypes[3][3][3];
+    Uint8 smetadata[3][3][3];
+    Uint8 slight_block[3][3][3];
+    Uint8 slight_sky[3][3][3];
+
+    bool skipped = true;
+
     for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_X * SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z; dat_it++)
     {
         /* This is to keep the loop body 8 spaces closer to the left margin */
@@ -457,71 +465,120 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
 
         block_id_t type = rubik[1][1][1]->get_type(x, y, z);
         if (type == BLOCK_ID_AIR)
+        {
+            skipped = true;
             continue;
+        }
 
         std::vector<terrain_vertex_t>* vtx = is_translucent[type] ? &vtx_translucent : &vtx_solid;
 
-        Uint8 metadata = rubik[1][1][1]->get_metadata(x, y, z);
+        float r = 1.0, g = 1.0, b = 1.0;
 
-        float r = float((type) & 3) / 3.0f, g = float((type >> 2) & 3) / 3.0f, b = float((type >> 4) & 3) / 3.0f;
-        r = 1.0, g = 1.0, b = 1.0;
+        /* std::move does actually increase speed in non-debug situations, don't remove it */
+#define SHIFT_BLOCK_INFO(ORG, NEW)                      \
+    do                                                  \
+    {                                                   \
+        stypes NEW = std::move(stypes ORG);             \
+        smetadata NEW = std::move(smetadata ORG);       \
+        slight_block NEW = std::move(slight_block ORG); \
+        slight_sky NEW = std::move(slight_sky ORG);     \
+    } while (0)
 
-        /** Index: [x+1][y+1][z+1] */
-        block_id_t stypes[3][3][3];
-        Uint8 smetadata[3][3][3];
-        Uint8 slight_block[3][3][3];
-        Uint8 slight_sky[3][3][3];
-        for (int i = -1; i < 2; i++)
+        /* The last set of block data was in a different vertical slice, therefore the last block should be considered skipped */
+        if (y == 0)
+            skipped = true;
+
+        /* Shift data from previous slices */
+        if (!skipped)
         {
-            for (int j = -1; j < 2; j++)
+            SHIFT_BLOCK_INFO([0][1][0], [0][0][0]);
+            SHIFT_BLOCK_INFO([1][1][0], [1][0][0]);
+            SHIFT_BLOCK_INFO([2][1][0], [2][0][0]);
+            SHIFT_BLOCK_INFO([0][1][1], [0][0][1]);
+            SHIFT_BLOCK_INFO([1][1][1], [1][0][1]);
+            SHIFT_BLOCK_INFO([2][1][1], [2][0][1]);
+            SHIFT_BLOCK_INFO([0][1][2], [0][0][2]);
+            SHIFT_BLOCK_INFO([1][1][2], [1][0][2]);
+            SHIFT_BLOCK_INFO([2][1][2], [2][0][2]);
+
+            SHIFT_BLOCK_INFO([0][2][0], [0][1][0]);
+            SHIFT_BLOCK_INFO([1][2][0], [1][1][0]);
+            SHIFT_BLOCK_INFO([2][2][0], [2][1][0]);
+            SHIFT_BLOCK_INFO([0][2][1], [0][1][1]);
+            SHIFT_BLOCK_INFO([1][2][1], [1][1][1]);
+            SHIFT_BLOCK_INFO([2][2][1], [2][1][1]);
+            SHIFT_BLOCK_INFO([0][2][2], [0][1][2]);
+            SHIFT_BLOCK_INFO([1][2][2], [1][1][2]);
+            SHIFT_BLOCK_INFO([2][2][2], [2][1][2]);
+        }
+#undef MOVE_WINDOW
+
+        /* When the last block was not skipped then the last slices are valid we do no need to collect the slices of information at y-1 or at y */
+        for (int j = ((skipped) ? -1 : 1); j < 2; j++)
+        {
+            int chunk_iy = 1;
+            int local_y = y + j;
+
+            switch (local_y)
+            {
+            case -1:
+                local_y = SUBCHUNK_SIZE_Y - 1;
+                chunk_iy--;
+                break;
+            case SUBCHUNK_SIZE_Y:
+                local_y = 0;
+                chunk_iy++;
+                break;
+            default:
+                break;
+            }
+
+            for (int i = -1; i < 2; i++)
             {
                 for (int k = -1; k < 2; k++)
                 {
-                    int chunk_ix = 1, chunk_iy = 1, chunk_iz = 1;
-                    int local_x = x + i, local_y = y + j, local_z = z + k;
+                    int chunk_ix = 1, chunk_iz = 1;
+                    int local_x = x + i, local_z = z + k;
 
-                    if (local_x < 0)
+                    switch (local_x)
                     {
-                        local_x += SUBCHUNK_SIZE_X;
+                    case -1:
+                        local_x = SUBCHUNK_SIZE_X - 1;
                         chunk_ix--;
-                    }
-                    else if (local_x >= SUBCHUNK_SIZE_X)
-                    {
-                        local_x -= SUBCHUNK_SIZE_X;
+                        break;
+                    case SUBCHUNK_SIZE_X:
+                        local_x = 0;
                         chunk_ix++;
+                        break;
+                    default:
+                        break;
                     }
 
-                    if (local_y < 0)
+                    switch (local_z)
                     {
-                        local_y += SUBCHUNK_SIZE_Y;
-                        chunk_iy--;
-                    }
-                    else if (local_y >= SUBCHUNK_SIZE_Y)
-                    {
-                        local_y -= SUBCHUNK_SIZE_Y;
-                        chunk_iy++;
-                    }
-
-                    if (local_z < 0)
-                    {
-                        local_z += SUBCHUNK_SIZE_Z;
+                    case -1:
+                        local_z = SUBCHUNK_SIZE_Z - 1;
                         chunk_iz--;
-                    }
-                    else if (local_z >= SUBCHUNK_SIZE_Z)
-                    {
-                        local_z -= SUBCHUNK_SIZE_Z;
+                        break;
+                    case SUBCHUNK_SIZE_Z:
+                        local_z = 0;
                         chunk_iz++;
+                        break;
+                    default:
+                        break;
                     }
 
                     chunk_cubic_t* c = rubik[chunk_ix][chunk_iy][chunk_iz];
-                    stypes[i + 1][j + 1][k + 1] = c == NULL ? BLOCK_ID_AIR : c->get_type_fallback(local_x, local_y, local_z, BLOCK_ID_AIR);
-                    /* TODO: Move this out? */
+                    stypes[i + 1][j + 1][k + 1] = c == NULL ? BLOCK_ID_AIR : c->get_type(local_x, local_y, local_z);
                     smetadata[i + 1][j + 1][k + 1] = c == NULL ? 0 : c->get_metadata(local_x, local_y, local_z);
                     slight_block[i + 1][j + 1][k + 1] = c == NULL ? 0 : c->get_light_block(local_x, local_y, local_z);
                     slight_sky[i + 1][j + 1][k + 1] = c == NULL ? 0 : c->get_light_sky(local_x, local_y, local_z);
                 }
             }
         }
+        skipped = false;
+
+        Uint8 metadata = smetadata[1][1][1];
 
         /**
          * Ordered +XYZ then -XYZ for simple blocks
