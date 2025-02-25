@@ -42,6 +42,7 @@
 #include "tetra/tetra.h"
 #include "tetra/util/convar.h"
 
+#include "shared/build_info.h"
 #include "shared/misc.h"
 #include "shared/packet.h"
 
@@ -1418,6 +1419,8 @@ int main(int argc, const char** argv)
     /* KDevelop fully buffers the output and will not display anything */
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
+
+    dc_log("mcs_b181_bridge (%s)-%s (%s)", build_info::ver_string::client().c_str(), build_info::build_mode, build_info::git::refspec);
 
     tetra::init("icrashstuff", "mcs_b181", "mcs_b181_bridge", argc, argv);
     tetra::init_gui("mcs_b181_bridge");

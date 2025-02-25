@@ -1,0 +1,62 @@
+/* SPDX-License-Identifier: 0BSD
+ *
+ * SPDX-FileCopyrightText: Copyright (c) 2025 Ian Hangartner <icrashstuff at outlook dot com>
+ *
+ * Permission to use, copy, modify, and/or distribute this software for
+ * any purpose with or without fee is hereby granted.
+ *
+ * THE SOFTWARE IS PROVIDED “AS IS” AND THE AUTHOR DISCLAIMS ALL
+ * WARRANTIES WITH REGARD TO THIS SOFTWARE INCLUDING ALL IMPLIED WARRANTIES
+ * OF MERCHANTABILITY AND FITNESS. IN NO EVENT SHALL THE AUTHOR BE LIABLE
+ * FOR ANY SPECIAL, DIRECT, INDIRECT, OR CONSEQUENTIAL DAMAGES OR ANY
+ * DAMAGES WHATSOEVER RESULTING FROM LOSS OF USE, DATA OR PROFITS, WHETHER IN
+ * AN ACTION OF CONTRACT, NEGLIGENCE OR OTHER TORTIOUS ACTION, ARISING OUT
+ * OF OR IN CONNECTION WITH THE USE OR PERFORMANCE OF THIS SOFTWARE.
+ */
+
+#include "shared/build_info.h"
+
+#include <SDL3/SDL_stdinc.h>
+
+const char* build_info::build_mode = "@CMAKE_BUILD_TYPE@";
+
+const char* build_info::git::hash::root = "@GIT_SHA1_ROOT@";
+const char* build_info::git::hash::client_only = "@GIT_SHA1_CLIENT@";
+const char* build_info::git::hash::server_only = "@GIT_SHA1_SERVER@";
+const char* build_info::git::hash::bridge_only = "@GIT_SHA1_BRIDGE@";
+const char* build_info::git::hash::shared_only = "@GIT_SHA1_SHARED@";
+
+// clang-format off
+const bool build_info::git::dirty::root = @GIT_DIRTY_ROOT@;
+const bool build_info::git::dirty::client_only = @GIT_DIRTY_CLIENT@;
+const bool build_info::git::dirty::server_only = @GIT_DIRTY_SERVER@;
+const bool build_info::git::dirty::bridge_only = @GIT_DIRTY_BRIDGE@;
+const bool build_info::git::dirty::shared_only = @GIT_DIRTY_SHARED@;
+// clang-format on
+
+const char* build_info::git::refspec = "@GIT_REFSPEC@";
+
+static std::string make_ver_string(const size_t hash_length, const char* component, const bool component_dirty)
+{
+    const size_t component_len = strlen(component);
+    const size_t root_len = strlen(build_info::git::hash::root);
+
+    std::string s;
+    s.reserve((hash_length + 1) * 2 + 1);
+
+    s.append("#", 1);
+    s.append(component, SDL_min(component_len, hash_length));
+    if (component_dirty)
+        s.append("-dirty");
+    s.append("+#", 2);
+    s.append(build_info::git::hash::root, SDL_min(root_len, hash_length));
+    if (build_info::git::dirty::root)
+        s.append("-dirty");
+
+    return s;
+}
+
+std::string build_info::ver_string::client() { return make_ver_string(8, build_info::git::hash::client_only, build_info::git::dirty::client_only); }
+std::string build_info::ver_string::server() { return make_ver_string(8, build_info::git::hash::server_only, build_info::git::dirty::server_only); }
+std::string build_info::ver_string::bridge() { return make_ver_string(8, build_info::git::hash::bridge_only, build_info::git::dirty::bridge_only); }
+std::string build_info::ver_string::shared() { return make_ver_string(8, build_info::git::hash::shared_only, build_info::git::dirty::shared_only); }

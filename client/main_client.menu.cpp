@@ -21,6 +21,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+#include "shared/build_info.h"
 #include "tetra/util/convar.h"
 #include <algorithm>
 
@@ -207,6 +208,12 @@ static void menu_done(mc_gui::mc_gui_ctx* ctx, client_menu_return_t& ret)
     ImGui::End();
 }
 
+static void text_brand_ver()
+{
+    const char* brand = mc_gui::get_translation("mcs_b181.brand_client");
+    mc_gui::text("%s (%s)-%s (%s)", brand, build_info::ver_string::client().c_str(), build_info::build_mode, build_info::git::refspec);
+}
+
 static client_menu_return_t do_main_menu(mc_gui::mc_gui_ctx* ctx)
 {
     client_menu_return_t ret;
@@ -243,7 +250,7 @@ static client_menu_return_t do_main_menu(mc_gui::mc_gui_ctx* ctx)
     ImGui::SetNextWindowPos(ImVec2(0.0f, ImGui::GetMainViewport()->Size.y), ImGuiCond_Always, ImVec2(0.0, 1.0));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(1, 1) * ctx->menu_scale);
     ImGui::Begin("Bottom Text", NULL, ctx->default_win_flags);
-    mc_gui::text_translated("mcs_b181.brand_client");
+    text_brand_ver();
     ImGui::End();
     ImGui::PopStyleVar();
 
@@ -1145,7 +1152,7 @@ static client_menu_return_t do_game_menu(mc_gui::mc_gui_ctx* ctx)
     ImGui::SetNextWindowPos(ImVec2(0.0f, ImGui::GetMainViewport()->Size.y), ImGuiCond_Always, ImVec2(0.0, 1.0));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(1, 1) * ctx->menu_scale);
     ImGui::Begin("Bottom Text", NULL, ctx->default_win_flags);
-    mc_gui::text_translated("mcs_b181.brand_client");
+    text_brand_ver();
     ImGui::End();
     ImGui::PopStyleVar();
 

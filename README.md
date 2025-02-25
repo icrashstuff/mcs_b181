@@ -3,7 +3,7 @@
 A minecraft beta 1.8.x server / bridge / client. This project is purely for my own entertainment
 
 ## License
-- This project (mcs_b181) is licensed under the MIT License
+- This project (mcs_b181) is largely licensed under the MIT License
   - Copyright (c) 2024 - 2025 Ian Hangartner
 
 ## 3rd Party Attributions

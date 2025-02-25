@@ -47,6 +47,7 @@
 #include "tetra/util/physfs/physfs.h"
 #include "tetra/util/stbi.h"
 
+#include "shared/build_info.h"
 #include "shared/chunk.h"
 #include "shared/ids.h"
 #include "shared/misc.h"
@@ -1259,6 +1260,15 @@ static void screenshot_callback()
 
 int main(const int argc, const char** argv)
 {
+    /* KDevelop fully buffers the output and will not display anything */
+    setvbuf(stdout, NULL, _IONBF, 0);
+    setvbuf(stderr, NULL, _IONBF, 0);
+
+    char window_title[256];
+    snprintf(window_title, SDL_arraysize(window_title), "mcs_b181_client (%s)-%s (%s)", build_info::ver_string::client().c_str(), build_info::build_mode,
+        build_info::git::refspec);
+    dc_log("%s", window_title);
+
     tetra::init("icrashstuff", "mcs_b181", "mcs_b181_client", argc, argv);
 
     if (!cvr_username.get().length())
@@ -1272,7 +1282,7 @@ int main(const int argc, const char** argv)
 
     tetra::set_render_api(tetra::RENDER_API_GL_CORE, 3, 3);
 
-    tetra::init_gui("mcs_b181_client");
+    tetra::init_gui(window_title);
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);

@@ -36,6 +36,7 @@
 #include <string>
 #include <vector>
 
+#include "shared/build_info.h"
 #include "shared/ids.h"
 #include "shared/java_strings.h"
 #include "shared/misc.h"
@@ -1657,6 +1658,8 @@ int main(const int argc, const char** argv)
     /* KDevelop fully buffers the output and will not display anything */
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
+
+    dc_log("mcs_b181_server (%s)-%s (%s)", build_info::ver_string::client().c_str(), build_info::build_mode, build_info::git::refspec);
 
     tetra::init("icrashstuff", "mcs_b181", "mcs_b181_server", argc, argv);
 

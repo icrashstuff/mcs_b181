@@ -1,5 +1,5 @@
-# SPDX-License-Identifier: MIT
-# SPDX-FileCopyrightText: Copyright 2024 Ian Hangartner
+# SPDX-License-Identifier: 0BSD
+# SPDX-FileCopyrightText: Copyright 2024 - 2025 Ian Hangartner
 cmake_minimum_required(VERSION 3.25)
 
 # Make option() honor normal variables
@@ -80,8 +80,27 @@ add_subdirectory(tetra/)
 
 add_subdirectory(client/entt)
 
+list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
+include(GetGitRevisionDescription)
+
+get_git_head_revision(GIT_REFSPEC GIT_SHA1)
+
+git_recent_rev("."      GIT_SHA1_ROOT)
+git_recent_rev("client" GIT_SHA1_CLIENT)
+git_recent_rev("server" GIT_SHA1_SERVER)
+git_recent_rev("bridge" GIT_SHA1_BRIDGE)
+git_recent_rev("shared" GIT_SHA1_SHARED)
+
+git_path_is_dirty("."      GIT_DIRTY_ROOT)
+git_path_is_dirty("client" GIT_DIRTY_CLIENT)
+git_path_is_dirty("server" GIT_DIRTY_SERVER)
+git_path_is_dirty("bridge" GIT_DIRTY_BRIDGE)
+git_path_is_dirty("shared" GIT_DIRTY_SHARED)
+
+configure_file("${CMAKE_CURRENT_SOURCE_DIR}/shared/build_info.cpp.in" "${CMAKE_CURRENT_BINARY_DIR}/shared/build_info.cpp" @ONLY)
+
 function(add_bin_common name)
-    add_tetra_executable(${name} "${${name}_SRC}")
+    add_tetra_executable(${name} "${${name}_SRC};shared/build_info.cpp")
 
     target_compile_options(${name} PUBLIC -Wall -Wextra -DSDL_DISABLE_OLD_NAMES=1)
 
