@@ -82,6 +82,8 @@ extern mc_gui_ctx* global_ctx;
 
 /**
  * Return the string matching the translation id
+ *
+ * NOTE: The string is only guaranteed to be valid until the end of a frame
  */
 const char* get_translation(const char* translation_id);
 

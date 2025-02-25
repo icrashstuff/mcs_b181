@@ -199,11 +199,11 @@ void mc_gui::mc_gui_ctx::load_resources()
 
     /* Load built in translations */
     translation_map_t built_in;
-    built_in.add_key("mcs_b181_client.reload_resources", "Reload Resources");
-    built_in.add_key("mcs_b181_client.username", "Username");
-    built_in.add_key("mcs_b181_client.menu.test_world", "Test world");
-    built_in.add_key("mcs_b181_client.placeholder", "Nothing to see here :)");
-    built_in.add_key("mcs_b181_client.mcs_b181_client", "mcs_b181_client");
+    built_in.add_key("mcs_b181.reload_resources", "Reload Resources");
+    built_in.add_key("mcs_b181.username", "Username");
+    built_in.add_key("mcs_b181.menu.test_world", "Test world");
+    built_in.add_key("mcs_b181.placeholder", "Nothing to see here :)");
+    built_in.add_key("mcs_b181.brand_client", "mcs_b181_client");
 
     translations = translation_map_t("/_resources/assets/minecraft/lang/en_US.lang");
     translations.import_keys(built_in, false);

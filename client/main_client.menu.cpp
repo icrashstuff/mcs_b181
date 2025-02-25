@@ -216,7 +216,7 @@ static client_menu_return_t do_main_menu(mc_gui::mc_gui_ctx* ctx)
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetWorkCenter(), ImGuiCond_Always, ImVec2(0.5, 0.5));
     ImGui::Begin("Main", NULL, ctx->default_win_flags);
 
-    if (mc_gui::button_big("mcs_b181_client.menu.test_world"))
+    if (mc_gui::button_big("mcs_b181.menu.test_world"))
     {
         games.push_back(new game_t(cvr_autoconnect_addr.get(), cvr_autoconnect_port.get(), cvr_username.get(), true, game_resources));
         ret.clear_stack = 1;
@@ -243,7 +243,7 @@ static client_menu_return_t do_main_menu(mc_gui::mc_gui_ctx* ctx)
     ImGui::SetNextWindowPos(ImVec2(0.0f, ImGui::GetMainViewport()->Size.y), ImGuiCond_Always, ImVec2(0.0, 1.0));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(1, 1) * ctx->menu_scale);
     ImGui::Begin("Bottom Text", NULL, ctx->default_win_flags);
-    mc_gui::text_translated("mcs_b181_client.mcs_b181_client");
+    mc_gui::text_translated("mcs_b181.brand_client");
     ImGui::End();
     ImGui::PopStyleVar();
 
@@ -1145,7 +1145,7 @@ static client_menu_return_t do_game_menu(mc_gui::mc_gui_ctx* ctx)
     ImGui::SetNextWindowPos(ImVec2(0.0f, ImGui::GetMainViewport()->Size.y), ImGuiCond_Always, ImVec2(0.0, 1.0));
     ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(1, 1) * ctx->menu_scale);
     ImGui::Begin("Bottom Text", NULL, ctx->default_win_flags);
-    mc_gui::text_translated("mcs_b181_client.mcs_b181_client");
+    mc_gui::text_translated("mcs_b181.brand_client");
     ImGui::End();
     ImGui::PopStyleVar();
 
@@ -1167,7 +1167,7 @@ static client_menu_return_t do_menu_options(mc_gui::mc_gui_ctx* ctx)
     if (mc_gui::button_big("options.controls"))
         ret.name_to_open = "menu.options.controls";
 
-    if (convar_t::dev() && mc_gui::button_big("mcs_b181_client.reload_resources"))
+    if (convar_t::dev() && mc_gui::button_big("mcs_b181.reload_resources"))
         reload_resources = 1;
 
     if (convar_t::dev())
@@ -1192,7 +1192,7 @@ static client_menu_return_t do_menu_options(mc_gui::mc_gui_ctx* ctx)
         char temp[17] = "";
         strncpy(temp, cvr_username.get().c_str(), SDL_arraysize(temp));
 
-        const char* translation = mc_gui::get_translation("mcs_b181_client.username");
+        const char* translation = mc_gui::get_translation("mcs_b181.username");
         float translation_width = ImGui::CalcTextSize(translation).x + ImGui::GetStyle().ItemSpacing.x * 2.0f;
         ImGui::SetNextItemWidth(SDL_max(ctx->get_width_large() - translation_width, ctx->get_width_large() / 2));
         if (ImGui::InputText(translation, temp, SDL_arraysize(temp)))
@@ -1300,7 +1300,7 @@ static client_menu_return_t do_menu_options_controls(mc_gui::mc_gui_ctx* ctx)
     ImGui::SetNextWindowPos(get_viewport_centered_title_bar(), ImGuiCond_Always, ImVec2(0.5, 0.0));
     ImGui::Begin("menu.options.controls", NULL, ctx->default_win_flags);
 
-    mc_gui::text_translated("mcs_b181_client.placeholder");
+    mc_gui::text_translated("mcs_b181.placeholder");
 
     ImGui::End();
 
