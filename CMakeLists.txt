@@ -65,6 +65,8 @@ set(mcs_b181_client_SRC
     shared/simplex_noise/SimplexNoise.cpp
 )
 
+SET_SOURCE_FILES_PROPERTIES(shared/simplex_noise/SimplexNoise.cpp PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS_RELEASE}")
+
 configure_file(client/shaders/terrain.frag shaders/terrain.frag COPYONLY)
 configure_file(client/shaders/terrain.vert shaders/terrain.vert COPYONLY)
 configure_file(client/shaders/pano.frag shaders/pano.frag COPYONLY)
