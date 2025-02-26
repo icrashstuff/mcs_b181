@@ -34,6 +34,7 @@ Client TODO:
 - Distance fog
 - Biome coloring (cubiomes looks promising https://github.com/Cubitect/cubiomes/)
 - Sky lighting
+- More parallelization
 
 Client Wants:
 - Colored Lighting
