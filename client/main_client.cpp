@@ -826,7 +826,7 @@ static void process_event(SDL_Event& event, bool* done)
 
         mouse_grabbed = !client_menu_manager.stack_size();
 
-        dc_log("%d %d", client_menu_manager.stack_size(), mouse_grabbed);
+        TRACE("%d %d", client_menu_manager.stack_size(), mouse_grabbed);
     }
 
     /* The only way for the mouse to be grabbed is in normal_loop() */
