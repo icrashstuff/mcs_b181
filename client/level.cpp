@@ -48,12 +48,12 @@
         built = 0;                     \
         tick_start = SDL_GetTicksNS(); \
     } while (0)
-#define PASS_TIMER_STOP(fmt, ...)                \
+#define PASS_TIMER_STOP(CONDITION, fmt, ...)     \
     do                                           \
     {                                            \
         elapsed = SDL_GetTicksNS() - tick_start; \
-        if (built)                               \
-            TRACE(fmt, ##__VA_ARGS__);           \
+        if ((CONDITION) && built)                \
+            dc_log(fmt, ##__VA_ARGS__);          \
     } while (0)
 
 static convar_int_t r_mesh_throttle("r_mesh_throttle", 1, 1, 64, "Maximum number of chunks that can be meshed per frame");
@@ -143,7 +143,9 @@ void level_t::build_dirty_meshes()
         c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0;
         built++;
     }
-    PASS_TIMER_STOP("Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 1)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
+    PASS_TIMER_STOP(enable_timer_log_light, "Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 1)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
+    last_perf_light_pass1.duration = elapsed;
+    last_perf_light_pass1.built = built;
 
     /* Second Light Pass */
     PASS_TIMER_START();
@@ -156,7 +158,9 @@ void level_t::build_dirty_meshes()
         c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_1;
         built++;
     }
-    PASS_TIMER_STOP("Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 2)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
+    PASS_TIMER_STOP(enable_timer_log_light, "Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 2)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
+    last_perf_light_pass2.duration = elapsed;
+    last_perf_light_pass2.built = built;
 
     /* Third Light Pass */
     PASS_TIMER_START();
@@ -169,7 +173,9 @@ void level_t::build_dirty_meshes()
         c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_2;
         built++;
     }
-    PASS_TIMER_STOP("Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 3)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
+    PASS_TIMER_STOP(enable_timer_log_light, "Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 3)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
+    last_perf_light_pass3.duration = elapsed;
+    last_perf_light_pass3.built = built;
 
     /* Fourth Light Pass */
     PASS_TIMER_START();
@@ -182,7 +188,9 @@ void level_t::build_dirty_meshes()
         c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
         built++;
     }
-    PASS_TIMER_STOP("Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 4)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
+    PASS_TIMER_STOP(enable_timer_log_light, "Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 4)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
+    last_perf_light_pass4.duration = elapsed;
+    last_perf_light_pass4.built = built;
 
     /* Mesh Pass */
     PASS_TIMER_START();
@@ -197,7 +205,9 @@ void level_t::build_dirty_meshes()
         built++;
         throttle--;
     }
-    PASS_TIMER_STOP("Built %zu meshes in %.2f ms (%.2f ms per)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
+    PASS_TIMER_STOP(enable_timer_log_mesh, "Built %zu meshes in %.2f ms (%.2f ms per)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
+    last_perf_mesh_pass.duration = elapsed;
+    last_perf_mesh_pass.built = built;
 }
 
 /**

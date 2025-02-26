@@ -218,6 +218,23 @@ struct level_t
     float pitch = 0.0f;
     float fov = 70.0f;
 
+    bool enable_timer_log_light = 0;
+    bool enable_timer_log_mesh = 0;
+
+    struct performance_timer_t
+    {
+        Uint64 duration = 0;
+        size_t built = 0;
+
+        void operator+=(const performance_timer_t& rh) { duration += rh.duration, built += rh.built; }
+    };
+
+    performance_timer_t last_perf_light_pass1;
+    performance_timer_t last_perf_light_pass2;
+    performance_timer_t last_perf_light_pass3;
+    performance_timer_t last_perf_light_pass4;
+    performance_timer_t last_perf_mesh_pass;
+
     inventory_player_t inventory;
 
 private:

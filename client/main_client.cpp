@@ -1258,6 +1258,209 @@ static void screenshot_callback()
     free(buf);
 }
 
+static convar_int_t cvr_profile_light("profile_light", 0, 0, 1, "Profile lighting engine then exit", CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_DEV_ONLY);
+void profile_light()
+{
+    game_t game(cvr_autoconnect_addr.get(), cvr_autoconnect_port.get(), cvr_username.get(), true, game_resources);
+
+    game.level->enable_timer_log_light = 1;
+
+    const glm::ivec3 world_configs[] = {
+        { 24, 16, 24 },
+        { 24, 8, 24 },
+
+        { 16, 16, 16 },
+
+        { 8, 64, 8 },
+        { 8, 32, 8 },
+        { 8, 16, 8 },
+        { 8, 8, 8 },
+
+        { 4, 256, 4 },
+        { 4, 128, 4 },
+        { 4, 64, 4 },
+        { 4, 32, 4 },
+        { 4, 16, 4 },
+        { 4, 8, 4 },
+    };
+
+    level_t::performance_timer_t timers[3][6];
+
+    /* Nothing special about this seed value */
+    Uint64 r_state = 0x41a870ef60fef764;
+    size_t overall_block_emptiness[3] = { 0 };
+    size_t overall_block_total[3] = { 0 };
+
+    for (int pass = 0; pass < IM_ARRAYSIZE(world_configs) * 2; pass++)
+    {
+        const glm::ivec3 world_size = world_configs[pass % IM_ARRAYSIZE(world_configs)];
+        const int world_volume = world_size.x * world_size.y * world_size.z;
+        const bool using_sdl_rand = !(pass < IM_ARRAYSIZE(world_configs));
+#define SPACER "================================"
+        dc_log(SPACER " Pass %d-%d (%dx%dx%d) (%d) " SPACER, using_sdl_rand, pass, world_size.x, world_size.y, world_size.z, world_volume);
+        game.level->clear();
+
+        if (!using_sdl_rand)
+        {
+            Uint64 tstart = SDL_GetTicksNS();
+            std::vector<chunk_cubic_t*> chunks;
+            chunks.resize(world_volume);
+            std::atomic<size_t> off = 0;
+            std::atomic<Uint64> elapsed_ns = 0;
+
+            util::parallel_for(0, world_size.x * world_size.z, [&](const int _start, const int _end) {
+                Uint64 start_tick = SDL_GetTicksNS();
+                chunk_t c_old;
+                for (int it = _start; it < _end; it++)
+                {
+                    /* Nothing special about this seed */
+                    Uint64 r_state_chunk = 0x2e17d7f27f825d7f + (it << 10);
+
+                    int cx = it % world_size.x;
+                    int cz = it / world_size.x;
+
+                    /* Nothing special about this seed */
+                    /* Coordinates fed to the generator are offset to coincide with the dev chunks */
+                    c_old.generate_from_seed_over(0xc4891e8c5ee07c5d, cx - world_size.x / 2, cz - world_size.z / 2);
+                    for (int cy = 0; cy < world_size.y; cy++)
+                    {
+                        chunk_cubic_t* c = new chunk_cubic_t();
+                        c->pos = glm::ivec3 { cx, cy, cz };
+                        for (int x = 0; x < 16; x++)
+                            for (int z = 0; z < 16; z++)
+                                for (int y = 0; y < 16; y++)
+                                {
+                                    c->set_type(x, y, z, c_old.get_type(x, y + (cy % 8) * 16, z));
+                                    c->set_metadata(x, y, z, c_old.get_metadata(x, y + (cy % 8) * 16, z));
+                                    c->set_light_block(x, y, z, c_old.get_light_block(x, y + (cy % 8) * 16, z));
+                                    c->set_light_sky(x, y, z, c_old.get_light_sky(x, y + (cy % 8) * 16, z));
+                                }
+
+                        for (int decoration_it = 0; decoration_it < 20; decoration_it++)
+                        {
+                            Uint32 rand_data = SDL_rand_bits_r(&r_state_chunk);
+                            const int y = (rand_data) & 0x0F;
+                            const int z = (rand_data >> 4) & 0x0F;
+                            const int x = (rand_data >> 8) & 0x0F;
+                            rand_data = SDL_rand_bits_r(&r_state_chunk);
+                            c->set_type(x, y, z, rand_data % BLOCK_ID_NUM_USED);
+                        }
+
+                        chunks[off++] = c;
+                    }
+                }
+                elapsed_ns += SDL_GetTicksNS() - start_tick;
+            });
+
+            assert(size_t(off) == chunks.size());
+
+            for (chunk_cubic_t* c : chunks)
+                game.level->add_chunk(c);
+
+            double elapsed_ms = double(elapsed_ns) / 1000.0 / 1000.0;
+            dc_log("Construction time: %.2f ms (%.3f ms per)", elapsed_ms, elapsed_ms / double(world_volume));
+        }
+        else
+        {
+            Uint64 tstart = SDL_GetTicksNS();
+            for (int cx = 0; cx < world_size.x; cx++)
+                for (int cz = 0; cz < world_size.z; cz++)
+                    for (int cy = 0; cy < world_size.y; cy++)
+                    {
+                        chunk_cubic_t* c = new chunk_cubic_t();
+                        c->pos = glm::ivec3 { cx, cy, cz };
+                        for (int pos_it = 0; pos_it < SUBCHUNK_SIZE_VOLUME; pos_it++)
+                        {
+                            const int y = (pos_it) & 0x0F;
+                            const int z = (pos_it >> 4) & 0x0F;
+                            const int x = (pos_it >> 8) & 0x0F;
+                            Uint32 rand_data = SDL_rand_bits_r(&r_state);
+                            if (rand_data % (rand_data % 15 + 1) < 5)
+                                c->set_type(x, y, z, rand_data % BLOCK_ID_NUM_USED);
+                        }
+                        game.level->add_chunk(c);
+                    }
+            double elapsed_ms = double(SDL_GetTicksNS() - tstart) / 1000.0 / 1000.0;
+            dc_log("Construction time: %.2f ms (%.3f ms per)", elapsed_ms, elapsed_ms / double(world_volume));
+        }
+
+        size_t emptiness = 0;
+        size_t total = 0;
+        for (chunk_cubic_t* c : game.level->get_chunk_vec())
+        {
+            c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
+            for (int pos_it = 0; pos_it < SUBCHUNK_SIZE_VOLUME; pos_it++)
+            {
+                const int y = (pos_it) & 0x0F;
+                const int z = (pos_it >> 4) & 0x0F;
+                const int x = (pos_it >> 8) & 0x0F;
+                emptiness += c->get_type(x, y, z) == 0;
+            }
+            total += SUBCHUNK_SIZE_VOLUME;
+        }
+
+        dc_log("Emptiness: %.3f%%", double((emptiness * 1000000) / total) / 10000.0);
+
+        game.level->render({ 128, 20 });
+
+        /* Add to individual counters */
+        timers[using_sdl_rand][0] += game.level->last_perf_light_pass1;
+        timers[using_sdl_rand][1] += game.level->last_perf_light_pass2;
+        timers[using_sdl_rand][2] += game.level->last_perf_light_pass3;
+        timers[using_sdl_rand][3] += game.level->last_perf_light_pass4;
+        timers[using_sdl_rand][4] += game.level->last_perf_mesh_pass;
+        timers[using_sdl_rand][5] += timers[using_sdl_rand][0];
+        timers[using_sdl_rand][5] += timers[using_sdl_rand][1];
+        timers[using_sdl_rand][5] += timers[using_sdl_rand][2];
+        timers[using_sdl_rand][5] += timers[using_sdl_rand][3];
+        overall_block_emptiness[using_sdl_rand] += emptiness;
+        overall_block_total[using_sdl_rand] += total;
+
+        /* Add to combined counters */
+        timers[2][0] += game.level->last_perf_light_pass1;
+        timers[2][1] += game.level->last_perf_light_pass2;
+        timers[2][2] += game.level->last_perf_light_pass3;
+        timers[2][3] += game.level->last_perf_light_pass4;
+        timers[2][4] += game.level->last_perf_mesh_pass;
+        timers[2][5] += timers[2][0];
+        timers[2][5] += timers[2][1];
+        timers[2][5] += timers[2][2];
+        timers[2][5] += timers[2][3];
+        overall_block_emptiness[2] += emptiness;
+        overall_block_total[2] += total;
+    }
+
+    int j = 0;
+    int i = 0;
+    /* chunk.cpp world */
+    dc_log(SPACER " Results (SimplexNoise + SDL_rand_bits world) " SPACER);
+    dc_log("Emptiness: %.3f%%", double((overall_block_emptiness[j] * 1000000) / overall_block_total[j]) / 10000.0);
+    for (; i < 4; i++)
+        if (timers[j][i].built)
+            dc_log("Lit %zu chunks in %.2f ms (%.2f us per) (Pass %d)", timers[j][i].built, timers[j][i].duration / 1000.0 / 1000.0,
+                timers[j][i].duration / timers[j][i].built / 1000.0, i % 5);
+
+    j++, i = 0;
+
+    /* SDL_rand_bits world */
+    dc_log(SPACER " Results (SDL_rand_bits world) " SPACER);
+    dc_log("Emptiness: %.3f%%", double((overall_block_emptiness[j] * 1000000) / overall_block_total[j]) / 10000.0);
+    for (; i < 4; i++)
+        if (timers[j][i].built)
+            dc_log("Lit %zu chunks in %.2f ms (%.2f us per) (Pass %d)", timers[j][i].built, timers[j][i].duration / 1000.0 / 1000.0,
+                timers[j][i].duration / timers[j][i].built / 1000.0, i % 5);
+
+    j++, i = 0;
+
+    /* Both worlds */
+    dc_log(SPACER " Results (Both worlds) " SPACER);
+    dc_log("Emptiness: %.3f%%", double((overall_block_emptiness[j] * 1000000) / overall_block_total[j]) / 10000.0);
+    for (; i < 4; i++)
+        if (timers[j][i].built)
+            dc_log("Lit %zu chunks in %.2f ms (%.2f us per) (Pass %d)", timers[j][i].built, timers[j][i].duration / 1000.0 / 1000.0,
+                timers[j][i].duration / timers[j][i].built / 1000.0, i % 5);
+}
+
 int main(const int argc, const char** argv)
 {
     /* KDevelop fully buffers the output and will not display anything */
@@ -1283,6 +1486,16 @@ int main(const int argc, const char** argv)
     tetra::set_render_api(tetra::RENDER_API_GL_CORE, 3, 3);
 
     tetra::init_gui(window_title);
+
+    /* No reason to allow cvr_profile_light in non-dev environments */
+    if (!convar_t::dev())
+        cvr_profile_light.set(0);
+
+    /* Prevent someone from unexpectedly killing the application */
+    cvr_profile_light.set_pre_callback([](int, int) -> bool { return 0; });
+
+    if (cvr_profile_light.get())
+        SDL_HideWindow(tetra::window);
 
     glEnable(GL_DEPTH_TEST);
     glEnable(GL_CULL_FACE);
@@ -1370,6 +1583,10 @@ int main(const int argc, const char** argv)
         }
         case ENGINE_STATE_CONFIGURE:
         {
+            /* This is maybe a bit unnecessary as no normal person should ever be in this situation but, it doesn't hurt to have this here */
+            if (cvr_profile_light.get())
+                SDL_ShowWindow(tetra::window);
+
             ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), viewport->WorkSize);
             ImGui::SetNextWindowPos(viewport->GetWorkCenter(), ImGuiCond_Always, ImVec2(0.5, 0.5));
             ImGui::Begin("Configuration Required!", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
@@ -1422,6 +1639,15 @@ int main(const int argc, const char** argv)
         }
         case ENGINE_STATE_RUNNING:
         {
+            if (cvr_profile_light.get())
+            {
+                profile_light();
+
+                engine_state_target = ENGINE_STATE_EXIT;
+
+                break;
+            }
+
             if (game_selected && game_selected->level && cvr_gui_renderer.get())
             {
                 level_t* level = game_selected->level;
