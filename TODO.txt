@@ -33,6 +33,7 @@ Client TODO:
 - Vignette
 - Distance fog
 - Biome coloring (cubiomes looks promising https://github.com/Cubitect/cubiomes/)
+- Sky lighting
 
 Client Wants:
 - Colored Lighting
