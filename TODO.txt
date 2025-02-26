@@ -1,0 +1,42 @@
+Client TODO:
+- Prevent AO from bleeding in corners
+- Rotate triangles to best align with light values
+- Improve crosshair contrast
+- Inventory windows
+- Proper block placing/destroying
+- Entity rendering
+  - Including lighting
+- Entity physics
+- Audio
+- Proper asset integration
+- Finish block models
+  - Railing
+  - Ladders
+  - Torches
+  - Doors
+  - Trapdoors
+  - Moss
+  - Fence
+  - Stairs
+  - Grass (Do an opaque overlay with glDepthFunc(GL_EQUAL))
+  - Buttons
+  - Pressure plates
+  - Fire
+  - etc.
+- Middle click get block
+- Particles
+- Weather
+  - Rain
+  - Snow
+  - Thunder flashes
+- Sky
+- Vignette
+- Distance fog
+- Biome coloring (cubiomes looks promising https://github.com/Cubitect/cubiomes/)
+
+Client Wants:
+- Colored Lighting
+  - Maybe with some form of refraction?
+- Vulkan, bgfx, or SDL3 GPU?
+- Basic directional lighting for sun/moon/thunder
+- Further optimize light flood algorithm, possibly with intrinsics or ASM
