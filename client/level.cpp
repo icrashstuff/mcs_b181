@@ -1052,12 +1052,12 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
         /* ============ BEGIN: IS_TORCH ============ */
         if (type == BLOCK_ID_TORCH || type == BLOCK_ID_TORCH_REDSTONE_ON || type == BLOCK_ID_TORCH_REDSTONE_OFF)
         {
+            const Uint8 ao[] = { 0, 0, 0, 0 };
+            const Uint8 bl[] = { slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1] };
+            const Uint8 sl[] = { slight_sky[1][1][1], slight_sky[1][1][1], slight_sky[1][1][1], slight_sky[1][1][1] };
+
             /* Positive Y */
             {
-                Uint8 ao[] = { 0, 0, 0, 0 };
-
-                Uint8 bl[] = { slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1] };
-
                 glm::vec2 cs = faces[1].corners[3] - faces[1].corners[0];
                 faces[1].corners[0] += cs * glm::vec2(0.4375f, 0.375f);
                 faces[1].corners[3] = faces[1].corners[0] + cs / 8.0f;
@@ -1067,134 +1067,118 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
 
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 9), Sint16(y * 16 + 10), Sint16(z * 16 + 9), ao[3] },
-                    { r, g, b, bl[3], slight_sky[1][2][1] },
+                    { r, g, b, bl[3], sl[3] },
                     faces[1].corners[0],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 9), Sint16(y * 16 + 10), Sint16(z * 16 + 7), ao[1] },
-                    { r, g, b, bl[1], slight_sky[1][2][1] },
+                    { r, g, b, bl[1], sl[1] },
                     faces[1].corners[2],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 7), Sint16(y * 16 + 10), Sint16(z * 16 + 9), ao[2] },
-                    { r, g, b, bl[2], slight_sky[1][2][1] },
+                    { r, g, b, bl[2], sl[2] },
                     faces[1].corners[1],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 7), Sint16(y * 16 + 10), Sint16(z * 16 + 7), ao[0] },
-                    { r, g, b, bl[0], slight_sky[1][2][1] },
+                    { r, g, b, bl[0], sl[0] },
                     faces[1].corners[3],
                 });
             }
 
             /* Positive X */
             {
-                Uint8 ao[] = { 0, 0, 0, 0 };
-
-                Uint8 bl[] = { slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1] };
-
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 9), Sint16(y * 16 + 0), Sint16(z * 16 + 0), ao[0] },
-                    { r, g, b, bl[0], slight_sky[2][1][1] },
+                    { r, g, b, bl[0], sl[0] },
                     faces[0].corners[3],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 9), Sint16(y * 16 + 16), Sint16(z * 16 + 0), ao[1] },
-                    { r, g, b, bl[1], slight_sky[2][1][1] },
+                    { r, g, b, bl[1], sl[1] },
                     faces[0].corners[1],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 9), Sint16(y * 16 + 0), Sint16(z * 16 + 16), ao[2] },
-                    { r, g, b, bl[2], slight_sky[2][1][1] },
+                    { r, g, b, bl[2], sl[2] },
                     faces[0].corners[2],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 9), Sint16(y * 16 + 16), Sint16(z * 16 + 16), ao[3] },
-                    { r, g, b, bl[3], slight_sky[2][1][1] },
+                    { r, g, b, bl[3], sl[3] },
                     faces[0].corners[0],
                 });
             }
 
             /* Negative X */
             {
-                Uint8 ao[] = { 0, 0, 0, 0 };
-
-                Uint8 bl[] = { slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1] };
-
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 7), Sint16(y * 16 + 16), Sint16(z * 16 + 16), ao[3] },
-                    { r, g, b, bl[3], slight_sky[0][1][1] },
+                    { r, g, b, bl[3], sl[3] },
                     faces[3].corners[1],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 7), Sint16(y * 16 + 16), Sint16(z * 16 + 0), ao[1] },
-                    { r, g, b, bl[1], slight_sky[0][1][1] },
+                    { r, g, b, bl[1], sl[1] },
                     faces[3].corners[0],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 7), Sint16(y * 16 + 0), Sint16(z * 16 + 16), ao[2] },
-                    { r, g, b, bl[2], slight_sky[0][1][1] },
+                    { r, g, b, bl[2], sl[2] },
                     faces[3].corners[3],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 7), Sint16(y * 16 + 0), Sint16(z * 16 + 0), ao[0] },
-                    { r, g, b, bl[0], slight_sky[0][1][1] },
+                    { r, g, b, bl[0], sl[0] },
                     faces[3].corners[2],
                 });
             }
 
             /* Positive Z */
             {
-                Uint8 ao[] = { 0, 0, 0, 0 };
-
-                Uint8 bl[] = { slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1] };
-
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 16), Sint16(z * 16 + 9), ao[3] },
-                    { r, g, b, bl[3], slight_sky[1][1][2] },
+                    { r, g, b, bl[3], sl[3] },
                     faces[2].corners[1],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 0), Sint16(y * 16 + 16), Sint16(z * 16 + 9), ao[1] },
-                    { r, g, b, bl[1], slight_sky[1][1][2] },
+                    { r, g, b, bl[1], sl[1] },
                     faces[2].corners[0],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 0), Sint16(z * 16 + 9), ao[2] },
-                    { r, g, b, bl[2], slight_sky[1][1][2] },
+                    { r, g, b, bl[2], sl[2] },
                     faces[2].corners[3],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 0), Sint16(y * 16 + 0), Sint16(z * 16 + 9), ao[0] },
-                    { r, g, b, bl[0], slight_sky[1][1][2] },
+                    { r, g, b, bl[0], sl[0] },
                     faces[2].corners[2],
                 });
             }
 
             /* Negative Z */
             {
-                Uint8 ao[] = { 0, 0, 0, 0 };
-
-                Uint8 bl[] = { slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1] };
-
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 0), Sint16(y * 16 + 0), Sint16(z * 16 + 7), ao[0] },
-                    { r, g, b, bl[0], slight_sky[1][1][0] },
+                    { r, g, b, bl[0], sl[0] },
                     faces[5].corners[3],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 0), Sint16(y * 16 + 16), Sint16(z * 16 + 7), ao[1] },
-                    { r, g, b, bl[1], slight_sky[1][1][0] },
+                    { r, g, b, bl[1], sl[1] },
                     faces[5].corners[1],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 0), Sint16(z * 16 + 7), ao[2] },
-                    { r, g, b, bl[2], slight_sky[1][1][0] },
+                    { r, g, b, bl[2], sl[2] },
                     faces[5].corners[2],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 16), Sint16(z * 16 + 7), ao[3] },
-                    { r, g, b, bl[3], slight_sky[1][1][0] },
+                    { r, g, b, bl[3], sl[3] },
                     faces[5].corners[0],
                 });
             }
