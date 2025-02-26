@@ -22,6 +22,7 @@
  */
 #include "misc.h"
 
+#include <SDL3/SDL.h>
 #include <limits.h>
 
 std::string format_memory(const size_t size, const bool rate)
@@ -100,4 +101,78 @@ bool int_from_str(const std::string str, int& out)
     if (r)
         out = o;
     return r;
+}
+
+void util::parallel_for(const int start, const int end, std::function<void(const int start, const int end)> func)
+{
+    /** Maximum number of threads available (Leave one thread alone for the system) */
+    const int max_new_threads = SDL_GetNumLogicalCPUCores() - 1;
+
+    assert(start <= end);
+
+    /** Number of jobs to spawn */
+    const int num_jobs = end - start;
+
+    /** If we only have one thread available or only one job to do, then there is no point continuing */
+    if (max_new_threads < 2 || num_jobs == 1)
+    {
+        func(start, end);
+        return;
+    }
+
+    int quotient = num_jobs / max_new_threads;
+    int remainder = num_jobs % max_new_threads;
+
+    TRACE("Min jobs per thread: %d, Remaining jobs to unequally distribute: %d", quotient, remainder);
+
+    struct thread_data_t
+    {
+        SDL_Thread* thread = nullptr;
+        std::function<void(const int start, const int end)> func;
+        int start = 0;
+        int end = 0;
+    };
+
+    std::vector<thread_data_t> tdata;
+
+    for (int job_it = start; job_it < end;)
+    {
+        int inc = quotient + (remainder-- > 0);
+        thread_data_t dat;
+        dat.func = func;
+        dat.start = job_it;
+        dat.end = job_it + inc;
+        job_it = dat.end;
+        dat.end = SDL_min(dat.end, end);
+
+        assert(dat.start >= start);
+        assert(dat.end <= end);
+
+        tdata.push_back(dat);
+    }
+
+    int num_jobs_check = 0;
+    for (thread_data_t thread : tdata)
+        num_jobs_check += (thread.end - thread.start);
+    assert(num_jobs_check == num_jobs);
+    assert(int(tdata.size()) <= max_new_threads);
+
+    SDL_ThreadFunction thread_func = [](void* data) -> int {
+        thread_data_t* tdata = (thread_data_t*)data;
+        TRACE("Thread: for(int i = %d; i < %d; i++) { do_something(); }", tdata->start, tdata->end);
+        tdata->func(tdata->start, tdata->end);
+        return 0;
+    };
+
+    for (size_t i = 1; i < tdata.size(); i++)
+        tdata[i].thread = SDL_CreateThread(thread_func, "parallel_for", &tdata[i]);
+
+    /* Execute job assigned to the main thread and any job that a thread was not created for */
+    for (thread_data_t thread : tdata)
+        if (!thread.thread)
+            thread_func(&thread);
+
+    /* Synchronize and cleanup */
+    for (thread_data_t thread : tdata)
+        SDL_WaitThread(thread.thread, NULL);
 }

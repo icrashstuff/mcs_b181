@@ -160,4 +160,32 @@ SDL_FORCE_INLINE Sint16 cast_to_sint16(Uint64 in) { return *(Sint16*)&in; }
 SDL_FORCE_INLINE Sint32 cast_to_sint32(Uint64 in) { return *(Sint32*)&in; }
 SDL_FORCE_INLINE Sint64 cast_to_sint64(Uint64 in) { return *(Sint64*)&in; }
 
+namespace util
+{
+/**
+ * Parallelize a for-loop over a range from start (inclusive) to end (exclusive) by splitting it into sub-loops
+ *
+ * This will utilize then block the calling thread until all sub loops have been called
+ *
+ * ex. instead of:
+ *
+ * for(int it = 0; it < 10; it++)
+ *     do_something();
+ *
+ * You write:
+ *
+ * parallel_for(0, 10, [&](const int start, const int end) {
+ *     for (int it = _start; it < _end; it++)
+ *         do_something();
+ * });
+ *
+ * TODO-OPT: In the future this should probably tap into a job system of some sort
+ *
+ * @param start Inclusive start of range
+ * @param end Inclusive end of range
+ * @param func Sub-loop function to call
+ */
+void parallel_for(const int start, const int end, std::function<void(const int start, const int end)> func);
+}
+
 #endif
