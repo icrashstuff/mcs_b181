@@ -26,6 +26,7 @@
 #include "tetra/util/convar.h"
 
 #include "shared/chunk.h"
+#include "shared/misc.h"
 
 game_resources_t::game_resources_t() { reload(); }
 
@@ -105,31 +106,40 @@ static convar_int_t cvr_world_y_off_neg("dev_world_y_off_neg", 6, 0, 32, "Negati
 void game_t::create_testworld()
 {
     const int world_size = cvr_world_size.get();
-    for (int i = 0; i < world_size * world_size; i++)
-    {
-        chunk_t c_old;
-        if (world_size < 4)
-            c_old.generate_from_seed_over(1, i / world_size - world_size / 2, i % world_size - world_size / 2);
-        else
-            c_old.generate_from_seed_over(1, i / world_size - world_size + 4, i % world_size - world_size + 4);
-        for (int j = 0; j < 8; j++)
+    std::vector<chunk_cubic_t*> gen_chunks;
+
+    gen_chunks.resize(world_size * world_size * 8, nullptr);
+
+    util::parallel_for(0, world_size * world_size, [&gen_chunks, &world_size](const int _start, const int _end) {
+        for (int i = _start; i < _end; i++)
         {
-            chunk_cubic_t* c = new chunk_cubic_t();
-            c->pos.x = i / world_size - world_size;
-            c->pos.z = i % world_size - world_size;
-            c->pos.y = j - cvr_world_y_off_neg.get() + cvr_world_y_off_pos.get();
-            level->add_chunk(c);
-            for (int x = 0; x < 16; x++)
-                for (int z = 0; z < 16; z++)
-                    for (int y = 0; y < 16; y++)
-                    {
-                        c->set_type(x, y, z, c_old.get_type(x, y + j * 16, z));
-                        c->set_metadata(x, y, z, c_old.get_metadata(x, y + j * 16, z));
-                        c->set_light_block(x, y, z, c_old.get_light_block(x, y + j * 16, z));
-                        c->set_light_sky(x, y, z, c_old.get_light_sky(x, y + j * 16, z));
-                    }
+            chunk_t c_old;
+            if (world_size < 4)
+                c_old.generate_from_seed_over(1, i / world_size - world_size / 2, i % world_size - world_size / 2);
+            else
+                c_old.generate_from_seed_over(1, i / world_size - world_size + 4, i % world_size - world_size + 4);
+            for (int j = 0; j < 8; j++)
+            {
+                chunk_cubic_t* c = new chunk_cubic_t();
+                c->pos.x = i / world_size - world_size;
+                c->pos.z = i % world_size - world_size;
+                c->pos.y = j - cvr_world_y_off_neg.get() + cvr_world_y_off_pos.get();
+                gen_chunks[i * 8 + j] = c;
+                for (int x = 0; x < 16; x++)
+                    for (int z = 0; z < 16; z++)
+                        for (int y = 0; y < 16; y++)
+                        {
+                            c->set_type(x, y, z, c_old.get_type(x, y + j * 16, z));
+                            c->set_metadata(x, y, z, c_old.get_metadata(x, y + j * 16, z));
+                            c->set_light_block(x, y, z, c_old.get_light_block(x, y + j * 16, z));
+                            c->set_light_sky(x, y, z, c_old.get_light_sky(x, y + j * 16, z));
+                        }
+            }
         }
-    }
+    });
+
+    for (chunk_cubic_t* c : gen_chunks)
+        level->add_chunk(c);
 
     for (int i = 0; i < 16; i++)
     {
