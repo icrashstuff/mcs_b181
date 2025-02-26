@@ -172,10 +172,25 @@ void game_t::create_testworld()
 
         chunk_cubic_t* c = new chunk_cubic_t();
         c->pos = pos;
-        for (int x = 0; x < 15; x++)
-            for (int z = 0; z < 15; z++)
-                for (int y = 0; y < 15; y++)
+        for (int x = 1; x < 15; x++)
+            for (int z = 1; z < 15; z++)
+                for (int y = 1; y < 15; y++)
                     c->set_type(x, y, z, BLOCK_ID_GLOWSTONE);
+
+        /* This block is to verify that smooth lighting doesn't jump through seams/corners */
+        c->set_type(7, 7, 7, BLOCK_ID_AIR);
+
+        c->set_type(8, 7, 7, BLOCK_ID_DIAMOND);
+        c->set_type(7, 8, 7, BLOCK_ID_DIAMOND);
+        c->set_type(7, 7, 8, BLOCK_ID_DIAMOND);
+        c->set_type(6, 7, 7, BLOCK_ID_DIAMOND);
+        c->set_type(7, 6, 7, BLOCK_ID_DIAMOND);
+        c->set_type(7, 7, 6, BLOCK_ID_DIAMOND);
+
+        c->set_type(7, 6, 6, BLOCK_ID_AIR);
+        c->set_type(6, 7, 6, BLOCK_ID_AIR);
+        c->set_type(6, 6, 7, BLOCK_ID_AIR);
+
         level->add_chunk(c);
 
         c = new chunk_cubic_t();

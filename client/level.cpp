@@ -473,6 +473,7 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
     }
 
     std::vector<terrain_vertex_t> vtx_solid;
+    std::vector<terrain_vertex_t> vtx_overlay;
     std::vector<terrain_vertex_t> vtx_translucent;
 
     bool is_transparent[256];
@@ -1853,8 +1854,182 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
         /* ============ BEGIN: IS_NORMAL ============ */
         else
         {
+            const bool do_face_pos_y = (is_transparent[stypes[1][2][1]] && (is_leaves_style_transparent[type] || stypes[1][2][1] != type));
+            const bool do_face_neg_y = (is_transparent[stypes[1][0][1]] && (is_leaves_style_transparent[type] || stypes[1][0][1] != type));
+            const bool do_face_pos_x = (is_transparent[stypes[2][1][1]] && (is_leaves_style_transparent[type] || stypes[2][1][1] != type));
+            const bool do_face_neg_x = (is_transparent[stypes[0][1][1]] && (is_leaves_style_transparent[type] || stypes[0][1][1] != type));
+            const bool do_face_pos_z = (is_transparent[stypes[1][1][2]] && (is_leaves_style_transparent[type] || stypes[1][1][2] != type));
+            const bool do_face_neg_z = (is_transparent[stypes[1][1][0]] && (is_leaves_style_transparent[type] || stypes[1][1][0] != type));
+
+            /* Quick reject */
+            if (!do_face_pos_y && !do_face_neg_y && !do_face_pos_x && !do_face_neg_x && !do_face_pos_z && !do_face_neg_z)
+                continue;
+
+            /* BEGIN: Preliminary Smooth Lighting Calculations */
+#define SBL(VP, LP) ((v VP) ? (slight_block LP) : 0)
+#define SSL(VP, LP) ((v VP) ? (slight_sky LP) : 0)
+            bool v[3][3] = { { 0 }, { 0, 1, 0 }, { 0 } };
+
+            struct corner_t
+            {
+                Uint16 sum, divisor;
+                corner_t() { sum = 0, divisor = 0; }
+                corner_t(const int _sum, const int _divisor) { sum = _sum, divisor = _divisor; }
+                corner_t(const Uint16 _sum, const Uint16 _divisor) { sum = _sum, divisor = _divisor; }
+                void operator+=(const corner_t& rh) { sum += rh.sum, divisor += rh.divisor; }
+                Uint8 get() const { return sum / divisor; }
+            };
+
             /* Positive Y */
-            if (is_transparent[stypes[1][2][1]] && (is_leaves_style_transparent[type] || stypes[1][2][1] != type))
+            v[1][1] = do_face_pos_y;
+            v[1][0] = is_transparent[stypes[1][2][0]];
+            v[1][2] = is_transparent[stypes[1][2][2]];
+            v[0][1] = is_transparent[stypes[0][2][1]];
+            v[2][1] = is_transparent[stypes[2][2][1]];
+            v[0][0] = is_transparent[stypes[0][2][0]] && (v[1][0] || v[0][1]);
+            v[2][0] = is_transparent[stypes[2][2][0]] && (v[1][0] || v[2][1]);
+            v[0][2] = is_transparent[stypes[0][2][2]] && (v[1][2] || v[0][1]);
+            v[2][2] = is_transparent[stypes[2][2][2]] && (v[1][2] || v[2][1]);
+
+            corner_t bl_pos_y[4] = {
+                { (SBL([0][0], [0][2][0]) + SBL([1][0], [1][2][0]) + SBL([0][1], [0][2][1]) + SBL([1][1], [1][2][1])), (1 + v[0][0] + v[1][0] + v[0][1]) },
+                { (SBL([2][0], [2][2][0]) + SBL([1][0], [1][2][0]) + SBL([2][1], [2][2][1]) + SBL([1][1], [1][2][1])), (1 + v[2][0] + v[1][0] + v[2][1]) },
+                { (SBL([0][2], [0][2][2]) + SBL([0][1], [0][2][1]) + SBL([1][2], [1][2][2]) + SBL([1][1], [1][2][1])), (1 + v[0][2] + v[0][1] + v[1][2]) },
+                { (SBL([2][2], [2][2][2]) + SBL([1][2], [1][2][2]) + SBL([2][1], [2][2][1]) + SBL([1][1], [1][2][1])), (1 + v[2][2] + v[1][2] + v[2][1]) },
+            };
+
+            corner_t sl_pos_y[4] = {
+                { (SSL([0][0], [0][2][0]) + SSL([1][0], [1][2][0]) + SSL([0][1], [0][2][1]) + SSL([1][1], [1][2][1])), (1 + v[0][0] + v[1][0] + v[0][1]) },
+                { (SSL([2][0], [2][2][0]) + SSL([1][0], [1][2][0]) + SSL([2][1], [2][2][1]) + SSL([1][1], [1][2][1])), (1 + v[2][0] + v[1][0] + v[2][1]) },
+                { (SSL([0][2], [0][2][2]) + SSL([0][1], [0][2][1]) + SSL([1][2], [1][2][2]) + SSL([1][1], [1][2][1])), (1 + v[0][2] + v[0][1] + v[1][2]) },
+                { (SSL([2][2], [2][2][2]) + SSL([1][2], [1][2][2]) + SSL([2][1], [2][2][1]) + SSL([1][1], [1][2][1])), (1 + v[2][2] + v[1][2] + v[2][1]) },
+            };
+
+            /* Negative Y */
+            v[1][1] = 1;
+            v[1][0] = is_transparent[stypes[1][0][0]];
+            v[1][2] = is_transparent[stypes[1][0][2]];
+            v[0][1] = is_transparent[stypes[0][0][1]];
+            v[2][1] = is_transparent[stypes[2][0][1]];
+            v[0][0] = is_transparent[stypes[0][0][0]] && (v[1][0] || v[0][1]);
+            v[2][0] = is_transparent[stypes[2][0][0]] && (v[1][0] || v[2][1]);
+            v[0][2] = is_transparent[stypes[0][0][2]] && (v[1][2] || v[0][1]);
+            v[2][2] = is_transparent[stypes[2][0][2]] && (v[1][2] || v[2][1]);
+
+            corner_t bl_neg_y[4] = {
+                { (SBL([0][0], [0][0][0]) + SBL([1][0], [1][0][0]) + SBL([0][1], [0][0][1]) + SBL([1][1], [1][0][1])), (1 + v[0][0] + v[1][0] + v[0][1]) },
+                { (SBL([2][0], [2][0][0]) + SBL([1][0], [1][0][0]) + SBL([2][1], [2][0][1]) + SBL([1][1], [1][0][1])), (1 + v[2][0] + v[1][0] + v[2][1]) },
+                { (SBL([0][2], [0][0][2]) + SBL([0][1], [0][0][1]) + SBL([1][2], [1][0][2]) + SBL([1][1], [1][0][1])), (1 + v[0][2] + v[0][1] + v[1][2]) },
+                { (SBL([2][2], [2][0][2]) + SBL([1][2], [1][0][2]) + SBL([2][1], [2][0][1]) + SBL([1][1], [1][0][1])), (1 + v[2][2] + v[1][2] + v[2][1]) },
+            };
+
+            corner_t sl_neg_y[4] = {
+                { (SSL([0][0], [0][0][0]) + SSL([1][0], [1][0][0]) + SSL([0][1], [0][0][1]) + SSL([1][1], [1][0][1])), (1 + v[0][0] + v[1][0] + v[0][1]) },
+                { (SSL([2][0], [2][0][0]) + SSL([1][0], [1][0][0]) + SSL([2][1], [2][0][1]) + SSL([1][1], [1][0][1])), (1 + v[2][0] + v[1][0] + v[2][1]) },
+                { (SSL([0][2], [0][0][2]) + SSL([0][1], [0][0][1]) + SSL([1][2], [1][0][2]) + SSL([1][1], [1][0][1])), (1 + v[0][2] + v[0][1] + v[1][2]) },
+                { (SSL([2][2], [2][0][2]) + SSL([1][2], [1][0][2]) + SSL([2][1], [2][0][1]) + SSL([1][1], [1][0][1])), (1 + v[2][2] + v[1][2] + v[2][1]) },
+            };
+
+            /* Positive X */
+            v[1][1] = 1;
+            v[1][0] = is_transparent[stypes[2][1][0]];
+            v[1][2] = is_transparent[stypes[2][1][2]];
+            v[0][1] = is_transparent[stypes[2][0][1]];
+            v[2][1] = is_transparent[stypes[2][2][1]];
+            v[0][0] = is_transparent[stypes[2][0][0]] && (v[1][0] || v[0][1]);
+            v[2][0] = is_transparent[stypes[2][2][0]] && (v[1][0] || v[2][1]);
+            v[0][2] = is_transparent[stypes[2][0][2]] && (v[1][2] || v[0][1]);
+            v[2][2] = is_transparent[stypes[2][2][2]] && (v[1][2] || v[2][1]);
+
+            corner_t bl_pos_x[4] = {
+                { (SBL([0][0], [2][0][0]) + SBL([1][0], [2][1][0]) + SBL([0][1], [2][0][1]) + SBL([1][1], [2][1][1])), (1 + v[0][0] + v[1][0] + v[0][1]) },
+                { (SBL([2][0], [2][2][0]) + SBL([1][0], [2][1][0]) + SBL([2][1], [2][2][1]) + SBL([1][1], [2][1][1])), (1 + v[2][0] + v[1][0] + v[2][1]) },
+                { (SBL([0][2], [2][0][2]) + SBL([0][1], [2][0][1]) + SBL([1][2], [2][1][2]) + SBL([1][1], [2][1][1])), (1 + v[0][2] + v[0][1] + v[1][2]) },
+                { (SBL([2][2], [2][2][2]) + SBL([1][2], [2][1][2]) + SBL([2][1], [2][2][1]) + SBL([1][1], [2][1][1])), (1 + v[2][2] + v[1][2] + v[2][1]) },
+            };
+            corner_t sl_pos_x[4] = {
+                { (SSL([0][0], [2][0][0]) + SSL([1][0], [2][1][0]) + SSL([0][1], [2][0][1]) + SSL([1][1], [2][1][1])), (1 + v[0][0] + v[1][0] + v[0][1]) },
+                { (SSL([2][0], [2][2][0]) + SSL([1][0], [2][1][0]) + SSL([2][1], [2][2][1]) + SSL([1][1], [2][1][1])), (1 + v[2][0] + v[1][0] + v[2][1]) },
+                { (SSL([0][2], [2][0][2]) + SSL([0][1], [2][0][1]) + SSL([1][2], [2][1][2]) + SSL([1][1], [2][1][1])), (1 + v[0][2] + v[0][1] + v[1][2]) },
+                { (SSL([2][2], [2][2][2]) + SSL([1][2], [2][1][2]) + SSL([2][1], [2][2][1]) + SSL([1][1], [2][1][1])), (1 + v[2][2] + v[1][2] + v[2][1]) },
+            };
+
+            /* Negative X */
+            v[1][1] = 1;
+            v[1][0] = is_transparent[stypes[0][1][0]];
+            v[1][2] = is_transparent[stypes[0][1][2]];
+            v[0][1] = is_transparent[stypes[0][0][1]];
+            v[2][1] = is_transparent[stypes[0][2][1]];
+            v[0][0] = is_transparent[stypes[0][0][0]] && (v[1][0] || v[0][1]);
+            v[2][0] = is_transparent[stypes[0][2][0]] && (v[1][0] || v[2][1]);
+            v[0][2] = is_transparent[stypes[0][0][2]] && (v[1][2] || v[0][1]);
+            v[2][2] = is_transparent[stypes[0][2][2]] && (v[1][2] || v[2][1]);
+
+            corner_t bl_neg_x[4] = {
+                { (SBL([0][0], [0][0][0]) + SBL([1][0], [0][1][0]) + SBL([0][1], [0][0][1]) + SBL([1][1], [0][1][1])), (1 + v[0][0] + v[1][0] + v[0][1]) },
+                { (SBL([2][0], [0][2][0]) + SBL([1][0], [0][1][0]) + SBL([2][1], [0][2][1]) + SBL([1][1], [0][1][1])), (1 + v[2][0] + v[1][0] + v[2][1]) },
+                { (SBL([0][2], [0][0][2]) + SBL([0][1], [0][0][1]) + SBL([1][2], [0][1][2]) + SBL([1][1], [0][1][1])), (1 + v[0][2] + v[0][1] + v[1][2]) },
+                { (SBL([2][2], [0][2][2]) + SBL([1][2], [0][1][2]) + SBL([2][1], [0][2][1]) + SBL([1][1], [0][1][1])), (1 + v[2][2] + v[1][2] + v[2][1]) },
+            };
+            corner_t sl_neg_x[4] = {
+                { (SSL([0][0], [0][0][0]) + SSL([1][0], [0][1][0]) + SSL([0][1], [0][0][1]) + SSL([1][1], [0][1][1])), (1 + v[0][0] + v[1][0] + v[0][1]) },
+                { (SSL([2][0], [0][2][0]) + SSL([1][0], [0][1][0]) + SSL([2][1], [0][2][1]) + SSL([1][1], [0][1][1])), (1 + v[2][0] + v[1][0] + v[2][1]) },
+                { (SSL([0][2], [0][0][2]) + SSL([0][1], [0][0][1]) + SSL([1][2], [0][1][2]) + SSL([1][1], [0][1][1])), (1 + v[0][2] + v[0][1] + v[1][2]) },
+                { (SSL([2][2], [0][2][2]) + SSL([1][2], [0][1][2]) + SSL([2][1], [0][2][1]) + SSL([1][1], [0][1][1])), (1 + v[2][2] + v[1][2] + v[2][1]) },
+            };
+
+            /* Positive Z */
+            v[1][1] = 1;
+            v[1][0] = is_transparent[stypes[1][0][2]];
+            v[1][2] = is_transparent[stypes[1][2][2]];
+            v[0][1] = is_transparent[stypes[0][1][2]];
+            v[2][1] = is_transparent[stypes[2][1][2]];
+            v[0][0] = is_transparent[stypes[0][0][2]] && (v[1][0] || v[0][1]);
+            v[2][0] = is_transparent[stypes[2][0][2]] && (v[1][0] || v[2][1]);
+            v[0][2] = is_transparent[stypes[0][2][2]] && (v[1][2] || v[0][1]);
+            v[2][2] = is_transparent[stypes[2][2][2]] && (v[1][2] || v[2][1]);
+
+            corner_t bl_pos_z[4] = {
+                { (SBL([0][0], [0][0][2]) + SBL([1][0], [1][0][2]) + SBL([0][1], [0][1][2]) + SBL([1][1], [1][1][2])), (1 + v[0][0] + v[1][0] + v[0][1]) },
+                { (SBL([2][0], [2][0][2]) + SBL([1][0], [1][0][2]) + SBL([2][1], [2][1][2]) + SBL([1][1], [1][1][2])), (1 + v[2][0] + v[1][0] + v[2][1]) },
+                { (SBL([0][2], [0][2][2]) + SBL([0][1], [0][1][2]) + SBL([1][2], [1][2][2]) + SBL([1][1], [1][1][2])), (1 + v[0][2] + v[0][1] + v[1][2]) },
+                { (SBL([2][2], [2][2][2]) + SBL([1][2], [1][2][2]) + SBL([2][1], [2][1][2]) + SBL([1][1], [1][1][2])), (1 + v[2][2] + v[1][2] + v[2][1]) },
+            };
+            corner_t sl_pos_z[4] = {
+                { (SSL([0][0], [0][0][2]) + SSL([1][0], [1][0][2]) + SSL([0][1], [0][1][2]) + SSL([1][1], [1][1][2])), (1 + v[0][0] + v[1][0] + v[0][1]) },
+                { (SSL([2][0], [2][0][2]) + SSL([1][0], [1][0][2]) + SSL([2][1], [2][1][2]) + SSL([1][1], [1][1][2])), (1 + v[2][0] + v[1][0] + v[2][1]) },
+                { (SSL([0][2], [0][2][2]) + SSL([0][1], [0][1][2]) + SSL([1][2], [1][2][2]) + SSL([1][1], [1][1][2])), (1 + v[0][2] + v[0][1] + v[1][2]) },
+                { (SSL([2][2], [2][2][2]) + SSL([1][2], [1][2][2]) + SSL([2][1], [2][1][2]) + SSL([1][1], [1][1][2])), (1 + v[2][2] + v[1][2] + v[2][1]) },
+            };
+
+            /* Negative Z */
+            v[1][1] = 1;
+            v[1][0] = is_transparent[stypes[1][0][0]];
+            v[1][2] = is_transparent[stypes[1][2][0]];
+            v[0][1] = is_transparent[stypes[0][1][0]];
+            v[2][1] = is_transparent[stypes[2][1][0]];
+            v[0][0] = is_transparent[stypes[0][0][0]] && (v[1][0] || v[0][1]);
+            v[2][0] = is_transparent[stypes[2][0][0]] && (v[1][0] || v[2][1]);
+            v[0][2] = is_transparent[stypes[0][2][0]] && (v[1][2] || v[0][1]);
+            v[2][2] = is_transparent[stypes[2][2][0]] && (v[1][2] || v[2][1]);
+
+            corner_t bl_neg_z[4] = {
+                { (SBL([0][0], [0][0][0]) + SBL([1][0], [1][0][0]) + SBL([0][1], [0][1][0]) + SBL([1][1], [1][1][0])), (1 + v[0][0] + v[1][0] + v[0][1]) },
+                { (SBL([2][0], [2][0][0]) + SBL([1][0], [1][0][0]) + SBL([2][1], [2][1][0]) + SBL([1][1], [1][1][0])), (1 + v[2][0] + v[1][0] + v[2][1]) },
+                { (SBL([0][2], [0][2][0]) + SBL([0][1], [0][1][0]) + SBL([1][2], [1][2][0]) + SBL([1][1], [1][1][0])), (1 + v[0][2] + v[0][1] + v[1][2]) },
+                { (SBL([2][2], [2][2][0]) + SBL([1][2], [1][2][0]) + SBL([2][1], [2][1][0]) + SBL([1][1], [1][1][0])), (1 + v[2][2] + v[1][2] + v[2][1]) },
+            };
+            corner_t sl_neg_z[4] = {
+                { (SSL([0][0], [0][0][0]) + SSL([1][0], [1][0][0]) + SSL([0][1], [0][1][0]) + SSL([1][1], [1][1][0])), (1 + v[0][0] + v[1][0] + v[0][1]) },
+                { (SSL([2][0], [2][0][0]) + SSL([1][0], [1][0][0]) + SSL([2][1], [2][1][0]) + SSL([1][1], [1][1][0])), (1 + v[2][0] + v[1][0] + v[2][1]) },
+                { (SSL([0][2], [0][2][0]) + SSL([0][1], [0][1][0]) + SSL([1][2], [1][2][0]) + SSL([1][1], [1][1][0])), (1 + v[0][2] + v[0][1] + v[1][2]) },
+                { (SSL([2][2], [2][2][0]) + SSL([1][2], [1][2][0]) + SSL([2][1], [2][1][0]) + SSL([1][1], [1][1][0])), (1 + v[2][2] + v[1][2] + v[2][1]) },
+            };
+
+            /* END: Preliminary Smooth Lighting Calculations */
+
+            /* Positive Y */
+            if (do_face_pos_y)
             {
                 Uint8 ao[] = {
                     Uint8(UAO([0][2][0]) + UAO([1][2][0]) + UAO([0][2][1])),
@@ -1863,44 +2038,42 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                     Uint8(UAO([2][2][2]) + UAO([1][2][2]) + UAO([2][2][1])),
                 };
 
-                Uint8 bl[] = {
-                    Uint8((UBL([0][2][0]) + UBL([1][2][0]) + UBL([0][2][1]) + slight_block[1][2][1]) / (4 - ao[0])),
-                    Uint8((UBL([2][2][0]) + UBL([1][2][0]) + UBL([2][2][1]) + slight_block[1][2][1]) / (4 - ao[1])),
-                    Uint8((UBL([0][2][2]) + UBL([0][2][1]) + UBL([1][2][2]) + slight_block[1][2][1]) / (4 - ao[2])),
-                    Uint8((UBL([2][2][2]) + UBL([1][2][2]) + UBL([2][2][1]) + slight_block[1][2][1]) / (4 - ao[3])),
-                };
+                corner_t bl[4] = { bl_pos_y[0], bl_pos_y[1], bl_pos_y[2], bl_pos_y[3] };
+                corner_t sl[4] = { sl_pos_y[0], sl_pos_y[1], sl_pos_y[2], sl_pos_y[3] };
 
-                Uint8 sl[] = {
-                    Uint8((USL([0][2][0]) + USL([1][2][0]) + USL([0][2][1]) + slight_sky[1][2][1]) / (4 - ao[0])),
-                    Uint8((USL([2][2][0]) + USL([1][2][0]) + USL([2][2][1]) + slight_sky[1][2][1]) / (4 - ao[1])),
-                    Uint8((USL([0][2][2]) + USL([0][2][1]) + USL([1][2][2]) + slight_sky[1][2][1]) / (4 - ao[2])),
-                    Uint8((USL([2][2][2]) + USL([1][2][2]) + USL([2][2][1]) + slight_sky[1][2][1]) / (4 - ao[3])),
-                };
+                /* TODO-OPT: Blending across edges? */
+#if 0
+                if(do_face_pos_x && is_transparent[stypes[2][2][1]])
+                {
+                    bl[3] += bl_pos_x[3], sl[3] += sl_pos_x[3];
+                    bl[1] += bl_pos_x[1], sl[1] += sl_pos_x[1];
+                }
+#endif
 
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
-                    { r, g, b, bl[3], sl[3] },
+                    { r, g, b, bl[3].get(), sl[3].get() },
                     faces[1].corners[0],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[1] },
-                    { r, g, b, bl[1], sl[1] },
+                    { r, g, b, bl[1].get(), sl[1].get() },
                     faces[1].corners[2],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[2] },
-                    { r, g, b, bl[2], sl[2] },
+                    { r, g, b, bl[2].get(), sl[2].get() },
                     faces[1].corners[1],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[0] },
-                    { r, g, b, bl[0], sl[0] },
+                    { r, g, b, bl[0].get(), sl[0].get() },
                     faces[1].corners[3],
                 });
             }
 
             /* Negative Y */
-            if (is_transparent[stypes[1][0][1]] && (is_leaves_style_transparent[type] || stypes[1][0][1] != type))
+            if (do_face_neg_y)
             {
                 Uint8 ao[] = {
                     Uint8(UAO([0][0][0]) + UAO([1][0][0]) + UAO([0][0][1])),
@@ -1909,44 +2082,33 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                     Uint8(UAO([2][0][2]) + UAO([1][0][2]) + UAO([2][0][1])),
                 };
 
-                Uint8 bl[] = {
-                    Uint8((UBL([0][0][0]) + UBL([1][0][0]) + UBL([0][0][1]) + slight_block[1][0][1]) / (4 - ao[0])),
-                    Uint8((UBL([2][0][0]) + UBL([1][0][0]) + UBL([2][0][1]) + slight_block[1][0][1]) / (4 - ao[1])),
-                    Uint8((UBL([0][0][2]) + UBL([0][0][1]) + UBL([1][0][2]) + slight_block[1][0][1]) / (4 - ao[2])),
-                    Uint8((UBL([2][0][2]) + UBL([1][0][2]) + UBL([2][0][1]) + slight_block[1][0][1]) / (4 - ao[3])),
-                };
-
-                Uint8 sl[] = {
-                    Uint8((USL([0][0][0]) + USL([1][0][0]) + USL([0][0][1]) + slight_sky[1][0][1]) / (4 - ao[0])),
-                    Uint8((USL([2][0][0]) + USL([1][0][0]) + USL([2][0][1]) + slight_sky[1][0][1]) / (4 - ao[1])),
-                    Uint8((USL([0][0][2]) + USL([0][0][1]) + USL([1][0][2]) + slight_sky[1][0][1]) / (4 - ao[2])),
-                    Uint8((USL([2][0][2]) + USL([1][0][2]) + USL([2][0][1]) + slight_sky[1][0][1]) / (4 - ao[3])),
-                };
+                corner_t bl[4] = { bl_neg_y[0], bl_neg_y[1], bl_neg_y[2], bl_neg_y[3] };
+                corner_t sl[4] = { sl_neg_y[0], sl_neg_y[1], sl_neg_y[2], sl_neg_y[3] };
 
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
-                    { r, g, b, bl[0], sl[0] },
+                    { r, g, b, bl[0].get(), sl[0].get() },
                     faces[4].corners[1],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[1] },
-                    { r, g, b, bl[1], sl[1] },
+                    { r, g, b, bl[1].get(), sl[1].get() },
                     faces[4].corners[0],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 1), ao[2] },
-                    { r, g, b, bl[2], sl[2] },
+                    { r, g, b, bl[2].get(), sl[2].get() },
                     faces[4].corners[3],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 1), ao[3] },
-                    { r, g, b, bl[3], sl[3] },
+                    { r, g, b, bl[3].get(), sl[3].get() },
                     faces[4].corners[2],
                 });
             }
 
             /* Positive X */
-            if (is_transparent[stypes[2][1][1]] && (is_leaves_style_transparent[type] || stypes[2][1][1] != type))
+            if (do_face_pos_x)
             {
                 Uint8 ao[] = {
                     Uint8(UAO([2][0][0]) + UAO([2][1][0]) + UAO([2][0][1])),
@@ -1955,44 +2117,33 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                     Uint8(UAO([2][2][2]) + UAO([2][1][2]) + UAO([2][2][1])),
                 };
 
-                Uint8 bl[] = {
-                    Uint8((UBL([2][0][0]) + UBL([2][0][1]) + UBL([2][1][0]) + slight_block[2][1][1]) / (4 - ao[0])),
-                    Uint8((UBL([2][2][0]) + UBL([2][2][1]) + UBL([2][1][0]) + slight_block[2][1][1]) / (4 - ao[1])),
-                    Uint8((UBL([2][0][2]) + UBL([2][0][1]) + UBL([2][1][2]) + slight_block[2][1][1]) / (4 - ao[2])),
-                    Uint8((UBL([2][2][2]) + UBL([2][2][1]) + UBL([2][1][2]) + slight_block[2][1][1]) / (4 - ao[3])),
-                };
-
-                Uint8 sl[] = {
-                    Uint8((USL([2][0][0]) + USL([2][0][1]) + USL([2][1][0]) + slight_sky[2][1][1]) / (4 - ao[0])),
-                    Uint8((USL([2][2][0]) + USL([2][2][1]) + USL([2][1][0]) + slight_sky[2][1][1]) / (4 - ao[1])),
-                    Uint8((USL([2][0][2]) + USL([2][0][1]) + USL([2][1][2]) + slight_sky[2][1][1]) / (4 - ao[2])),
-                    Uint8((USL([2][2][2]) + USL([2][2][1]) + USL([2][1][2]) + slight_sky[2][1][1]) / (4 - ao[3])),
-                };
+                corner_t bl[4] = { bl_pos_x[0], bl_pos_x[1], bl_pos_x[2], bl_pos_x[3] };
+                corner_t sl[4] = { sl_pos_x[0], sl_pos_x[1], sl_pos_x[2], sl_pos_x[3] };
 
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[0] },
-                    { r, g, b, bl[0], sl[0] },
+                    { r, g, b, bl[0].get(), sl[0].get() },
                     faces[0].corners[3],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[1] },
-                    { r, g, b, bl[1], sl[1] },
+                    { r, g, b, bl[1].get(), sl[1].get() },
                     faces[0].corners[1],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 1), ao[2] },
-                    { r, g, b, bl[2], sl[2] },
+                    { r, g, b, bl[2].get(), sl[2].get() },
                     faces[0].corners[2],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
-                    { r, g, b, bl[3], sl[3] },
+                    { r, g, b, bl[3].get(), sl[3].get() },
                     faces[0].corners[0],
                 });
             }
 
             /* Negative X */
-            if (is_transparent[stypes[0][1][1]] && (is_leaves_style_transparent[type] || stypes[0][1][1] != type))
+            if (do_face_neg_x)
             {
                 Uint8 ao[] = {
                     Uint8(UAO([0][0][0]) + UAO([0][1][0]) + UAO([0][0][1])),
@@ -2001,44 +2152,33 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                     Uint8(UAO([0][2][2]) + UAO([0][1][2]) + UAO([0][2][1])),
                 };
 
-                Uint8 bl[] = {
-                    Uint8((UBL([0][0][0]) + UBL([0][1][0]) + UBL([0][0][1]) + slight_block[0][1][1]) / (4 - ao[0])),
-                    Uint8((UBL([0][2][0]) + UBL([0][1][0]) + UBL([0][2][1]) + slight_block[0][1][1]) / (4 - ao[1])),
-                    Uint8((UBL([0][0][2]) + UBL([0][0][1]) + UBL([0][1][2]) + slight_block[0][1][1]) / (4 - ao[2])),
-                    Uint8((UBL([0][2][2]) + UBL([0][1][2]) + UBL([0][2][1]) + slight_block[0][1][1]) / (4 - ao[3])),
-                };
-
-                Uint8 sl[] = {
-                    Uint8((USL([0][0][0]) + USL([0][1][0]) + USL([0][0][1]) + slight_sky[0][1][1]) / (4 - ao[0])),
-                    Uint8((USL([0][2][0]) + USL([0][1][0]) + USL([0][2][1]) + slight_sky[0][1][1]) / (4 - ao[1])),
-                    Uint8((USL([0][0][2]) + USL([0][0][1]) + USL([0][1][2]) + slight_sky[0][1][1]) / (4 - ao[2])),
-                    Uint8((USL([0][2][2]) + USL([0][1][2]) + USL([0][2][1]) + slight_sky[0][1][1]) / (4 - ao[3])),
-                };
+                corner_t bl[4] = { bl_neg_x[0], bl_neg_x[1], bl_neg_x[2], bl_neg_x[3] };
+                corner_t sl[4] = { sl_neg_x[0], sl_neg_x[1], sl_neg_x[2], sl_neg_x[3] };
 
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[3] },
-                    { r, g, b, bl[3], sl[3] },
+                    { r, g, b, bl[3].get(), sl[3].get() },
                     faces[3].corners[1],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[1] },
-                    { r, g, b, bl[1], sl[1] },
+                    { r, g, b, bl[1].get(), sl[1].get() },
                     faces[3].corners[0],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 1), ao[2] },
-                    { r, g, b, bl[2], sl[2] },
+                    { r, g, b, bl[2].get(), sl[2].get() },
                     faces[3].corners[3],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
-                    { r, g, b, bl[0], sl[0] },
+                    { r, g, b, bl[0].get(), sl[0].get() },
                     faces[3].corners[2],
                 });
             }
 
             /* Positive Z */
-            if (is_transparent[stypes[1][1][2]] && (is_leaves_style_transparent[type] || stypes[1][1][2] != type))
+            if (do_face_pos_z)
             {
                 Uint8 ao[] = {
                     Uint8(UAO([0][0][2]) + UAO([1][0][2]) + UAO([0][1][2])),
@@ -2047,44 +2187,33 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                     Uint8(UAO([2][2][2]) + UAO([1][2][2]) + UAO([2][1][2])),
                 };
 
-                Uint8 bl[] = {
-                    Uint8((UBL([0][0][2]) + UBL([1][0][2]) + UBL([0][1][2]) + slight_block[1][1][2]) / (4 - ao[0])),
-                    Uint8((UBL([0][2][2]) + UBL([0][1][2]) + UBL([1][2][2]) + slight_block[1][1][2]) / (4 - ao[1])),
-                    Uint8((UBL([2][0][2]) + UBL([1][0][2]) + UBL([2][1][2]) + slight_block[1][1][2]) / (4 - ao[2])),
-                    Uint8((UBL([2][2][2]) + UBL([1][2][2]) + UBL([2][1][2]) + slight_block[1][1][2]) / (4 - ao[3])),
-                };
-
-                Uint8 sl[] = {
-                    Uint8((USL([0][0][2]) + USL([1][0][2]) + USL([0][1][2]) + slight_sky[1][1][2]) / (4 - ao[0])),
-                    Uint8((USL([0][2][2]) + USL([0][1][2]) + USL([1][2][2]) + slight_sky[1][1][2]) / (4 - ao[1])),
-                    Uint8((USL([2][0][2]) + USL([1][0][2]) + USL([2][1][2]) + slight_sky[1][1][2]) / (4 - ao[2])),
-                    Uint8((USL([2][2][2]) + USL([1][2][2]) + USL([2][1][2]) + slight_sky[1][1][2]) / (4 - ao[3])),
-                };
+                corner_t bl[4] = { bl_pos_z[0], bl_pos_z[1], bl_pos_z[2], bl_pos_z[3] };
+                corner_t sl[4] = { sl_pos_z[0], sl_pos_z[1], sl_pos_z[2], sl_pos_z[3] };
 
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
-                    { r, g, b, bl[3], sl[3] },
+                    { r, g, b, bl[3].get(), sl[3].get() },
                     faces[2].corners[1],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[1] },
-                    { r, g, b, bl[1], sl[1] },
+                    { r, g, b, bl[2].get(), sl[2].get() },
                     faces[2].corners[0],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 1), ao[2] },
-                    { r, g, b, bl[2], sl[2] },
+                    { r, g, b, bl[1].get(), sl[1].get() },
                     faces[2].corners[3],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 1), ao[0] },
-                    { r, g, b, bl[0], sl[0] },
+                    { r, g, b, bl[0].get(), sl[0].get() },
                     faces[2].corners[2],
                 });
             }
 
             /* Negative Z */
-            if (is_transparent[stypes[1][1][0]] && (is_leaves_style_transparent[type] || stypes[1][1][0] != type))
+            if (do_face_neg_z)
             {
                 Uint8 ao[] = {
                     Uint8(UAO([0][0][0]) + UAO([1][0][0]) + UAO([0][1][0])),
@@ -2093,38 +2222,27 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                     Uint8(UAO([2][2][0]) + UAO([1][2][0]) + UAO([2][1][0])),
                 };
 
-                Uint8 bl[] = {
-                    Uint8((UBL([0][0][0]) + UBL([1][0][0]) + UBL([0][1][0]) + slight_block[1][1][0]) / (4 - ao[0])),
-                    Uint8((UBL([0][2][0]) + UBL([0][1][0]) + UBL([1][2][0]) + slight_block[1][1][0]) / (4 - ao[1])),
-                    Uint8((UBL([2][0][0]) + UBL([1][0][0]) + UBL([2][1][0]) + slight_block[1][1][0]) / (4 - ao[2])),
-                    Uint8((UBL([2][2][0]) + UBL([1][2][0]) + UBL([2][1][0]) + slight_block[1][1][0]) / (4 - ao[3])),
-                };
-
-                Uint8 sl[] = {
-                    Uint8((USL([0][0][0]) + USL([1][0][0]) + USL([0][1][0]) + slight_sky[1][1][0]) / (4 - ao[0])),
-                    Uint8((USL([0][2][0]) + USL([0][1][0]) + USL([1][2][0]) + slight_sky[1][1][0]) / (4 - ao[1])),
-                    Uint8((USL([2][0][0]) + USL([1][0][0]) + USL([2][1][0]) + slight_sky[1][1][0]) / (4 - ao[2])),
-                    Uint8((USL([2][2][0]) + USL([1][2][0]) + USL([2][1][0]) + slight_sky[1][1][0]) / (4 - ao[3])),
-                };
+                corner_t bl[4] = { bl_neg_z[0], bl_neg_z[1], bl_neg_z[2], bl_neg_z[3] };
+                corner_t sl[4] = { sl_neg_z[0], sl_neg_z[1], sl_neg_z[2], sl_neg_z[3] };
 
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
-                    { r, g, b, bl[0], sl[0] },
+                    { r, g, b, bl[0].get(), sl[0].get() },
                     faces[5].corners[3],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[1] },
-                    { r, g, b, bl[1], sl[1] },
+                    { r, g, b, bl[2].get(), sl[2].get() },
                     faces[5].corners[1],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[2] },
-                    { r, g, b, bl[2], sl[2] },
+                    { r, g, b, bl[1].get(), sl[1].get() },
                     faces[5].corners[2],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[3] },
-                    { r, g, b, bl[3], sl[3] },
+                    { r, g, b, bl[3].get(), sl[3].get() },
                     faces[5].corners[0],
                 });
             }
