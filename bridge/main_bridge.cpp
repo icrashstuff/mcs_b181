@@ -1554,7 +1554,7 @@ int main(int argc, const char** argv)
                 {
                     c->change_happened++;
                     c->time_last_read = sdl_tick_cur;
-                    TRACE("Got packet from client[%zu]: 0x%02x", i, pack_server->id);
+                    TRACE("Got packet from client[%zu]: 0x%02x", i, pack_from_client->id);
                     if (pack_from_client->id == PACKET_ID_CHAT_MSG)
                     {
                         packet_chat_message_t* p = (packet_chat_message_t*)pack_from_client;
@@ -1584,7 +1584,7 @@ int main(int argc, const char** argv)
                 {
                     c->change_happened++;
                     c->time_last_read = sdl_tick_cur;
-                    TRACE("Got packet from server: 0x%02x", pack_client->id);
+                    TRACE("Got packet from server: 0x%02x", pack_from_server->id);
                     send_buffer(c->sock_to_client, pack_from_server->assemble());
 
                     c->world_diag.feed_packet_from_server(pack_from_server);

@@ -2105,7 +2105,8 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
         /* ============ END: IS_NORMAL ============ */
     }
 
-    TRACE("Chunk: <%d, %d, %d>, Vertices: %zu, Indices: %zu", chunk_x, chunk_y, chunk_z, vtx.size(), vtx.size() / 4 * 6);
+    TRACE("Chunk: <%d, %d, %d>, Vertices (Solid): %zu, Indices: %zu", chunk_x, chunk_y, chunk_z, vtx_solid.size(), vtx_solid.size() / 4 * 6);
+    TRACE("Chunk: <%d, %d, %d>, Vertices (Trans): %zu, Indices: %zu", chunk_x, chunk_y, chunk_z, vtx_translucent.size(), vtx_translucent.size() / 4 * 6);
 
     if (!vtx_solid.size() && !vtx_translucent.size())
     {

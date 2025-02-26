@@ -248,7 +248,7 @@ int dim_reg_gen_func(void* data)
 
     dim_reg_gen_data_t* d = (dim_reg_gen_data_t*)data;
 
-    TRACE("Generating region %d %d", (*it).x, (*it).z);
+    TRACE("Generating region %d %d", d->x, d->z);
     (*d->r) = new region_t();
     if ((*d->r))
         (*d->r)->generate_from_seed(d->seed, d->generator, d->x, d->z);

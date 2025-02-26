@@ -59,7 +59,7 @@ typedef double jdouble;
 #ifdef ENABLE_TRACE
 #define TRACE(fmt, ...) LOG_TRACE(fmt, ##__VA_ARGS__)
 #else
-#define TRACE(fmt, ...) void(0)
+#define TRACE(fmt, ...) util::black_hole(fmt, ##__VA_ARGS__)
 #endif
 
 #ifndef NDEBUG
@@ -186,6 +186,11 @@ namespace util
  * @param func Sub-loop function to call
  */
 void parallel_for(const int start, const int end, std::function<void(const int start, const int end)> func);
+
+/**
+ * Dummy printf-style function
+ */
+SDL_FORCE_INLINE SDL_PRINTF_VARARG_FUNC(1) void black_hole(const char*, ...) { }
 }
 
 #endif
