@@ -215,6 +215,7 @@ static bool held_shift = 0;
 static bool held_ctrl = 0;
 static bool held_tab = 1;
 static bool mouse_grabbed = 0;
+static bool window_has_focus = 0;
 static bool wireframe = 0;
 static bool reload_resources = 0;
 #define AO_ALGO_MAX 5
@@ -593,6 +594,9 @@ static void normal_loop()
 
     game_t* game = game_selected;
 
+    if (game && !client_menu_manager.stack_size() && (!game->connection || game->connection->get_in_world()))
+        mouse_grabbed = 1;
+
     if (!show_level || !game_selected)
         mouse_grabbed = 0;
 
@@ -602,8 +606,12 @@ static void normal_loop()
     if (!game || client_menu_manager.stack_size())
         mouse_grabbed = 0;
 
-    if (game && !client_menu_manager.stack_size() && (!game->connection || game->connection->get_in_world()))
-        mouse_grabbed = 1;
+    if (!window_has_focus)
+    {
+        mouse_grabbed = 0;
+        if (game && !client_menu_manager.stack_size() && (!game->connection || game->connection->get_in_world()))
+            client_menu_manager.stack_push("menu.game");
+    }
 
     if (!mouse_grabbed)
     {
@@ -788,7 +796,13 @@ static void process_event(SDL_Event& event, bool* done)
         *done = true;
         break;
     case SDL_EVENT_WINDOW_FOCUS_LOST:
+        TRACE("Focus Lost");
         mouse_grabbed = false;
+        window_has_focus = 0;
+        break;
+    case SDL_EVENT_WINDOW_FOCUS_GAINED:
+        TRACE("Focus Gained");
+        window_has_focus = 1;
         break;
     default:
         break;
