@@ -97,10 +97,10 @@ struct chunk_cubic_t
 
     void free_gl()
     {
-        vao = 0;
-        vbo = 0;
         glDeleteVertexArrays(1, &vao);
         glDeleteBuffers(1, &vbo);
+        vao = 0;
+        vbo = 0;
     }
 
     CHUNK_CUBIC_INLINE Uint8 get_type(const int x, const int y, const int z)
