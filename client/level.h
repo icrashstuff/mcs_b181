@@ -221,6 +221,11 @@ struct level_t
     bool enable_timer_log_light = 0;
     bool enable_timer_log_mesh = 0;
 
+    /**
+     * If the value is greater than zero, then it will be used instead of r_render_distance
+     */
+    int render_distance_override = 0;
+
     struct performance_timer_t
     {
         Uint64 duration = 0;

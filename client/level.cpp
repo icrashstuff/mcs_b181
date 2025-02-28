@@ -2523,7 +2523,7 @@ void level_t::render_entities()
 
 void level_t::render(const glm::ivec2 win_size)
 {
-    const int render_distance = r_render_distance.get();
+    const int render_distance = (render_distance_override > 0) ? render_distance_override : r_render_distance.get();
 
     cull_chunks(win_size, render_distance);
 
