@@ -225,13 +225,15 @@ static client_menu_return_t do_main_menu(mc_gui::mc_gui_ctx* ctx)
 
     if (mc_gui::button_big("mcs_b181.menu.test_world"))
     {
-        games.push_back(new game_t(cvr_autoconnect_addr.get(), cvr_autoconnect_port.get(), cvr_username.get(), true, game_resources));
+        game_t* new_game = new game_t(game_resources);
+        new_game->create_testworld();
+        games.push_back(new_game);
         ret.clear_stack = 1;
     }
 
     if (mc_gui::button_big("menu.multiplayer"))
     {
-        games.push_back(new game_t(cvr_autoconnect_addr.get(), cvr_autoconnect_port.get(), cvr_username.get(), false, game_resources));
+        games.push_back(new game_t(cvr_autoconnect_addr.get(), cvr_autoconnect_port.get(), cvr_username.get(), game_resources));
         ret.clear_stack = 1;
     }
 

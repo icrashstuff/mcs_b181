@@ -60,22 +60,45 @@ struct game_t
      * @param addr Address to connect to
      * @param port Port to connect to
      * @param username Username to use
-     * @param test_level Connect to a test level instead of connecting to a server
      * @param resources Resources to use for game
      */
-    game_t(const std::string addr, const Uint16 port, const std::string username, const bool test_level, const game_resources_t* const _resources);
+    game_t(const std::string addr, const Uint16 port, const std::string username, const game_resources_t* const resources);
 
     /**
-     * Forces a reload of all resources
+     * Creates a internal game (No connection)
+     *
+     * @param resources Resources to use for game
+     */
+    game_t(const game_resources_t* const resources);
+
+    /**
+     * Forces the game to reload its resources
+     *
+     * NOTE: This does not call game_resources_t::reload()
      *
      * @param resources New resources struct to pull from (NULL to reuse existing one)
-     * @param force_null Allows setting resources to a null object
      */
-    void reload_resources(const game_resources_t* const _resources = nullptr, const bool force_null = false);
-
-    void create_testworld();
+    void reload_resources(const game_resources_t* const resources = nullptr, const bool force_null = false);
 
     ~game_t();
+
+    /** Replace world with test world */
+    void create_testworld();
+
+    /**
+     * Replace world with light test simplex world
+     *
+     * @param size World size
+     */
+    void create_light_test_decorated_simplex(const glm::ivec3 size);
+
+    /**
+     * Replace world with light test SDL_rand world
+     *
+     * @param size World size
+     * @param r_state State for SDL_rand_bits(), if null then a fixed state is used
+     */
+    void create_light_test_sdl_rand(const glm::ivec3 size, Uint64* r_state = NULL);
 };
 
 #endif

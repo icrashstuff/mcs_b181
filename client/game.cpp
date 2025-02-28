@@ -56,19 +56,23 @@ game_resources_t::~game_resources_t() { destroy(); }
 
 static SDL_AtomicInt game_counter = { 0 };
 
-game_t::game_t(const std::string addr, const Uint16 port, const std::string username, const bool test_level, const game_resources_t* const _resources)
+game_t::game_t(const std::string addr, const Uint16 port, const std::string username, const game_resources_t* const _resources)
     : game_id(SDL_AddAtomicInt(&game_counter, 1))
 {
     level = new level_t(_resources->terrain_atlas);
     level->lightmap.set_world_time(1000);
 
-    if (test_level)
-        create_testworld();
-    else
-    {
-        connection = new connection_t();
-        connection->init(addr, port, username);
-    }
+    connection = new connection_t();
+    connection->init(addr, port, username);
+
+    reload_resources(_resources);
+}
+
+game_t::game_t(const game_resources_t* const _resources)
+    : game_id(SDL_AddAtomicInt(&game_counter, 1))
+{
+    level = new level_t(_resources->terrain_atlas);
+    level->lightmap.set_world_time(1000);
 
     reload_resources(_resources);
 }
@@ -105,6 +109,8 @@ static convar_int_t cvr_world_y_off_pos("dev_world_y_off_pos", 0, 0, 32, "Positi
 static convar_int_t cvr_world_y_off_neg("dev_world_y_off_neg", 6, 0, 32, "Negative Chunk Y offset of the test world", CONVAR_FLAG_DEV_ONLY);
 void game_t::create_testworld()
 {
+    level->clear();
+
     const int world_size = cvr_world_size.get();
     std::vector<chunk_cubic_t*> gen_chunks;
 
@@ -242,4 +248,99 @@ void game_t::create_testworld()
     level->inventory.items[level->inventory.hotbar_min + 0] = { BLOCK_ID_DIAMOND };
     level->inventory.items[level->inventory.hotbar_min + 1] = { BLOCK_ID_TORCH };
     level->inventory.items[level->inventory.hotbar_min + 2] = { BLOCK_ID_GLOWSTONE };
+}
+
+void game_t::create_light_test_decorated_simplex(const glm::ivec3 world_size)
+{
+    level->clear();
+    const int world_volume = world_size.x * world_size.y * world_size.z;
+
+    std::vector<chunk_cubic_t*> chunks;
+    chunks.resize(world_volume);
+    std::atomic<size_t> off = 0;
+    std::atomic<Uint64> elapsed_ns = 0;
+
+    util::parallel_for(0, world_size.x * world_size.z, [&](const int _start, const int _end) {
+        Uint64 start_tick = SDL_GetTicksNS();
+        chunk_t c_old;
+        for (int it = _start; it < _end; it++)
+        {
+            /* Nothing special about this seed */
+            Uint64 r_state_chunk = 0x2e17d7f27f825d7f + (it << 10);
+
+            int cx = it % world_size.x;
+            int cz = it / world_size.x;
+
+            /* Nothing special about this seed */
+            /* Coordinates fed to the generator are offset to coincide with the dev chunks */
+            c_old.generate_from_seed_over(0xc4891e8c5ee07c5d, cx - world_size.x / 2, cz - world_size.z / 2);
+            for (int cy = 0; cy < world_size.y; cy++)
+            {
+                chunk_cubic_t* c = new chunk_cubic_t();
+                c->pos = glm::ivec3 { cx, cy, cz };
+                for (int x = 0; x < 16; x++)
+                    for (int z = 0; z < 16; z++)
+                        for (int y = 0; y < 16; y++)
+                        {
+                            c->set_type(x, y, z, c_old.get_type(x, y + (cy % 8) * 16, z));
+                            c->set_metadata(x, y, z, c_old.get_metadata(x, y + (cy % 8) * 16, z));
+                            c->set_light_block(x, y, z, c_old.get_light_block(x, y + (cy % 8) * 16, z));
+                            c->set_light_sky(x, y, z, c_old.get_light_sky(x, y + (cy % 8) * 16, z));
+                        }
+
+                for (int decoration_it = 0; decoration_it < 20; decoration_it++)
+                {
+                    Uint32 rand_data = SDL_rand_bits_r(&r_state_chunk);
+                    const int y = (rand_data) & 0x0F;
+                    const int z = (rand_data >> 4) & 0x0F;
+                    const int x = (rand_data >> 8) & 0x0F;
+                    rand_data = SDL_rand_bits_r(&r_state_chunk);
+                    c->set_type(x, y, z, rand_data % BLOCK_ID_NUM_USED);
+                }
+
+                chunks[off++] = c;
+            }
+        }
+        elapsed_ns += SDL_GetTicksNS() - start_tick;
+    });
+
+    assert(size_t(off) == chunks.size());
+
+    for (chunk_cubic_t* c : chunks)
+        level->add_chunk(c);
+
+    double elapsed_ms = double(elapsed_ns) / 1000.0 / 1000.0;
+    dc_log("Construction time: %.2f ms (%.3f ms per)", elapsed_ms, elapsed_ms / double(world_volume));
+}
+
+void game_t::create_light_test_sdl_rand(const glm::ivec3 world_size, Uint64* r_state)
+{
+    level->clear();
+    const int world_volume = world_size.x * world_size.y * world_size.z;
+
+    /* Nothing special about this seed */
+    Uint64 r_state_if_null = 0x8c5ee07d7f257c5d;
+    if (!r_state)
+        r_state = &r_state_if_null;
+
+    Uint64 tstart = SDL_GetTicksNS();
+    for (int cx = 0; cx < world_size.x; cx++)
+        for (int cz = 0; cz < world_size.z; cz++)
+            for (int cy = 0; cy < world_size.y; cy++)
+            {
+                chunk_cubic_t* c = new chunk_cubic_t();
+                c->pos = glm::ivec3 { cx, cy, cz };
+                for (int pos_it = 0; pos_it < SUBCHUNK_SIZE_VOLUME; pos_it++)
+                {
+                    const int y = (pos_it) & 0x0F;
+                    const int z = (pos_it >> 4) & 0x0F;
+                    const int x = (pos_it >> 8) & 0x0F;
+                    Uint32 rand_data = SDL_rand_bits_r(r_state);
+                    if (rand_data % (rand_data % 15 + 1) < 5)
+                        c->set_type(x, y, z, rand_data % BLOCK_ID_NUM_USED);
+                }
+                level->add_chunk(c);
+            }
+    double elapsed_ms = double(SDL_GetTicksNS() - tstart) / 1000.0 / 1000.0;
+    dc_log("Construction time: %.2f ms (%.3f ms per)", elapsed_ms, elapsed_ms / double(world_volume));
 }
