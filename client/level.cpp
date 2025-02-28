@@ -532,7 +532,8 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
 
         std::vector<terrain_vertex_t>* vtx = is_translucent[type] ? &vtx_translucent : &vtx_solid;
 
-        float r = 1.0, g = 1.0, b = 1.0;
+        float r = 1.0f, g = 1.0f, b = 1.0f;
+        float r_overlay = r, g_overlay = g, b_overlay = b;
 
         /* std::move does actually increase speed in non-debug situations, don't remove it */
 #define SHIFT_BLOCK_INFO(ORG, NEW)                      \
@@ -640,10 +641,22 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
 
         Uint8 metadata = smetadata[1][1][1];
 
-        /**
-         * Ordered +XYZ then -XYZ for simple blocks
-         */
+        /** Ordered +XYZ then -XYZ for simple blocks */
         mc_id::terrain_face_t faces[6];
+        /** Ordered +XYZ then -XYZ for simple blocks */
+        mc_id::terrain_face_t faces_overlay[6];
+        /** Ordered +XYZ then -XYZ for simple blocks */
+        bool use_overlay[6] = { 0 };
+#define BLOCK_SIMPLE_NO_CASE(ID_FACE)          \
+    do                                         \
+    {                                          \
+        faces[0] = terrain->get_face(ID_FACE); \
+        faces[1] = faces[0];                   \
+        faces[2] = faces[0];                   \
+        faces[3] = faces[0];                   \
+        faces[4] = faces[0];                   \
+        faces[5] = faces[0];                   \
+    } while (0)
 #define BLOCK_SIMPLE(ID_BLOCK, ID_FACE)        \
     case ID_BLOCK:                             \
     {                                          \
@@ -682,7 +695,24 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
         {
             BLOCK_SIMPLE(BLOCK_ID_AIR, mc_id::FACE_DEBUG);
             BLOCK_SIMPLE(BLOCK_ID_STONE, mc_id::FACE_STONE);
-            BLOCK_SIMPLE(BLOCK_ID_GRASS, mc_id::FACE_GRASS_TOP);
+        case BLOCK_ID_GRASS:
+        {
+            BLOCK_SIMPLE_NO_CASE(mc_id::FACE_DIRT);
+
+            faces_overlay[0] = terrain->get_face(mc_id::FACE_GRASS_SIDE_OVERLAY);
+            faces_overlay[1] = terrain->get_face(mc_id::FACE_GRASS_TOP);
+            faces_overlay[2] = faces_overlay[0];
+            faces_overlay[3] = faces_overlay[0];
+            faces_overlay[5] = faces_overlay[0];
+
+            use_overlay[0] = true;
+            use_overlay[1] = true;
+            use_overlay[2] = true;
+            use_overlay[3] = true;
+            use_overlay[5] = true;
+
+            break;
+        }
             BLOCK_SIMPLE(BLOCK_ID_DIRT, mc_id::FACE_DIRT);
             BLOCK_SIMPLE(BLOCK_ID_COBBLESTONE, mc_id::FACE_COBBLESTONE);
         case BLOCK_ID_WOOD_PLANKS:
@@ -1046,7 +1076,9 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
         }
         }
 
-        if (type == BLOCK_ID_GRASS || type == BLOCK_ID_MOSS || type == BLOCK_ID_FOLIAGE)
+        if (type == BLOCK_ID_GRASS)
+            r_overlay = 0.2f, g_overlay = 0.8f, b_overlay = 0.2f;
+        if (type == BLOCK_ID_MOSS || type == BLOCK_ID_FOLIAGE)
             r = 0.2f, g = 0.8f, b = 0.2f;
         else if (type == BLOCK_ID_LEAVES)
         {
@@ -2089,6 +2121,30 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                     { r, g, b, bl[0].get(), sl[0].get() },
                     faces[1].corners[3],
                 });
+
+                if (use_overlay[1])
+                {
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
+                        { r_overlay, g_overlay, b_overlay, bl[3].get(), sl[3].get() },
+                        faces_overlay[1].corners[0],
+                    });
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[1] },
+                        { r_overlay, g_overlay, b_overlay, bl[1].get(), sl[1].get() },
+                        faces_overlay[1].corners[2],
+                    });
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[2] },
+                        { r_overlay, g_overlay, b_overlay, bl[2].get(), sl[2].get() },
+                        faces_overlay[1].corners[1],
+                    });
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[0] },
+                        { r_overlay, g_overlay, b_overlay, bl[0].get(), sl[0].get() },
+                        faces_overlay[1].corners[3],
+                    });
+                }
             }
 
             /* Negative Y */
@@ -2124,6 +2180,30 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                     { r, g, b, bl[3].get(), sl[3].get() },
                     faces[4].corners[2],
                 });
+
+                if (use_overlay[4])
+                {
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
+                        { r_overlay, g_overlay, b_overlay, bl[0].get(), sl[0].get() },
+                        faces_overlay[4].corners[1],
+                    });
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[1] },
+                        { r_overlay, g_overlay, b_overlay, bl[1].get(), sl[1].get() },
+                        faces_overlay[4].corners[0],
+                    });
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 1), ao[2] },
+                        { r_overlay, g_overlay, b_overlay, bl[2].get(), sl[2].get() },
+                        faces_overlay[4].corners[3],
+                    });
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 1), ao[3] },
+                        { r_overlay, g_overlay, b_overlay, bl[3].get(), sl[3].get() },
+                        faces_overlay[4].corners[2],
+                    });
+                }
             }
 
             /* Positive X */
@@ -2159,6 +2239,30 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                     { r, g, b, bl[3].get(), sl[3].get() },
                     faces[0].corners[0],
                 });
+
+                if (use_overlay[0])
+                {
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[0] },
+                        { r_overlay, g_overlay, b_overlay, bl[0].get(), sl[0].get() },
+                        faces_overlay[0].corners[3],
+                    });
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[1] },
+                        { r_overlay, g_overlay, b_overlay, bl[1].get(), sl[1].get() },
+                        faces_overlay[0].corners[1],
+                    });
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 1), ao[2] },
+                        { r_overlay, g_overlay, b_overlay, bl[2].get(), sl[2].get() },
+                        faces_overlay[0].corners[2],
+                    });
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
+                        { r_overlay, g_overlay, b_overlay, bl[3].get(), sl[3].get() },
+                        faces_overlay[0].corners[0],
+                    });
+                }
             }
 
             /* Negative X */
@@ -2194,6 +2298,30 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                     { r, g, b, bl[0].get(), sl[0].get() },
                     faces[3].corners[2],
                 });
+
+                if (use_overlay[3])
+                {
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[3] },
+                        { r_overlay, g_overlay, b_overlay, bl[3].get(), sl[3].get() },
+                        faces_overlay[3].corners[1],
+                    });
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[1] },
+                        { r_overlay, g_overlay, b_overlay, bl[1].get(), sl[1].get() },
+                        faces_overlay[3].corners[0],
+                    });
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 1), ao[2] },
+                        { r_overlay, g_overlay, b_overlay, bl[2].get(), sl[2].get() },
+                        faces_overlay[3].corners[3],
+                    });
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
+                        { r_overlay, g_overlay, b_overlay, bl[0].get(), sl[0].get() },
+                        faces_overlay[3].corners[2],
+                    });
+                }
             }
 
             /* Positive Z */
@@ -2229,6 +2357,30 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                     { r, g, b, bl[0].get(), sl[0].get() },
                     faces[2].corners[2],
                 });
+
+                if (use_overlay[2])
+                {
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
+                        { r_overlay, g_overlay, b_overlay, bl[3].get(), sl[3].get() },
+                        faces_overlay[2].corners[1],
+                    });
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[1] },
+                        { r_overlay, g_overlay, b_overlay, bl[2].get(), sl[2].get() },
+                        faces_overlay[2].corners[0],
+                    });
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 1), ao[2] },
+                        { r_overlay, g_overlay, b_overlay, bl[1].get(), sl[1].get() },
+                        faces_overlay[2].corners[3],
+                    });
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 1), ao[0] },
+                        { r_overlay, g_overlay, b_overlay, bl[0].get(), sl[0].get() },
+                        faces_overlay[2].corners[2],
+                    });
+                }
             }
 
             /* Negative Z */
@@ -2264,6 +2416,30 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                     { r, g, b, bl[3].get(), sl[3].get() },
                     faces[5].corners[0],
                 });
+
+                if (use_overlay[5])
+                {
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
+                        { r_overlay, g_overlay, b_overlay, bl[0].get(), sl[0].get() },
+                        faces_overlay[5].corners[3],
+                    });
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[1] },
+                        { r_overlay, g_overlay, b_overlay, bl[2].get(), sl[2].get() },
+                        faces_overlay[5].corners[1],
+                    });
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[2] },
+                        { r_overlay, g_overlay, b_overlay, bl[1].get(), sl[1].get() },
+                        faces_overlay[5].corners[2],
+                    });
+                    vtx_overlay.push_back({
+                        { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[3] },
+                        { r_overlay, g_overlay, b_overlay, bl[3].get(), sl[3].get() },
+                        faces_overlay[5].corners[0],
+                    });
+                }
             }
         }
         /* ============ END: IS_NORMAL ============ */
@@ -2271,6 +2447,7 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
 
     TRACE("Chunk: <%d, %d, %d>, Vertices (Solid): %zu, Indices: %zu", chunk_x, chunk_y, chunk_z, vtx_solid.size(), vtx_solid.size() / 4 * 6);
     TRACE("Chunk: <%d, %d, %d>, Vertices (Trans): %zu, Indices: %zu", chunk_x, chunk_y, chunk_z, vtx_translucent.size(), vtx_translucent.size() / 4 * 6);
+    TRACE("Chunk: <%d, %d, %d>, Vertices (Overlay): %zu, Indices: %zu", chunk_x, chunk_y, chunk_z, vtx_overlay.size(), vtx_overlay.size() / 4 * 6);
 
     if (!vtx_solid.size() && !vtx_translucent.size())
     {
@@ -2294,7 +2471,11 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
 
     center->index_type = GL_UNSIGNED_INT;
     center->index_count = vtx_solid.size() / 4 * 6;
+    center->index_count_overlay = vtx_overlay.size() / 4 * 6;
     center->index_count_translucent = vtx_translucent.size() / 4 * 6;
+
+    for (terrain_vertex_t v : vtx_overlay)
+        vtx_solid.push_back(v);
 
     for (terrain_vertex_t v : vtx_translucent)
         vtx_solid.push_back(v);
@@ -2567,6 +2748,7 @@ void level_t::render(const glm::ivec2 win_size)
         GLboolean blend;
         GLboolean depth_test;
         GLboolean depth_mask;
+        GLint depth_func;
 
         void restore(GLenum pname, GLboolean i)
         {
@@ -2578,6 +2760,7 @@ void level_t::render(const glm::ivec2 win_size)
     glGetBooleanv(GL_BLEND, &prev_gl_state.blend);
     glGetBooleanv(GL_DEPTH_TEST, &prev_gl_state.depth_test);
     glGetBooleanv(GL_DEPTH_WRITEMASK, &prev_gl_state.depth_mask);
+    glGetIntegerv(GL_DEPTH_FUNC, &prev_gl_state.depth_func);
 
     glDisable(GL_BLEND);
     glEnable(GL_DEPTH_TEST);
@@ -2597,6 +2780,20 @@ void level_t::render(const glm::ivec2 win_size)
         shader_terrain->set_model(glm::translate(glm::mat4(1.0f), translate));
         glDrawElements(GL_TRIANGLES, c->index_count, c->index_type, 0);
     }
+
+    glDepthFunc(GL_EQUAL);
+    for (auto it = chunks.rbegin(); it != chunks.rend(); it = next(it))
+    {
+        chunk_cubic_t* c = *it;
+        if (c->index_type == GL_NONE || c->index_count_overlay == 0 || !c->visible)
+            continue;
+        assert(c->index_type == GL_UNSIGNED_INT);
+        glBindVertexArray(c->vao);
+        glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
+        shader_terrain->set_model(glm::translate(glm::mat4(1.0f), translate));
+        glDrawElements(GL_TRIANGLES, c->index_count_overlay, c->index_type, (void*)(c->index_count * 4));
+    }
+    glDepthFunc(prev_gl_state.depth_func);
 
     render_entities();
 
@@ -2618,7 +2815,7 @@ void level_t::render(const glm::ivec2 win_size)
         glBindVertexArray(c->vao);
         glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
         shader_terrain->set_model(glm::translate(glm::mat4(1.0f), translate));
-        glDrawElements(GL_TRIANGLES, c->index_count_translucent, c->index_type, (void*)(c->index_count * 4));
+        glDrawElements(GL_TRIANGLES, c->index_count_translucent, c->index_type, (void*)((c->index_count + c->index_count_overlay) * 4));
     }
 
     prev_gl_state.restore(GL_BLEND, prev_gl_state.blend);
