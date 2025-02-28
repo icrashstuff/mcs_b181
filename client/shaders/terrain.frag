@@ -42,6 +42,8 @@ void main()
 
     if (use_texture)
         out_color *= texture2D(tex_atlas, frag_uv);
+    else
+        out_color.a *= texture2D(tex_atlas, frag_uv).a;
 
     if (out_color.a < 0.0625)
         discard;
