@@ -68,7 +68,7 @@ struct level_t
     /**
      * Returns the chunk vector for iteration
      */
-    inline const std::vector<chunk_cubic_t*>& get_chunk_vec() { return chunks; }
+    inline const std::vector<chunk_cubic_t*>& get_chunk_vec() { return chunks_render_order; }
 
     /**
      * Returns the chunk vector for iteration
@@ -267,8 +267,13 @@ private:
     /** For quick retrieval of chunks */
     std::map<glm::ivec3, chunk_cubic_t*, ivec3_comparator_t> cmap;
 
-    /* For sorted chunks */
-    std::vector<chunk_cubic_t*> chunks;
+    /* Render order chunks (sorted by distance to camera) */
+    std::vector<chunk_cubic_t*> chunks_render_order;
+
+    /**
+     * Light order chunks (Arranged in descending strips of chunks with the same XY coordinates)
+     */
+    std::vector<chunk_cubic_t*> chunks_light_order;
 
     /**
      * Runs the culling pass and builds all visible/near visible dirty meshes
@@ -295,11 +300,16 @@ private:
     /**
      * Conduct a lighting pass on corresponding chunk
      *
-     * 3 Light passes are necessary for light to correctly jump chunks
-     *
-     * TODO: Handle light transmission in water/other translucent blocks
+     * 4 Light passes are necessary for light to correctly jump chunks
      */
     void light_pass(const int chunk_x, const int chunk_y, const int chunk_z, const bool local_only);
+
+    /**
+     * Conduct a lighting pass on corresponding chunk
+     *
+     * 4 Light passes are necessary for light to correctly jump chunks
+     */
+    void light_pass_sky(const int chunk_x, const int chunk_y, const int chunk_z, const bool local_only);
 
     /** Items should probably be removed from terrain **/
     texture_terrain_t* terrain;

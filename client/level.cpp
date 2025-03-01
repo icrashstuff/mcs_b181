@@ -61,7 +61,7 @@ static convar_int_t r_render_distance("r_render_distance", 8, 1, 64, "Maximum ch
 
 void level_t::clear_mesh(const bool free_gl)
 {
-    for (chunk_cubic_t* c : chunks)
+    for (chunk_cubic_t* c : chunks_render_order)
     {
         if (free_gl)
             c->free_gl();
@@ -104,7 +104,7 @@ void level_t::cull_chunks(const glm::ivec2 win_size, const int render_distance)
         c->visible = 0;           \
         continue;                 \
     }
-    for (chunk_cubic_t* c : chunks)
+    for (chunk_cubic_t* c : chunks_render_order)
     {
         const glm::vec3 chunk_center = glm::vec3((c->pos << 1) - camera_half_chunk_pos);
 
@@ -131,15 +131,40 @@ void level_t::build_dirty_meshes()
     Uint64 tick_start;
     const Uint64 tick_func_start_ms = SDL_GetTicks();
 
-    /* First Light Pass */
+    std::sort(chunks_light_order.begin(), chunks_light_order.end(), [](const chunk_cubic_t* const a, const chunk_cubic_t* const b) {
+        if (a->pos.x > b->pos.x)
+            return true;
+        if (a->pos.x < b->pos.x)
+            return false;
+        if (a->pos.z > b->pos.z)
+            return true;
+        if (a->pos.z < b->pos.z)
+            return false;
+        return a->pos.y > b->pos.y;
+    });
+
+    /* Clear Light Pass */
     PASS_TIMER_START();
-    for (auto it = chunks.rbegin(); it != chunks.rend(); it++)
+    for (auto it = chunks_light_order.begin(); it != chunks_light_order.end(); it++)
     {
         chunk_cubic_t* c = *it;
         if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL)
             continue;
         c->clear_light_block(0);
+        c->clear_light_sky(0);
+        built++;
+    }
+    PASS_TIMER_STOP(enable_timer_log_light, "Cleared %zu chunks in %.2f ms (%.2f ms per) (Pass 1)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
+
+    /* First Light Pass */
+    PASS_TIMER_START();
+    for (auto it = chunks_light_order.begin(); it != chunks_light_order.end(); it++)
+    {
+        chunk_cubic_t* c = *it;
+        if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL)
+            continue;
         light_pass(c->pos.x, c->pos.y, c->pos.z, true);
+        light_pass_sky(c->pos.x, c->pos.y, c->pos.z, true);
         c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0;
         built++;
     }
@@ -149,12 +174,13 @@ void level_t::build_dirty_meshes()
 
     /* Second Light Pass */
     PASS_TIMER_START();
-    for (auto it = chunks.rbegin(); it != chunks.rend(); it++)
+    for (auto it = chunks_light_order.begin(); it != chunks_light_order.end(); it++)
     {
         chunk_cubic_t* c = *it;
         if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0)
             continue;
         light_pass(c->pos.x, c->pos.y, c->pos.z, false);
+        light_pass_sky(c->pos.x, c->pos.y, c->pos.z, false);
         c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_1;
         built++;
     }
@@ -164,12 +190,13 @@ void level_t::build_dirty_meshes()
 
     /* Third Light Pass */
     PASS_TIMER_START();
-    for (auto it = chunks.rbegin(); it != chunks.rend(); it++)
+    for (auto it = chunks_light_order.begin(); it != chunks_light_order.end(); it++)
     {
         chunk_cubic_t* c = *it;
         if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_1)
             continue;
         light_pass(c->pos.x, c->pos.y, c->pos.z, false);
+        light_pass_sky(c->pos.x, c->pos.y, c->pos.z, false);
         c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_2;
         built++;
     }
@@ -179,12 +206,13 @@ void level_t::build_dirty_meshes()
 
     /* Fourth Light Pass */
     PASS_TIMER_START();
-    for (auto it = chunks.rbegin(); it != chunks.rend(); it++)
+    for (auto it = chunks_light_order.begin(); it != chunks_light_order.end(); it++)
     {
         chunk_cubic_t* c = *it;
         if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_2)
             continue;
         light_pass(c->pos.x, c->pos.y, c->pos.z, false);
+        light_pass_sky(c->pos.x, c->pos.y, c->pos.z, false);
         c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
         built++;
     }
@@ -195,7 +223,7 @@ void level_t::build_dirty_meshes()
     /* Mesh Pass */
     PASS_TIMER_START();
     int throttle = r_mesh_throttle.get();
-    for (auto it = chunks.rbegin(); it != chunks.rend() && throttle > 0; it++)
+    for (auto it = chunks_render_order.rbegin(); it != chunks_render_order.rend() && throttle > 0; it++)
     {
         chunk_cubic_t* c = *it;
         if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_MESH || !c->visible)
@@ -451,6 +479,231 @@ void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z
         lvl--;
 
         cross.c->set_light_block(x, y, z, lvl);
+    }
+}
+
+void level_t::light_pass_sky(const int chunk_x, const int chunk_y, const int chunk_z, const bool local_only)
+{
+    /** Index: C +XYZ -XYZ */
+    chunk_cross_t cross;
+
+    auto it = cmap.find(glm::ivec3(chunk_x, chunk_y, chunk_z) + glm::ivec3(0, 0, 0));
+    cross.c = ((it != cmap.end()) ? it->second : NULL);
+
+    Uint8 top_light = 0;
+
+    if (!local_only)
+    {
+        it = cmap.find(glm::ivec3(chunk_x, chunk_y, chunk_z) + glm::ivec3(+1, +0, +0));
+        cross.pos_x = it != cmap.end() ? it->second : NULL;
+        it = cmap.find(glm::ivec3(chunk_x, chunk_y, chunk_z) + glm::ivec3(-1, +0, +0));
+        cross.neg_x = it != cmap.end() ? it->second : NULL;
+        it = cmap.find(glm::ivec3(chunk_x, chunk_y, chunk_z) + glm::ivec3(+0, +1, +0));
+        cross.pos_y = it != cmap.end() ? it->second : NULL;
+        if (!cross.pos_y)
+            top_light = 15;
+        it = cmap.find(glm::ivec3(chunk_x, chunk_y, chunk_z) + glm::ivec3(+0, -1, +0));
+        cross.neg_y = it != cmap.end() ? it->second : NULL;
+        it = cmap.find(glm::ivec3(chunk_x, chunk_y, chunk_z) + glm::ivec3(+0, +0, +1));
+        cross.pos_z = it != cmap.end() ? it->second : NULL;
+        it = cmap.find(glm::ivec3(chunk_x, chunk_y, chunk_z) + glm::ivec3(+0, +0, -1));
+        cross.neg_z = it != cmap.end() ? it->second : NULL;
+    }
+
+    if (!cross.c)
+    {
+        dc_log_error("Attempt made to update lighting for unloaded chunk at chunk coordinates: %d, %d, %d", chunk_x, chunk_y, chunk_z);
+        return;
+    }
+
+    bool is_transparent[256];
+    bool non_decaying_types[256] = { 1 };
+
+    /* Move this out to something like mc_id::get_sky_light_attenuation() */
+    non_decaying_types[BLOCK_ID_LEAVES] = 0;
+    non_decaying_types[BLOCK_ID_WATER_FLOWING] = 0;
+    non_decaying_types[BLOCK_ID_WATER_SOURCE] = 0;
+
+    for (int i = 0; i < IM_ARRAYSIZE(is_transparent); i++)
+        is_transparent[i] = mc_id::is_transparent(i);
+
+    Uint32 total = 0;
+    Uint8 min_level = 15;
+    Uint8 max_level = 0;
+    /* Initial scan of light levels */
+    for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_VOLUME; dat_it++)
+    {
+        const int y = (dat_it) & 0x0F;
+        const int z = (dat_it >> 4) & 0x0F;
+        const int x = (dat_it >> 8) & 0x0F;
+
+        Uint8 type = cross.c->get_type(x, y, z);
+
+        if (!is_transparent[type])
+            continue;
+
+        /** Index: +XYZ -XYZ, all values are *ALWAYS* in the range [1, 16] */
+        Uint8 sur_levels[6] = { 0 };
+
+        switch (x)
+        {
+        case 0:
+            sur_levels[0] = Uint8(cross.c->get_light_sky(x + 1, y, z));
+            sur_levels[3] = cross.neg_x ? (Uint8(cross.neg_x->get_light_sky(SUBCHUNK_SIZE_X - 1, y, z))) : 0;
+            break;
+        case (SUBCHUNK_SIZE_X - 1):
+            sur_levels[0] = cross.pos_x ? (Uint8(cross.pos_x->get_light_sky(0, y, z))) : 0;
+            sur_levels[3] = Uint8(cross.c->get_light_sky(x - 1, y, z));
+            break;
+        default:
+            sur_levels[0] = Uint8(cross.c->get_light_sky(x + 1, y, z));
+            sur_levels[3] = Uint8(cross.c->get_light_sky(x - 1, y, z));
+            break;
+        }
+
+        switch (y)
+        {
+        case 0:
+            sur_levels[1] = Uint8(cross.c->get_light_sky(x, y + 1, z));
+            sur_levels[4] = cross.neg_y ? (Uint8(cross.neg_y->get_light_sky(x, SUBCHUNK_SIZE_Y - 1, z))) : 0;
+            break;
+        case (SUBCHUNK_SIZE_Y - 1):
+            /* Fallback to full sky light if there is no chunk above */
+            sur_levels[1] = cross.pos_y ? (Uint8(cross.pos_y->get_light_sky(x, 0, z))) : top_light;
+            sur_levels[4] = Uint8(cross.c->get_light_sky(x, y - 1, z));
+            break;
+        default:
+            sur_levels[1] = Uint8(cross.c->get_light_sky(x, y + 1, z));
+            sur_levels[4] = Uint8(cross.c->get_light_sky(x, y - 1, z));
+            break;
+        }
+
+        switch (z)
+        {
+        case 0:
+            sur_levels[2] = Uint8(cross.c->get_light_sky(x, y, z + 1));
+            sur_levels[5] = cross.neg_z ? (Uint8(cross.neg_z->get_light_sky(x, y, SUBCHUNK_SIZE_Z - 1))) : 0;
+            break;
+        case (SUBCHUNK_SIZE_Z - 1):
+            sur_levels[2] = cross.pos_z ? (Uint8(cross.pos_z->get_light_sky(x, y, 0))) : 0;
+            sur_levels[5] = Uint8(cross.c->get_light_sky(x, y, z - 1));
+            break;
+        default:
+            sur_levels[2] = Uint8(cross.c->get_light_sky(x, y, z + 1));
+            sur_levels[5] = Uint8(cross.c->get_light_sky(x, y, z - 1));
+            break;
+        }
+
+        /* Shift light value from range [0, 15] to [1, 16] */
+        Uint8 lvl = cross.c->get_light_sky(x, y, z) + 1;
+
+        /* This SDL_max() isn't necessary because lvl is guaranteed to be at least one by now */
+        // lvl = SDL_max(1, lvl);
+
+        lvl = SDL_max(lvl, sur_levels[0]);
+        lvl = SDL_max(lvl, sur_levels[2]);
+        lvl = SDL_max(lvl, sur_levels[3]);
+        lvl = SDL_max(lvl, sur_levels[4]);
+        lvl = SDL_max(lvl, sur_levels[5]);
+
+        /* Sky light does not decay downward through air */
+        lvl = SDL_max(lvl, sur_levels[1] + non_decaying_types[type]);
+
+        /* Move lvl from range [1,16] to [0,15] */
+        lvl--;
+
+        cross.c->set_light_sky(x, y, z, lvl);
+        min_level = SDL_min(min_level, lvl);
+        max_level = SDL_max(max_level, lvl);
+        total += lvl;
+    }
+
+    /* If the light level is uniform then no propagation is required for a local pass */
+    if (local_only && total % SUBCHUNK_SIZE_VOLUME == 0)
+        return;
+
+    /* Propagate light */
+    for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_VOLUME * (max_level - min_level); dat_it++)
+    {
+        const int y = (dat_it) & 0x0F;
+        const int z = (dat_it >> 4) & 0x0F;
+        const int x = (dat_it >> 8) & 0x0F;
+
+        Uint8 type = cross.c->get_type(x, y, z);
+
+        if (!is_transparent[type])
+            continue;
+
+        /** Index: +XYZ -XYZ, all values are *ALWAYS* in the range [1, 16] */
+        Uint8 sur_levels[6] = { 0 };
+
+        switch (x)
+        {
+        case 0:
+            sur_levels[0] = Uint8(cross.c->get_light_sky(x + 1, y, z));
+            sur_levels[3] = 0;
+            break;
+        case (SUBCHUNK_SIZE_X - 1):
+            sur_levels[0] = 0;
+            sur_levels[3] = Uint8(cross.c->get_light_sky(x - 1, y, z));
+            break;
+        default:
+            sur_levels[0] = Uint8(cross.c->get_light_sky(x + 1, y, z));
+            sur_levels[3] = Uint8(cross.c->get_light_sky(x - 1, y, z));
+            break;
+        }
+
+        switch (y)
+        {
+        case 0:
+            sur_levels[1] = Uint8(cross.c->get_light_sky(x, y + 1, z));
+            sur_levels[4] = 0;
+            break;
+        case (SUBCHUNK_SIZE_Y - 1):
+            sur_levels[1] = 0;
+            sur_levels[4] = Uint8(cross.c->get_light_sky(x, y - 1, z));
+            break;
+        default:
+            sur_levels[1] = Uint8(cross.c->get_light_sky(x, y + 1, z));
+            sur_levels[4] = Uint8(cross.c->get_light_sky(x, y - 1, z));
+            break;
+        }
+
+        switch (z)
+        {
+        case 0:
+            sur_levels[2] = Uint8(cross.c->get_light_sky(x, y, z + 1));
+            sur_levels[5] = 0;
+            break;
+        case (SUBCHUNK_SIZE_Z - 1):
+            sur_levels[2] = 0;
+            sur_levels[5] = Uint8(cross.c->get_light_sky(x, y, z - 1));
+            break;
+        default:
+            sur_levels[2] = Uint8(cross.c->get_light_sky(x, y, z + 1));
+            sur_levels[5] = Uint8(cross.c->get_light_sky(x, y, z - 1));
+            break;
+        }
+
+        /* Shift light value from range [0, 15] to [1, 16] */
+        Uint8 lvl = cross.c->get_light_sky(x, y, z) + 1;
+
+        /* This SDL_max() isn't necessary because lvl is guaranteed to be at least one by now */
+        // lvl = SDL_max(1, lvl);
+
+        lvl = SDL_max(lvl, sur_levels[0]);
+        lvl = SDL_max(lvl, sur_levels[2]);
+        lvl = SDL_max(lvl, sur_levels[3]);
+        lvl = SDL_max(lvl, sur_levels[4]);
+        lvl = SDL_max(lvl, sur_levels[5]);
+
+        /* Sky light does not decay downward through air */
+        lvl = SDL_max(lvl, sur_levels[1] + non_decaying_types[type]);
+
+        /* Move lvl from range [1,16] to [0,15] */
+        lvl--;
+
+        cross.c->set_light_sky(x, y, z, lvl);
     }
 }
 #if (FORCE_OPT_LIGHT)
@@ -2532,6 +2785,7 @@ void level_t::set_block(const glm::ivec3 pos, const block_id_t type, const Uint8
     int diff_y = ((block_pos.y & 0x0F) < 8) ? -1 : 1;
     int diff_z = ((block_pos.z & 0x0F) < 8) ? -1 : 1;
 
+    /* TODO: Mark all continuous chunks below as invalid */
     for (int i = 0; i < 8; i++)
     {
         const int ix = (i >> 2) & 1;
@@ -2732,7 +2986,7 @@ void level_t::render(const glm::ivec2 win_size)
     glm::i64vec3 ent_camera_pos = glm::i64vec3(camera_pos) << 15l;
 
     glm::dvec3 c2pos(glm::ivec3(ent_camera_pos) >> 19);
-    std::sort(chunks.begin(), chunks.end(), [=](chunk_cubic_t* a, chunk_cubic_t* b) {
+    std::sort(chunks_render_order.begin(), chunks_render_order.end(), [=](chunk_cubic_t* a, chunk_cubic_t* b) {
         float adist = glm::distance(glm::dvec3(a->pos), c2pos);
         float bdist = glm::distance(glm::dvec3(b->pos), c2pos);
         return adist > bdist;
@@ -2769,7 +3023,7 @@ void level_t::render(const glm::ivec2 win_size)
     /* Draw opaque geometry from front to back to reduce unnecessary filling
      * This can actually make a performance difference (I tested it)
      */
-    for (auto it = chunks.rbegin(); it != chunks.rend(); it = next(it))
+    for (auto it = chunks_render_order.rbegin(); it != chunks_render_order.rend(); it = next(it))
     {
         chunk_cubic_t* c = *it;
         if (c->index_type == GL_NONE || c->index_count == 0 || !c->visible)
@@ -2782,7 +3036,7 @@ void level_t::render(const glm::ivec2 win_size)
     }
 
     glDepthFunc(GL_EQUAL);
-    for (auto it = chunks.rbegin(); it != chunks.rend(); it = next(it))
+    for (auto it = chunks_render_order.rbegin(); it != chunks_render_order.rend(); it = next(it))
     {
         chunk_cubic_t* c = *it;
         if (c->index_type == GL_NONE || c->index_count_overlay == 0 || !c->visible)
@@ -2807,7 +3061,7 @@ void level_t::render(const glm::ivec2 win_size)
      */
     glDepthMask(GL_FALSE);
 
-    for (chunk_cubic_t* c : chunks)
+    for (chunk_cubic_t* c : chunks_render_order)
     {
         if (c->index_type == GL_NONE || c->index_count_translucent == 0 || !c->visible)
             continue;
@@ -2836,7 +3090,7 @@ void level_t::remove_chunk(const glm::ivec3 pos)
         cmap.erase(it_map);
     }
 
-    for (auto it_vec = chunks.begin(); it_vec != chunks.end();)
+    for (auto it_vec = chunks_render_order.begin(); it_vec != chunks_render_order.end();)
     {
         if ((*it_vec)->pos != pos)
             it_vec++;
@@ -2844,7 +3098,19 @@ void level_t::remove_chunk(const glm::ivec3 pos)
         {
             if (*it_vec != mapped_del)
                 delete *it_vec;
-            it_vec = chunks.erase(it_vec);
+            it_vec = chunks_render_order.erase(it_vec);
+        }
+    }
+
+    for (auto it_vec = chunks_light_order.begin(); it_vec != chunks_light_order.end();)
+    {
+        if ((*it_vec)->pos != pos)
+            it_vec++;
+        else
+        {
+            if (*it_vec != mapped_del)
+                delete *it_vec;
+            it_vec = chunks_light_order.erase(it_vec);
         }
     }
 }
@@ -2856,7 +3122,8 @@ void level_t::add_chunk(chunk_cubic_t* const c)
         dc_log_error("Chunk is NULL!");
         return;
     }
-    chunks.push_back(c);
+    chunks_light_order.push_back(c);
+    chunks_render_order.push_back(c);
     cmap[c->pos] = c;
 }
 
@@ -2912,7 +3179,7 @@ level_t::~level_t()
     glDeleteBuffers(1, &ebo);
     glDeleteBuffers(1, &ent_missing_vbo);
     glDeleteVertexArrays(1, &ent_missing_vao);
-    for (chunk_cubic_t* c : chunks)
+    for (chunk_cubic_t* c : chunks_render_order)
         delete c;
 }
 
@@ -2932,7 +3199,7 @@ bool level_t::gamemode_set(int x)
 
 void level_t::clear()
 {
-    chunks.clear();
+    chunks_render_order.clear();
     cmap.clear();
     cmap.clear();
 
