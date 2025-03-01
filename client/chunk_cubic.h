@@ -96,10 +96,10 @@ struct chunk_cubic_t
 
     glm::ivec3 pos = { 0, 0, 0 };
 
-    Uint8 data_block[SUBCHUNK_SIZE_VOLUME] = { 0 };
-    Uint8 data_light_block[SUBCHUNK_SIZE_VOLUME / 2] = { 0 };
-    Uint8 data_light_sky[SUBCHUNK_SIZE_VOLUME / 2] = { 0 };
-    Uint8 data_metadata[SUBCHUNK_SIZE_VOLUME / 2] = { 0 };
+    alignas(16) Uint8 data_block[SUBCHUNK_SIZE_VOLUME] = { 0 };
+    alignas(16) Uint8 data_light_block[SUBCHUNK_SIZE_VOLUME / 2] = { 0 };
+    alignas(16) Uint8 data_light_sky[SUBCHUNK_SIZE_VOLUME / 2] = { 0 };
+    alignas(16) Uint8 data_metadata[SUBCHUNK_SIZE_VOLUME / 2] = { 0 };
 
     chunk_cubic_t() { }
 

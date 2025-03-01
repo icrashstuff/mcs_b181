@@ -42,6 +42,8 @@
 #define FORCE_OPT_MESH 0
 #endif
 
+#define LEVEL_T_ENABLE_SSE2 1
+
 #define PASS_TIMER_START()             \
     do                                 \
     {                                  \
@@ -261,6 +263,52 @@ struct chunk_cross_t
     chunk_cross_t() { }
 };
 
+static convar_int_t cvr_use_sse2("use_sse2", SDL_HasSSE2(), 0, 1, "Use manually SSE2 optimized routines", CONVAR_FLAG_SAVE | CONVAR_FLAG_INT_IS_BOOL);
+
+#if defined(__SSE2__) && LEVEL_T_ENABLE_SSE2
+
+#include <emmintrin.h>
+
+#define ENABLE_VERIFY_SSE2 0
+
+#if ENABLE_VERIFY_SSE2
+/**
+ * Check that each element of a [u8 x 16] vector is within a certain range, otherwise assert
+ *
+ * @param vec [u8 x 16] vector to check
+ * @param min Minimum value for each element
+ * @param max Maximum value for each element
+ */
+static void verify_packed_8_in_range(const __m128i& vec, Uint8 min, Uint8 max)
+{
+    /* The volatile keyword is to make contents always viewable in the debugger */
+    volatile Uint8 verify[16];
+
+    _mm_storeu_si128((__m128i*)verify, vec);
+
+    SDL_assert(BETWEEN_INCL(verify[0x00], min, max));
+    SDL_assert(BETWEEN_INCL(verify[0x01], min, max));
+    SDL_assert(BETWEEN_INCL(verify[0x02], min, max));
+    SDL_assert(BETWEEN_INCL(verify[0x03], min, max));
+    SDL_assert(BETWEEN_INCL(verify[0x04], min, max));
+    SDL_assert(BETWEEN_INCL(verify[0x05], min, max));
+    SDL_assert(BETWEEN_INCL(verify[0x06], min, max));
+    SDL_assert(BETWEEN_INCL(verify[0x07], min, max));
+    SDL_assert(BETWEEN_INCL(verify[0x08], min, max));
+    SDL_assert(BETWEEN_INCL(verify[0x09], min, max));
+    SDL_assert(BETWEEN_INCL(verify[0x0A], min, max));
+    SDL_assert(BETWEEN_INCL(verify[0x0B], min, max));
+    SDL_assert(BETWEEN_INCL(verify[0x0C], min, max));
+    SDL_assert(BETWEEN_INCL(verify[0x0D], min, max));
+    SDL_assert(BETWEEN_INCL(verify[0x0E], min, max));
+    SDL_assert(BETWEEN_INCL(verify[0x0F], min, max));
+}
+#else
+#define verify_packed_8_in_range(vec, min, max) (void)(__m128i(vec), Uint8(min), Uint8(max))
+#endif /* #if ENABLE_VERIFY_SSE2 */
+
+#endif /* #if defined(__SSE2__) && LEVEL_T_ENABLE_SSE2 */
+
 void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z, const bool local_only)
 {
     /** Index: C +XYZ -XYZ */
@@ -401,7 +449,142 @@ void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z
     if (local_only && total % SUBCHUNK_SIZE_VOLUME == 0)
         return;
 
-    /* Propagate light */
+#if defined(__SSE2__) && LEVEL_T_ENABLE_SSE2
+    const __m128i one = _mm_set1_epi8(1);
+    verify_packed_8_in_range(one, 1, 1);
+
+    if (!cvr_use_sse2.get())
+        goto bypass_sse2;
+
+    static_assert(SUBCHUNK_SIZE_X == 16);
+    static_assert(SUBCHUNK_SIZE_Y == 16);
+    static_assert(SUBCHUNK_SIZE_Z == 16);
+    static_assert(sizeof(chunk_cubic_t::data_light_block) == SUBCHUNK_SIZE_VOLUME / 2);
+    static_assert(sizeof(__m128i) == (SUBCHUNK_INDEX(0, 16, 0) - SUBCHUNK_INDEX(0, 0, 0)));
+    static_assert(sizeof(__m128i) * 16 == (SUBCHUNK_INDEX(0, 0, 16) - SUBCHUNK_INDEX(0, 0, 0)));
+
+    /* Unpack light data */
+    Uint8 data_light[SUBCHUNK_SIZE_VOLUME];
+    for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_VOLUME; dat_it += 2)
+    {
+        const Uint8 packed = cross.c->data_light_block[dat_it >> 1];
+        data_light[dat_it] = packed & 0x0F;
+        data_light[dat_it + 1] = (packed >> 4) & 0x0F;
+    }
+
+    __m128i last_strip;
+
+    /* Propagate light (SSE2) (Block) */
+    for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_X * SUBCHUNK_SIZE_Z * (max_level - min_level); dat_it++)
+    {
+        const int vol_it = dat_it & 0xFF;
+        const int z = (dat_it >> 0) & 0x0F;
+        const int x = (dat_it >> 4) & 0x0F;
+
+        const Uint8* const data_block_at_vol = cross.c->data_block + (vol_it << 4);
+        __m128i* const data_light_at_vol = (__m128i*)data_light + vol_it;
+
+        /* TODO: is __v16qu portable to other compilers? */
+        __v16qu mask;
+        mask[0x00] = is_transparent[data_block_at_vol[0x00]] ? 0xFF : 0x00;
+        mask[0x01] = is_transparent[data_block_at_vol[0x01]] ? 0xFF : 0x00;
+        mask[0x02] = is_transparent[data_block_at_vol[0x02]] ? 0xFF : 0x00;
+        mask[0x03] = is_transparent[data_block_at_vol[0x03]] ? 0xFF : 0x00;
+        mask[0x04] = is_transparent[data_block_at_vol[0x04]] ? 0xFF : 0x00;
+        mask[0x05] = is_transparent[data_block_at_vol[0x05]] ? 0xFF : 0x00;
+        mask[0x06] = is_transparent[data_block_at_vol[0x06]] ? 0xFF : 0x00;
+        mask[0x07] = is_transparent[data_block_at_vol[0x07]] ? 0xFF : 0x00;
+        mask[0x08] = is_transparent[data_block_at_vol[0x08]] ? 0xFF : 0x00;
+        mask[0x09] = is_transparent[data_block_at_vol[0x09]] ? 0xFF : 0x00;
+        mask[0x0A] = is_transparent[data_block_at_vol[0x0A]] ? 0xFF : 0x00;
+        mask[0x0B] = is_transparent[data_block_at_vol[0x0B]] ? 0xFF : 0x00;
+        mask[0x0C] = is_transparent[data_block_at_vol[0x0C]] ? 0xFF : 0x00;
+        mask[0x0D] = is_transparent[data_block_at_vol[0x0D]] ? 0xFF : 0x00;
+        mask[0x0E] = is_transparent[data_block_at_vol[0x0E]] ? 0xFF : 0x00;
+        mask[0x0F] = is_transparent[data_block_at_vol[0x0F]] ? 0xFF : 0x00;
+
+        /** Index: +XYZ -XYZ, all values are *ALWAYS* in the range [1, 16] */
+        __m128i sur_levels[6];
+
+        switch (x)
+        {
+        case 0:
+            sur_levels[0] = _mm_load_si128(data_light_at_vol + SUBCHUNK_SIZE_Z);
+            sur_levels[3] = one;
+            break;
+        case (SUBCHUNK_SIZE_X - 1):
+            sur_levels[0] = one;
+            sur_levels[3] = _mm_load_si128(data_light_at_vol - SUBCHUNK_SIZE_Z);
+            break;
+        default:
+            sur_levels[0] = _mm_load_si128(data_light_at_vol + SUBCHUNK_SIZE_Z);
+            sur_levels[3] = _mm_load_si128(data_light_at_vol - SUBCHUNK_SIZE_Z);
+            break;
+        }
+
+        switch (z)
+        {
+        case 0:
+            sur_levels[2] = _mm_load_si128(data_light_at_vol + 1);
+            sur_levels[5] = one;
+            break;
+        case (SUBCHUNK_SIZE_Z - 1):
+            sur_levels[2] = one;
+            sur_levels[5] = last_strip;
+            break;
+        default:
+            sur_levels[2] = _mm_load_si128(data_light_at_vol + 1);
+            sur_levels[5] = last_strip;
+            break;
+        }
+
+        __m128i lvl = _mm_load_si128(data_light_at_vol);
+
+        sur_levels[1] = _mm_bslli_si128(lvl, 1);
+        sur_levels[4] = _mm_bsrli_si128(lvl, 1);
+
+        verify_packed_8_in_range(lvl, 0, 15);
+        verify_packed_8_in_range(sur_levels[0], 0, 15);
+        verify_packed_8_in_range(sur_levels[1], 0, 15);
+        verify_packed_8_in_range(sur_levels[2], 0, 15);
+        verify_packed_8_in_range(sur_levels[3], 0, 15);
+        verify_packed_8_in_range(sur_levels[4], 0, 15);
+        verify_packed_8_in_range(sur_levels[5], 0, 15);
+
+        /* Shift lvl from [0,15] to [1,16] */
+        lvl = _mm_add_epi8(lvl, one);
+        verify_packed_8_in_range(lvl, 1, 16);
+
+        lvl = _mm_max_epu8(lvl, sur_levels[0]);
+        lvl = _mm_max_epu8(lvl, sur_levels[1]);
+        lvl = _mm_max_epu8(lvl, sur_levels[2]);
+        lvl = _mm_max_epu8(lvl, sur_levels[3]);
+        lvl = _mm_max_epu8(lvl, sur_levels[4]);
+        lvl = _mm_max_epu8(lvl, sur_levels[5]);
+        verify_packed_8_in_range(lvl, 1, 16);
+
+        /* Move lvl from range [1,16] to [0,15] */
+        lvl = _mm_sub_epi8(lvl, one);
+        verify_packed_8_in_range(lvl, 0, 15);
+
+        /* Mask out lvl */
+        lvl = _mm_and_si128(lvl, (__m128i)mask);
+        verify_packed_8_in_range(lvl, 0, 15);
+
+        _mm_storeu_si128(data_light_at_vol, lvl);
+
+        last_strip = lvl;
+    }
+
+    /* Repack light data */
+    for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_VOLUME; dat_it += 2)
+        cross.c->data_light_block[dat_it >> 1] = (data_light[dat_it] & 0x0F) | ((data_light[dat_it + 1] & 0x0F) << 4);
+
+    return;
+bypass_sse2:
+#endif
+
+    /* Propagate light (Block) */
     for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_VOLUME * (max_level - min_level); dat_it++)
     {
         const int y = (dat_it) & 0x0F;
@@ -622,7 +805,162 @@ void level_t::light_pass_sky(const int chunk_x, const int chunk_y, const int chu
     if (local_only && total % SUBCHUNK_SIZE_VOLUME == 0)
         return;
 
-    /* Propagate light */
+#if defined(__SSE2__) && LEVEL_T_ENABLE_SSE2
+    const __m128i one = _mm_set1_epi8(1);
+    verify_packed_8_in_range(one, 1, 1);
+
+    if (!cvr_use_sse2.get())
+        goto bypass_sse2;
+
+    static_assert(SUBCHUNK_SIZE_X == 16);
+    static_assert(SUBCHUNK_SIZE_Y == 16);
+    static_assert(SUBCHUNK_SIZE_Z == 16);
+    static_assert(sizeof(chunk_cubic_t::data_light_sky) == SUBCHUNK_SIZE_VOLUME / 2);
+    static_assert(sizeof(__m128i) == (SUBCHUNK_INDEX(0, 16, 0) - SUBCHUNK_INDEX(0, 0, 0)));
+    static_assert(sizeof(__m128i) * 16 == (SUBCHUNK_INDEX(0, 0, 16) - SUBCHUNK_INDEX(0, 0, 0)));
+
+    /* Unpack light data */
+    Uint8 data_light[SUBCHUNK_SIZE_VOLUME];
+    for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_VOLUME; dat_it += 2)
+    {
+        const Uint8 packed = cross.c->data_light_sky[dat_it >> 1];
+        data_light[dat_it] = packed & 0x0F;
+        data_light[dat_it + 1] = (packed >> 4) & 0x0F;
+    }
+
+    __m128i last_strip;
+
+    /* Propagate light (SSE2) (Sky) */
+    for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_X * SUBCHUNK_SIZE_Z * (max_level - min_level); dat_it++)
+    {
+        const int vol_it = dat_it & 0xFF;
+        const int z = (dat_it >> 0) & 0x0F;
+        const int x = (dat_it >> 4) & 0x0F;
+
+        const Uint8* const data_block_at_vol = cross.c->data_block + (vol_it << 4);
+        __m128i* const data_light_at_vol = (__m128i*)data_light + vol_it;
+
+        /* TODO: is __v16qu portable to other compilers? */
+        __v16qu mask;
+        mask[0x00] = is_transparent[data_block_at_vol[0x00]] ? 0xFF : 0x00;
+        mask[0x01] = is_transparent[data_block_at_vol[0x01]] ? 0xFF : 0x00;
+        mask[0x02] = is_transparent[data_block_at_vol[0x02]] ? 0xFF : 0x00;
+        mask[0x03] = is_transparent[data_block_at_vol[0x03]] ? 0xFF : 0x00;
+        mask[0x04] = is_transparent[data_block_at_vol[0x04]] ? 0xFF : 0x00;
+        mask[0x05] = is_transparent[data_block_at_vol[0x05]] ? 0xFF : 0x00;
+        mask[0x06] = is_transparent[data_block_at_vol[0x06]] ? 0xFF : 0x00;
+        mask[0x07] = is_transparent[data_block_at_vol[0x07]] ? 0xFF : 0x00;
+        mask[0x08] = is_transparent[data_block_at_vol[0x08]] ? 0xFF : 0x00;
+        mask[0x09] = is_transparent[data_block_at_vol[0x09]] ? 0xFF : 0x00;
+        mask[0x0A] = is_transparent[data_block_at_vol[0x0A]] ? 0xFF : 0x00;
+        mask[0x0B] = is_transparent[data_block_at_vol[0x0B]] ? 0xFF : 0x00;
+        mask[0x0C] = is_transparent[data_block_at_vol[0x0C]] ? 0xFF : 0x00;
+        mask[0x0D] = is_transparent[data_block_at_vol[0x0D]] ? 0xFF : 0x00;
+        mask[0x0E] = is_transparent[data_block_at_vol[0x0E]] ? 0xFF : 0x00;
+        mask[0x0F] = is_transparent[data_block_at_vol[0x0F]] ? 0xFF : 0x00;
+
+        __v16qu antidecay;
+        antidecay[0x00] = non_decaying_types[data_block_at_vol[0x00]];
+        antidecay[0x01] = non_decaying_types[data_block_at_vol[0x01]];
+        antidecay[0x02] = non_decaying_types[data_block_at_vol[0x02]];
+        antidecay[0x03] = non_decaying_types[data_block_at_vol[0x03]];
+        antidecay[0x04] = non_decaying_types[data_block_at_vol[0x04]];
+        antidecay[0x05] = non_decaying_types[data_block_at_vol[0x05]];
+        antidecay[0x06] = non_decaying_types[data_block_at_vol[0x06]];
+        antidecay[0x07] = non_decaying_types[data_block_at_vol[0x07]];
+        antidecay[0x08] = non_decaying_types[data_block_at_vol[0x08]];
+        antidecay[0x09] = non_decaying_types[data_block_at_vol[0x09]];
+        antidecay[0x0A] = non_decaying_types[data_block_at_vol[0x0A]];
+        antidecay[0x0B] = non_decaying_types[data_block_at_vol[0x0B]];
+        antidecay[0x0C] = non_decaying_types[data_block_at_vol[0x0C]];
+        antidecay[0x0D] = non_decaying_types[data_block_at_vol[0x0D]];
+        antidecay[0x0E] = non_decaying_types[data_block_at_vol[0x0E]];
+        antidecay[0x0F] = non_decaying_types[data_block_at_vol[0x0F]];
+
+        /** Index: +XYZ -XYZ, all values are *ALWAYS* in the range [1, 16] */
+        __m128i sur_levels[6];
+
+        switch (x)
+        {
+        case 0:
+            sur_levels[0] = _mm_load_si128(data_light_at_vol + SUBCHUNK_SIZE_Z);
+            sur_levels[3] = one;
+            break;
+        case (SUBCHUNK_SIZE_X - 1):
+            sur_levels[0] = one;
+            sur_levels[3] = _mm_load_si128(data_light_at_vol - SUBCHUNK_SIZE_Z);
+            break;
+        default:
+            sur_levels[0] = _mm_load_si128(data_light_at_vol + SUBCHUNK_SIZE_Z);
+            sur_levels[3] = _mm_load_si128(data_light_at_vol - SUBCHUNK_SIZE_Z);
+            break;
+        }
+
+        switch (z)
+        {
+        case 0:
+            sur_levels[2] = _mm_load_si128(data_light_at_vol + 1);
+            sur_levels[5] = one;
+            break;
+        case (SUBCHUNK_SIZE_Z - 1):
+            sur_levels[2] = one;
+            sur_levels[5] = last_strip;
+            break;
+        default:
+            sur_levels[2] = _mm_load_si128(data_light_at_vol + 1);
+            sur_levels[5] = last_strip;
+            break;
+        }
+
+        __m128i lvl = _mm_load_si128(data_light_at_vol);
+
+        sur_levels[4] = _mm_bslli_si128(lvl, 1);
+
+        /* Sky light may or may not decay */
+        sur_levels[1] = _mm_bsrli_si128(_mm_add_epi8(lvl, (__m128i)antidecay), 1);
+
+        verify_packed_8_in_range(lvl, 0, 15);
+        verify_packed_8_in_range(sur_levels[0], 0, 15);
+        verify_packed_8_in_range(sur_levels[1], 0, 16);
+        verify_packed_8_in_range(sur_levels[2], 0, 15);
+        verify_packed_8_in_range(sur_levels[3], 0, 15);
+        verify_packed_8_in_range(sur_levels[4], 0, 15);
+        verify_packed_8_in_range(sur_levels[5], 0, 15);
+
+        /* Shift lvl from [0,15] to [1,16] */
+        lvl = _mm_add_epi8(lvl, one);
+        verify_packed_8_in_range(lvl, 1, 16);
+
+        lvl = _mm_max_epu8(lvl, sur_levels[0]);
+        lvl = _mm_max_epu8(lvl, sur_levels[1]);
+        lvl = _mm_max_epu8(lvl, sur_levels[2]);
+        lvl = _mm_max_epu8(lvl, sur_levels[3]);
+        lvl = _mm_max_epu8(lvl, sur_levels[4]);
+        lvl = _mm_max_epu8(lvl, sur_levels[5]);
+        verify_packed_8_in_range(lvl, 1, 16);
+
+        /* Move lvl from range [1,16] to [0,15] */
+        lvl = _mm_sub_epi8(lvl, one);
+        verify_packed_8_in_range(lvl, 0, 15);
+
+        /* Mask out lvl */
+        lvl = _mm_and_si128(lvl, (__m128i)mask);
+        verify_packed_8_in_range(lvl, 0, 15);
+
+        _mm_storeu_si128(data_light_at_vol, lvl);
+
+        last_strip = lvl;
+    }
+
+    /* Repack light data */
+    for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_VOLUME; dat_it += 2)
+        cross.c->data_light_sky[dat_it >> 1] = (data_light[dat_it] & 0x0F) | ((data_light[dat_it + 1] & 0x0F) << 4);
+
+    return;
+bypass_sse2:
+#endif
+
+    /* Propagate light (Sky) */
     for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_VOLUME * (max_level - min_level); dat_it++)
     {
         const int y = (dat_it) & 0x0F;
