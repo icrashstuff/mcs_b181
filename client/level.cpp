@@ -464,7 +464,7 @@ void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z
     static_assert(sizeof(__m128i) * 16 == (SUBCHUNK_INDEX(0, 0, 16) - SUBCHUNK_INDEX(0, 0, 0)));
 
     /* Unpack light data */
-    Uint8 data_light[SUBCHUNK_SIZE_VOLUME];
+    alignas(16) Uint8 data_light[SUBCHUNK_SIZE_VOLUME];
     for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_VOLUME; dat_it += 2)
     {
         const Uint8 packed = cross.c->data_light_block[dat_it >> 1];
@@ -820,7 +820,7 @@ void level_t::light_pass_sky(const int chunk_x, const int chunk_y, const int chu
     static_assert(sizeof(__m128i) * 16 == (SUBCHUNK_INDEX(0, 0, 16) - SUBCHUNK_INDEX(0, 0, 0)));
 
     /* Unpack light data */
-    Uint8 data_light[SUBCHUNK_SIZE_VOLUME];
+    alignas(16) Uint8 data_light[SUBCHUNK_SIZE_VOLUME];
     for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_VOLUME; dat_it += 2)
     {
         const Uint8 packed = cross.c->data_light_sky[dat_it >> 1];
