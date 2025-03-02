@@ -2513,10 +2513,6 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                 continue;
 
             /* BEGIN: Preliminary Smooth Lighting Calculations */
-#define SBL(VP, LP) ((v VP) ? (slight_block LP) : 0)
-#define SSL(VP, LP) ((v VP) ? (slight_sky LP) : 0)
-            bool v[3][3] = { { 0 }, { 0, 1, 0 }, { 0 } };
-
             struct corner_t
             {
                 Uint16 sum, divisor;
@@ -2524,153 +2520,94 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                 corner_t(const int _sum, const int _divisor) { sum = _sum, divisor = _divisor; }
                 corner_t(const Uint16 _sum, const Uint16 _divisor) { sum = _sum, divisor = _divisor; }
                 void operator+=(const corner_t& rh) { sum += rh.sum, divisor += rh.divisor; }
+                void operator+=(const int& rh)
+                {
+                    sum += rh;
+                    divisor++;
+                }
                 Uint8 get() const { return sum / divisor; }
             };
 
-            /* Positive Y */
-            v[1][1] = do_face_pos_y;
-            v[1][0] = is_transparent[stypes[1][2][0]];
-            v[1][2] = is_transparent[stypes[1][2][2]];
-            v[0][1] = is_transparent[stypes[0][2][1]];
-            v[2][1] = is_transparent[stypes[2][2][1]];
-            v[0][0] = is_transparent[stypes[0][2][0]] && (v[1][0] || v[0][1]);
-            v[2][0] = is_transparent[stypes[2][2][0]] && (v[1][0] || v[2][1]);
-            v[0][2] = is_transparent[stypes[0][2][2]] && (v[1][2] || v[0][1]);
-            v[2][2] = is_transparent[stypes[2][2][2]] && (v[1][2] || v[2][1]);
+            const std::function<std::pair<corner_t, corner_t> const(const int, const int, const int, const bool, const bool, const bool)> calc_corner
+                = [&](const int _x, const int _y, const int _z, const bool f_x, const bool f_y, const bool f_z) -> std::pair<corner_t, corner_t> const {
+                corner_t corner_b, corner_s;
 
-            corner_t bl_pos_y[4] = {
-                { (SBL([0][0], [0][2][0]) + SBL([1][0], [1][2][0]) + SBL([0][1], [0][2][1]) + SBL([1][1], [1][2][1])), (1 + v[0][0] + v[1][0] + v[0][1]) },
-                { (SBL([2][0], [2][2][0]) + SBL([1][0], [1][2][0]) + SBL([2][1], [2][2][1]) + SBL([1][1], [1][2][1])), (1 + v[2][0] + v[1][0] + v[2][1]) },
-                { (SBL([0][2], [0][2][2]) + SBL([0][1], [0][2][1]) + SBL([1][2], [1][2][2]) + SBL([1][1], [1][2][1])), (1 + v[0][2] + v[0][1] + v[1][2]) },
-                { (SBL([2][2], [2][2][2]) + SBL([1][2], [1][2][2]) + SBL([2][1], [2][2][1]) + SBL([1][1], [1][2][1])), (1 + v[2][2] + v[1][2] + v[2][1]) },
-            };
+                uint_fast8_t mask = f_x | (f_y << 1) | (f_z << 2);
 
-            corner_t sl_pos_y[4] = {
-                { (SSL([0][0], [0][2][0]) + SSL([1][0], [1][2][0]) + SSL([0][1], [0][2][1]) + SSL([1][1], [1][2][1])), (1 + v[0][0] + v[1][0] + v[0][1]) },
-                { (SSL([2][0], [2][2][0]) + SSL([1][0], [1][2][0]) + SSL([2][1], [2][2][1]) + SSL([1][1], [1][2][1])), (1 + v[2][0] + v[1][0] + v[2][1]) },
-                { (SSL([0][2], [0][2][2]) + SSL([0][1], [0][2][1]) + SSL([1][2], [1][2][2]) + SSL([1][1], [1][2][1])), (1 + v[0][2] + v[0][1] + v[1][2]) },
-                { (SSL([2][2], [2][2][2]) + SSL([1][2], [1][2][2]) + SSL([2][1], [2][2][1]) + SSL([1][1], [1][2][1])), (1 + v[2][2] + v[1][2] + v[2][1]) },
-            };
+                /* Check that mask has only 1 flag */
+                assert(mask && !(mask & (mask - 1)));
 
-            /* Negative Y */
-            v[1][1] = 1;
-            v[1][0] = is_transparent[stypes[1][0][0]];
-            v[1][2] = is_transparent[stypes[1][0][2]];
-            v[0][1] = is_transparent[stypes[0][0][1]];
-            v[2][1] = is_transparent[stypes[2][0][1]];
-            v[0][0] = is_transparent[stypes[0][0][0]] && (v[1][0] || v[0][1]);
-            v[2][0] = is_transparent[stypes[2][0][0]] && (v[1][0] || v[2][1]);
-            v[0][2] = is_transparent[stypes[0][0][2]] && (v[1][2] || v[0][1]);
-            v[2][2] = is_transparent[stypes[2][0][2]] && (v[1][2] || v[2][1]);
+                const int x = 1 + _x;
+                const int y = 1 + _y;
+                const int z = 1 + _z;
 
-            corner_t bl_neg_y[4] = {
-                { (SBL([0][0], [0][0][0]) + SBL([1][0], [1][0][0]) + SBL([0][1], [0][0][1]) + SBL([1][1], [1][0][1])), (1 + v[0][0] + v[1][0] + v[0][1]) },
-                { (SBL([2][0], [2][0][0]) + SBL([1][0], [1][0][0]) + SBL([2][1], [2][0][1]) + SBL([1][1], [1][0][1])), (1 + v[2][0] + v[1][0] + v[2][1]) },
-                { (SBL([0][2], [0][0][2]) + SBL([0][1], [0][0][1]) + SBL([1][2], [1][0][2]) + SBL([1][1], [1][0][1])), (1 + v[0][2] + v[0][1] + v[1][2]) },
-                { (SBL([2][2], [2][0][2]) + SBL([1][2], [1][0][2]) + SBL([2][1], [2][0][1]) + SBL([1][1], [1][0][1])), (1 + v[2][2] + v[1][2] + v[2][1]) },
-            };
+                bool v_x = 0, v_y = 0, v_z = 0;
+                bool v_diag_xy = 0, v_diag_xz = 0, v_diag_zy = 0;
+                bool v_diag_xzy = 0;
 
-            corner_t sl_neg_y[4] = {
-                { (SSL([0][0], [0][0][0]) + SSL([1][0], [1][0][0]) + SSL([0][1], [0][0][1]) + SSL([1][1], [1][0][1])), (1 + v[0][0] + v[1][0] + v[0][1]) },
-                { (SSL([2][0], [2][0][0]) + SSL([1][0], [1][0][0]) + SSL([2][1], [2][0][1]) + SSL([1][1], [1][0][1])), (1 + v[2][0] + v[1][0] + v[2][1]) },
-                { (SSL([0][2], [0][0][2]) + SSL([0][1], [0][0][1]) + SSL([1][2], [1][0][2]) + SSL([1][1], [1][0][1])), (1 + v[0][2] + v[0][1] + v[1][2]) },
-                { (SSL([2][2], [2][0][2]) + SSL([1][2], [1][0][2]) + SSL([2][1], [2][0][1]) + SSL([1][1], [1][0][1])), (1 + v[2][2] + v[1][2] + v[2][1]) },
-            };
+                switch (mask)
+                {
+                case 0x01:
+                    v_x = is_transparent[stypes[x][1][1]];
+                    break;
+                case 0x02:
+                    v_y = is_transparent[stypes[1][y][1]];
+                    break;
+                case 0x04:
+                    v_z = is_transparent[stypes[1][1][z]];
+                    break;
+                }
 
-            /* Positive X */
-            v[1][1] = 1;
-            v[1][0] = is_transparent[stypes[2][1][0]];
-            v[1][2] = is_transparent[stypes[2][1][2]];
-            v[0][1] = is_transparent[stypes[2][0][1]];
-            v[2][1] = is_transparent[stypes[2][2][1]];
-            v[0][0] = is_transparent[stypes[2][0][0]] && (v[1][0] || v[0][1]);
-            v[2][0] = is_transparent[stypes[2][2][0]] && (v[1][0] || v[2][1]);
-            v[0][2] = is_transparent[stypes[2][0][2]] && (v[1][2] || v[0][1]);
-            v[2][2] = is_transparent[stypes[2][2][2]] && (v[1][2] || v[2][1]);
+                if (mask & ~0x01)
+                    v_diag_zy = (v_z || v_y) && is_transparent[stypes[1][y][z]];
 
-            corner_t bl_pos_x[4] = {
-                { (SBL([0][0], [2][0][0]) + SBL([1][0], [2][1][0]) + SBL([0][1], [2][0][1]) + SBL([1][1], [2][1][1])), (1 + v[0][0] + v[1][0] + v[0][1]) },
-                { (SBL([2][0], [2][2][0]) + SBL([1][0], [2][1][0]) + SBL([2][1], [2][2][1]) + SBL([1][1], [2][1][1])), (1 + v[2][0] + v[1][0] + v[2][1]) },
-                { (SBL([0][2], [2][0][2]) + SBL([0][1], [2][0][1]) + SBL([1][2], [2][1][2]) + SBL([1][1], [2][1][1])), (1 + v[0][2] + v[0][1] + v[1][2]) },
-                { (SBL([2][2], [2][2][2]) + SBL([1][2], [2][1][2]) + SBL([2][1], [2][2][1]) + SBL([1][1], [2][1][1])), (1 + v[2][2] + v[1][2] + v[2][1]) },
-            };
-            corner_t sl_pos_x[4] = {
-                { (SSL([0][0], [2][0][0]) + SSL([1][0], [2][1][0]) + SSL([0][1], [2][0][1]) + SSL([1][1], [2][1][1])), (1 + v[0][0] + v[1][0] + v[0][1]) },
-                { (SSL([2][0], [2][2][0]) + SSL([1][0], [2][1][0]) + SSL([2][1], [2][2][1]) + SSL([1][1], [2][1][1])), (1 + v[2][0] + v[1][0] + v[2][1]) },
-                { (SSL([0][2], [2][0][2]) + SSL([0][1], [2][0][1]) + SSL([1][2], [2][1][2]) + SSL([1][1], [2][1][1])), (1 + v[0][2] + v[0][1] + v[1][2]) },
-                { (SSL([2][2], [2][2][2]) + SSL([1][2], [2][1][2]) + SSL([2][1], [2][2][1]) + SSL([1][1], [2][1][1])), (1 + v[2][2] + v[1][2] + v[2][1]) },
-            };
+                if (mask & ~0x02)
+                    v_diag_xz = (v_x || v_z) && is_transparent[stypes[x][1][z]];
 
-            /* Negative X */
-            v[1][1] = 1;
-            v[1][0] = is_transparent[stypes[0][1][0]];
-            v[1][2] = is_transparent[stypes[0][1][2]];
-            v[0][1] = is_transparent[stypes[0][0][1]];
-            v[2][1] = is_transparent[stypes[0][2][1]];
-            v[0][0] = is_transparent[stypes[0][0][0]] && (v[1][0] || v[0][1]);
-            v[2][0] = is_transparent[stypes[0][2][0]] && (v[1][0] || v[2][1]);
-            v[0][2] = is_transparent[stypes[0][0][2]] && (v[1][2] || v[0][1]);
-            v[2][2] = is_transparent[stypes[0][2][2]] && (v[1][2] || v[2][1]);
+                if (mask & ~0x04)
+                    v_diag_xy = (v_x || v_y) && is_transparent[stypes[x][y][1]];
 
-            corner_t bl_neg_x[4] = {
-                { (SBL([0][0], [0][0][0]) + SBL([1][0], [0][1][0]) + SBL([0][1], [0][0][1]) + SBL([1][1], [0][1][1])), (1 + v[0][0] + v[1][0] + v[0][1]) },
-                { (SBL([2][0], [0][2][0]) + SBL([1][0], [0][1][0]) + SBL([2][1], [0][2][1]) + SBL([1][1], [0][1][1])), (1 + v[2][0] + v[1][0] + v[2][1]) },
-                { (SBL([0][2], [0][0][2]) + SBL([0][1], [0][0][1]) + SBL([1][2], [0][1][2]) + SBL([1][1], [0][1][1])), (1 + v[0][2] + v[0][1] + v[1][2]) },
-                { (SBL([2][2], [0][2][2]) + SBL([1][2], [0][1][2]) + SBL([2][1], [0][2][1]) + SBL([1][1], [0][1][1])), (1 + v[2][2] + v[1][2] + v[2][1]) },
-            };
-            corner_t sl_neg_x[4] = {
-                { (SSL([0][0], [0][0][0]) + SSL([1][0], [0][1][0]) + SSL([0][1], [0][0][1]) + SSL([1][1], [0][1][1])), (1 + v[0][0] + v[1][0] + v[0][1]) },
-                { (SSL([2][0], [0][2][0]) + SSL([1][0], [0][1][0]) + SSL([2][1], [0][2][1]) + SSL([1][1], [0][1][1])), (1 + v[2][0] + v[1][0] + v[2][1]) },
-                { (SSL([0][2], [0][0][2]) + SSL([0][1], [0][0][1]) + SSL([1][2], [0][1][2]) + SSL([1][1], [0][1][1])), (1 + v[0][2] + v[0][1] + v[1][2]) },
-                { (SSL([2][2], [0][2][2]) + SSL([1][2], [0][1][2]) + SSL([2][1], [0][2][1]) + SSL([1][1], [0][1][1])), (1 + v[2][2] + v[1][2] + v[2][1]) },
-            };
+                /* By this point, two diagonals have been calculated */
+                v_diag_xzy = (v_diag_xy || v_diag_xz || v_diag_zy) && is_transparent[stypes[x][y][z]];
 
-            /* Positive Z */
-            v[1][1] = 1;
-            v[1][0] = is_transparent[stypes[1][0][2]];
-            v[1][2] = is_transparent[stypes[1][2][2]];
-            v[0][1] = is_transparent[stypes[0][1][2]];
-            v[2][1] = is_transparent[stypes[2][1][2]];
-            v[0][0] = is_transparent[stypes[0][0][2]] && (v[1][0] || v[0][1]);
-            v[2][0] = is_transparent[stypes[2][0][2]] && (v[1][0] || v[2][1]);
-            v[0][2] = is_transparent[stypes[0][2][2]] && (v[1][2] || v[0][1]);
-            v[2][2] = is_transparent[stypes[2][2][2]] && (v[1][2] || v[2][1]);
+                if (mask & 0x01 || !v_diag_zy)
+                    v_diag_zy = v_diag_xzy && is_transparent[stypes[1][y][z]];
 
-            corner_t bl_pos_z[4] = {
-                { (SBL([0][0], [0][0][2]) + SBL([1][0], [1][0][2]) + SBL([0][1], [0][1][2]) + SBL([1][1], [1][1][2])), (1 + v[0][0] + v[1][0] + v[0][1]) },
-                { (SBL([2][0], [2][0][2]) + SBL([1][0], [1][0][2]) + SBL([2][1], [2][1][2]) + SBL([1][1], [1][1][2])), (1 + v[2][0] + v[1][0] + v[2][1]) },
-                { (SBL([0][2], [0][2][2]) + SBL([0][1], [0][1][2]) + SBL([1][2], [1][2][2]) + SBL([1][1], [1][1][2])), (1 + v[0][2] + v[0][1] + v[1][2]) },
-                { (SBL([2][2], [2][2][2]) + SBL([1][2], [1][2][2]) + SBL([2][1], [2][1][2]) + SBL([1][1], [1][1][2])), (1 + v[2][2] + v[1][2] + v[2][1]) },
-            };
-            corner_t sl_pos_z[4] = {
-                { (SSL([0][0], [0][0][2]) + SSL([1][0], [1][0][2]) + SSL([0][1], [0][1][2]) + SSL([1][1], [1][1][2])), (1 + v[0][0] + v[1][0] + v[0][1]) },
-                { (SSL([2][0], [2][0][2]) + SSL([1][0], [1][0][2]) + SSL([2][1], [2][1][2]) + SSL([1][1], [1][1][2])), (1 + v[2][0] + v[1][0] + v[2][1]) },
-                { (SSL([0][2], [0][2][2]) + SSL([0][1], [0][1][2]) + SSL([1][2], [1][2][2]) + SSL([1][1], [1][1][2])), (1 + v[0][2] + v[0][1] + v[1][2]) },
-                { (SSL([2][2], [2][2][2]) + SSL([1][2], [1][2][2]) + SSL([2][1], [2][1][2]) + SSL([1][1], [1][1][2])), (1 + v[2][2] + v[1][2] + v[2][1]) },
-            };
+                if (mask & 0x02 || !v_diag_xz)
+                    v_diag_xz = v_diag_xzy && is_transparent[stypes[x][1][z]];
 
-            /* Negative Z */
-            v[1][1] = 1;
-            v[1][0] = is_transparent[stypes[1][0][0]];
-            v[1][2] = is_transparent[stypes[1][2][0]];
-            v[0][1] = is_transparent[stypes[0][1][0]];
-            v[2][1] = is_transparent[stypes[2][1][0]];
-            v[0][0] = is_transparent[stypes[0][0][0]] && (v[1][0] || v[0][1]);
-            v[2][0] = is_transparent[stypes[2][0][0]] && (v[1][0] || v[2][1]);
-            v[0][2] = is_transparent[stypes[0][2][0]] && (v[1][2] || v[0][1]);
-            v[2][2] = is_transparent[stypes[2][2][0]] && (v[1][2] || v[2][1]);
+                if (mask & 0x04 || !v_diag_xy)
+                    v_diag_xy = v_diag_xzy && is_transparent[stypes[x][y][1]];
 
-            corner_t bl_neg_z[4] = {
-                { (SBL([0][0], [0][0][0]) + SBL([1][0], [1][0][0]) + SBL([0][1], [0][1][0]) + SBL([1][1], [1][1][0])), (1 + v[0][0] + v[1][0] + v[0][1]) },
-                { (SBL([2][0], [2][0][0]) + SBL([1][0], [1][0][0]) + SBL([2][1], [2][1][0]) + SBL([1][1], [1][1][0])), (1 + v[2][0] + v[1][0] + v[2][1]) },
-                { (SBL([0][2], [0][2][0]) + SBL([0][1], [0][1][0]) + SBL([1][2], [1][2][0]) + SBL([1][1], [1][1][0])), (1 + v[0][2] + v[0][1] + v[1][2]) },
-                { (SBL([2][2], [2][2][0]) + SBL([1][2], [1][2][0]) + SBL([2][1], [2][1][0]) + SBL([1][1], [1][1][0])), (1 + v[2][2] + v[1][2] + v[2][1]) },
-            };
-            corner_t sl_neg_z[4] = {
-                { (SSL([0][0], [0][0][0]) + SSL([1][0], [1][0][0]) + SSL([0][1], [0][1][0]) + SSL([1][1], [1][1][0])), (1 + v[0][0] + v[1][0] + v[0][1]) },
-                { (SSL([2][0], [2][0][0]) + SSL([1][0], [1][0][0]) + SSL([2][1], [2][1][0]) + SSL([1][1], [1][1][0])), (1 + v[2][0] + v[1][0] + v[2][1]) },
-                { (SSL([0][2], [0][2][0]) + SSL([0][1], [0][1][0]) + SSL([1][2], [1][2][0]) + SSL([1][1], [1][1][0])), (1 + v[0][2] + v[0][1] + v[1][2]) },
-                { (SSL([2][2], [2][2][0]) + SSL([1][2], [1][2][0]) + SSL([2][1], [2][1][0]) + SSL([1][1], [1][1][0])), (1 + v[2][2] + v[1][2] + v[2][1]) },
+                if (!v_x)
+                    v_x = (v_diag_xy || v_diag_xz) && is_transparent[stypes[x][1][1]];
+                if (!v_y)
+                    v_y = (v_diag_xy || v_diag_zy) && is_transparent[stypes[1][y][1]];
+                if (!v_z)
+                    v_z = (v_diag_xz || v_diag_zy) && is_transparent[stypes[1][1][z]];
+
+#define CORNER_IF_COND(COND, COORDS)         \
+    do                                       \
+        if (COND)                            \
+        {                                    \
+            corner_s += slight_sky COORDS;   \
+            corner_b += slight_block COORDS; \
+        }                                    \
+    while (0)
+
+                CORNER_IF_COND(v_x, [x][1][1]);
+                CORNER_IF_COND(v_y, [1][y][1]);
+                CORNER_IF_COND(v_z, [1][1][z]);
+
+                CORNER_IF_COND(v_diag_xy, [x][y][1]);
+                CORNER_IF_COND(v_diag_xz, [x][1][z]);
+                CORNER_IF_COND(v_diag_zy, [1][y][z]);
+
+                CORNER_IF_COND(v_diag_xzy, [x][y][z]);
+
+#undef CORNER_IF_COND
+
+                return std::pair(corner_b, corner_s);
             };
 
             /* END: Preliminary Smooth Lighting Calculations */
@@ -2685,17 +2622,15 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                     Uint8(UAO([2][2][2]) + UAO([1][2][2]) + UAO([2][2][1])),
                 };
 
-                corner_t bl[4] = { bl_pos_y[0], bl_pos_y[1], bl_pos_y[2], bl_pos_y[3] };
-                corner_t sl[4] = { sl_pos_y[0], sl_pos_y[1], sl_pos_y[2], sl_pos_y[3] };
+                std::pair<corner_t, corner_t> templ[4];
 
-                /* TODO-OPT: Blending across edges? */
-#if 0
-                if(do_face_pos_x && is_transparent[stypes[2][2][1]])
-                {
-                    bl[3] += bl_pos_x[3], sl[3] += sl_pos_x[3];
-                    bl[1] += bl_pos_x[1], sl[1] += sl_pos_x[1];
-                }
-#endif
+                templ[0] = calc_corner(-1, 1, -1, 0, 1, 0);
+                templ[1] = calc_corner(+1, 1, -1, 0, 1, 0);
+                templ[2] = calc_corner(-1, 1, +1, 0, 1, 0);
+                templ[3] = calc_corner(+1, 1, +1, 0, 1, 0);
+
+                corner_t bl[4] = { templ[0].first, templ[1].first, templ[2].first, templ[3].first };
+                corner_t sl[4] = { templ[0].second, templ[1].second, templ[2].second, templ[3].second };
 
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
@@ -2753,8 +2688,15 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                     Uint8(UAO([2][0][2]) + UAO([1][0][2]) + UAO([2][0][1])),
                 };
 
-                corner_t bl[4] = { bl_neg_y[0], bl_neg_y[1], bl_neg_y[2], bl_neg_y[3] };
-                corner_t sl[4] = { sl_neg_y[0], sl_neg_y[1], sl_neg_y[2], sl_neg_y[3] };
+                std::pair<corner_t, corner_t> templ[4];
+
+                templ[0] = calc_corner(-1, -1, -1, 0, 1, 0);
+                templ[1] = calc_corner(+1, -1, -1, 0, 1, 0);
+                templ[2] = calc_corner(-1, -1, +1, 0, 1, 0);
+                templ[3] = calc_corner(+1, -1, +1, 0, 1, 0);
+
+                corner_t bl[4] = { templ[0].first, templ[1].first, templ[2].first, templ[3].first };
+                corner_t sl[4] = { templ[0].second, templ[1].second, templ[2].second, templ[3].second };
 
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
@@ -2812,8 +2754,15 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                     Uint8(UAO([2][2][2]) + UAO([2][1][2]) + UAO([2][2][1])),
                 };
 
-                corner_t bl[4] = { bl_pos_x[0], bl_pos_x[1], bl_pos_x[2], bl_pos_x[3] };
-                corner_t sl[4] = { sl_pos_x[0], sl_pos_x[1], sl_pos_x[2], sl_pos_x[3] };
+                std::pair<corner_t, corner_t> templ[4];
+
+                templ[0] = calc_corner(+1, -1, -1, 1, 0, 0);
+                templ[1] = calc_corner(+1, +1, -1, 1, 0, 0);
+                templ[2] = calc_corner(+1, -1, +1, 1, 0, 0);
+                templ[3] = calc_corner(+1, +1, +1, 1, 0, 0);
+
+                corner_t bl[4] = { templ[0].first, templ[1].first, templ[2].first, templ[3].first };
+                corner_t sl[4] = { templ[0].second, templ[1].second, templ[2].second, templ[3].second };
 
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[0] },
@@ -2871,8 +2820,15 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                     Uint8(UAO([0][2][2]) + UAO([0][1][2]) + UAO([0][2][1])),
                 };
 
-                corner_t bl[4] = { bl_neg_x[0], bl_neg_x[1], bl_neg_x[2], bl_neg_x[3] };
-                corner_t sl[4] = { sl_neg_x[0], sl_neg_x[1], sl_neg_x[2], sl_neg_x[3] };
+                std::pair<corner_t, corner_t> templ[4];
+
+                templ[0] = calc_corner(-1, -1, -1, 1, 0, 0);
+                templ[1] = calc_corner(-1, +1, -1, 1, 0, 0);
+                templ[2] = calc_corner(-1, -1, +1, 1, 0, 0);
+                templ[3] = calc_corner(-1, +1, +1, 1, 0, 0);
+
+                corner_t bl[4] = { templ[0].first, templ[1].first, templ[2].first, templ[3].first };
+                corner_t sl[4] = { templ[0].second, templ[1].second, templ[2].second, templ[3].second };
 
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[3] },
@@ -2930,8 +2886,15 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                     Uint8(UAO([2][2][2]) + UAO([1][2][2]) + UAO([2][1][2])),
                 };
 
-                corner_t bl[4] = { bl_pos_z[0], bl_pos_z[1], bl_pos_z[2], bl_pos_z[3] };
-                corner_t sl[4] = { sl_pos_z[0], sl_pos_z[1], sl_pos_z[2], sl_pos_z[3] };
+                std::pair<corner_t, corner_t> templ[4];
+
+                templ[0] = calc_corner(-1, -1, +1, 0, 0, 1);
+                templ[1] = calc_corner(+1, -1, +1, 0, 0, 1);
+                templ[2] = calc_corner(-1, +1, +1, 0, 0, 1);
+                templ[3] = calc_corner(+1, +1, +1, 0, 0, 1);
+
+                corner_t bl[4] = { templ[0].first, templ[1].first, templ[2].first, templ[3].first };
+                corner_t sl[4] = { templ[0].second, templ[1].second, templ[2].second, templ[3].second };
 
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
@@ -2989,8 +2952,15 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                     Uint8(UAO([2][2][0]) + UAO([1][2][0]) + UAO([2][1][0])),
                 };
 
-                corner_t bl[4] = { bl_neg_z[0], bl_neg_z[1], bl_neg_z[2], bl_neg_z[3] };
-                corner_t sl[4] = { sl_neg_z[0], sl_neg_z[1], sl_neg_z[2], sl_neg_z[3] };
+                std::pair<corner_t, corner_t> templ[4];
+
+                templ[0] = calc_corner(-1, -1, -1, 0, 0, 1);
+                templ[1] = calc_corner(+1, -1, -1, 0, 0, 1);
+                templ[2] = calc_corner(-1, +1, -1, 0, 0, 1);
+                templ[3] = calc_corner(+1, +1, -1, 0, 0, 1);
+
+                corner_t bl[4] = { templ[0].first, templ[1].first, templ[2].first, templ[3].first };
+                corner_t sl[4] = { templ[0].second, templ[1].second, templ[2].second, templ[3].second };
 
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },

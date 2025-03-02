@@ -169,6 +169,7 @@ void game_t::create_testworld()
         c->set_type(7, 2, 5 + i % 4, BLOCK_ID_GLASS);
         c->set_type(8, 2, 5 + i % 4, BLOCK_ID_GLASS);
         c->set_type(7, 2, 7, BLOCK_ID_TORCH);
+        c->set_type(7, 12, 5, BLOCK_ID_TORCH);
     }
 
     /* Test light propagation across all 3 axis jumps
