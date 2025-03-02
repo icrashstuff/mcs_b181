@@ -275,6 +275,17 @@ private:
      */
     std::vector<chunk_cubic_t*> chunks_light_order;
 
+    /** If set to true then level_t::chunks_render_order will be sorted, and then this bool will be cleared */
+    bool request_render_order_sort = 1;
+
+    /** If set to true then level_t::chunks_light_order will be sorted, and then this bool will be cleared */
+    bool request_light_order_sort = 1;
+
+    Uint64 last_render_order_sort_time = 0;
+    Uint64 last_light_order_sort_time = 0;
+
+    glm::i64vec3 last_render_order_cpos = { 0, 0, 0 };
+
     /**
      * Runs the culling pass and builds all visible/near visible dirty meshes
      *

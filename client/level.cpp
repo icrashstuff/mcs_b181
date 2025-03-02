@@ -133,17 +133,22 @@ void level_t::build_dirty_meshes()
     Uint64 tick_start;
     const Uint64 tick_func_start_ms = SDL_GetTicks();
 
-    std::sort(chunks_light_order.begin(), chunks_light_order.end(), [](const chunk_cubic_t* const a, const chunk_cubic_t* const b) {
-        if (a->pos.x > b->pos.x)
-            return true;
-        if (a->pos.x < b->pos.x)
-            return false;
-        if (a->pos.z > b->pos.z)
-            return true;
-        if (a->pos.z < b->pos.z)
-            return false;
-        return a->pos.y > b->pos.y;
-    });
+    if (request_light_order_sort || tick_func_start_ms - last_light_order_sort_time > 5000)
+    {
+        std::sort(chunks_light_order.begin(), chunks_light_order.end(), [](const chunk_cubic_t* const a, const chunk_cubic_t* const b) {
+            if (a->pos.x > b->pos.x)
+                return true;
+            if (a->pos.x < b->pos.x)
+                return false;
+            if (a->pos.z > b->pos.z)
+                return true;
+            if (a->pos.z < b->pos.z)
+                return false;
+            return a->pos.y > b->pos.y;
+        });
+        last_light_order_sort_time = SDL_GetTicks();
+        request_light_order_sort = 0;
+    }
 
     /* Clear Light Pass */
     PASS_TIMER_START();
@@ -3321,14 +3326,30 @@ void level_t::render(const glm::ivec2 win_size)
     glBindTexture(GL_TEXTURE_2D, lightmap.tex_id_linear);
     glActiveTexture(GL_TEXTURE0);
 
-    glm::i64vec3 ent_camera_pos = glm::i64vec3(camera_pos) << 15l;
+    {
+        const glm::i64vec3 ent_camera_pos = ABSCOORD_TO_ECOORD_GLM_LONG(glm::i64vec3(camera_pos * 32.0f));
+        const glm::i64vec3 cpos(ECOORD_TO_ABSCOORD_GLM_LONG(ent_camera_pos) >> 5l >> 4l);
+        const glm::i64vec3 camera_pos_diff = cpos - last_render_order_cpos;
+        const glm::dvec3 float_cpos(cpos);
 
-    glm::dvec3 c2pos(glm::ivec3(ent_camera_pos) >> 19);
-    std::sort(chunks_render_order.begin(), chunks_render_order.end(), [=](chunk_cubic_t* a, chunk_cubic_t* b) {
-        float adist = glm::distance(glm::dvec3(a->pos), c2pos);
-        float bdist = glm::distance(glm::dvec3(b->pos), c2pos);
-        return adist > bdist;
-    });
+        if (camera_pos_diff != glm::i64vec3(0, 0, 0))
+            request_render_order_sort = 1;
+
+        if (request_render_order_sort)
+            TRACE("Render order sort requested @ %ld", SDL_GetTicks());
+
+        if (request_render_order_sort || SDL_GetTicks() - last_render_order_sort_time > 5000)
+        {
+            std::sort(chunks_render_order.begin(), chunks_render_order.end(), [&float_cpos](const chunk_cubic_t* const a, const chunk_cubic_t* const b) {
+                const float adist = glm::distance(glm::dvec3(a->pos), float_cpos);
+                const float bdist = glm::distance(glm::dvec3(b->pos), float_cpos);
+                return adist > bdist;
+            });
+            last_render_order_sort_time = SDL_GetTicks();
+            request_render_order_sort = 0;
+            last_render_order_cpos = cpos;
+        }
+    }
 
     glActiveTexture(GL_TEXTURE0);
     glBindTexture(GL_TEXTURE_2D, get_terrain()->tex_id_main);
@@ -3451,6 +3472,9 @@ void level_t::remove_chunk(const glm::ivec3 pos)
             it_vec = chunks_light_order.erase(it_vec);
         }
     }
+
+    request_render_order_sort = 1;
+    request_light_order_sort = 1;
 }
 
 void level_t::add_chunk(chunk_cubic_t* const c)
@@ -3463,6 +3487,9 @@ void level_t::add_chunk(chunk_cubic_t* const c)
     chunks_light_order.push_back(c);
     chunks_render_order.push_back(c);
     cmap[c->pos] = c;
+
+    request_render_order_sort = 1;
+    request_light_order_sort = 1;
 }
 
 level_t::level_t(texture_terrain_t* const _terrain)

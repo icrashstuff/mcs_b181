@@ -112,6 +112,21 @@ typedef Sint32 ecoord_abs_t;
 #define ABSCOORD_TO_ECOORD(X) (ecoord_t(X) << ABSCOORD_ECOORD_SHIFT)
 #define ECOORD_TO_ABSCOORD(X) (ecoord_abs_t(ecoord_t((X)) >> ABSCOORD_ECOORD_SHIFT))
 
+#define BLOCKCOORD_TO_ECOORD(X) (ecoord_t(X) << ABSCOORD_ECOORD_SHIFT << 5)
+#define ECOORD_TO_BLOCKCOORD(X) (ecoord_t(X) >> ABSCOORD_ECOORD_SHIFT >> 5)
+
+#define CHUNKCOORD_TO_ECOORD(X) (ecoord_t(X) << ABSCOORD_ECOORD_SHIFT << 9)
+#define ECOORD_TO_CHUNKCOORD(X) (ecoord_t(X) >> ABSCOORD_ECOORD_SHIFT >> 9)
+
+#define ABSCOORD_TO_ECOORD_GLM(X) ((X) << ABSCOORD_ECOORD_SHIFT)
+#define ECOORD_TO_ABSCOORD_GLM(X) ((X) >> ABSCOORD_ECOORD_SHIFT)
+
+#define ABSCOORD_TO_ECOORD_GLM_LONG(X) ((X) << long(ABSCOORD_ECOORD_SHIFT))
+#define ECOORD_TO_ABSCOORD_GLM_LONG(X) ((X) >> long(ABSCOORD_ECOORD_SHIFT))
+
+#define ABSCOORD_ONE_BLOCK (ecoord_abs_t(32))
+#define ECOORD_ONE_BLOCK (ABSCOORD_TO_ECOORD(ABSCOORD_ONE_BLOCK))
+
 struct entity_base_t
 {
     /**
