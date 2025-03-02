@@ -309,7 +309,7 @@ static void verify_packed_8_in_range(const __m128i& vec, Uint8 min, Uint8 max)
     SDL_assert(BETWEEN_INCL(verify[0x0F], min, max));
 }
 #else
-#define verify_packed_8_in_range(vec, min, max) (void)(__m128i(vec), Uint8(min), Uint8(max))
+#define verify_packed_8_in_range(vec, min, max) (void)(void(__m128i(vec)), void(Uint8(min)), void(Uint8(max)))
 #endif /* #if ENABLE_VERIFY_SSE2 */
 
 #endif /* #if defined(__SSE2__) && LEVEL_T_ENABLE_SSE2 */
