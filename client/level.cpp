@@ -268,7 +268,7 @@ struct chunk_cross_t
     chunk_cross_t() { }
 };
 
-static convar_int_t cvr_use_sse2("use_sse2", SDL_HasSSE2(), 0, 1, "Use manually SSE2 optimized routines", CONVAR_FLAG_SAVE | CONVAR_FLAG_INT_IS_BOOL);
+static convar_int_t cvr_use_sse2("use_sse2", 0, 0, 1, "Use manually SSE2 optimized routines", CONVAR_FLAG_SAVE | CONVAR_FLAG_INT_IS_BOOL);
 
 #if defined(__SSE2__) && LEVEL_T_ENABLE_SSE2
 
@@ -590,7 +590,7 @@ bypass_sse2:
 #endif
 
     /* Propagate light (Block) */
-    for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_VOLUME * (max_level - min_level); dat_it++)
+    for (int dat_it = SUBCHUNK_SIZE_VOLUME - 1; dat_it >= 0; dat_it--)
     {
         const int y = (dat_it) & 0x0F;
         const int z = (dat_it >> 4) & 0x0F;
@@ -966,7 +966,7 @@ bypass_sse2:
 #endif
 
     /* Propagate light (Sky) */
-    for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_VOLUME * (max_level - min_level); dat_it++)
+    for (int dat_it = SUBCHUNK_SIZE_VOLUME - 1; dat_it >= 0; dat_it--)
     {
         const int y = (dat_it) & 0x0F;
         const int z = (dat_it >> 4) & 0x0F;
