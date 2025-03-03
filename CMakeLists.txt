@@ -44,6 +44,7 @@ set(mcs_b181_client_SRC
     client/texture_terrain.cpp
     client/shaders.cpp
     client/level.cpp
+    client/level_mesh.cpp
     client/entity.cpp
     client/lightmap.cpp
     client/connection.cpp
