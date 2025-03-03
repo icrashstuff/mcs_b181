@@ -943,7 +943,7 @@ static void process_event(SDL_Event& event, bool* done)
             {
                 packet_inventory_action_creative_t pack_inv_action;
 
-                const bool can_create = level->gamemode_get() != mc_id::GAMEMODE_CREATIVE && connection;
+                const bool can_create = level->gamemode_get() == mc_id::GAMEMODE_CREATIVE || !connection;
 
                 int new_slot_id = level->inventory.hotbar_sel;
 
@@ -956,11 +956,12 @@ static void process_event(SDL_Event& event, bool* done)
                 if (can_create && level->inventory.items[new_slot_id] != block_at_ray)
                 {
                     const int num_squares = level->inventory.hotbar_max - level->inventory.hotbar_min + 1;
+                    const int cur_square = level->inventory.hotbar_sel - level->inventory.hotbar_min;
                     bool found = 0;
-                    for (int i = 0; !found && i <= num_squares; i++)
+                    for (int i = 0; !found && i < num_squares; i++)
                     {
-                        int slot_id = level->inventory.hotbar_min + (i % num_squares);
-                        if (level->inventory.items[slot_id].id == BLOCK_ID_NONE)
+                        int slot_id = level->inventory.hotbar_min + ((i + cur_square) % num_squares);
+                        if (level->inventory.items[slot_id].id == BLOCK_ID_NONE || level->inventory.items[slot_id].id == BLOCK_ID_AIR)
                             new_slot_id = slot_id, found = 1;
                     }
                 }
@@ -976,7 +977,7 @@ static void process_event(SDL_Event& event, bool* done)
                 level->inventory.hotbar_sel = new_slot_id;
 
                 /* All actions past this point require creative permission */
-                if (can_create)
+                if (!can_create)
                     return;
 
                 itemstack_t& hand = level->inventory.items[level->inventory.hotbar_sel];
