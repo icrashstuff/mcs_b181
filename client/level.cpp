@@ -61,6 +61,15 @@
 static convar_int_t r_mesh_throttle("r_mesh_throttle", 1, 1, 64, "Maximum number of chunks that can be meshed per frame", CONVAR_FLAG_SAVE);
 static convar_int_t r_render_distance("r_render_distance", 8, 1, 64, "Maximum chunk distance that can be viewed at once", CONVAR_FLAG_SAVE);
 
+static convar_int_t cvr_r_smooth_lighting {
+    "r_smooth_lighting",
+    1,
+    0,
+    1,
+    "Use smooth lighting",
+    CONVAR_FLAG_SAVE | CONVAR_FLAG_DEV_ONLY,
+};
+
 void level_t::clear_mesh(const bool free_gl)
 {
     for (chunk_cubic_t* c : chunks_render_order)
@@ -2512,7 +2521,6 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
             if (!do_face_pos_y && !do_face_neg_y && !do_face_pos_x && !do_face_neg_x && !do_face_pos_z && !do_face_neg_z)
                 continue;
 
-            /* BEGIN: Preliminary Smooth Lighting Calculations */
             struct corner_t
             {
                 Uint16 sum, divisor;
@@ -2558,6 +2566,9 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                     break;
                 }
 
+                if (!cvr_r_smooth_lighting.get())
+                    goto skip_smooth;
+
                 if (mask & ~0x01)
                     v_diag_zy = (v_z || v_y) && is_transparent[stypes[1][y][z]];
 
@@ -2594,10 +2605,7 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
             corner_b += slight_block COORDS; \
         }                                    \
     while (0)
-
-                CORNER_IF_COND(v_x, [x][1][1]);
-                CORNER_IF_COND(v_y, [1][y][1]);
-                CORNER_IF_COND(v_z, [1][1][z]);
+                CORNER_IF_COND(is_transparent[stypes[1][1][1]], [1][1][1]);
 
                 CORNER_IF_COND(v_diag_xy, [x][y][1]);
                 CORNER_IF_COND(v_diag_xz, [x][1][z]);
@@ -2605,12 +2613,15 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
 
                 CORNER_IF_COND(v_diag_xzy, [x][y][z]);
 
+            skip_smooth:
+                CORNER_IF_COND(v_x, [x][1][1]);
+                CORNER_IF_COND(v_y, [1][y][1]);
+                CORNER_IF_COND(v_z, [1][1][z]);
+
 #undef CORNER_IF_COND
 
                 return std::pair(corner_b, corner_s);
             };
-
-            /* END: Preliminary Smooth Lighting Calculations */
 
             /* Positive Y */
             if (do_face_pos_y)
