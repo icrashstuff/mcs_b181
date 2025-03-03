@@ -877,13 +877,34 @@ static void process_event(SDL_Event& event, bool* done)
             cam_dir.x = SDL_cosf(glm::radians(level->yaw)) * SDL_cosf(glm::radians(level->pitch));
             cam_dir.y = SDL_sinf(glm::radians(level->pitch));
             cam_dir.z = SDL_sinf(glm::radians(level->yaw)) * SDL_cosf(glm::radians(level->pitch));
-            glm::ivec3 cam_pos = level->camera_pos + glm::normalize(cam_dir) * 2.5f;
+            cam_dir = glm::normalize(cam_dir);
+
+            glm::vec3 rotation_point = level->camera_pos /*+ glm::vec3(0.0f, (!crouching) ? 1.625f : 1.275f, 0.0f)*/;
+
+            itemstack_t block_at_ray;
+            glm::ivec3 collapsed_ray;
+            glm::vec3 ray = rotation_point;
+            {
+                bool found = 0;
+                for (int i = 0; !found && i <= 32 * 5; i++, ray += cam_dir / 32.0f)
+                {
+                    collapsed_ray = glm::floor(ray);
+                    if (level->get_block(collapsed_ray, block_at_ray) && block_at_ray.id != BLOCK_ID_AIR && mc_id::is_block(block_at_ray.id))
+                        found = 1;
+                }
+
+                if (!found)
+                {
+                    dc_log("Point: <%.1f, %.1f, %.1f>, Ray: <%.1f, %.1f, %.1f>", rotation_point.x, rotation_point.y, rotation_point.z, ray.x, ray.y, ray.z);
+                    return;
+                }
+            }
 
             if (event.button.button == 1)
             {
                 connection_t::tentative_block_t t;
                 t.timestamp = SDL_GetTicks();
-                t.pos = cam_pos;
+                t.pos = collapsed_ray;
                 if (level->get_block(t.pos, t.old) && t.old.id != BLOCK_ID_AIR)
                 {
                     level->set_block(t.pos, BLOCK_ID_AIR, 0);
@@ -911,7 +932,7 @@ static void process_event(SDL_Event& event, bool* done)
             {
                 connection_t::tentative_block_t t;
                 t.timestamp = SDL_GetTicks();
-                t.pos = cam_pos;
+                t.pos = collapsed_ray;
                 itemstack_t hand = level->inventory.items[level->inventory.hotbar_sel];
 
                 if (level->get_block(t.pos, t.old) && t.old != hand)
@@ -925,7 +946,7 @@ static void process_event(SDL_Event& event, bool* done)
 
                     packet_player_place_t p;
                     p.x = t.pos.x;
-                    p.y = t.pos.y - 1;
+                    p.y = t.pos.y;
                     p.z = t.pos.z;
                     p.direction = 1;
                     p.block_item_id = hand.id;
