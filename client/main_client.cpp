@@ -638,14 +638,29 @@ static void normal_loop()
         held_tab = 0;
     }
 
-    float camera_speed = 3.5f * delta_time * (held_ctrl ? 4.0f : 1.0f);
-
     glm::ivec2 win_size;
     SDL_GetWindowSize(tetra::window, &win_size.x, &win_size.y);
 
     for (game_t* g : games)
         if (g->connection && g->level)
             g->connection->run(g->level);
+
+    bool in_flight = (game && game->level->gamemode_get() != mc_id::GAMEMODE_SURVIVAL && game->level->gamemode_get() != mc_id::GAMEMODE_ADVENTURE);
+
+    /* Base player speed is ~4.317 m/s, Source: https://minecraft.wiki/w/Sprinting */
+    float camera_speed = 4.3175f * delta_time;
+
+    /* Ground sprinting increases speed by 30%, Source: https://minecraft.wiki/w/Sprinting */
+    if (held_ctrl)
+        camera_speed *= in_flight ? 2.0f : 1.3f;
+
+    /* Speed while in flight is around 250% of ground speed, Source: https://minecraft.wiki/w/Flying */
+    if (in_flight)
+        camera_speed *= 2.5f;
+
+    /* Until spectator speed is changeable by some method, this will do */
+    if (game && game->level->gamemode_get() == mc_id::GAMEMODE_SPECTATOR)
+        camera_speed *= 1.5f;
 
     if (game)
     {
