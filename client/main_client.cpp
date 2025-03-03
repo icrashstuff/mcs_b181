@@ -926,7 +926,59 @@ static void process_event(SDL_Event& event, bool* done)
             }
             else if (event.button.button == 2)
             {
-                // TODO: Pick block
+                packet_inventory_action_creative_t pack_inv_action;
+
+                const bool can_create = level->gamemode_get() != mc_id::GAMEMODE_CREATIVE && connection;
+
+                int new_slot_id = level->inventory.hotbar_sel;
+
+                /* Try to find existing */
+                for (int i = level->inventory.hotbar_min; level->inventory.items[new_slot_id] != block_at_ray && i <= level->inventory.hotbar_max; i++)
+                    if (level->inventory.items[i] == block_at_ray)
+                        new_slot_id = i;
+
+                /* Try to find the nearest open slot for block creation */
+                if (can_create && level->inventory.items[new_slot_id] != block_at_ray)
+                {
+                    const int num_squares = level->inventory.hotbar_max - level->inventory.hotbar_min + 1;
+                    bool found = 0;
+                    for (int i = 0; !found && i <= num_squares; i++)
+                    {
+                        int slot_id = level->inventory.hotbar_min + (i % num_squares);
+                        if (level->inventory.items[slot_id].id == BLOCK_ID_NONE)
+                            new_slot_id = slot_id, found = 1;
+                    }
+                }
+
+                /* Inform the server of any slot selection changes */
+                if (new_slot_id != level->inventory.hotbar_sel)
+                {
+                    packet_hold_change_t pack;
+                    pack.slot_id = new_slot_id - level->inventory.hotbar_min;
+                    if (connection)
+                        connection->send_packet(pack);
+                }
+                level->inventory.hotbar_sel = new_slot_id;
+
+                /* All actions past this point require creative permission */
+                if (can_create)
+                    return;
+
+                itemstack_t& hand = level->inventory.items[level->inventory.hotbar_sel];
+
+                if (hand == block_at_ray)
+                    return;
+
+                hand = block_at_ray;
+                hand.quantity = 1;
+
+                pack_inv_action.item_id = hand.id;
+                pack_inv_action.damage = hand.damage;
+                pack_inv_action.quantity = hand.quantity;
+                pack_inv_action.slot = level->inventory.hotbar_sel;
+
+                if (connection)
+                    connection->send_packet(pack_inv_action);
             }
             else if (event.button.button == 3)
             {
