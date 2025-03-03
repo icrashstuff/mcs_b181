@@ -752,9 +752,11 @@ static void normal_loop()
 
     if (menu_ret.allow_world && in_world)
     {
+        ImGui::SetCurrentContext(last_ctx);
         game->level->lightmap.update();
         game->level->get_terrain()->update();
         game->level->render(win_size);
+        ImGui::SetCurrentContext(imgui_ctx_main_menu);
 
         render_world_overlays(game->level, bg_draw_list);
 
