@@ -679,17 +679,12 @@ static void normal_loop()
         if (held_shift)
             level->camera_pos.y -= camera_speed;
 
-        if (held_ctrl)
-            level->fov += delta_time * 30.0f;
-        else
-            level->fov -= delta_time * 30.0f;
+        level->modifier_sprint.set_use(held_ctrl);
+        level->modifier_fly.set_use(in_flight);
 
-        float fov_base = cvr_r_fov_base.get();
-
-        if (level->fov > fov_base + 2.0f)
-            level->fov = fov_base + 2.0f;
-        else if (level->fov < fov_base)
-            level->fov = fov_base;
+        level->fov = cvr_r_fov_base.get();
+        level->fov *= level->modifier_sprint.get_modifier();
+        level->fov *= level->modifier_fly.get_modifier();
     }
 
     ImGuiContext* last_ctx = ImGui::GetCurrentContext();

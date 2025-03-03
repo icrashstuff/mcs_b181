@@ -31,6 +31,7 @@
 #include "shared/ids.h"
 #include "shared/inventory.h"
 #include "texture_terrain.h"
+#include "time_blended_modifer.h"
 #include <GL/glew.h>
 #include <entt/entt.hpp>
 #include <glm/glm.hpp>
@@ -220,6 +221,11 @@ struct level_t
 
     bool enable_timer_log_light = 0;
     bool enable_timer_log_mesh = 0;
+
+    /* FOV increase while flying is 10%, Source: https://minecraft.wiki/w/Flying */
+    time_blended_modifer_t modifier_fly = time_blended_modifer_t(500, 1.0f, 1.1f, false);
+    /* I couldn't find anything definitive on the FOV increase while sprinting, so we'll just reuse the percentage from flying - Ian */
+    time_blended_modifer_t modifier_sprint = time_blended_modifer_t(500, 1.0f, 1.1f, false);
 
     /**
      * If the value is greater than zero, then it will be used instead of r_render_distance
