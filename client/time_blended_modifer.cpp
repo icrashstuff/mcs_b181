@@ -25,23 +25,24 @@
 
 #include <SDL3/SDL.h>
 
-#define MIX(a, b, factor) ((1.0 - SDL_clamp(factor, 0.0f, 1.0f)) * a + SDL_clamp(factor, 0.0f, 1.0f) * b)
+#define MIX(a, b, factor) ((1.0 - SDL_clamp(factor, 0.0, 1.0)) * a + SDL_clamp(factor, 0.0, 1.0) * b)
 float time_blended_modifer_t::get_modifier()
 {
     Uint64 diff = SDL_GetTicks() - time_of_change;
 
     if (diff > dur_of_change || time_of_change == 0)
-        return (last = (use) ? max : min);
+        return (use) ? max : min;
 
-    float mix = float(diff) / float(dur_of_change);
+    double mix = double(diff) / double(dur_of_change);
 
-    return (last = ((use) ? MIX(last, max, mix) : MIX(last, min, mix)));
+    return ((use) ? MIX(last, max, mix) : MIX(last, min, mix));
 }
 
 void time_blended_modifer_t::set_use(bool x)
 {
     if (x == use)
         return;
+    last = get_modifier();
     use = x;
     time_of_change = SDL_GetTicks();
 }

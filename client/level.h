@@ -223,9 +223,9 @@ struct level_t
     bool enable_timer_log_mesh = 0;
 
     /* FOV increase while flying is 10%, Source: https://minecraft.wiki/w/Flying */
-    time_blended_modifer_t modifier_fly = time_blended_modifer_t(500, 1.0f, 1.1f, false);
+    time_blended_modifer_t modifier_fly = time_blended_modifer_t(75, 1.0f, 1.1f, false);
     /* I couldn't find anything definitive on the FOV increase while sprinting, so we'll just reuse the percentage from flying - Ian */
-    time_blended_modifer_t modifier_sprint = time_blended_modifer_t(500, 1.0f, 1.1f, false);
+    time_blended_modifer_t modifier_sprint = time_blended_modifer_t(75, 1.0f, 1.1f, false);
 
     /**
      * If the value is greater than zero, then it will be used instead of r_render_distance
