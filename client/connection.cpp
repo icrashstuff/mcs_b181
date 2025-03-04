@@ -390,6 +390,8 @@ void connection_t::run(level_t* const level)
 
                 level->gamemode_set(p->mode);
                 level->world_height = p->world_height;
+                level->mc_seed = p->seed;
+                dc_log("Seed is: %ld", p->seed);
                 max_players = p->max_players;
                 if (p->dimension == -1)
                     level->lightmap.set_preset(lightmap_t::LIGHTMAP_PRESET_NETHER);
@@ -467,6 +469,10 @@ void connection_t::run(level_t* const level)
 
                 level->gamemode_set(p->mode);
                 level->world_height = p->world_height;
+
+                if (level->mc_seed != p->seed)
+                    dc_log("Seed is now: %ld", p->seed);
+                level->mc_seed = p->seed;
 
                 break;
             }
