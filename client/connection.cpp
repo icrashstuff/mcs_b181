@@ -512,8 +512,13 @@ void connection_t::run(level_t* const level)
             {
                 CAST_PACK_TO_P(packet_player_look_t);
 
-                level->pitch = SDL_clamp(-p->pitch, -89.0f, 89.0f);
+                level->pitch = SDL_clamp(-p->pitch, -89.95f, 89.95f);
+
                 level->yaw = p->yaw + 90.0f;
+                level->yaw = SDL_fmodf(level->yaw, 360.0f);
+                if (level->yaw < 0.0f)
+                    level->yaw += 360.0f;
+
                 last_update_tick_camera = 0;
 
                 break;
@@ -532,8 +537,12 @@ void connection_t::run(level_t* const level)
                 CAST_PACK_TO_P(packet_player_pos_look_s2c_t);
 
                 level->camera_pos = { p->x, p->y, p->z };
-                level->pitch = SDL_clamp(-p->pitch, -89.0f, 89.0f);
+                level->pitch = SDL_clamp(-p->pitch, -89.95f, 89.95f);
+
                 level->yaw = p->yaw + 90.0f;
+                level->yaw = SDL_fmodf(level->yaw, 360.0f);
+                if (level->yaw < 0.0f)
+                    level->yaw += 360.0f;
 
                 in_world = true;
                 set_status_msg("");
