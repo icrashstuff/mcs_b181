@@ -902,20 +902,20 @@ static void process_event(SDL_Event& event, bool* done)
         if (mouse_grabbed)
         {
             // TODO: Add place block function
-            glm::vec3 cam_dir;
-            cam_dir.x = SDL_cosf(glm::radians(level->yaw)) * SDL_cosf(glm::radians(level->pitch));
-            cam_dir.y = SDL_sinf(glm::radians(level->pitch));
-            cam_dir.z = SDL_sinf(glm::radians(level->yaw)) * SDL_cosf(glm::radians(level->pitch));
+            glm::dvec3 cam_dir;
+            cam_dir.x = SDL_cos(glm::radians(level->yaw)) * SDL_cos(glm::radians(level->pitch));
+            cam_dir.y = SDL_sin(glm::radians(level->pitch));
+            cam_dir.z = SDL_sin(glm::radians(level->yaw)) * SDL_cos(glm::radians(level->pitch));
             cam_dir = glm::normalize(cam_dir);
 
-            glm::vec3 rotation_point = level->camera_pos /*+ glm::vec3(0.0f, (!crouching) ? 1.625f : 1.275f, 0.0f)*/;
+            glm::dvec3 rotation_point = level->camera_pos /*+ glm::vec3(0.0f, (!crouching) ? 1.625f : 1.275f, 0.0f)*/;
 
             itemstack_t block_at_ray;
             glm::ivec3 collapsed_ray;
-            glm::vec3 ray = rotation_point;
+            glm::dvec3 ray = rotation_point;
             {
                 bool found = 0;
-                for (int i = 0; !found && i <= 32 * 5; i++, ray += cam_dir / 32.0f)
+                for (int i = 0; !found && i <= 32 * 5; i++, ray += cam_dir / 32.0)
                 {
                     collapsed_ray = glm::floor(ray);
                     if (level->get_block(collapsed_ray, block_at_ray) && block_at_ray.id != BLOCK_ID_AIR && mc_id::is_block(block_at_ray.id))
@@ -1027,9 +1027,9 @@ static void process_event(SDL_Event& event, bool* done)
                     }
 
                     packet_player_place_t p;
-                    p.x = t.pos.x;
-                    p.y = t.pos.y;
-                    p.z = t.pos.z;
+                    p.x = collapsed_ray.x;
+                    p.y = collapsed_ray.y;
+                    p.z = collapsed_ray.z;
                     p.direction = 1;
                     p.block_item_id = hand.id;
                     p.amount = 0;
