@@ -1054,6 +1054,9 @@ static void process_event(SDL_Event& event, bool* done)
 
         if (event.motion.xrel != 0.0f)
             level->yaw = SDL_fmodf(level->yaw + event.motion.xrel * sensitivity, 360.0f);
+
+        if (level->yaw < 0.0f)
+            level->yaw += 360.0f;
     }
 
     if (event.type == SDL_EVENT_KEY_DOWN)
