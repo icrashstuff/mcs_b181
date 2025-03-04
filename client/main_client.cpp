@@ -1046,10 +1046,10 @@ static void process_event(SDL_Event& event, bool* done)
         if (event.motion.yrel != 0.0f)
         {
             level->pitch -= event.motion.yrel * sensitivity;
-            if (level->pitch > 89.0f)
-                level->pitch = 89.0f;
-            if (level->pitch < -89.0f)
-                level->pitch = -89.0f;
+            if (level->pitch > 89.95f)
+                level->pitch = 89.95f;
+            if (level->pitch < -89.95f)
+                level->pitch = -89.95f;
         }
 
         if (event.motion.xrel != 0.0f)
@@ -1692,7 +1692,7 @@ int main(const int argc, const char** argv)
 
                 ImGui::Text("Camera: <%.1f, %.1f, %.1f>", level->camera_pos.x, level->camera_pos.y, level->camera_pos.z);
 
-                ImGui::SliderFloat("Camera Pitch", &level->pitch, -89.0f, 89.0f);
+                ImGui::SliderFloat("Camera Pitch", &level->pitch, -89.95f, 89.95f);
                 ImGui::SliderFloat("Camera Yaw", &level->yaw, 0.0f, 360.0f);
                 ImGui::InputFloat("Camera X", &level->camera_pos.x, 1.0f);
                 ImGui::InputFloat("Camera Y", &level->camera_pos.y, 1.0f);
