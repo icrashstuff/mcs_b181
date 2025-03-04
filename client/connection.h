@@ -142,6 +142,9 @@ struct connection_t
 
     ~connection_t();
 
+    /** For F3 debug screen */
+    inline size_t get_size_ent_id_map() { return ent_id_map.size(); };
+
 private:
     void set_status_msg(const std::string translation_id, const std::string _sub_status = "");
 

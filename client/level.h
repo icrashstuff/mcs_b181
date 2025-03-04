@@ -248,7 +248,7 @@ struct level_t
 
     inventory_player_t inventory;
 
-    Sint64 mc_seed;
+    Sint64 mc_seed = 0;
 
 private:
     mc_id::gamemode_t gamemode = mc_id::GAMEMODE_SPECTATOR;

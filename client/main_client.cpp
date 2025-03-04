@@ -221,6 +221,8 @@ static bool wireframe = 0;
 static bool reload_resources = 0;
 #define AO_ALGO_MAX 5
 
+static convar_int_t cvr_debug_screen("debug_screen", 0, 0, 1, "Enable debug screen (F3 menu)", CONVAR_FLAG_SAVE);
+
 #include "main_client.menu.cpp"
 
 #define GLM_TO_IM(A) ImVec2((A).x, (A).y)
@@ -510,6 +512,9 @@ void render_world_overlays(level_t* level, ImDrawList* const bg_draw_list)
     }
 }
 
+void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist);
+void do_debug_crosshair(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist);
+
 static void normal_loop()
 {
     bool warp_mouse_to_center = 0;
@@ -762,25 +767,34 @@ static void normal_loop()
 
         render_hotbar(mc_gui::global_ctx, bg_draw_list);
 
-        /* This blendfunc causes properly made cursors to contrast with the environment better */
-        bg_draw_list->AddCallback([](const ImDrawList*, const ImDrawCmd*) { glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_ALPHA); }, NULL);
-
-        /* Render crosshair
-         * NOTE: If a function called by client_menu_manager.run_last_in_stack() adds to
-         * the background draw list then the crosshair will be drawn on top!
-         */
-        const ImVec2 center = ImGui::GetMainViewport()->GetWorkCenter();
-        const float scale = cvr_r_crosshair_scale.get() * SDL_min(3, mc_gui::global_ctx->menu_scale);
-        const ImVec2 pos0(center - ImVec2(8.0f, 8.0f) * scale);
-        const ImVec2 pos1(center + ImVec2(8.0f, 8.0f) * scale);
-        const ImVec2 uv0(240.0f / 256.0f, 0.0f);
-        const ImVec2 uv1(1.0f, 16.0f / 256.0f);
-        if (cvr_r_crosshair_widgets.get())
-            bg_draw_list->AddImage(reinterpret_cast<ImTextureID>(mc_gui::global_ctx->tex_id_widgets), pos0, pos1, uv0, uv1);
+        if (cvr_debug_screen.get())
+        {
+            do_debug_crosshair(mc_gui::global_ctx, game, bg_draw_list);
+            do_debug_screen(mc_gui::global_ctx, game, bg_draw_list);
+        }
         else
-            bg_draw_list->AddImage(reinterpret_cast<ImTextureID>(mc_gui::global_ctx->tex_id_crosshair), pos0, pos1);
-        bg_draw_list->AddCallback(ImDrawCallback_ResetRenderState, NULL);
+        {
+            /* This blendfunc causes properly made cursors to contrast with the environment better */
+            bg_draw_list->AddCallback([](const ImDrawList*, const ImDrawCmd*) { glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_ALPHA); }, NULL);
 
+            /* Render crosshair
+             * NOTE: If a function called by client_menu_manager.run_last_in_stack() adds to
+             * the background draw list then the crosshair will be drawn on top!
+             */
+            const ImVec2 center = ImGui::GetMainViewport()->GetWorkCenter();
+            const float scale = cvr_r_crosshair_scale.get() * SDL_min(3, mc_gui::global_ctx->menu_scale);
+            const ImVec2 pos0(center - ImVec2(8.0f, 8.0f) * scale);
+            const ImVec2 pos1(center + ImVec2(8.0f, 8.0f) * scale);
+            const ImVec2 uv0(240.0f / 256.0f, 0.0f);
+            const ImVec2 uv1(1.0f, 16.0f / 256.0f);
+            if (cvr_r_crosshair_widgets.get())
+                bg_draw_list->AddImage(reinterpret_cast<ImTextureID>(mc_gui::global_ctx->tex_id_widgets), pos0, pos1, uv0, uv1);
+            else
+                bg_draw_list->AddImage(reinterpret_cast<ImTextureID>(mc_gui::global_ctx->tex_id_crosshair), pos0, pos1);
+            bg_draw_list->AddCallback(ImDrawCallback_ResetRenderState, NULL);
+        }
+
+        /* Draw world dim */
         if (client_menu_manager.stack_size())
             bg_draw_list->AddRectFilled(ImVec2(-32, -32), ImGui::GetMainViewport()->Size + ImVec2(32, 32), IM_COL32(32, 32, 32, 255 * 0.5f));
     }
@@ -835,6 +849,9 @@ static void process_event(SDL_Event& event, bool* done)
 
     if (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_F2 && !event.key.repeat)
         take_screenshot = 1;
+
+    if (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_F3 && !event.key.repeat)
+        cvr_debug_screen.set(!cvr_debug_screen.get());
 
     if (tetra::imgui_ctx_main_wants_input())
         return;
@@ -1601,6 +1618,7 @@ int main(const int argc, const char** argv)
         engine_state_step();
 
         tetra::show_imgui_ctx_main(engine_state_current != ENGINE_STATE_RUNNING);
+        tetra::show_imgui_ctx_overlay(!game_selected || !cvr_debug_screen.get());
 
         if (tetra::imgui_ctx_main_wants_input())
             mouse_grabbed = 0;

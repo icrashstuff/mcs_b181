@@ -1212,6 +1212,11 @@ private:
     pool_container_type pools;
     group_container_type groups;
     storage_for_type<entity_type> entities;
+public:
+    /**
+     * Addition by mcs_b181, so that entities can be counted
+     */
+    const decltype(entities)* get_entities() { return &entities; }
 };
 
 } // namespace entt

@@ -57,6 +57,7 @@ set(mcs_b181_client_SRC
 
     client/gui/mc_gui.cpp
     client/gui/panorama.cpp
+    client/gui/debug_screen.cpp
 
     shared/ids.cpp
     shared/misc.cpp

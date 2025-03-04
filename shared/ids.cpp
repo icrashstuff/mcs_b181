@@ -569,6 +569,19 @@ bool mc_id::is_translucent(short block_id)
     }
 }
 
+bool mc_id::is_fluid(short block_id)
+{
+    switch (block_id)
+    {
+        ADD_NAME(BLOCK_ID_WATER_FLOWING, 1);
+        ADD_NAME(BLOCK_ID_WATER_SOURCE, 1);
+        ADD_NAME(BLOCK_ID_LAVA_FLOWING, 1);
+        ADD_NAME(BLOCK_ID_LAVA_SOURCE, 1);
+    default:
+        return 0;
+    }
+}
+
 bool mc_id::is_transparent(short block_id)
 {
     switch (block_id)

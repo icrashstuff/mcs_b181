@@ -438,6 +438,8 @@ struct block_return_t
 
 SDL_FORCE_INLINE bool is_block(short block_id) { return BETWEEN_EXCL(block_id, BLOCK_ID_NONE, BLOCK_ID_NUM_USED); };
 
+bool is_fluid(short block_id);
+
 bool is_transparent(short block_id);
 
 bool is_leaves_style_transparent(short block_id);
