@@ -361,6 +361,28 @@ void connection_t::run(level_t* const level)
             {
                 CAST_PACK_TO_P(packet_login_request_s2c_t);
 
+                const level_t::dimension_switch_result switch_result = level->dimension_switch(p->dimension);
+
+                switch (switch_result)
+                {
+                case level_t::DIM_SWITCH_ALREADY_IN_USE:
+                {
+                    break;
+                }
+                case level_t::DIM_SWITCH_INVALID_DIM:
+                {
+                    status = CONNECTION_FAILED;
+                    break;
+                }
+                case level_t::DIM_SWITCH_SUCCESSFUL:
+                {
+                    ent_id_map.clear();
+                    in_world = 0;
+                    set_status_msg("multiplayer.downloadingTerrain");
+                    break;
+                }
+                }
+
                 player_eid_server = p->player_eid;
 
                 level->ecs.emplace_or_replace<entity_food_t>(level->player_eid,
@@ -393,12 +415,6 @@ void connection_t::run(level_t* const level)
                 level->mc_seed = p->seed;
                 dc_log("Seed is: %ld", p->seed);
                 max_players = p->max_players;
-                if (p->dimension == -1)
-                    level->lightmap.set_preset(lightmap_t::LIGHTMAP_PRESET_NETHER);
-                else
-                    level->lightmap.set_preset(lightmap_t::LIGHTMAP_PRESET_OVERWORLD);
-
-                set_status_msg("multiplayer.downloadingTerrain");
 
                 break;
             }
