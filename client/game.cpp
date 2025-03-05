@@ -110,6 +110,14 @@ static convar_int_t cvr_world_y_off_neg("dev_world_y_off_neg", 6, 0, 32, "Negati
 void game_t::create_testworld()
 {
     level->clear();
+    level->camera_pos = { -38, -12.7, -52 };
+    level->camera_direction = { 1, 0, 0 };
+    level->camera_right = { 1, 0, 0 };
+    level->camera_up = { 0, 1, 0 };
+    level->yaw = 119.0f;
+    level->pitch = -45.0f;
+    level->fov = -1.0f;
+    level->mc_seed = 1;
 
     const int world_size = cvr_world_size.get();
     std::vector<chunk_cubic_t*> gen_chunks;
@@ -123,7 +131,7 @@ void game_t::create_testworld()
             if (world_size < 4)
                 c_old.generate_from_seed_over(1, i / world_size - world_size / 2, i % world_size - world_size / 2);
             else
-                c_old.generate_from_seed_over(1, i / world_size - world_size + 4, i % world_size - world_size + 4);
+                c_old.generate_from_seed_over(1, i / world_size - world_size + 6, i % world_size - world_size + 6);
             for (int j = 0; j < 8; j++)
             {
                 chunk_cubic_t* c = new chunk_cubic_t();
