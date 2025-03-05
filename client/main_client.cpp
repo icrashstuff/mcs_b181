@@ -1612,7 +1612,23 @@ int main(const int argc, const char** argv)
         delta_time = (double)last_loop_time / 1000000000.0;
         SDL_GetWindowSize(tetra::window, &win_width, &win_height);
         glViewport(0, 0, win_width, win_height);
-        glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
+        if (game_selected)
+        {
+            switch (game_selected->level->dimension_get())
+            {
+            case mc_id::DIMENSION_OVERWORLD:
+                glClearColor(0.452f, 0.677f, 1.0f, 1.0f);
+                break;
+            case mc_id::DIMENSION_NETHER:
+                glClearColor(0.2f, 0.03f, 0.03f, 1.0f);
+                break;
+            case mc_id::DIMENSION_END:
+                glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
+                break;
+            }
+        }
+        else
+            glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
 
         engine_state_step();
