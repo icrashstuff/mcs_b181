@@ -461,6 +461,7 @@ void connection_t::run(level_t* const level)
                 }
                 case level_t::DIM_SWITCH_SUCCESSFUL:
                 {
+                    ent_id_map.clear();
                     in_world = 0;
                     set_status_msg("multiplayer.downloadingTerrain");
                     break;

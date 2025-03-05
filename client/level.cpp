@@ -1530,12 +1530,16 @@ bool level_t::gamemode_set(int x)
 
 void level_t::clear()
 {
+    chunks_light_order.clear();
     chunks_render_order.clear();
     cmap.clear();
-    cmap.clear();
 
-    /* TODO: In the future if the player is stored here, they shouldn't be deleted */
-    ecs.clear();
+    // for(auto entity: ecs.view<entt::entity>(entt::exclude<T>)) { ... }
+    for (auto entity : ecs.view<ent_id_t>())
+    {
+        if (entity != player_eid)
+            ecs.destroy(entity);
+    }
 }
 
 level_t::dimension_switch_result level_t::dimension_switch(const int dim)
