@@ -209,7 +209,7 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
     }
 }
 
-void do_debug_crosshair(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist)
+void do_debug_crosshair(mc_gui::mc_gui_ctx*, game_t* game, ImDrawList* drawlist)
 {
     const ImVec2 work_size = ImGui::GetMainViewport()->WorkSize;
     const ImVec2 work_center = ImGui::GetMainViewport()->GetWorkCenter();
@@ -225,15 +225,19 @@ void do_debug_crosshair(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawl
     y = y * mat_rot;
     z = z * mat_rot;
 
-    float scale = SDL_min(work_size.x, work_size.y) * 0.05f;
+    float scale = SDL_min(work_size.x, work_size.y) * 0.03125f;
     float weight = scale / 16.0f;
 
     int dir = (int(game->level->yaw + 360.f - 45.f) % 360) / 90;
 
+    drawlist->AddLine(work_center, work_center + ImVec2(z.x, z.y) * scale, IM_COL32_BLACK, weight + 2.5f);
+    drawlist->AddLine(work_center, work_center + ImVec2(x.x, x.y) * scale, IM_COL32_BLACK, weight + 2.5f);
+    drawlist->AddLine(work_center, work_center + ImVec2(y.x, y.y) * scale, IM_COL32_BLACK, weight + 2.5f);
+
     if (dir != 0 && dir != 3)
         drawlist->AddLine(work_center, work_center + ImVec2(y.x, y.y) * scale, IM_COL32(0, 255, 0, 255), weight);
 
-    drawlist->AddLine(work_center, work_center + ImVec2(z.x, z.y) * scale, IM_COL32(0, 0, 255, 255), weight);
+    drawlist->AddLine(work_center, work_center + ImVec2(z.x, z.y) * scale, IM_COL32(127, 127, 255, 255), weight);
     drawlist->AddLine(work_center, work_center + ImVec2(x.x, x.y) * scale, IM_COL32(255, 0, 0, 255), weight);
 
     if (dir == 0 || dir == 3)
