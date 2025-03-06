@@ -46,7 +46,7 @@ static convar_int_t cvr_r_smooth_lighting {
     0,
     1,
     "Use smooth lighting",
-    CONVAR_FLAG_SAVE | CONVAR_FLAG_DEV_ONLY,
+    CONVAR_FLAG_SAVE,
 };
 
 #if (FORCE_OPT_MESH)
