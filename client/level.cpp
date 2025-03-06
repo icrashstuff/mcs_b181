@@ -1125,7 +1125,7 @@ bool level_t::get_block(const glm::ivec3 pos, block_id_t& type, Uint8& metadata)
     auto it = cmap.find(chunk_pos);
     if (it == cmap.end())
     {
-        dc_log_error("Unable to find chunk <%d, %d, %d>", chunk_pos.x, chunk_pos.y, chunk_pos.z);
+        TRACE("Unable to find chunk <%d, %d, %d>", chunk_pos.x, chunk_pos.y, chunk_pos.z);
         return false;
     }
 
