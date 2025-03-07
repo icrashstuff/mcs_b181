@@ -867,3 +867,205 @@ const char* mc_id::gamemode_get_trans_id(gamemode_t x)
 bool mc_id::gamemode_is_valid(int a) { return GAMEMODE_SURVIVAL <= a && a <= GAMEMODE_SPECTATOR; }
 
 bool mc_id::dimension_is_valid(int a) { return DIMENSION_NETHER == a || a == DIMENSION_OVERWORLD; }
+
+#include <shared/cubiomes/biomes.h>
+
+static_assert((int)mc_id::BIOME_OCEAN == (int)ocean);
+static_assert((int)mc_id::BIOME_PLAINS == (int)plains);
+static_assert((int)mc_id::BIOME_DESERT == (int)desert);
+static_assert((int)mc_id::BIOME_MOUNTAINS == (int)mountains);
+static_assert((int)mc_id::BIOME_FOREST == (int)forest);
+static_assert((int)mc_id::BIOME_TAIGA == (int)taiga);
+static_assert((int)mc_id::BIOME_SWAMP == (int)swamp);
+static_assert((int)mc_id::BIOME_RIVER == (int)river);
+static_assert((int)mc_id::BIOME_NETHER_WASTES == (int)nether_wastes);
+static_assert((int)mc_id::BIOME_THE_END == (int)the_end);
+
+/* Values pulled from the biome data files for 1.21.4 */
+float mc_id::get_biome_downfall(int biome_id)
+{
+    switch (biome_id)
+    {
+        ADD_NAME(mc_id::BIOME_OCEAN, 0.5);
+        ADD_NAME(mc_id::BIOME_PLAINS, 0.4);
+        ADD_NAME(mc_id::BIOME_DESERT, 0.0);
+        ADD_NAME(mc_id::BIOME_MOUNTAINS, 0.3);
+        ADD_NAME(mc_id::BIOME_FOREST, 0.8);
+        ADD_NAME(mc_id::BIOME_TAIGA, 0.8);
+        ADD_NAME(mc_id::BIOME_SWAMP, 0.9);
+        ADD_NAME(mc_id::BIOME_RIVER, 0.5);
+        ADD_NAME(mc_id::BIOME_NETHER_WASTES, 0.0);
+        ADD_NAME(mc_id::BIOME_THE_END, 0.5);
+
+    default:
+        return 0.5f;
+    };
+}
+
+/* Values pulled from the biome data files for 1.21.4 */
+float mc_id::get_biome_temperature(int biome_id)
+{
+    switch (biome_id)
+    {
+        ADD_NAME(mc_id::BIOME_OCEAN, 0.5);
+        ADD_NAME(mc_id::BIOME_PLAINS, 0.8);
+        ADD_NAME(mc_id::BIOME_DESERT, 2.0);
+        ADD_NAME(mc_id::BIOME_MOUNTAINS, 0.2);
+        ADD_NAME(mc_id::BIOME_FOREST, 0.7);
+        ADD_NAME(mc_id::BIOME_TAIGA, 0.25);
+        // ADD_NAME(mc_id::BIOME_SWAMP, 0.8);
+        ADD_NAME(mc_id::BIOME_SWAMP, 0.7);
+        ADD_NAME(mc_id::BIOME_RIVER, 0.5);
+        ADD_NAME(mc_id::BIOME_NETHER_WASTES, 2.0);
+        ADD_NAME(mc_id::BIOME_THE_END, 0.5);
+
+    default:
+        return 0.5f;
+    };
+}
+
+const char* mc_id::get_biome_name(int biome_id)
+{
+    switch (biome_id)
+    {
+        ADD_NAME(mc_id::BIOME_OCEAN, "Ocean");
+        ADD_NAME(mc_id::BIOME_PLAINS, "Plains");
+        ADD_NAME(mc_id::BIOME_DESERT, "Desert");
+        ADD_NAME(mc_id::BIOME_MOUNTAINS, "Mountains");
+        ADD_NAME(mc_id::BIOME_FOREST, "Forest");
+        ADD_NAME(mc_id::BIOME_TAIGA, "Taiga");
+        ADD_NAME(mc_id::BIOME_SWAMP, "Swamp");
+        ADD_NAME(mc_id::BIOME_RIVER, "River");
+        ADD_NAME(mc_id::BIOME_NETHER_WASTES, "Nether Wastes");
+        ADD_NAME(mc_id::BIOME_THE_END, "The End");
+
+    default:
+        return "Unknown biome";
+    };
+}
+
+/* Values pulled from the biome data files for 1.21.4 or the wiki */
+glm::vec3 mc_id::get_biome_color_grass(int biome_id)
+{
+    switch (biome_id)
+    {
+        ADD_NAME(mc_id::BIOME_OCEAN, (glm::vec3 { 0.5569f, 0.7255f, 0.4431f }));
+        ADD_NAME(mc_id::BIOME_PLAINS, (glm::vec3 { 0.5686f, 0.7412f, 0.3490f }));
+        ADD_NAME(mc_id::BIOME_DESERT, (glm::vec3 { 0.7490f, 0.7176f, 0.3333f }));
+        ADD_NAME(mc_id::BIOME_MOUNTAINS, (glm::vec3 { 0.5412f, 0.7137f, 0.5373f }));
+        ADD_NAME(mc_id::BIOME_FOREST, (glm::vec3 { 0.4745f, 0.7529f, 0.3529f }));
+        ADD_NAME(mc_id::BIOME_TAIGA, (glm::vec3 { 0.5255f, 0.7176f, 0.5137f }));
+        ADD_NAME(mc_id::BIOME_SWAMP, (glm::vec3 { 0.4157f, 0.4392f, 0.2235f }));
+        ADD_NAME(mc_id::BIOME_RIVER, (glm::vec3 { 0.5569f, 0.7255f, 0.4431f }));
+        ADD_NAME(mc_id::BIOME_NETHER_WASTES, (glm::vec3 { 0.7490f, 0.7176f, 0.3333f }));
+        ADD_NAME(mc_id::BIOME_THE_END, (glm::vec3 { 0.5569f, 0.7255f, 0.4431f }));
+
+    default:
+        return glm::vec3 { 1.0f, 0.0f, 1.0f };
+    };
+}
+
+/* Values pulled from the biome data files for 1.21.4 or the wiki */
+glm::vec3 mc_id::get_biome_color_foliage(int biome_id)
+{
+    switch (biome_id)
+    {
+        ADD_NAME(mc_id::BIOME_OCEAN, (glm::vec3 { 0.4431f, 0.6549f, 0.3020f }));
+        ADD_NAME(mc_id::BIOME_PLAINS, (glm::vec3 { 0.4667f, 0.6706f, 0.1843f }));
+        ADD_NAME(mc_id::BIOME_DESERT, (glm::vec3 { 0.6824f, 0.6431f, 0.1647f }));
+        ADD_NAME(mc_id::BIOME_MOUNTAINS, (glm::vec3 { 0.4275f, 0.6392f, 0.4196f }));
+        ADD_NAME(mc_id::BIOME_FOREST, (glm::vec3 { 0.3490f, 0.6824f, 0.1882f }));
+        ADD_NAME(mc_id::BIOME_TAIGA, (glm::vec3 { 0.4078f, 0.6431f, 0.3922f }));
+        ADD_NAME(mc_id::BIOME_SWAMP, (glm::vec3 { 0.4157f, 0.4392f, 0.2235f }));
+        ADD_NAME(mc_id::BIOME_RIVER, (glm::vec3 { 0.4431f, 0.6549f, 0.3020f }));
+        ADD_NAME(mc_id::BIOME_NETHER_WASTES, (glm::vec3 { 0.6824f, 0.6431f, 0.1647f }));
+        ADD_NAME(mc_id::BIOME_THE_END, (glm::vec3 { 0.4431f, 0.6549f, 0.3020f }));
+
+    default:
+        return glm::vec3 { 1.0f, 0.0f, 1.0f };
+    };
+}
+
+/* Values pulled from the biome data files for 1.21.4 or the wiki */
+glm::vec3 mc_id::get_biome_color_sky(int biome_id)
+{
+    switch (biome_id)
+    {
+        ADD_NAME(mc_id::BIOME_OCEAN, (glm::vec3 { 0.4824f, 0.6431f, 1.0000f }));
+        ADD_NAME(mc_id::BIOME_PLAINS, (glm::vec3 { 0.4706f, 0.6549f, 1.0000f }));
+        ADD_NAME(mc_id::BIOME_DESERT, (glm::vec3 { 0.4314f, 0.6941f, 1.0000f }));
+        ADD_NAME(mc_id::BIOME_MOUNTAINS, (glm::vec3 { 0.4902f, 0.6353f, 1.0000f }));
+        ADD_NAME(mc_id::BIOME_FOREST, (glm::vec3 { 0.4745f, 0.6510f, 1.0000f }));
+        ADD_NAME(mc_id::BIOME_TAIGA, (glm::vec3 { 0.4902f, 0.6392f, 1.0000f }));
+        ADD_NAME(mc_id::BIOME_SWAMP, (glm::vec3 { 0.4706f, 0.6549f, 1.0000f }));
+        ADD_NAME(mc_id::BIOME_RIVER, (glm::vec3 { 0.4824f, 0.6431f, 1.0000f }));
+        ADD_NAME(mc_id::BIOME_NETHER_WASTES, (glm::vec3 { 0.4314f, 0.6941f, 1.0000f }));
+        ADD_NAME(mc_id::BIOME_THE_END, (glm::vec3 { 0.0000f, 0.0000f, 0.0000f }));
+
+    default:
+        return glm::vec3 { 1.0f, 0.0f, 1.0f };
+    };
+}
+
+/* Values pulled from the biome data files for 1.21.4 or the wiki */
+glm::vec3 mc_id::get_biome_color_water(int biome_id)
+{
+    switch (biome_id)
+    {
+        ADD_NAME(mc_id::BIOME_OCEAN, (glm::vec3 { 0.2471f, 0.4627f, 0.8941f }));
+        ADD_NAME(mc_id::BIOME_PLAINS, (glm::vec3 { 0.2471f, 0.4627f, 0.8941f }));
+        ADD_NAME(mc_id::BIOME_DESERT, (glm::vec3 { 0.2471f, 0.4627f, 0.8941f }));
+        ADD_NAME(mc_id::BIOME_MOUNTAINS, (glm::vec3 { 0.2471f, 0.4627f, 0.8941f }));
+        ADD_NAME(mc_id::BIOME_FOREST, (glm::vec3 { 0.2471f, 0.4627f, 0.8941f }));
+        ADD_NAME(mc_id::BIOME_TAIGA, (glm::vec3 { 0.2471f, 0.4627f, 0.8941f }));
+        ADD_NAME(mc_id::BIOME_SWAMP, (glm::vec3 { 0.3804f, 0.4824f, 0.3922f }));
+        ADD_NAME(mc_id::BIOME_RIVER, (glm::vec3 { 0.2471f, 0.4627f, 0.8941f }));
+        ADD_NAME(mc_id::BIOME_NETHER_WASTES, (glm::vec3 { 0.2471f, 0.4627f, 0.8941f }));
+        ADD_NAME(mc_id::BIOME_THE_END, (glm::vec3 { 0.2471f, 0.4627f, 0.8941f }));
+
+    default:
+        return glm::vec3 { 1.0f, 0.0f, 1.0f };
+    };
+}
+
+/* Values pulled from the biome data files for 1.21.4 or the wiki */
+glm::vec3 mc_id::get_biome_color_fog_water(int biome_id)
+{
+    switch (biome_id)
+    {
+        ADD_NAME(mc_id::BIOME_OCEAN, (glm::vec3 { 0.0196f, 0.0196f, 0.2000f }));
+        ADD_NAME(mc_id::BIOME_PLAINS, (glm::vec3 { 0.0196f, 0.0196f, 0.2000f }));
+        ADD_NAME(mc_id::BIOME_DESERT, (glm::vec3 { 0.0196f, 0.0196f, 0.2000f }));
+        ADD_NAME(mc_id::BIOME_MOUNTAINS, (glm::vec3 { 0.0196f, 0.0196f, 0.2000f }));
+        ADD_NAME(mc_id::BIOME_FOREST, (glm::vec3 { 0.0196f, 0.0196f, 0.2000f }));
+        ADD_NAME(mc_id::BIOME_TAIGA, (glm::vec3 { 0.0196f, 0.0196f, 0.2000f }));
+        ADD_NAME(mc_id::BIOME_SWAMP, (glm::vec3 { 0.1373f, 0.1373f, 0.0902f }));
+        ADD_NAME(mc_id::BIOME_RIVER, (glm::vec3 { 0.0196f, 0.0196f, 0.2000f }));
+        ADD_NAME(mc_id::BIOME_NETHER_WASTES, (glm::vec3 { 0.0196f, 0.0196f, 0.2000f }));
+        ADD_NAME(mc_id::BIOME_THE_END, (glm::vec3 { 0.0196f, 0.0196f, 0.2000f }));
+
+    default:
+        return glm::vec3 { 1.0f, 0.0f, 1.0f };
+    };
+}
+
+/* Values pulled from the biome data files for 1.21.4 or the wiki */
+glm::vec3 mc_id::get_biome_color_fog(int biome_id)
+{
+    switch (biome_id)
+    {
+        ADD_NAME(mc_id::BIOME_OCEAN, (glm::vec3 { 0.7529f, 0.8471f, 1.0000f }));
+        ADD_NAME(mc_id::BIOME_PLAINS, (glm::vec3 { 0.7529f, 0.8471f, 1.0000f }));
+        ADD_NAME(mc_id::BIOME_DESERT, (glm::vec3 { 0.7529f, 0.8471f, 1.0000f }));
+        ADD_NAME(mc_id::BIOME_MOUNTAINS, (glm::vec3 { 0.7529f, 0.8471f, 1.0000f }));
+        ADD_NAME(mc_id::BIOME_FOREST, (glm::vec3 { 0.7529f, 0.8471f, 1.0000f }));
+        ADD_NAME(mc_id::BIOME_TAIGA, (glm::vec3 { 0.7529f, 0.8471f, 1.0000f }));
+        ADD_NAME(mc_id::BIOME_SWAMP, (glm::vec3 { 0.7529f, 0.8471f, 1.0000f }));
+        ADD_NAME(mc_id::BIOME_RIVER, (glm::vec3 { 0.7529f, 0.8471f, 1.0000f }));
+        ADD_NAME(mc_id::BIOME_NETHER_WASTES, (glm::vec3 { 0.2000f, 0.0314f, 0.0314f }));
+        ADD_NAME(mc_id::BIOME_THE_END, (glm::vec3 { 0.6275f, 0.5020f, 0.6275f }));
+
+    default:
+        return glm::vec3 { 1.0f, 0.0f, 1.0f };
+    };
+}

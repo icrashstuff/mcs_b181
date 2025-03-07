@@ -85,6 +85,8 @@ add_subdirectory(tetra/)
 
 add_subdirectory(client/entt)
 
+add_subdirectory(shared/cubiomes/)
+
 list(APPEND CMAKE_MODULE_PATH "${CMAKE_CURRENT_SOURCE_DIR}/cmake/")
 include(GetGitRevisionDescription)
 
@@ -121,4 +123,6 @@ add_bin_common(mcs_b181_client)
 
 target_link_libraries(mcs_b181_client OpenAL::OpenAL)
 target_link_libraries(mcs_b181_client EnTT::EnTT)
+target_link_libraries(mcs_b181_client cubiomes_static)
 
+target_link_libraries(mcs_b181_server cubiomes_static)

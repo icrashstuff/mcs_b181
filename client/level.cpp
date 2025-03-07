@@ -1502,6 +1502,8 @@ level_t::level_t(texture_terrain_t* const _terrain)
     last_tick = SDL_GetTicks() / 50;
 
     player_eid = ecs.create();
+
+    generator_create();
 }
 
 level_t::~level_t()
@@ -1512,6 +1514,8 @@ level_t::~level_t()
     glDeleteVertexArrays(1, &ent_missing_vao);
     for (chunk_cubic_t* c : chunks_render_order)
         delete c;
+
+    generator_destroy();
 }
 
 bool level_t::gamemode_set(int x)

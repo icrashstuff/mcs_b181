@@ -49,6 +49,15 @@ static convar_int_t cvr_r_smooth_lighting {
     CONVAR_FLAG_SAVE,
 };
 
+static convar_int_t cvr_r_biome_oversample {
+    "r_biome_blend_limit",
+    0,
+    0,
+    16,
+    "Limit of biome blending",
+    CONVAR_FLAG_SAVE,
+};
+
 #if (FORCE_OPT_MESH)
 #pragma GCC push_options
 #pragma GCC optimize("Og")
@@ -100,6 +109,12 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
     for (int i = 0; i < IM_ARRAYSIZE(is_leaves_style_transparent); i++)
         is_leaves_style_transparent[i] = mc_id::is_leaves_style_transparent(i);
 
+    /** Index: [x + 1][y + 1] */
+    glm::vec3 biome_colors[18][18];
+    float biome_temperature[18][18];
+    float biome_downfall[18][18];
+    generate_climate_colors(glm::ivec3(chunk_x, chunk_y, chunk_z), biome_colors, biome_temperature, biome_downfall);
+
     /** Index: [x+1][y+1][z+1] */
     block_id_t stypes[3][3][3];
     Uint8 smetadata[3][3][3];
@@ -126,6 +141,14 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
 
         float r = 1.0f, g = 1.0f, b = 1.0f;
         float r_overlay = r, g_overlay = g, b_overlay = b;
+        float r_0x_0z = r, g_0x_0z = g, b_0x_0z = b;
+        float r_0x_1z = r, g_0x_1z = g, b_0x_1z = b;
+        float r_1x_0z = r, g_1x_0z = g, b_1x_0z = b;
+        float r_1x_1z = r, g_1x_1z = g, b_1x_1z = b;
+        float r_overlay_0x_0z = r, g_overlay_0x_0z = g, b_overlay_0x_0z = b;
+        float r_overlay_0x_1z = r, g_overlay_0x_1z = g, b_overlay_0x_1z = b;
+        float r_overlay_1x_0z = r, g_overlay_1x_0z = g, b_overlay_1x_0z = b;
+        float r_overlay_1x_1z = r, g_overlay_1x_1z = g, b_overlay_1x_1z = b;
 
         /* std::move does actually increase speed in non-debug situations, don't remove it */
 #define SHIFT_BLOCK_INFO(ORG, NEW)                      \
@@ -668,25 +691,79 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
         }
         }
 
-        if (type == BLOCK_ID_GRASS)
-            r_overlay = 0.2f, g_overlay = 0.8f, b_overlay = 0.2f;
-        if (type == BLOCK_ID_MOSS || type == BLOCK_ID_FOLIAGE)
-            r = 0.2f, g = 0.8f, b = 0.2f;
-        else if (type == BLOCK_ID_LEAVES)
+        if (type == BLOCK_ID_GRASS || type == BLOCK_ID_LEAVES || type == BLOCK_ID_FOLIAGE || type == BLOCK_ID_MOSS)
         {
-            switch (metadata)
+#define AVG_BIOME_COL(X, Z) glm::vec3(biome_colors[X][Z] + biome_colors[X + 1][Z] + biome_colors[X][Z + 1] + biome_colors[X + 1][Z + 1])
+            glm::vec3 col_0x_0z = AVG_BIOME_COL(x + 0, z + 0) * 0.25f;
+            glm::vec3 col_0x_1z = AVG_BIOME_COL(x + 0, z + 1) * 0.25f;
+            glm::vec3 col_1x_0z = AVG_BIOME_COL(x + 1, z + 0) * 0.25f;
+            glm::vec3 col_1x_1z = AVG_BIOME_COL(x + 1, z + 1) * 0.25f;
+
+            if (!cvr_r_biome_oversample.get())
             {
-            case WOOD_ID_SPRUCE:
-                r = 0.380f, g = 0.600f, b = 0.380f;
-                break;
-            case WOOD_ID_BIRCH:
-                r = 0.502f, g = 0.655f, b = 0.333f;
-                break;
-            case WOOD_ID_OAK: /* Fall through */
-            default:
-                r = 0.2f, g = 1.0f, b = 0.2f;
-                break;
+                col_0x_0z = (col_0x_0z + col_0x_1z + col_1x_0z + col_1x_1z) * 0.25f;
+                col_0x_1z = col_0x_0z, col_1x_0z = col_0x_0z, col_1x_1z = col_0x_0z;
             }
+
+            r_overlay_0x_0z = col_0x_0z.r;
+            g_overlay_0x_0z = col_0x_0z.g;
+            b_overlay_0x_0z = col_0x_0z.b;
+
+            r_overlay_0x_1z = col_0x_1z.r;
+            g_overlay_0x_1z = col_0x_1z.g;
+            b_overlay_0x_1z = col_0x_1z.b;
+
+            r_overlay_1x_0z = col_1x_0z.r;
+            g_overlay_1x_0z = col_1x_0z.g;
+            b_overlay_1x_0z = col_1x_0z.b;
+
+            r_overlay_1x_1z = col_1x_1z.r;
+            g_overlay_1x_1z = col_1x_1z.g;
+            b_overlay_1x_1z = col_1x_1z.b;
+        }
+
+        if (type == BLOCK_ID_LEAVES || (type == BLOCK_ID_FOLIAGE && metadata != 0) || type == BLOCK_ID_MOSS)
+        {
+            r_0x_0z = r_overlay_0x_0z, g_0x_0z = g_overlay_0x_0z, b_0x_0z = b_overlay_0x_0z;
+            r_0x_1z = r_overlay_0x_1z, g_0x_1z = g_overlay_0x_1z, b_0x_1z = b_overlay_0x_1z;
+            r_1x_0z = r_overlay_1x_0z, g_1x_0z = g_overlay_1x_0z, b_1x_0z = b_overlay_1x_0z;
+            r_1x_1z = r_overlay_1x_1z, g_1x_1z = g_overlay_1x_1z, b_1x_1z = b_overlay_1x_1z;
+
+            float lr, lg, lb;
+            if (type == BLOCK_ID_FOLIAGE)
+                goto skip_default_tint;
+
+            if (type == BLOCK_ID_LEAVES)
+            {
+                switch (metadata)
+                {
+                case WOOD_ID_SPRUCE:
+                    lr = 0.380f, lg = 0.600f, lb = 0.380f;
+                    r_0x_0z = (lr + r_0x_0z) * 0.5f, g_0x_0z = (lr + g_0x_0z) * 0.5f, b_0x_0z = (lr + b_0x_0z) * 0.5f;
+                    r_0x_1z = (lr + r_0x_1z) * 0.5f, g_0x_1z = (lr + g_0x_1z) * 0.5f, b_0x_1z = (lr + b_0x_1z) * 0.5f;
+                    r_1x_0z = (lr + r_1x_0z) * 0.5f, g_1x_0z = (lr + g_1x_0z) * 0.5f, b_1x_0z = (lr + b_1x_0z) * 0.5f;
+                    r_1x_1z = (lr + r_1x_1z) * 0.5f, g_1x_1z = (lr + g_1x_1z) * 0.5f, b_1x_1z = (lr + b_1x_1z) * 0.5f;
+                    goto skip_default_tint;
+                case WOOD_ID_BIRCH:
+                    lr = 0.502f, lg = 0.655f, lb = 0.333f;
+                    r_0x_0z = (lr + r_0x_0z) * 0.5f, g_0x_0z = (lr + g_0x_0z) * 0.5f, b_0x_0z = (lr + b_0x_0z) * 0.5f;
+                    r_0x_1z = (lr + r_0x_1z) * 0.5f, g_0x_1z = (lr + g_0x_1z) * 0.5f, b_0x_1z = (lr + b_0x_1z) * 0.5f;
+                    r_1x_0z = (lr + r_1x_0z) * 0.5f, g_1x_0z = (lr + g_1x_0z) * 0.5f, b_1x_0z = (lr + b_1x_0z) * 0.5f;
+                    r_1x_1z = (lr + r_1x_1z) * 0.5f, g_1x_1z = (lr + g_1x_1z) * 0.5f, b_1x_1z = (lr + b_1x_1z) * 0.5f;
+                    goto skip_default_tint;
+                case WOOD_ID_OAK: /* Fall through */
+                default:
+                    break;
+                }
+            }
+
+            lr = 0.900f, lg = 1.000f, lb = 0.900f;
+            r_0x_0z = (lr * r_0x_0z), g_0x_0z = (lr * g_0x_0z), b_0x_0z = (lr * b_0x_0z);
+            r_0x_1z = (lr * r_0x_1z), g_0x_1z = (lr * g_0x_1z), b_0x_1z = (lr * b_0x_1z);
+            r_1x_0z = (lr * r_1x_0z), g_1x_0z = (lr * g_1x_0z), b_1x_0z = (lr * b_1x_0z);
+            r_1x_1z = (lr * r_1x_1z), g_1x_1z = (lr * g_1x_1z), b_1x_1z = (lr * b_1x_1z);
+
+        skip_default_tint:;
         }
 
 #define UAO(X) (!is_transparent[stypes X])
@@ -841,22 +918,22 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
 
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 0), Sint16(z * 16 + 1), ao[0] },
-                    { r, g, b, bl[0], slight_sky[1][1][1] },
+                    { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl[0], slight_sky[1][1][1] },
                     faces[0].corners[3],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 16), Sint16(z * 16 + 1), ao[1] },
-                    { r, g, b, bl[1], slight_sky[1][1][1] },
+                    { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl[1], slight_sky[1][1][1] },
                     faces[0].corners[1],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 0), Sint16(z * 16 + 15), ao[2] },
-                    { r, g, b, bl[2], slight_sky[1][1][1] },
+                    { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl[2], slight_sky[1][1][1] },
                     faces[0].corners[2],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 16), Sint16(z * 16 + 15), ao[3] },
-                    { r, g, b, bl[3], slight_sky[1][1][1] },
+                    { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl[3], slight_sky[1][1][1] },
                     faces[0].corners[0],
                 });
             }
@@ -869,22 +946,22 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
 
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 16), Sint16(z * 16 + 15), ao[3] },
-                    { r, g, b, bl[3], slight_sky[1][1][1] },
+                    { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl[3], slight_sky[1][1][1] },
                     faces[3].corners[1],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 16), Sint16(z * 16 + 1), ao[1] },
-                    { r, g, b, bl[1], slight_sky[1][1][1] },
+                    { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl[1], slight_sky[1][1][1] },
                     faces[3].corners[0],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 0), Sint16(z * 16 + 15), ao[2] },
-                    { r, g, b, bl[2], slight_sky[1][1][1] },
+                    { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl[2], slight_sky[1][1][1] },
                     faces[3].corners[3],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 0), Sint16(z * 16 + 1), ao[0] },
-                    { r, g, b, bl[0], slight_sky[1][1][1] },
+                    { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl[0], slight_sky[1][1][1] },
                     faces[3].corners[2],
                 });
             }
@@ -897,22 +974,22 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
 
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 16), Sint16(z * 16 + 15), ao[3] },
-                    { r, g, b, bl[3], slight_sky[1][1][1] },
+                    { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl[3], slight_sky[1][1][1] },
                     faces[2].corners[1],
                 });
                 vtx->push_back({
-                    { 1, Sint16(x * 16 + 0), Sint16(y * 16 + 16), Sint16(z * 16 + 0), ao[1] },
-                    { r, g, b, bl[1], slight_sky[1][1][1] },
+                    { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 16), Sint16(z * 16 + 1), ao[1] },
+                    { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl[1], slight_sky[1][1][1] },
                     faces[2].corners[0],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 0), Sint16(z * 16 + 15), ao[2] },
-                    { r, g, b, bl[2], slight_sky[1][1][1] },
+                    { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl[2], slight_sky[1][1][1] },
                     faces[2].corners[3],
                 });
                 vtx->push_back({
-                    { 1, Sint16(x * 16 + 0), Sint16(y * 16 + 0), Sint16(z * 16 + 0), ao[0] },
-                    { r, g, b, bl[0], slight_sky[1][1][1] },
+                    { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 0), Sint16(z * 16 + 1), ao[0] },
+                    { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl[0], slight_sky[1][1][1] },
                     faces[2].corners[2],
                 });
             }
@@ -925,22 +1002,22 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
 
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 0), Sint16(z * 16 + 1), ao[0] },
-                    { r, g, b, bl[0], slight_sky[1][1][1] },
+                    { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl[0], slight_sky[1][1][1] },
                     faces[5].corners[3],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 16), Sint16(z * 16 + 1), ao[1] },
-                    { r, g, b, bl[1], slight_sky[1][1][1] },
+                    { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl[1], slight_sky[1][1][1] },
                     faces[5].corners[1],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 0), Sint16(z * 16 + 15), ao[2] },
-                    { r, g, b, bl[2], slight_sky[1][1][1] },
+                    { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl[2], slight_sky[1][1][1] },
                     faces[5].corners[2],
                 });
                 vtx->push_back({
                     { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 16), Sint16(z * 16 + 15), ao[3] },
-                    { r, g, b, bl[3], slight_sky[1][1][1] },
+                    { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl[3], slight_sky[1][1][1] },
                     faces[5].corners[0],
                 });
             }
@@ -1632,22 +1709,22 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
 
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
-                    { r, g, b, bl[3].get(), sl[3].get() },
+                    { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl[3].get(), sl[3].get() },
                     faces[1].corners[0],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[1] },
-                    { r, g, b, bl[1].get(), sl[1].get() },
+                    { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl[1].get(), sl[1].get() },
                     faces[1].corners[2],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[2] },
-                    { r, g, b, bl[2].get(), sl[2].get() },
+                    { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl[2].get(), sl[2].get() },
                     faces[1].corners[1],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[0] },
-                    { r, g, b, bl[0].get(), sl[0].get() },
+                    { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl[0].get(), sl[0].get() },
                     faces[1].corners[3],
                 });
 
@@ -1655,22 +1732,22 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                 {
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
-                        { r_overlay, g_overlay, b_overlay, bl[3].get(), sl[3].get() },
+                        { r_overlay * r_overlay_1x_1z, g_overlay * g_overlay_1x_1z, b_overlay * b_overlay_1x_1z, bl[3].get(), sl[3].get() },
                         faces_overlay[1].corners[0],
                     });
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[1] },
-                        { r_overlay, g_overlay, b_overlay, bl[1].get(), sl[1].get() },
+                        { r_overlay * r_overlay_1x_0z, g_overlay * g_overlay_1x_0z, b_overlay * b_overlay_1x_0z, bl[1].get(), sl[1].get() },
                         faces_overlay[1].corners[2],
                     });
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[2] },
-                        { r_overlay, g_overlay, b_overlay, bl[2].get(), sl[2].get() },
+                        { r_overlay * r_overlay_0x_1z, g_overlay * g_overlay_0x_1z, b_overlay * b_overlay_0x_1z, bl[2].get(), sl[2].get() },
                         faces_overlay[1].corners[1],
                     });
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[0] },
-                        { r_overlay, g_overlay, b_overlay, bl[0].get(), sl[0].get() },
+                        { r_overlay * r_overlay_0x_0z, g_overlay * g_overlay_0x_0z, b_overlay * b_overlay_0x_0z, bl[0].get(), sl[0].get() },
                         faces_overlay[1].corners[3],
                     });
                 }
@@ -1698,22 +1775,22 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
 
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
-                    { r, g, b, bl[0].get(), sl[0].get() },
+                    { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl[0].get(), sl[0].get() },
                     faces[4].corners[1],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[1] },
-                    { r, g, b, bl[1].get(), sl[1].get() },
+                    { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl[1].get(), sl[1].get() },
                     faces[4].corners[0],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 1), ao[2] },
-                    { r, g, b, bl[2].get(), sl[2].get() },
+                    { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl[2].get(), sl[2].get() },
                     faces[4].corners[3],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 1), ao[3] },
-                    { r, g, b, bl[3].get(), sl[3].get() },
+                    { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl[3].get(), sl[3].get() },
                     faces[4].corners[2],
                 });
 
@@ -1721,22 +1798,22 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                 {
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
-                        { r_overlay, g_overlay, b_overlay, bl[0].get(), sl[0].get() },
+                        { r_overlay * r_overlay_0x_0z, g_overlay * g_overlay_0x_0z, b_overlay * b_overlay_0x_0z, bl[0].get(), sl[0].get() },
                         faces_overlay[4].corners[1],
                     });
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[1] },
-                        { r_overlay, g_overlay, b_overlay, bl[1].get(), sl[1].get() },
+                        { r_overlay * r_overlay_1x_0z, g_overlay * g_overlay_1x_0z, b_overlay * b_overlay_1x_0z, bl[1].get(), sl[1].get() },
                         faces_overlay[4].corners[0],
                     });
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 1), ao[2] },
-                        { r_overlay, g_overlay, b_overlay, bl[2].get(), sl[2].get() },
+                        { r_overlay * r_overlay_0x_1z, g_overlay * g_overlay_0x_1z, b_overlay * b_overlay_0x_1z, bl[2].get(), sl[2].get() },
                         faces_overlay[4].corners[3],
                     });
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 1), ao[3] },
-                        { r_overlay, g_overlay, b_overlay, bl[3].get(), sl[3].get() },
+                        { r_overlay * r_overlay_1x_1z, g_overlay * g_overlay_1x_1z, b_overlay * b_overlay_1x_1z, bl[3].get(), sl[3].get() },
                         faces_overlay[4].corners[2],
                     });
                 }
@@ -1764,22 +1841,22 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
 
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[0] },
-                    { r, g, b, bl[0].get(), sl[0].get() },
+                    { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl[0].get(), sl[0].get() },
                     faces[0].corners[3],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[1] },
-                    { r, g, b, bl[1].get(), sl[1].get() },
+                    { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl[1].get(), sl[1].get() },
                     faces[0].corners[1],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 1), ao[2] },
-                    { r, g, b, bl[2].get(), sl[2].get() },
+                    { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl[2].get(), sl[2].get() },
                     faces[0].corners[2],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
-                    { r, g, b, bl[3].get(), sl[3].get() },
+                    { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl[3].get(), sl[3].get() },
                     faces[0].corners[0],
                 });
 
@@ -1787,22 +1864,22 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                 {
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[0] },
-                        { r_overlay, g_overlay, b_overlay, bl[0].get(), sl[0].get() },
+                        { r_overlay * r_overlay_1x_0z, g_overlay * g_overlay_1x_0z, b_overlay * b_overlay_1x_0z, bl[0].get(), sl[0].get() },
                         faces_overlay[0].corners[3],
                     });
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[1] },
-                        { r_overlay, g_overlay, b_overlay, bl[1].get(), sl[1].get() },
+                        { r_overlay * r_overlay_1x_0z, g_overlay * g_overlay_1x_0z, b_overlay * b_overlay_1x_0z, bl[1].get(), sl[1].get() },
                         faces_overlay[0].corners[1],
                     });
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 1), ao[2] },
-                        { r_overlay, g_overlay, b_overlay, bl[2].get(), sl[2].get() },
+                        { r_overlay * r_overlay_1x_1z, g_overlay * g_overlay_1x_1z, b_overlay * b_overlay_1x_1z, bl[2].get(), sl[2].get() },
                         faces_overlay[0].corners[2],
                     });
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
-                        { r_overlay, g_overlay, b_overlay, bl[3].get(), sl[3].get() },
+                        { r_overlay * r_overlay_1x_1z, g_overlay * g_overlay_1x_1z, b_overlay * b_overlay_1x_1z, bl[3].get(), sl[3].get() },
                         faces_overlay[0].corners[0],
                     });
                 }
@@ -1830,22 +1907,22 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
 
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[3] },
-                    { r, g, b, bl[3].get(), sl[3].get() },
+                    { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl[3].get(), sl[3].get() },
                     faces[3].corners[1],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[1] },
-                    { r, g, b, bl[1].get(), sl[1].get() },
+                    { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl[1].get(), sl[1].get() },
                     faces[3].corners[0],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 1), ao[2] },
-                    { r, g, b, bl[2].get(), sl[2].get() },
+                    { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl[2].get(), sl[2].get() },
                     faces[3].corners[3],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
-                    { r, g, b, bl[0].get(), sl[0].get() },
+                    { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl[0].get(), sl[0].get() },
                     faces[3].corners[2],
                 });
 
@@ -1853,22 +1930,22 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                 {
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[3] },
-                        { r_overlay, g_overlay, b_overlay, bl[3].get(), sl[3].get() },
+                        { r_overlay * r_overlay_0x_1z, g_overlay * g_overlay_0x_1z, b_overlay * b_overlay_0x_1z, bl[3].get(), sl[3].get() },
                         faces_overlay[3].corners[1],
                     });
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[1] },
-                        { r_overlay, g_overlay, b_overlay, bl[1].get(), sl[1].get() },
+                        { r_overlay * r_overlay_0x_0z, g_overlay * g_overlay_0x_0z, b_overlay * b_overlay_0x_0z, bl[1].get(), sl[1].get() },
                         faces_overlay[3].corners[0],
                     });
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 1), ao[2] },
-                        { r_overlay, g_overlay, b_overlay, bl[2].get(), sl[2].get() },
+                        { r_overlay * r_overlay_0x_1z, g_overlay * g_overlay_0x_1z, b_overlay * b_overlay_0x_1z, bl[2].get(), sl[2].get() },
                         faces_overlay[3].corners[3],
                     });
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
-                        { r_overlay, g_overlay, b_overlay, bl[0].get(), sl[0].get() },
+                        { r_overlay * r_overlay_0x_0z, g_overlay * g_overlay_0x_0z, b_overlay * b_overlay_0x_0z, bl[0].get(), sl[0].get() },
                         faces_overlay[3].corners[2],
                     });
                 }
@@ -1896,22 +1973,22 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
 
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
-                    { r, g, b, bl[3].get(), sl[3].get() },
+                    { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl[3].get(), sl[3].get() },
                     faces[2].corners[1],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[1] },
-                    { r, g, b, bl[2].get(), sl[2].get() },
+                    { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl[2].get(), sl[2].get() },
                     faces[2].corners[0],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 1), ao[2] },
-                    { r, g, b, bl[1].get(), sl[1].get() },
+                    { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl[1].get(), sl[1].get() },
                     faces[2].corners[3],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 1), ao[0] },
-                    { r, g, b, bl[0].get(), sl[0].get() },
+                    { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl[0].get(), sl[0].get() },
                     faces[2].corners[2],
                 });
 
@@ -1919,22 +1996,22 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                 {
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
-                        { r_overlay, g_overlay, b_overlay, bl[3].get(), sl[3].get() },
+                        { r_overlay * r_overlay_1x_1z, g_overlay * g_overlay_1x_1z, b_overlay * b_overlay_1x_1z, bl[3].get(), sl[3].get() },
                         faces_overlay[2].corners[1],
                     });
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[1] },
-                        { r_overlay, g_overlay, b_overlay, bl[2].get(), sl[2].get() },
+                        { r_overlay * r_overlay_0x_1z, g_overlay * g_overlay_0x_1z, b_overlay * b_overlay_0x_1z, bl[2].get(), sl[2].get() },
                         faces_overlay[2].corners[0],
                     });
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 1), ao[2] },
-                        { r_overlay, g_overlay, b_overlay, bl[1].get(), sl[1].get() },
+                        { r_overlay * r_overlay_1x_1z, g_overlay * g_overlay_1x_1z, b_overlay * b_overlay_1x_1z, bl[1].get(), sl[1].get() },
                         faces_overlay[2].corners[3],
                     });
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 1), ao[0] },
-                        { r_overlay, g_overlay, b_overlay, bl[0].get(), sl[0].get() },
+                        { r_overlay * r_overlay_0x_1z, g_overlay * g_overlay_0x_1z, b_overlay * b_overlay_0x_1z, bl[0].get(), sl[0].get() },
                         faces_overlay[2].corners[2],
                     });
                 }
@@ -1962,22 +2039,22 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
 
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
-                    { r, g, b, bl[0].get(), sl[0].get() },
+                    { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl[0].get(), sl[0].get() },
                     faces[5].corners[3],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[1] },
-                    { r, g, b, bl[2].get(), sl[2].get() },
+                    { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl[2].get(), sl[2].get() },
                     faces[5].corners[1],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[2] },
-                    { r, g, b, bl[1].get(), sl[1].get() },
+                    { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl[1].get(), sl[1].get() },
                     faces[5].corners[2],
                 });
                 vtx->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[3] },
-                    { r, g, b, bl[3].get(), sl[3].get() },
+                    { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl[3].get(), sl[3].get() },
                     faces[5].corners[0],
                 });
 
@@ -1985,22 +2062,22 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
                 {
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
-                        { r_overlay, g_overlay, b_overlay, bl[0].get(), sl[0].get() },
+                        { r_overlay * r_overlay_0x_0z, g_overlay * g_overlay_0x_0z, b_overlay * b_overlay_0x_0z, bl[0].get(), sl[0].get() },
                         faces_overlay[5].corners[3],
                     });
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[1] },
-                        { r_overlay, g_overlay, b_overlay, bl[2].get(), sl[2].get() },
+                        { r_overlay * r_overlay_0x_0z, g_overlay * g_overlay_0x_0z, b_overlay * b_overlay_0x_0z, bl[2].get(), sl[2].get() },
                         faces_overlay[5].corners[1],
                     });
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[2] },
-                        { r_overlay, g_overlay, b_overlay, bl[1].get(), sl[1].get() },
+                        { r_overlay * r_overlay_1x_0z, g_overlay * g_overlay_1x_0z, b_overlay * b_overlay_1x_0z, bl[1].get(), sl[1].get() },
                         faces_overlay[5].corners[2],
                     });
                     vtx_overlay.push_back({
                         { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[3] },
-                        { r_overlay, g_overlay, b_overlay, bl[3].get(), sl[3].get() },
+                        { r_overlay * r_overlay_1x_0z, g_overlay * g_overlay_1x_0z, b_overlay * b_overlay_1x_0z, bl[3].get(), sl[3].get() },
                         faces_overlay[5].corners[0],
                     });
                 }
@@ -2049,6 +2126,177 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
     glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, pos));
     glVertexAttribIPointer(1, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, col));
     glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, tex));
+}
+
+#include "shared/cubiomes/biomes.h"
+#include "shared/cubiomes/generator.h"
+
+#define GEN ((Generator*)(generator))
+
+void level_t::generator_create()
+{
+    generator = new Generator;
+    setupGenerator(GEN, MC_B1_8, 0);
+}
+
+void level_t::generator_destroy() { delete GEN; }
+
+void level_t::generate_biome_ids(glm::ivec3 chunk_pos, std::vector<mc_id::biome_t>& biome_ids, int oversample)
+{
+    applySeed(GEN, DIM_OVERWORLD, mc_seed);
+
+    Range r = {
+        .scale = 1,
+        .x = chunk_pos.x * SUBCHUNK_SIZE_X - oversample,
+        .z = chunk_pos.z * SUBCHUNK_SIZE_Z - oversample,
+        .sx = SUBCHUNK_SIZE_X + 2 * oversample,
+        .sz = SUBCHUNK_SIZE_Z + 2 * oversample,
+        .y = chunk_pos.y * SUBCHUNK_SIZE_Y,
+        .sy = 1,
+    };
+
+    biome_ids.resize(getMinCacheSize(GEN, r.scale, r.sx, r.sy, r.sz));
+
+    switch (dimension)
+    {
+    case mc_id::DIMENSION_OVERWORLD:
+        static_assert(sizeof(mc_id::biome_t) == sizeof(int));
+        genBiomes(GEN, (int*)biome_ids.data(), r);
+        break;
+    case mc_id::DIMENSION_NETHER:
+        for (auto& it : biome_ids)
+            it = mc_id::BIOME_NETHER_WASTES;
+        break;
+    case mc_id::DIMENSION_END:
+        for (auto& it : biome_ids)
+            it = mc_id::BIOME_THE_END;
+        break;
+    }
+}
+
+/**
+ * One dimensional Gaussian blur function
+ */
+SDL_FORCE_INLINE float gauss(const float x, const float sigma)
+{
+    return (1.0f / sqrtf(SDL_PI_F * 2.0f * sigma * sigma)) * expf(-(x * x) / (2.0f * sigma * sigma));
+}
+
+SDL_FORCE_INLINE const glm::vec3 get_color_map(const float temperature, const float humidity)
+{
+    glm::vec3 ret(0.0f);
+
+    float temp = SDL_clamp(temperature, 0.0f, 1.0f);
+    float rain = SDL_clamp(humidity, 0.0f, 1.0f);
+
+    rain = rain * temp;
+
+    ret.r = ((temp + rain) * 90.0 + 30.0) / 255.0;
+    ret.g = ((rain) * 55.0 + 180.0) / 255.0;
+    ret.b = ((1.0 - temp) * 80.0 + 50.0) / 255.0;
+
+    return ret;
+}
+
+void level_t::generate_climate_colors(const glm::ivec3 chunk_pos, glm::vec3 colors[18][18], float temperature[18][18], float humidity[18][18])
+{
+    generate_climate_parameters(chunk_pos, temperature, humidity);
+    for (int i = 0; i < 18; i++)
+        for (int j = 0; j < 18; j++)
+            colors[i][j] = get_color_map(temperature[i][j], humidity[i][j]);
+}
+
+void level_t::generate_climate_parameters(const glm::ivec3 chunk_pos, float temperature[18][18], float humidity[18][18])
+{
+    const int biome_oversample = cvr_r_biome_oversample.get();
+    std::vector<mc_id::biome_t> biome_ids;
+    generate_biome_ids(chunk_pos, biome_ids, biome_oversample + 1);
+
+    float get_biome_temperature[mc_id::BIOME_NUM_BIOMES];
+    float get_biome_downfall[mc_id::BIOME_NUM_BIOMES];
+
+    for (int i = 0; i < IM_ARRAYSIZE(get_biome_temperature); i++)
+        get_biome_temperature[i] = mc_id::get_biome_temperature(i);
+
+    for (int i = 0; i < IM_ARRAYSIZE(get_biome_downfall); i++)
+        get_biome_downfall[i] = mc_id::get_biome_downfall(i);
+
+    const int array_width = SUBCHUNK_SIZE_X + (1 + biome_oversample) * 2;
+
+    /* If blurring isn't requested, then just write out the unmodified values */
+    if (biome_oversample == 0)
+    {
+        for (int x = 0; x < array_width; x++)
+            for (int z = 0; z < array_width; z++)
+            {
+                mc_id::biome_t id = biome_ids[z * array_width + x];
+                assert(BETWEEN_INCL(id, 0, mc_id::BIOME_NUM_BIOMES - 1));
+                temperature[x][z] = mc_id::get_biome_temperature(id);
+                humidity[x][z] = mc_id::get_biome_downfall(id);
+            }
+        return;
+    }
+
+    /* Gaussian blur climate values, (This is broken) */
+
+    std::vector<float> tmp0_temp;
+    std::vector<float> tmp0_rain;
+    tmp0_temp.resize(array_width * array_width, 0.0f);
+    tmp0_rain.resize(array_width * array_width, 0.0f);
+
+    /* Setup Gaussian blur */
+    const float sigma = (biome_oversample + 0.5f) / 3.0f;
+    std::vector<float> kernel_;
+    kernel_.reserve(biome_oversample * 2 + 3);
+    kernel_.push_back(0.0f);
+    for (int i = -biome_oversample; i <= biome_oversample; i++)
+        kernel_.push_back(gauss(i, sigma));
+    kernel_.push_back(0.0f);
+    const float* const kernel = kernel_.data() + biome_oversample + 1;
+
+    /* Clear output arrays */
+    for (int x = 0; x < 18; x++)
+        for (int z = 0; z < 18; z++)
+            temperature[x][z] = 0.0f, humidity[x][z] = 0.0f;
+
+#define IDX(X, Z) ((Z + biome_oversample) * array_width + (X + biome_oversample))
+
+    /* Blur on X axis */
+    for (int x = 0; x < 18; x++)
+        for (int z = 0; z < array_width; z++)
+            for (int i = -biome_oversample; i <= biome_oversample; i++)
+            {
+                tmp0_temp[z * array_width + x + biome_oversample] += kernel[i] * get_biome_temperature[biome_ids[IDX(x + i, z)]];
+                tmp0_rain[z * array_width + x + biome_oversample] += kernel[i] * get_biome_downfall[biome_ids[IDX(x + i, z)]];
+            }
+
+    /* Blur on Z axis and write out */
+    for (int x = 0; x < 18; x++)
+        for (int z = 0; z < 18; z++)
+            for (int i = -biome_oversample; i <= biome_oversample; i++)
+            {
+                temperature[x][z] += kernel[i] * tmp0_temp[IDX(x, z + i)];
+                humidity[x][z] += kernel[i] * tmp0_rain[IDX(x, z + i)];
+            }
+}
+
+mc_id::biome_t level_t::get_biome_at(const glm::ivec3 pos)
+{
+    switch (dimension)
+    {
+    case mc_id::DIMENSION_OVERWORLD:
+        static_assert(sizeof(mc_id::biome_t) == sizeof(int));
+        applySeed(GEN, DIM_OVERWORLD, mc_seed);
+        return mc_id::biome_t(getBiomeAt(GEN, 1, pos.x, pos.y, pos.z));
+        break;
+    case mc_id::DIMENSION_NETHER:
+        return mc_id::BIOME_NETHER_WASTES;
+        break;
+    case mc_id::DIMENSION_END:
+        return mc_id::BIOME_THE_END;
+        break;
+    }
+    return mc_id::BIOME_OCEAN;
 }
 
 #if (FORCE_OPT_MESH)

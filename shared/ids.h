@@ -413,6 +413,23 @@ enum dimension_t : jbyte
     DIMENSION_END = 1,
 };
 
+/** Mirrors the biome ids from cubiomes */
+enum biome_t : int
+{
+    BIOME_OCEAN,
+    BIOME_PLAINS,
+    BIOME_DESERT,
+    BIOME_MOUNTAINS,
+    BIOME_FOREST,
+    BIOME_TAIGA,
+    BIOME_SWAMP,
+    BIOME_RIVER,
+    BIOME_NETHER_WASTES,
+    BIOME_THE_END,
+
+    BIOME_NUM_BIOMES,
+};
+
 bool gamemode_is_valid(int x);
 
 const char* gamemode_get_trans_id(gamemode_t x);
@@ -507,5 +524,50 @@ SDL_FORCE_INLINE int is_armor(short item_id)
  * Get max stack size for a given id
  */
 Uint8 get_max_quantity_for_id(short item_id);
+
+/**
+ * Gets the downfall value for a corresponding biome id
+ */
+float get_biome_downfall(int biome_id);
+
+/**
+ * Gets the temperature value for a corresponding biome id
+ */
+float get_biome_temperature(int biome_id);
+
+/**
+ * Gets the name for a corresponding biome id
+ */
+const char* get_biome_name(int biome_id);
+
+/**
+ * Gets the grass color for a corresponding biome id
+ */
+glm::vec3 get_biome_color_grass(int biome_id);
+
+/**
+ * Gets the foliage color for a corresponding biome id
+ */
+glm::vec3 get_biome_color_foliage(int biome_id);
+
+/**
+ * Gets the sky color for a corresponding biome id
+ */
+glm::vec3 get_biome_color_sky(int biome_id);
+
+/**
+ * Gets the water color for a corresponding biome id
+ */
+glm::vec3 get_biome_color_water(int biome_id);
+
+/**
+ * Gets the water fog color for a corresponding biome id
+ */
+glm::vec3 get_biome_color_fog_water(int biome_id);
+
+/**
+ * Gets the fog color for a corresponding biome id
+ */
+glm::vec3 get_biome_color_fog(int biome_id);
 }
 #endif

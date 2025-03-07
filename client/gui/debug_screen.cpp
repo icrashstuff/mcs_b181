@@ -55,7 +55,7 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
     ImVec2 cursor_l(ctx->menu_scale * 2, ctx->menu_scale * 1.5f);
     ImVec2 cursor_r(ImGui::GetMainViewport()->Size.x - ctx->menu_scale * 2, ctx->menu_scale * 1.5f);
 
-    add_text(ctx, drawlist, 0, cursor_l, "mcs_b181_client (%s)", build_info::ver_string::client().c_str());
+    add_text(ctx, drawlist, 0, cursor_l, "mcs_b181_client (%s) (%.0f FPS)", build_info::ver_string::client().c_str(), ImGui::GetIO().Framerate);
 
     size_t mem_chunk_guess = 0;
     size_t mem_chunk_mesh_guess = 0;
@@ -102,6 +102,8 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
     cursor_l.y += get_y_spacing();
 
     add_text(ctx, drawlist, 0, cursor_l, "Seed: %ld", game->level->mc_seed);
+
+    add_text(ctx, drawlist, 0, cursor_l, "Biome: %s", mc_id::get_biome_name(game->level->get_biome_at(game->level->camera_pos)));
 
     /* ======================== RIGHT SIDE ======================== */
 

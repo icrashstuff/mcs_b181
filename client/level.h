@@ -193,6 +193,13 @@ struct level_t
     }
 
     /**
+     * Get biome id at position
+     *
+     * @param pos Position in block coordinates
+     */
+    mc_id::biome_t get_biome_at(const glm::ivec3 pos);
+
+    /**
      * Clears all chunks and entities
      */
     void clear();
@@ -332,6 +339,40 @@ private:
 
     /** Items should probably be removed from terrain **/
     texture_terrain_t* terrain;
+
+    /** Cubiomes generator */
+    void* generator = NULL;
+    void generator_create();
+    void generator_destroy();
+
+    /**
+     * Generates biome colors/climate values for a chunk with side strips for blending purposes
+     *
+     * @param chunk_pos Chunk position in chunk coordinates
+     * @param colors Output for color values, index: [x+1][y+1]
+     * @param temperature Output for temperature values, index: [x+1][y+1]
+     * @param humidity Output for humidity values, index: [x+1][y+1]
+     */
+    void generate_climate_colors(const glm::ivec3 chunk_pos, glm::vec3 colors[18][18], float temperature[18][18], float humidity[18][18]);
+
+    /**
+     * Generates temperature and humidity values for a chunk with side strips for blending purposes
+     *
+     * @param chunk_pos Chunk position in chunk coordinates
+     * @param temperature Output for temperature values, index: [x+1][y+1]
+     * @param humidity Output for humidity values, index: [x+1][y+1]
+     */
+    void generate_climate_parameters(const glm::ivec3 chunk_pos, float temperature[18][18], float humidity[18][18]);
+
+    /**
+     * Generate biome ids with a certain amount of oversample
+     *
+     * @param level Level to pull information from
+     * @param chunk_pos Chunk position in chunk coordinates
+     * @param biome_ids Output vector for biome ids, index: (Z * (oversample * 2 + SUBCHUNK_SIZE_X) + X)
+     * @param oversample Amount of blocks to oversample the ids by
+     */
+    void generate_biome_ids(const glm::ivec3 chunk_pos, std::vector<mc_id::biome_t>& biome_ids, const int oversample);
 };
 
 #endif
