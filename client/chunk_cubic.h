@@ -110,8 +110,19 @@ struct chunk_cubic_t
     {
         glDeleteVertexArrays(1, &vao);
         glDeleteBuffers(1, &vbo);
+        glDeleteBuffers(1, &ebo_translucent);
+
         vao = 0;
         vbo = 0;
+        ebo_translucent = 0;
+
+        index_count = 0;
+        index_count_overlay = 0;
+        index_count_translucent = 0;
+
+        index_type = GL_NONE;
+        index_type_overlay = GL_NONE;
+        index_type_translucent = GL_NONE;
     }
 
     CHUNK_CUBIC_INLINE Uint8 get_type(const int x, const int y, const int z)

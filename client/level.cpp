@@ -1349,7 +1349,7 @@ void level_t::render(const glm::ivec2 win_size)
     for (auto it = chunks_render_order.rbegin(); it != chunks_render_order.rend(); it = next(it))
     {
         chunk_cubic_t* c = *it;
-        if (c->index_type == GL_NONE || c->index_count == 0 || !c->visible)
+        if (c->index_type == GL_NONE || c->index_count == 0 || !c->visible || !c->vao)
             continue;
         assert(c->index_type == GL_UNSIGNED_INT);
         glBindVertexArray(c->vao);
@@ -1362,7 +1362,7 @@ void level_t::render(const glm::ivec2 win_size)
     for (auto it = chunks_render_order.rbegin(); it != chunks_render_order.rend(); it = next(it))
     {
         chunk_cubic_t* c = *it;
-        if (c->index_type == GL_NONE || c->index_count_overlay == 0 || !c->visible)
+        if (c->index_type == GL_NONE || c->index_count_overlay == 0 || !c->visible || !c->vao)
             continue;
         assert(c->index_type == GL_UNSIGNED_INT);
         glBindVertexArray(c->vao);
@@ -1386,7 +1386,7 @@ void level_t::render(const glm::ivec2 win_size)
 
     for (chunk_cubic_t* c : chunks_render_order)
     {
-        if (c->index_type == GL_NONE || c->index_count_translucent == 0 || !c->visible)
+        if (c->index_type == GL_NONE || c->index_count_translucent == 0 || !c->visible || !c->vao)
             continue;
         assert(c->index_type == GL_UNSIGNED_INT);
         glBindVertexArray(c->vao);
