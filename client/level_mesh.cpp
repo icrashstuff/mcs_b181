@@ -396,9 +396,9 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
             switch (metadata)
             {
                 BLOCK_SIMPLE(0, mc_id::FACE_DEADBUSH);
-                BLOCK_SIMPLE(1, mc_id::FACE_FERN);
+                BLOCK_SIMPLE(2, mc_id::FACE_FERN);
             default: /* Fall through */
-                BLOCK_SIMPLE(2, mc_id::FACE_TALLGRASS);
+                BLOCK_SIMPLE(1, mc_id::FACE_TALLGRASS);
             }
             break;
         }
