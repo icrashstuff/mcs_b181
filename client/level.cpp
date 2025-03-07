@@ -456,6 +456,7 @@ void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z
 
 #if defined(__SSE2__) && LEVEL_T_ENABLE_SSE2
     const __m128i one = _mm_set1_epi8(1);
+    __m128i last_strip = one;
     verify_packed_8_in_range(one, 1, 1);
 
     if (!cvr_use_sse2.get())
@@ -476,8 +477,6 @@ void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z
         data_light[dat_it] = packed & 0x0F;
         data_light[dat_it + 1] = (packed >> 4) & 0x0F;
     }
-
-    __m128i last_strip;
 
     /* Propagate light (SSE2) (Block) */
     for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_X * SUBCHUNK_SIZE_Z * (max_level - min_level); dat_it++)
@@ -812,6 +811,7 @@ void level_t::light_pass_sky(const int chunk_x, const int chunk_y, const int chu
 
 #if defined(__SSE2__) && LEVEL_T_ENABLE_SSE2
     const __m128i one = _mm_set1_epi8(1);
+    __m128i last_strip = one;
     verify_packed_8_in_range(one, 1, 1);
 
     if (!cvr_use_sse2.get())
@@ -832,8 +832,6 @@ void level_t::light_pass_sky(const int chunk_x, const int chunk_y, const int chu
         data_light[dat_it] = packed & 0x0F;
         data_light[dat_it + 1] = (packed >> 4) & 0x0F;
     }
-
-    __m128i last_strip;
 
     /* Propagate light (SSE2) (Sky) */
     for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_X * SUBCHUNK_SIZE_Z * (max_level - min_level); dat_it++)
