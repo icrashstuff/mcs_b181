@@ -591,6 +591,7 @@ bool mc_id::is_transparent(short block_id)
         ADD_NAME(BLOCK_ID_GLASS_PANE, 1);
         ADD_NAME(BLOCK_ID_IRON_BARS, 1);
         ADD_NAME(BLOCK_ID_BED, 1);
+        ADD_NAME(BLOCK_ID_CACTUS, 1);
         ADD_NAME(BLOCK_ID_DOOR_IRON, 1);
         ADD_NAME(BLOCK_ID_DOOR_WOOD, 1);
         ADD_NAME(BLOCK_ID_TORCH, 1);

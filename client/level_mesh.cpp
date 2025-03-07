@@ -550,7 +550,7 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
             BLOCK_SIMPLE(BLOCK_ID_SNOW, mc_id::FACE_SNOW);
             BLOCK_SIMPLE(BLOCK_ID_ICE, mc_id::FACE_ICE);
             BLOCK_SIMPLE(BLOCK_ID_SNOW_BLOCK, mc_id::FACE_SNOW);
-            BLOCK_SIMPLE(BLOCK_ID_CACTUS, mc_id::FACE_CACTUS_SIDE);
+            BLOCK_TNT(BLOCK_ID_CACTUS, mc_id::FACE_CACTUS_TOP, mc_id::FACE_CACTUS_BOTTOM, mc_id::FACE_CACTUS_SIDE);
             BLOCK_SIMPLE(BLOCK_ID_CLAY, mc_id::FACE_CLAY);
             BLOCK_SIMPLE(BLOCK_ID_SUGAR_CANE, mc_id::FACE_REEDS);
         case BLOCK_ID_JUKEBOX:
@@ -1571,6 +1571,174 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
 #undef FLUID_CALC_SIDE_HEIGHTS
         }
         /* ============ END: IS_FLUID ============ */
+        /* ============ BEGIN: IS_CACTI ============ */
+        else if (type == BLOCK_ID_CACTUS)
+        {
+            const Uint8 ao[] = { 0, 0, 0, 0 };
+            Uint8 bl_top = slight_block[1][1][1];
+            Uint8 bl_bot = slight_block[1][1][1];
+            Uint8 sl_top = slight_sky[1][1][1];
+            Uint8 sl_bot = slight_sky[1][1][1];
+
+            if (stypes[1][2][1] == BLOCK_ID_CACTUS)
+            {
+                bl_top = (slight_block[1][2][1] + bl_top) * 0.5f;
+                sl_top = (slight_sky[1][2][1] + sl_top) * 0.5f;
+            }
+
+            if (stypes[1][0][1] == BLOCK_ID_CACTUS)
+            {
+                bl_bot = (slight_block[1][0][1] + bl_bot) * 0.5f;
+                sl_bot = (slight_sky[1][0][1] + sl_bot) * 0.5f;
+            }
+
+            /* Positive Y */
+            if (stypes[1][2][1] != BLOCK_ID_CACTUS)
+            {
+                vtx->push_back({
+                    { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
+                    { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl_top, sl_top },
+                    faces[1].corners[0],
+                });
+                vtx->push_back({
+                    { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[1] },
+                    { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl_top, sl_top },
+                    faces[1].corners[2],
+                });
+                vtx->push_back({
+                    { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[2] },
+                    { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl_top, sl_top },
+                    faces[1].corners[1],
+                });
+                vtx->push_back({
+                    { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[0] },
+                    { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl_top, sl_top },
+                    faces[1].corners[3],
+                });
+            }
+
+            /* Negative Y */
+            if (stypes[1][0][1] != BLOCK_ID_CACTUS)
+            {
+                vtx->push_back({
+                    { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
+                    { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl_bot, sl_bot },
+                    faces[4].corners[1],
+                });
+                vtx->push_back({
+                    { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[1] },
+                    { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl_bot, sl_bot },
+                    faces[4].corners[0],
+                });
+                vtx->push_back({
+                    { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 1), ao[2] },
+                    { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl_bot, sl_bot },
+                    faces[4].corners[3],
+                });
+                vtx->push_back({
+                    { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 1), ao[3] },
+                    { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl_bot, sl_bot },
+                    faces[4].corners[2],
+                });
+            }
+
+            /* Positive X */
+            {
+                vtx->push_back({
+                    { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 00), Sint16(z * 16 + 00), ao[0] },
+                    { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl_bot, sl_bot },
+                    faces[0].corners[3],
+                });
+                vtx->push_back({
+                    { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 16), Sint16(z * 16 + 00), ao[1] },
+                    { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl_top, sl_top },
+                    faces[0].corners[1],
+                });
+                vtx->push_back({
+                    { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 00), Sint16(z * 16 + 16), ao[2] },
+                    { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl_bot, sl_bot },
+                    faces[0].corners[2],
+                });
+                vtx->push_back({
+                    { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 16), Sint16(z * 16 + 16), ao[3] },
+                    { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl_top, sl_top },
+                    faces[0].corners[0],
+                });
+            }
+
+            /* Negative X */
+            {
+                vtx->push_back({
+                    { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 16), Sint16(z * 16 + 16), ao[3] },
+                    { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl_top, sl_top },
+                    faces[3].corners[1],
+                });
+                vtx->push_back({
+                    { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 16), Sint16(z * 16 + 00), ao[1] },
+                    { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl_top, sl_top },
+                    faces[3].corners[0],
+                });
+                vtx->push_back({
+                    { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 00), Sint16(z * 16 + 16), ao[2] },
+                    { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl_bot, sl_bot },
+                    faces[3].corners[3],
+                });
+                vtx->push_back({
+                    { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 00), Sint16(z * 16 + 00), ao[0] },
+                    { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl_bot, sl_bot },
+                    faces[3].corners[2],
+                });
+            }
+
+            /* Positive Z */
+            {
+                vtx->push_back({
+                    { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 16), Sint16(z * 16 + 15), ao[3] },
+                    { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl_top, sl_top },
+                    faces[2].corners[1],
+                });
+                vtx->push_back({
+                    { 1, Sint16(x * 16 + 00), Sint16(y * 16 + 16), Sint16(z * 16 + 15), ao[1] },
+                    { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl_top, sl_top },
+                    faces[2].corners[0],
+                });
+                vtx->push_back({
+                    { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 00), Sint16(z * 16 + 15), ao[2] },
+                    { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl_bot, sl_bot },
+                    faces[2].corners[3],
+                });
+                vtx->push_back({
+                    { 1, Sint16(x * 16 + 00), Sint16(y * 16 + 00), Sint16(z * 16 + 15), ao[0] },
+                    { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl_bot, sl_bot },
+                    faces[2].corners[2],
+                });
+            }
+
+            /* Negative Z */
+            {
+                vtx->push_back({
+                    { 1, Sint16(x * 16 + 00), Sint16(y * 16 + 00), Sint16(z * 16 + 1), ao[0] },
+                    { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl_bot, sl_bot },
+                    faces[5].corners[3],
+                });
+                vtx->push_back({
+                    { 1, Sint16(x * 16 + 00), Sint16(y * 16 + 16), Sint16(z * 16 + 1), ao[1] },
+                    { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl_top, sl_top },
+                    faces[5].corners[1],
+                });
+                vtx->push_back({
+                    { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 00), Sint16(z * 16 + 1), ao[2] },
+                    { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl_bot, sl_bot },
+                    faces[5].corners[2],
+                });
+                vtx->push_back({
+                    { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 16), Sint16(z * 16 + 1), ao[3] },
+                    { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl_top, sl_top },
+                    faces[5].corners[0],
+                });
+            }
+        }
+        /* ============ END: IS_CACTI ============ */
         /* ============ BEGIN: IS_NORMAL ============ */
         else
         {
