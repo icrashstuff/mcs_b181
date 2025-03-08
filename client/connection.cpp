@@ -284,10 +284,10 @@ void connection_t::run(level_t* const level)
     for (auto it = ent_id_map.begin(); it != ent_id_map.end();)
     {
         auto* component = level->ecs.try_get<entity_timed_destroy_t>(it->second);
-        if (component)
+        if (component && component->server_entity && component->counter < 0)
         {
-            if (component->server_entity && component->counter < 0)
-                level->ecs.destroy(it->second);
+            level->ecs.destroy(it->second);
+            it = ent_id_map.erase(it);
         }
         else
             it++;
