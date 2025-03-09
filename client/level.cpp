@@ -1601,6 +1601,8 @@ void level_t::tick()
 
 void level_t::tick_real()
 {
+    lightmap.set_world_time(++mc_time);
+
     for (auto [entity, counter] : ecs.view<entity_timed_destroy_t>().each())
     {
         counter.counter--;

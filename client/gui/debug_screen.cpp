@@ -104,6 +104,7 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
     add_text(ctx, drawlist, 0, cursor_l, "Seed: %ld", game->level->mc_seed);
 
     add_text(ctx, drawlist, 0, cursor_l, "Biome: %s", mc_id::get_biome_name(game->level->get_biome_at(game->level->camera_pos)));
+    add_text(ctx, drawlist, 0, cursor_l, "Time: %ld (Day: %ld)", ((game->level->mc_time % 24000) + 24000) % 24000, game->level->mc_time / 24000);
 
     /* ======================== RIGHT SIDE ======================== */
 

@@ -522,6 +522,7 @@ void connection_t::run(level_t* const level)
             case PACKET_ID_UPDATE_TIME:
             {
                 CAST_PACK_TO_P(packet_time_update_t);
+                level->mc_time = p->time;
                 level->lightmap.set_world_time(p->time);
                 break;
             }
