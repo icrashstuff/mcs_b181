@@ -1731,6 +1731,8 @@ int main(const int argc, const char** argv)
 
                 ImGui::SliderFloat("Camera Pitch", &level->pitch, -89.95f, 89.95f);
                 ImGui::SliderFloat("Camera Yaw", &level->yaw, 0.0f, 360.0f);
+                ImGui::SliderFloat("Camera Offset Height", &level->camera_offset_height, -4.0f, 4.0f);
+                ImGui::SliderFloat("Camera Offset Radius", &level->camera_offset_radius, -4.0f, 4.0f);
                 ImGui::InputFloat("Foot X", &level->foot_pos.x, 1.0f);
                 ImGui::InputFloat("Foot Y", &level->foot_pos.y, 1.0f);
                 ImGui::InputFloat("Foot Z", &level->foot_pos.z, 1.0f);
