@@ -93,40 +93,6 @@ typedef jint eid_t;
 /** Minecraft Tick (50ms)*/
 typedef int mc_tick_t;
 
-/**
- * Fixed precision number (1/1048576)
- *
- * Ranges from -2^43 to 2^43
- */
-typedef Sint64 ecoord_t;
-
-/**
- * Fixed precision number (1/32) number used in entity packets
- *
- * Ranges from -2^26 to 2^26
- */
-typedef Sint32 ecoord_abs_t;
-
-#define ABSCOORD_ECOORD_SHIFT (20 - 5)
-
-#define ABSCOORD_TO_ECOORD(X) (ecoord_t(X) << ABSCOORD_ECOORD_SHIFT)
-#define ECOORD_TO_ABSCOORD(X) (ecoord_abs_t(ecoord_t((X)) >> ABSCOORD_ECOORD_SHIFT))
-
-#define BLOCKCOORD_TO_ECOORD(X) (ecoord_t(X) << ABSCOORD_ECOORD_SHIFT << 5)
-#define ECOORD_TO_BLOCKCOORD(X) (ecoord_t(X) >> ABSCOORD_ECOORD_SHIFT >> 5)
-
-#define CHUNKCOORD_TO_ECOORD(X) (ecoord_t(X) << ABSCOORD_ECOORD_SHIFT << 9)
-#define ECOORD_TO_CHUNKCOORD(X) (ecoord_t(X) >> ABSCOORD_ECOORD_SHIFT >> 9)
-
-#define ABSCOORD_TO_ECOORD_GLM(X) ((X) << ABSCOORD_ECOORD_SHIFT)
-#define ECOORD_TO_ABSCOORD_GLM(X) ((X) >> ABSCOORD_ECOORD_SHIFT)
-
-#define ABSCOORD_TO_ECOORD_GLM_LONG(X) ((X) << long(ABSCOORD_ECOORD_SHIFT))
-#define ECOORD_TO_ABSCOORD_GLM_LONG(X) ((X) >> long(ABSCOORD_ECOORD_SHIFT))
-
-#define ABSCOORD_ONE_BLOCK (ecoord_abs_t(32))
-#define ECOORD_ONE_BLOCK (ABSCOORD_TO_ECOORD(ABSCOORD_ONE_BLOCK))
-
 struct entity_base_t
 {
     /**
@@ -175,9 +141,7 @@ struct entity_health_t
 
 struct entity_transform_t
 {
-    ecoord_t x;
-    ecoord_t y;
-    ecoord_t z;
+    glm::f64vec3 pos;
 
     float pitch;
     float yaw;
@@ -186,7 +150,7 @@ struct entity_transform_t
     inline glm::mat4 get_mat() const
     {
         glm::mat4 model(1.0f);
-        model = glm::translate(model, glm::vec3(ECOORD_TO_ABSCOORD(x), ECOORD_TO_ABSCOORD(y), ECOORD_TO_ABSCOORD(z)) / 32.0f);
+        model = glm::translate(model, glm::vec3(pos));
         model = glm::scale(model, glm::vec3(1.0f) / 24.0f);
         model = glm::rotate(model, glm::radians(-pitch), glm::vec3(1.0f, 0.0f, 0.0f));
         model = glm::rotate(model, glm::radians(yaw), glm::vec3(0.0f, 1.0f, 0.0f));
@@ -216,18 +180,12 @@ struct entity_timed_destroy_t
 
 struct entity_velocity_t
 {
-    /**
-     * Unit: 1/(2^20) block/second
-     */
-    ecoord_t vel_x;
-    /**
-     * Unit: 1/(2^20) block/second
-     */
-    ecoord_t vel_y;
-    /**
-     * Unit: 1/(2^20) block/second
-     */
-    ecoord_t vel_z;
+    /** Unit: blocks/mc_tick */
+    glm::f64vec3 vel;
+};
+
+struct entity_drag_after_accel_t
+{
 };
 
 #endif

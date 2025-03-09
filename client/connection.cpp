@@ -743,9 +743,7 @@ void connection_t::run(level_t* const level)
                 /* Wiki.vg says that the packet velocity units are believed to be 1/32000 blocks per server tick(200ms) */
                 level->ecs.emplace_or_replace<entity_velocity_t>(entity,
                     entity_velocity_t {
-                        .vel_x = ABSCOORD_TO_ECOORD(ecoord_abs_t(p->vel_x) * 32) / (8000),
-                        .vel_y = ABSCOORD_TO_ECOORD(ecoord_abs_t(p->vel_y) * 32) / (8000),
-                        .vel_z = ABSCOORD_TO_ECOORD(ecoord_abs_t(p->vel_z) * 32) / (8000),
+                        .vel = glm::f64vec3(p->vel_x, p->vel_y, p->vel_z) * 32000.0 * 0.25,
                     });
                 break;
             }
@@ -765,9 +763,7 @@ void connection_t::run(level_t* const level)
                 level->ecs.emplace<entity_id_t>(entity, ENT_ID_THUNDERBOLT);
                 level->ecs.emplace<entity_transform_t>(entity,
                     entity_transform_t {
-                        .x = ABSCOORD_TO_ECOORD(p->x),
-                        .y = ABSCOORD_TO_ECOORD(p->y),
-                        .z = ABSCOORD_TO_ECOORD(p->z),
+                        .pos = glm::f64vec3(p->x, p->y, p->z) / 32.0,
                         .pitch = 0.0f,
                         .yaw = 0.0f,
                         .roll = 0.0f,
@@ -789,9 +785,7 @@ void connection_t::run(level_t* const level)
                 level->ecs.emplace<entity_id_t>(entity, entity_id_t(entity_base_t::mc_id_to_id(p->type, 1)));
                 level->ecs.emplace<entity_transform_t>(entity,
                     entity_transform_t {
-                        .x = ABSCOORD_TO_ECOORD(p->x),
-                        .y = ABSCOORD_TO_ECOORD(p->y),
-                        .z = ABSCOORD_TO_ECOORD(p->z),
+                        .pos = glm::f64vec3(p->x, p->y, p->z) / 32.0,
                         .pitch = 0.0f,
                         .yaw = 0.0f,
                         .roll = 0.0f,
@@ -807,9 +801,7 @@ void connection_t::run(level_t* const level)
                 level->ecs.emplace<entity_id_t>(entity, entity_id_t(entity_base_t::mc_id_to_id(p->type, 0)));
                 level->ecs.emplace<entity_transform_t>(entity,
                     entity_transform_t {
-                        .x = ABSCOORD_TO_ECOORD(p->x),
-                        .y = ABSCOORD_TO_ECOORD(p->y),
-                        .z = ABSCOORD_TO_ECOORD(p->z),
+                        .pos = glm::f64vec3(p->x, p->y, p->z) / 32.0,
                         .pitch = p->pitch * 360.0f / 256.0f,
                         .yaw = p->yaw * 360.0f / 256.0f,
                         .roll = 0.0f,
@@ -825,9 +817,7 @@ void connection_t::run(level_t* const level)
                 level->ecs.emplace<entity_id_t>(entity, ENT_ID_XP);
                 level->ecs.emplace<entity_transform_t>(entity,
                     entity_transform_t {
-                        .x = ABSCOORD_TO_ECOORD(p->x),
-                        .y = ABSCOORD_TO_ECOORD(p->y),
-                        .z = ABSCOORD_TO_ECOORD(p->z),
+                        .pos = glm::f64vec3(p->x, p->y, p->z) / 32.0,
                         .pitch = 0.0f,
                         .yaw = 0.0f,
                         .roll = 0.0f,
@@ -843,9 +833,7 @@ void connection_t::run(level_t* const level)
                 level->ecs.emplace<entity_id_t>(entity, ENT_ID_ITEM);
                 level->ecs.emplace<entity_transform_t>(entity,
                     entity_transform_t {
-                        .x = ABSCOORD_TO_ECOORD(p->x),
-                        .y = ABSCOORD_TO_ECOORD(p->y),
-                        .z = ABSCOORD_TO_ECOORD(p->z),
+                        .pos = glm::f64vec3(p->x, p->y, p->z) / 32.0,
                         .pitch = p->pitch * 360.0f / 256.0f,
                         .yaw = p->rotation * 360.0f / 256.0f,
                         .roll = p->roll * 360.0f / 256.0f,
@@ -861,9 +849,7 @@ void connection_t::run(level_t* const level)
                 level->ecs.emplace<entity_id_t>(entity, ENT_ID_PAINTING);
                 level->ecs.emplace<entity_transform_t>(entity,
                     entity_transform_t {
-                        .x = ABSCOORD_TO_ECOORD(p->center_x),
-                        .y = ABSCOORD_TO_ECOORD(p->center_y),
-                        .z = ABSCOORD_TO_ECOORD(p->center_z),
+                        .pos = glm::f64vec3(p->center_x, p->center_y, p->center_z) / 32.0,
                         .pitch = 0.0f,
                         .yaw = p->direction * 90.0f,
                         .roll = 0.0f,
@@ -879,9 +865,7 @@ void connection_t::run(level_t* const level)
                 level->ecs.emplace<entity_id_t>(entity, ENT_ID_PLAYER);
                 level->ecs.emplace<entity_transform_t>(entity,
                     entity_transform_t {
-                        .x = ABSCOORD_TO_ECOORD(p->x),
-                        .y = ABSCOORD_TO_ECOORD(p->y),
-                        .z = ABSCOORD_TO_ECOORD(p->z),
+                        .pos = glm::f64vec3(p->x, p->y, p->z) / 32.0,
                         .pitch = p->pitch * 360.0f / 256.0f,
                         .yaw = p->rotation * 360.0f / 256.0f,
                         .roll = 0.0f,
@@ -899,11 +883,8 @@ void connection_t::run(level_t* const level)
                 if (!level->ecs.all_of<entity_transform_t>(entity))
                     break;
 
-                level->ecs.patch<entity_transform_t>(entity, [&p](entity_transform_t& transform) {
-                    transform.x += ABSCOORD_TO_ECOORD(p->delta_x);
-                    transform.y += ABSCOORD_TO_ECOORD(p->delta_y);
-                    transform.z += ABSCOORD_TO_ECOORD(p->delta_z);
-                });
+                level->ecs.patch<entity_transform_t>(
+                    entity, [&p](entity_transform_t& transform) { transform.pos += glm::f64vec3(p->delta_x, p->delta_y, p->delta_z) / 32.0; });
 
                 break;
             }
@@ -937,9 +918,7 @@ void connection_t::run(level_t* const level)
                     break;
 
                 level->ecs.patch<entity_transform_t>(entity, [&p](entity_transform_t& transform) {
-                    transform.x += ABSCOORD_TO_ECOORD(p->delta_x);
-                    transform.y += ABSCOORD_TO_ECOORD(p->delta_y);
-                    transform.z += ABSCOORD_TO_ECOORD(p->delta_z);
+                    transform.pos += glm::f64vec3(p->delta_x, p->delta_y, p->delta_z) / 32.0;
                     transform.pitch = p->pitch * 360.0f / 256.0f;
                     transform.yaw = p->yaw * 360.0f / 256.0f;
                 });
@@ -958,10 +937,7 @@ void connection_t::run(level_t* const level)
                     break;
 
                 level->ecs.patch<entity_transform_t>(entity, [&p](entity_transform_t& transform) {
-                    transform.x = ABSCOORD_TO_ECOORD(p->x);
-                    transform.y = ABSCOORD_TO_ECOORD(p->y);
-                    transform.z = ABSCOORD_TO_ECOORD(p->z);
-                    transform.pitch = p->pitch * 360.0f / 256.0f;
+                    transform.pos = glm::f64vec3(p->x, p->y, p->z) / 32.0, transform.pitch = p->pitch * 360.0f / 256.0f;
                     transform.yaw = p->rotation * 360.0f / 256.0f;
                 });
 

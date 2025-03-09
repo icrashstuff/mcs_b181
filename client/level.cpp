@@ -1238,14 +1238,11 @@ void level_t::render_entities()
         return;
     }
 
-    glm::vec3 camera_pos_capture = camera_pos;
+    glm::f64vec3 camera_pos_capture = camera_pos;
 
     ecs.sort<entity_transform_t>([&camera_pos_capture](const entity_transform_t& a, const entity_transform_t& b) -> bool {
-        const glm::vec3 apos(ECOORD_TO_ABSCOORD(a.x) / 32.0f, ECOORD_TO_ABSCOORD(a.y) / 32.0f, ECOORD_TO_ABSCOORD(a.z) / 32.0f);
-        const glm::vec3 bpos(ECOORD_TO_ABSCOORD(b.x) / 32.0f, ECOORD_TO_ABSCOORD(b.y) / 32.0f, ECOORD_TO_ABSCOORD(b.z) / 32.0f);
-
-        const float adist = glm::distance(apos, camera_pos_capture);
-        const float bdist = glm::distance(bpos, camera_pos_capture);
+        const float adist = glm::distance(a.pos, camera_pos_capture);
+        const float bdist = glm::distance(b.pos, camera_pos_capture);
         return adist < bdist;
     });
 
@@ -1291,10 +1288,9 @@ void level_t::render(const glm::ivec2 win_size)
     glActiveTexture(GL_TEXTURE0);
 
     {
-        const glm::i64vec3 ent_camera_pos = ABSCOORD_TO_ECOORD_GLM_LONG(glm::i64vec3(camera_pos * 32.0f));
-        const glm::i64vec3 cpos(ECOORD_TO_ABSCOORD_GLM_LONG(ent_camera_pos) >> 5l >> 4l);
+        const glm::i64vec3 cpos(glm::round(camera_pos / 16.0f));
         const glm::i64vec3 camera_pos_diff = cpos - last_render_order_cpos;
-        const glm::dvec3 float_cpos(cpos);
+        const glm::f64vec3 float_cpos(cpos);
 
         if (camera_pos_diff != glm::i64vec3(0, 0, 0))
             request_render_order_sort = 1;
@@ -1305,8 +1301,8 @@ void level_t::render(const glm::ivec2 win_size)
         if (request_render_order_sort || SDL_GetTicks() - last_render_order_sort_time > 5000)
         {
             std::sort(chunks_render_order.begin(), chunks_render_order.end(), [&float_cpos](const chunk_cubic_t* const a, const chunk_cubic_t* const b) {
-                const float adist = glm::distance(glm::dvec3(a->pos), float_cpos);
-                const float bdist = glm::distance(glm::dvec3(b->pos), float_cpos);
+                const float adist = glm::distance(glm::f64vec3(a->pos), float_cpos);
+                const float bdist = glm::distance(glm::f64vec3(b->pos), float_cpos);
                 return adist > bdist;
             });
             last_render_order_sort_time = SDL_GetTicks();
@@ -1635,10 +1631,5 @@ void level_t::tick_real()
         }
     }
 
-    for (auto [entity, transform, velocity] : ecs.view<entity_transform_t, entity_velocity_t>().each())
-    {
-        transform.x += velocity.vel_x / 20;
-        transform.y += velocity.vel_y / 20;
-        transform.z += velocity.vel_z / 20;
-    }
+    // for (auto [entity, transform, velocity] : ecs.view<entity_transform_t, entity_velocity_t>().each()) transform.pos += velocity.vel;
 }
