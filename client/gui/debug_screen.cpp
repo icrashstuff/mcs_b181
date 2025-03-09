@@ -65,6 +65,7 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
         const std::vector<chunk_cubic_t*>& cvec = game->level->get_chunk_vec();
         size_t num_total = cvec.size();
         size_t num_dirty = 0;
+        size_t num_dirty_visible = 0;
         size_t num_meshed = 0;
         size_t num_visible = 0;
         for (auto it : cvec)
@@ -72,13 +73,14 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
             num_visible += it->visible;
             num_meshed += it->vbo != 0;
             num_dirty += it->dirty_level != chunk_cubic_t::DIRTY_LEVEL_NONE;
+            num_dirty_visible += it->visible ? (it->dirty_level != chunk_cubic_t::DIRTY_LEVEL_NONE) : 0;
 
             mem_chunk_guess += sizeof(chunk_cubic_t);
             mem_chunk_mesh_guess += sizeof(terrain_vertex_t) * (it->index_count + it->index_count_overlay + it->index_count_translucent) / 6 * 4;
         }
         mem_chunk_guess += cvec.capacity() * sizeof(cvec[0]);
 
-        add_text(ctx, drawlist, 0, cursor_l, "C: %zu/%zu, M: %zu, D: %zu", num_visible, num_total, num_meshed, num_dirty);
+        add_text(ctx, drawlist, 0, cursor_l, "C: %zu/%zu, M: %zu, D: %zu/%zu", num_visible, num_total, num_meshed, num_dirty_visible, num_dirty);
     }
 
     /* Entity stats */
