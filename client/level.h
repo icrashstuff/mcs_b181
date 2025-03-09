@@ -218,13 +218,17 @@ struct level_t
      */
     void render(const glm::ivec2 win_size);
 
-    glm::vec3 camera_pos = { 0, 0, 0 };
+    inline glm::vec3 get_camera_pos() const { return foot_pos + glm::vec3(0, camera_offset_height, 0) + camera_direction * camera_offset_radius; }
+
+    glm::vec3 foot_pos = { 0, 0, 0 };
     glm::vec3 camera_direction = { 1, 0, 0 };
     glm::vec3 camera_right = { 1, 0, 0 };
     glm::vec3 camera_up = { 0, 1, 0 };
     float yaw = 0.0f;
     float pitch = 0.0f;
     float fov = 70.0f;
+    float camera_offset_height = 1.62;
+    float camera_offset_radius = 0.05;
 
     bool enable_timer_log_light = 0;
     bool enable_timer_log_mesh = 0;

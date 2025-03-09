@@ -236,7 +236,7 @@ static convar_int_t cvr_debug_screen("debug_screen", 0, 0, 1, "Enable debug scre
 void render_world_overlays(level_t* level, ImDrawList* const bg_draw_list)
 {
     /* This is a bit much */
-    const glm::vec3 cam_pos = glm::floor(level->camera_pos);
+    const glm::vec3 cam_pos = glm::floor(level->get_camera_pos());
 
     block_id_t type = BLOCK_ID_AIR;
     Uint8 metadata = 0;
@@ -672,17 +672,17 @@ static void normal_loop()
         level_t* level = game->level;
 
         if (held_w)
-            level->camera_pos += camera_speed * glm::vec3(SDL_cosf(glm::radians(level->yaw)), 0, SDL_sinf(glm::radians(level->yaw)));
+            level->foot_pos += camera_speed * glm::vec3(SDL_cosf(glm::radians(level->yaw)), 0, SDL_sinf(glm::radians(level->yaw)));
         if (held_s)
-            level->camera_pos -= camera_speed * glm::vec3(SDL_cosf(glm::radians(level->yaw)), 0, SDL_sinf(glm::radians(level->yaw)));
+            level->foot_pos -= camera_speed * glm::vec3(SDL_cosf(glm::radians(level->yaw)), 0, SDL_sinf(glm::radians(level->yaw)));
         if (held_a)
-            level->camera_pos -= camera_speed * glm::vec3(-SDL_sinf(glm::radians(level->yaw)), 0, SDL_cosf(glm::radians(level->yaw)));
+            level->foot_pos -= camera_speed * glm::vec3(-SDL_sinf(glm::radians(level->yaw)), 0, SDL_cosf(glm::radians(level->yaw)));
         if (held_d)
-            level->camera_pos += camera_speed * glm::vec3(-SDL_sinf(glm::radians(level->yaw)), 0, SDL_cosf(glm::radians(level->yaw)));
+            level->foot_pos += camera_speed * glm::vec3(-SDL_sinf(glm::radians(level->yaw)), 0, SDL_cosf(glm::radians(level->yaw)));
         if (held_space)
-            level->camera_pos.y += camera_speed;
+            level->foot_pos.y += camera_speed;
         if (held_shift)
-            level->camera_pos.y -= camera_speed;
+            level->foot_pos.y -= camera_speed;
 
         level->modifier_sprint.set_use(held_ctrl);
         level->modifier_fly.set_use(in_flight);
@@ -908,7 +908,7 @@ static void process_event(SDL_Event& event, bool* done)
             cam_dir.z = SDL_sin(glm::radians(level->yaw)) * SDL_cos(glm::radians(level->pitch));
             cam_dir = glm::normalize(cam_dir);
 
-            glm::dvec3 rotation_point = level->camera_pos /*+ glm::vec3(0.0f, (!crouching) ? 1.625f : 1.275f, 0.0f)*/;
+            glm::dvec3 rotation_point = level->get_camera_pos() /*+ glm::vec3(0.0f, (!crouching) ? 1.625f : 1.275f, 0.0f)*/;
 
             itemstack_t block_at_ray;
             glm::ivec3 collapsed_ray;
@@ -1114,7 +1114,7 @@ static void process_event(SDL_Event& event, bool* done)
         }
         case SDL_SCANCODE_P:
         {
-            glm::ivec3 chunk_coords = glm::ivec3(level->camera_pos) >> 4;
+            glm::ivec3 chunk_coords = glm::ivec3(level->foot_pos) >> 4;
             for (chunk_cubic_t* c : level->get_chunk_vec())
             {
                 if (chunk_coords != c->pos)
@@ -1128,7 +1128,7 @@ static void process_event(SDL_Event& event, bool* done)
         {
             for (chunk_cubic_t* c : level->get_chunk_vec())
             {
-                glm::ivec3 chunk_coords = glm::ivec3(level->camera_pos) >> 4;
+                glm::ivec3 chunk_coords = glm::ivec3(level->foot_pos) >> 4;
                 if (chunk_coords != c->pos)
                     continue;
                 c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
@@ -1154,7 +1154,7 @@ static void process_event(SDL_Event& event, bool* done)
         }
         case SDL_SCANCODE_M:
         {
-            glm::ivec3 chunk_coords = glm::ivec3(level->camera_pos) >> 4;
+            glm::ivec3 chunk_coords = glm::ivec3(level->foot_pos) >> 4;
             for (chunk_cubic_t* c : level->get_chunk_vec())
             {
                 if (SDL_abs(chunk_coords.x - c->pos.x) > 1 || SDL_abs(chunk_coords.y - c->pos.y) > 1 || SDL_abs(chunk_coords.z - c->pos.z) > 1)
@@ -1727,13 +1727,13 @@ int main(const int argc, const char** argv)
                 ImGui::SetNextWindowSize(ImVec2(520, 480), ImGuiCond_FirstUseEver);
                 ImGui::BeginCVR("Running", &cvr_gui_renderer);
 
-                ImGui::Text("Camera: <%.1f, %.1f, %.1f>", level->camera_pos.x, level->camera_pos.y, level->camera_pos.z);
+                ImGui::Text("Foot: <%.1f, %.1f, %.1f>", level->foot_pos.x, level->foot_pos.y, level->foot_pos.z);
 
                 ImGui::SliderFloat("Camera Pitch", &level->pitch, -89.95f, 89.95f);
                 ImGui::SliderFloat("Camera Yaw", &level->yaw, 0.0f, 360.0f);
-                ImGui::InputFloat("Camera X", &level->camera_pos.x, 1.0f);
-                ImGui::InputFloat("Camera Y", &level->camera_pos.y, 1.0f);
-                ImGui::InputFloat("Camera Z", &level->camera_pos.z, 1.0f);
+                ImGui::InputFloat("Foot X", &level->foot_pos.x, 1.0f);
+                ImGui::InputFloat("Foot Y", &level->foot_pos.y, 1.0f);
+                ImGui::InputFloat("Foot Z", &level->foot_pos.z, 1.0f);
 
                 if (ImGui::Button("Rebuild resources"))
                 {

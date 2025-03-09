@@ -545,7 +545,7 @@ void connection_t::run(level_t* const level)
             {
                 CAST_PACK_TO_P(packet_player_pos_t);
 
-                level->camera_pos = { p->x, p->y, p->z };
+                level->foot_pos = { p->x, p->y, p->z };
                 last_update_tick_camera = 0;
 
                 break;
@@ -554,7 +554,7 @@ void connection_t::run(level_t* const level)
             {
                 CAST_PACK_TO_P(packet_player_pos_look_s2c_t);
 
-                level->camera_pos = { p->x, p->y, p->z };
+                level->foot_pos = { p->x, p->y, p->z };
                 level->pitch = SDL_clamp(-p->pitch, -89.95f, 89.95f);
 
                 level->yaw = p->yaw + 90.0f;
@@ -997,10 +997,10 @@ void connection_t::run(level_t* const level)
             if (SDL_GetTicks() - last_update_tick_camera > 50)
             {
                 packet_player_pos_look_c2s_t location_response;
-                location_response.x = level->camera_pos.x;
-                location_response.y = level->camera_pos.y;
-                location_response.stance = level->camera_pos.y + 1.0f;
-                location_response.z = level->camera_pos.z;
+                location_response.x = level->foot_pos.x;
+                location_response.y = level->foot_pos.y;
+                location_response.stance = level->foot_pos.y + 1.0f;
+                location_response.z = level->foot_pos.z;
 
                 location_response.pitch = -level->pitch;
                 location_response.yaw = level->yaw - 90.0f;

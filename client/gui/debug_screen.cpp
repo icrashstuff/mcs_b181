@@ -96,16 +96,16 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
 
     cursor_l.y += get_y_spacing();
 
-    add_text(ctx, drawlist, 0, cursor_l, "x: %.3f", game->level->camera_pos.x);
-    add_text(ctx, drawlist, 0, cursor_l, "y: %.3f", game->level->camera_pos.y);
-    add_text(ctx, drawlist, 0, cursor_l, "z: %.3f", game->level->camera_pos.z);
+    add_text(ctx, drawlist, 0, cursor_l, "x: %.3f", game->level->foot_pos.x);
+    add_text(ctx, drawlist, 0, cursor_l, "y: %.3f", game->level->foot_pos.y);
+    add_text(ctx, drawlist, 0, cursor_l, "z: %.3f", game->level->foot_pos.z);
     add_text(ctx, drawlist, 0, cursor_l, "f: %d (%.0f)", (int(game->level->yaw + 360.f - 45.f) % 360) / 90, game->level->yaw);
 
     cursor_l.y += get_y_spacing();
 
     add_text(ctx, drawlist, 0, cursor_l, "Seed: %ld", game->level->mc_seed);
 
-    add_text(ctx, drawlist, 0, cursor_l, "Biome: %s", mc_id::get_biome_name(game->level->get_biome_at(game->level->camera_pos)));
+    add_text(ctx, drawlist, 0, cursor_l, "Biome: %s", mc_id::get_biome_name(game->level->get_biome_at(game->level->foot_pos)));
     add_text(ctx, drawlist, 0, cursor_l, "Time: %ld (Day: %ld)", ((game->level->mc_time % 24000) + 24000) % 24000, game->level->mc_time / 24000);
 
     /* ======================== RIGHT SIDE ======================== */
@@ -168,7 +168,7 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
         cam_dir.z = SDL_sin(glm::radians(game->level->yaw)) * SDL_cos(glm::radians(game->level->pitch));
         cam_dir = glm::normalize(cam_dir);
 
-        glm::dvec3 rotation_point = game->level->camera_pos /*+ glm::vec3(0.0f, (!crouching) ? 1.625f : 1.275f, 0.0f)*/;
+        glm::dvec3 rotation_point = game->level->get_camera_pos() /*+ glm::vec3(0.0f, (!crouching) ? 1.625f : 1.275f, 0.0f)*/;
 
         {
             itemstack_t block_at_ray;

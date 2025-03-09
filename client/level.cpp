@@ -96,7 +96,7 @@ void level_t::cull_chunks(const glm::ivec2 win_size, const int render_distance)
     fov_normals[3] = glm::normalize(glm::cross(cam_right, +camera_direction + cam_up * half_v));
 
     /* Convert camera position to 1/2 chunk coords and translate it to center chunk positions */
-    const glm::ivec3 camera_half_chunk_pos = (glm::ivec3(camera_pos) >> 3) - glm::ivec3(1, 1, 1);
+    const glm::ivec3 camera_half_chunk_pos = (glm::ivec3(get_camera_pos()) >> 3) - glm::ivec3(1, 1, 1);
     const float render_distance_half_chunk = render_distance * 2.0f;
     const float min_dist = -4.0f;
 
@@ -1238,7 +1238,7 @@ void level_t::render_entities()
         return;
     }
 
-    glm::f64vec3 camera_pos_capture = camera_pos;
+    const glm::f64vec3 camera_pos_capture = get_camera_pos();
 
     ecs.sort<entity_transform_t>([&camera_pos_capture](const entity_transform_t& a, const entity_transform_t& b) -> bool {
         const float adist = glm::distance(a.pos, camera_pos_capture);
@@ -1274,7 +1274,7 @@ void level_t::render(const glm::ivec2 win_size)
     const glm::mat4 mat_proj = glm::perspective(glm::radians(fov), (float)win_size.x / (float)win_size.y, 0.03125f, render_distance * 32.0f);
     shader_terrain->set_projection(mat_proj);
 
-    const glm::mat4 mat_cam = glm::lookAt(camera_pos, camera_pos + camera_direction, camera_up);
+    const glm::mat4 mat_cam = glm::lookAt(get_camera_pos(), get_camera_pos() + camera_direction, camera_up);
     shader_terrain->set_camera(mat_cam);
 
     shader_terrain->set_model(glm::mat4(1.0f));
@@ -1288,7 +1288,7 @@ void level_t::render(const glm::ivec2 win_size)
     glActiveTexture(GL_TEXTURE0);
 
     {
-        const glm::i64vec3 cpos(glm::round(camera_pos / 16.0f));
+        const glm::i64vec3 cpos(glm::round(get_camera_pos() / 16.0f));
         const glm::i64vec3 camera_pos_diff = cpos - last_render_order_cpos;
         const glm::f64vec3 float_cpos(cpos);
 

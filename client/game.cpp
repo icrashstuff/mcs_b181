@@ -110,7 +110,7 @@ static convar_int_t cvr_world_y_off_neg("dev_world_y_off_neg", 6, 0, 32, "Negati
 void game_t::create_testworld()
 {
     level->clear();
-    level->camera_pos = { -38, -12.7, -52 };
+    level->foot_pos = { -38, -12.7, -52 };
     level->camera_direction = { 1, 0, 0 };
     level->camera_right = { 1, 0, 0 };
     level->camera_up = { 0, 1, 0 };
