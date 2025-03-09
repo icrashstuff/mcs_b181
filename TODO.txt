@@ -1,14 +1,35 @@
 Client TODO:
 - Prevent AO from bleeding in corners
 - Rotate triangles to best align with light values
+- Proper translucency support
+  - Idea:
+    - Custom EBOs for nearby chunks
+    - Forward/Reverse EBO for non-nearby chunks
 - Improve crosshair contrast
-- Inventory windows
+- Occlusion culling
+- GUI
+  - Chat
+  - 1.3+ Style Creative window
+  - Button sounds
+  - Inventory windows
 - Proper block placing/destroying
 - Entity rendering
   - Including lighting
 - Entity physics
 - Audio
-- Proper asset integration
+  - Music
+  - Ambience (mood)
+  - Button sounds
+  - Block place/destroy
+  - Entity sounds
+    - Ambient entity
+    - Walking
+    - Hurting
+  - Doors
+  - Pressure plates
+  - Buttons
+  - ...
+- Proper assets integration
 - Finish block models
   - Railing
   - Ladders
@@ -18,27 +39,31 @@ Client TODO:
   - Moss
   - Fence
   - Stairs
-  - Grass (Do an opaque overlay with glDepthFunc(GL_EQUAL))
   - Buttons
   - Pressure plates
   - Fire
   - etc.
-- Middle click get block
+  - Water backface
 - Particles
 - Weather
   - Rain
   - Snow
   - Thunder flashes
 - Sky
+- Clouds
+- Highlighted block bounding box
 - Vignette
 - Distance fog
-- Biome coloring (cubiomes looks promising https://github.com/Cubitect/cubiomes/)
-- Sky lighting
+  - High in lava
+- Rotate on damage
+- View bobbing
 - More parallelization
+  - Meshing/Lighting engine on separate thread
+- Explosions
 
 Client Wants:
 - Colored Lighting
   - Maybe with some form of refraction?
-- Vulkan, bgfx, or SDL3 GPU?
-- Basic directional lighting for sun/moon/thunder
+- Vulkan, bgfx, or SDL3_GPU?
+- Basic directional lighting for sun/moon/thunder (Shadow mapping)
 - Further optimize light flood algorithm, possibly with intrinsics or ASM
