@@ -174,7 +174,7 @@ namespace util
  *
  * You write:
  *
- * parallel_for(0, 10, [&](const int start, const int end) {
+ * parallel_for(0, 10, [&](const int _start, const int _end) {
  *     for (int it = _start; it < _end; it++)
  *         do_something();
  * });
