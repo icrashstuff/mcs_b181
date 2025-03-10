@@ -1135,6 +1135,30 @@ bool level_t::get_block(const glm::ivec3 pos, block_id_t& type, Uint8& metadata)
     return true;
 }
 
+bool level_t::get_block(const glm::ivec3 pos, itemstack_t& item, chunk_cubic_t*& cache)
+{
+    glm::ivec3 chunk_pos = pos >> 4;
+    glm::ivec3 block_pos = pos & 0x0F;
+
+    /* Attempt to find chunk, if cache doesn't match */
+    if (!cache || cache->pos != chunk_pos)
+    {
+        auto it = cmap.find(chunk_pos);
+        if (it == cmap.end())
+        {
+            TRACE("Unable to find chunk <%d, %d, %d>", chunk_pos.x, chunk_pos.y, chunk_pos.z);
+            return false;
+        }
+
+        cache = it->second;
+    }
+
+    item.id = cache->get_type(block_pos.x, block_pos.y, block_pos.z);
+    item.damage = cache->get_metadata(block_pos.x, block_pos.y, block_pos.z);
+
+    return true;
+}
+
 void level_t::set_terrain(texture_terrain_t* const _terrain)
 {
     terrain = _terrain;

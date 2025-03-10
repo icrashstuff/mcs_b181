@@ -910,6 +910,7 @@ static void process_event(SDL_Event& event, bool* done)
 
             glm::dvec3 rotation_point = level->get_camera_pos() /*+ glm::vec3(0.0f, (!crouching) ? 1.625f : 1.275f, 0.0f)*/;
 
+            chunk_cubic_t* cache = NULL;
             itemstack_t block_at_ray;
             glm::ivec3 collapsed_ray;
             glm::dvec3 ray = rotation_point;
@@ -918,7 +919,7 @@ static void process_event(SDL_Event& event, bool* done)
                 for (int i = 0; !found && i <= 32 * 5; i++, ray += cam_dir / 32.0)
                 {
                     collapsed_ray = glm::floor(ray);
-                    if (level->get_block(collapsed_ray, block_at_ray) && block_at_ray.id != BLOCK_ID_AIR && mc_id::is_block(block_at_ray.id))
+                    if (level->get_block(collapsed_ray, block_at_ray, cache) && block_at_ray.id != BLOCK_ID_AIR && mc_id::is_block(block_at_ray.id))
                         found = 1;
                 }
 
@@ -934,7 +935,7 @@ static void process_event(SDL_Event& event, bool* done)
                 connection_t::tentative_block_t t;
                 t.timestamp = SDL_GetTicks();
                 t.pos = collapsed_ray;
-                if (level->get_block(t.pos, t.old) && t.old.id != BLOCK_ID_AIR)
+                if (level->get_block(t.pos, t.old, cache) && t.old.id != BLOCK_ID_AIR)
                 {
                     level->set_block(t.pos, BLOCK_ID_AIR, 0);
 
@@ -1017,7 +1018,7 @@ static void process_event(SDL_Event& event, bool* done)
                 t.pos = collapsed_ray;
                 itemstack_t hand = level->inventory.items[level->inventory.hotbar_sel];
 
-                if (level->get_block(t.pos, t.old) && t.old != hand)
+                if (level->get_block(t.pos, t.old, cache) && t.old != hand)
                 {
                     if (mc_id::is_block(hand.id))
                     {

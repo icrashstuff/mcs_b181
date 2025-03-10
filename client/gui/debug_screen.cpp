@@ -170,6 +170,7 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
 
         glm::dvec3 rotation_point = game->level->get_camera_pos() /*+ glm::vec3(0.0f, (!crouching) ? 1.625f : 1.275f, 0.0f)*/;
 
+        chunk_cubic_t* cache = NULL;
         {
             itemstack_t block_at_ray;
             glm::ivec3 collapsed_ray;
@@ -178,7 +179,7 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
             for (int i = 0; !found && i <= 32 * 5; i++, ray += cam_dir / 32.0)
             {
                 collapsed_ray = glm::floor(ray);
-                if (game->level->get_block(collapsed_ray, block_at_ray) && block_at_ray.id != BLOCK_ID_AIR && !mc_id::is_fluid(block_at_ray.id))
+                if (game->level->get_block(collapsed_ray, block_at_ray, cache) && block_at_ray.id != BLOCK_ID_AIR && !mc_id::is_fluid(block_at_ray.id))
                     found = 1;
             }
 
@@ -199,7 +200,7 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
             for (int i = 0; !found && i <= 32 * 5; i++, ray += cam_dir / 32.0)
             {
                 collapsed_ray = glm::floor(ray);
-                if (game->level->get_block(collapsed_ray, block_at_ray) && block_at_ray.id != BLOCK_ID_AIR && mc_id::is_fluid(block_at_ray.id))
+                if (game->level->get_block(collapsed_ray, block_at_ray, cache) && block_at_ray.id != BLOCK_ID_AIR && mc_id::is_fluid(block_at_ray.id))
                     found = 1;
             }
 

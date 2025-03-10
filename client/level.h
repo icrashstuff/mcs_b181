@@ -172,12 +172,19 @@ struct level_t
     /**
      * Gets the block data at the provided position
      *
+     * @param pos Position of block in block coordinates
+     * @param type Output for block id
+     * @param metadata Output for block metadata
+     *
      * @returns false on block not found, true on block found
      */
     bool get_block(const glm::ivec3 pos, block_id_t& type, Uint8& metadata);
 
     /**
      * Gets the block data at the provided position
+     *
+     * @param pos Position of block in block coordinates
+     * @param item Output for block data
      *
      * @returns false on block not found, true on block found
      */
@@ -191,6 +198,17 @@ struct level_t
         item.damage = metadata;
         return true;
     }
+
+    /**
+     * Gets the block data at the provided position, while caching the origin chunk for nearby future calls
+     *
+     * @param pos Position of block in block coordinates
+     * @param item Output for block data
+     * @param cache Pointer to last searched chunk (NOTE: Pointer validity is only guaranteed in the absence of level_t::remove_chunk() calls)
+     *
+     * @returns false if containing chunk not found, true otherwise
+     */
+    bool get_block(const glm::ivec3 pos, itemstack_t& item, chunk_cubic_t*& cache);
 
     /**
      * Get biome id at position
