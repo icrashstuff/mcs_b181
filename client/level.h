@@ -27,7 +27,7 @@
 #include "chunk_cubic.h"
 #include "entity.h"
 #include "lightmap.h"
-#include "shaders.h"
+#include "shaders/shaders.h"
 #include "shared/ids.h"
 #include "shared/inventory.h"
 #include "texture_terrain.h"

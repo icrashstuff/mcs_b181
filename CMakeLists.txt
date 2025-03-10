@@ -42,7 +42,6 @@ find_package(OpenAL REQUIRED)
 set(mcs_b181_client_SRC
     client/main_client.cpp
     client/texture_terrain.cpp
-    client/shaders.cpp
     client/level.cpp
     client/level_mesh.cpp
     client/entity.cpp
@@ -58,6 +57,8 @@ set(mcs_b181_client_SRC
     client/gui/mc_gui.cpp
     client/gui/panorama.cpp
     client/gui/debug_screen.cpp
+
+    client/shaders/shaders.cpp
 
     shared/ids.cpp
     shared/misc.cpp

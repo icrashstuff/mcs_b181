@@ -57,11 +57,12 @@
 
 #include "connection.h"
 #include "level.h"
-#include "shaders.h"
 #include "texture_terrain.h"
 
 #include "gui/mc_gui.h"
 #include "gui/panorama.h"
+
+#include "shaders/shaders.h"
 
 static convar_string_t cvr_username("username", "", "Username (duh)", CONVAR_FLAG_SAVE);
 static convar_string_t cvr_dir_assets("dir_assets", "", "Path to assets (ex: \"~/.minecraft/assets/\")", CONVAR_FLAG_SAVE);
@@ -223,7 +224,7 @@ static bool reload_resources = 0;
 
 static convar_int_t cvr_debug_screen("debug_screen", 0, 0, 1, "Enable debug screen (F3 menu)", CONVAR_FLAG_SAVE);
 
-#include "main_client.menu.cpp"
+#include "gui/main_client.menu.cpp"
 
 #define GLM_TO_IM(A) ImVec2((A).x, (A).y)
 

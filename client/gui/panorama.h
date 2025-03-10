@@ -28,7 +28,7 @@
 #include <SDL3/SDL_stdinc.h>
 #include <glm/glm.hpp>
 
-#include "client/shaders.h"
+#include "client/shaders/shaders.h"
 
 /**
  * Shows a continually rotating Gaussian blurred cube-mapped panorama
