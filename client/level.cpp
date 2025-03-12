@@ -1634,8 +1634,41 @@ static convar_int_t cvr_mc_enable_physics {
     CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_DEV_ONLY,
 };
 
+static convar_int_t cvr_a_delay_mood { "a_delay_mood", 6000, 20, 30000, "Maximum value for mood counter (MC Ticks)", CONVAR_FLAG_SAVE };
+
 void level_t::tick_real()
 {
+    /* Modify mood counter */
+    {
+        float light_block = 0;
+        float light_sky = 0;
+
+        /* Fetch block */
+        const glm::vec3 offset = (glm::vec3(SDL_randf(), SDL_randf(), SDL_randf()) - 0.5f) * 17.0f;
+        const glm::ivec3 pos = glm::round(offset + get_camera_pos());
+        chunk_cubic_t* c = get_chunk(pos >> 4);
+        if (c)
+        {
+            light_block = c->get_light_block(pos.x & 0x0F, pos.y & 0x0F, pos.z & 0x0F);
+            light_sky = c->get_light_sky(pos.x & 0x0F, pos.y & 0x0F, pos.z & 0x0F);
+        }
+
+        const float coeff = 1.0f / cvr_a_delay_mood.get();
+
+        if (light_sky)
+            mood -= light_sky * 4.0f * coeff;
+        else
+            mood -= (light_block - 1.0f) * coeff;
+
+        mood = SDL_max(0.0f, mood);
+
+        if (mood >= 1.0f)
+        {
+            dc_log("Play cave ambience");
+            mood = 0.0f;
+        }
+    }
+
     lightmap.set_world_time(++mc_time);
 
     for (auto [entity, counter] : ecs.view<entity_timed_destroy_t>().each())

@@ -280,6 +280,9 @@ struct level_t
     Sint64 mc_seed = 0;
     long mc_time = 0;
 
+    /** Used for the ambience sounds (https://minecraft.wiki/w/Ambience#Mood_algorithm) */
+    float mood = 0;
+
 private:
     mc_id::gamemode_t gamemode = mc_id::GAMEMODE_SPECTATOR;
 
