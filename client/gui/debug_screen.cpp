@@ -214,6 +214,65 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
             }
         }
     }
+
+    /* Frametime graph */
+    {
+        Uint64 sdl_tick_cur = SDL_GetTicksNS();
+
+        static float frametimes[512] = { 0.0f };
+        static int frametimes_pos = 0;
+        static Uint64 sdl_tick_last = sdl_tick_cur;
+
+        frametimes_pos = (frametimes_pos + 1) % SDL_arraysize(frametimes);
+        frametimes[frametimes_pos] = double(sdl_tick_cur - sdl_tick_last) / 1000000.0;
+        sdl_tick_last = sdl_tick_cur;
+
+        float frametimes_sorted[SDL_arraysize(frametimes)];
+        memcpy(frametimes_sorted, frametimes, sizeof(frametimes_sorted));
+
+        SDL_qsort(frametimes_sorted, SDL_arraysize(frametimes), sizeof(*frametimes), [](const void* _a, const void* _b) -> int {
+            const float a = *(float*)_a;
+            const float b = *(float*)_b;
+
+            if (a < b)
+                return -1;
+            if (a > b)
+                return 1;
+            return 0;
+        });
+        float frametime_avg = 0.0;
+        float frametime_min = frametimes_sorted[0];
+        float frametime_max = frametimes_sorted[IM_ARRAYSIZE(frametimes_sorted) - 1];
+
+        for (int i = 0; i < IM_ARRAYSIZE(frametimes); i++)
+            frametime_avg += frametimes[i];
+
+        frametime_avg /= float(IM_ARRAYSIZE(frametimes));
+
+        ImGui::SetNextWindowPos(ImGui::GetMainViewport()->Size * ImVec2(0, 1), ImGuiCond_Always, ImVec2(0, 1));
+
+        ImGui::PushStyleVar(ImGuiStyleVar_ItemSpacing, ImVec2(0, 0));
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(0, 0));
+        ImGui::PushStyleVar(ImGuiStyleVar_FramePadding, ImVec2(1, 1) * ctx->menu_scale);
+        ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, 0);
+
+        ImGui::PushStyleColor(ImGuiCol_FrameBg, IM_COL32(0, 0, 0, 192));
+        ImGui::PushStyleColor(ImGuiCol_PlotLines, IM_COL32(128, 255, 128, 224));
+
+        ImGui::Begin("Frametimes window", NULL, ctx->default_win_flags | ImGuiWindowFlags_NoInputs);
+
+        ImGui::Spacing();
+        ImVec2 cursor_f = ImGui::GetCursorScreenPos();
+        add_text(ctx, drawlist, 0, cursor_f, "F3->F3: AVG: %.4f ms, R: [%.4f, %.4f]", frametime_avg, frametime_min, frametime_max);
+        ImGui::SetCursorScreenPos(cursor_f);
+
+        ImGui::PlotLines("##Frametimes", frametimes, IM_ARRAYSIZE(frametimes), frametimes_pos, NULL, FLT_MAX, FLT_MAX, ImVec2(240, 120) * ctx->menu_scale);
+
+        ImGui::End();
+
+        ImGui::PopStyleColor(2);
+        ImGui::PopStyleVar(4);
+    }
 }
 
 void do_debug_crosshair(mc_gui::mc_gui_ctx*, game_t* game, ImDrawList* drawlist)
