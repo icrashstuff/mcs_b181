@@ -20,8 +20,8 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#ifndef MCS_B181_CLIENT_ENTITY_H
-#define MCS_B181_CLIENT_ENTITY_H
+#ifndef MCS_B181__CLIENT__ENTITY__ENTITY_H
+#define MCS_B181__CLIENT__ENTITY__ENTITY_H
 
 #include <SDL3/SDL_stdinc.h>
 #include <glm/ext/matrix_transform.hpp>
@@ -55,7 +55,6 @@ enum entity_id_t : Uint8
     OBJ_ID_FISHING_FLOAT,
 
     OBJ_ID_MAX,
-
     ENT_ID_PIG = OBJ_ID_MAX,
     ENT_ID_SHEEP,
     ENT_ID_COW,
@@ -178,14 +177,6 @@ struct entity_timed_destroy_t
     bool server_entity;
 };
 
-struct entity_velocity_t
-{
-    /** Unit: blocks/mc_tick */
-    glm::f64vec3 vel;
-};
-
-struct entity_drag_after_accel_t
-{
-};
+#include "entity_physics.h"
 
 #endif

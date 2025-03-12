@@ -50,8 +50,9 @@ Uint8 entity_base_t::mc_id_to_id(Uint8 id, bool is_object)
             ADD_NAME(VEHICLE_TYPE_GRAVEL, OBJ_ID_FALLING_GRAVEL);
 
             ADD_NAME(VEHICLE_TYPE_FISH_FLOAT, OBJ_ID_FISHING_FLOAT);
+        default:
+            return OBJ_ID_NONE;
         }
-        return OBJ_ID_NONE;
     }
     else
     {
@@ -77,7 +78,8 @@ Uint8 entity_base_t::mc_id_to_id(Uint8 id, bool is_object)
             ADD_NAME(MOB_TYPE_GHAST, ENT_ID_GHAST);
             ADD_NAME(MOB_TYPE_ENDERMAN, ENT_ID_ENDERMAN);
             ADD_NAME(MOB_TYPE_SILVERFISH, ENT_ID_SILVER_FISH);
+        default:
+            return ENT_ID_NONE;
         }
-        return ENT_ID_NONE;
     }
 }

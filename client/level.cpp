@@ -1521,6 +1521,12 @@ level_t::level_t(texture_terrain_t* const _terrain)
 
     player_eid = ecs.create();
 
+    /* For testing */
+    entity_physics_t physics;
+    physics.reset_to_entity_defaults(ENT_ID_CREEPER);
+    ecs.emplace<entity_physics_t>(player_eid, physics);
+    ecs.emplace<entity_transform_t>(player_eid, entity_transform_t { .pos = { -30.0, 1280.0, -30.0 } });
+
     generator_create();
 }
 
@@ -1619,6 +1625,15 @@ void level_t::tick()
         dc_log_warn("Call to level_t::tick() maxed out iterations");
 }
 
+static convar_int_t cvr_mc_enable_physics {
+    "mc_enable_physics",
+    0,
+    0,
+    1,
+    "Enable physics (Experimental)",
+    CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_DEV_ONLY,
+};
+
 void level_t::tick_real()
 {
     lightmap.set_world_time(++mc_time);
@@ -1655,5 +1670,47 @@ void level_t::tick_real()
         }
     }
 
-    // for (auto [entity, transform, velocity] : ecs.view<entity_transform_t, entity_velocity_t>().each()) transform.pos += velocity.vel;
+    if (!cvr_mc_enable_physics.get())
+        return;
+
+    bool block_has_collision[256];
+    for (int i = 0; i < IM_ARRAYSIZE(block_has_collision); i++)
+        block_has_collision[i] = mc_id::block_has_collision(i);
+
+    chunk_cubic_t* chunk_cache = NULL;
+
+    ecs.patch<entity_transform_t>(player_eid, [=](entity_transform_t& transform) { transform.pos = foot_pos; });
+
+    /* Formulae from both: https://minecraft.wiki/w/Entity#Motion_of_entities and https://github.com/OrHy3/MinecraftMotionTools */
+    for (auto [entity, transform, physics] : ecs.view<entity_transform_t, entity_physics_t>().each())
+    {
+        glm::f64vec3 new_velocity;
+        /* Tick velocity */
+        {
+            glm::f64vec3 v_i = physics.vel;
+            glm::f64vec3 v_f;
+            const double drag_h = physics.flags.on_ground ? physics.drag_horizontal_on_ground : physics.drag_horizontal;
+            const double drag_v = physics.drag_vertical;
+
+            v_f = v_i * (glm::f64vec3(1.0f) - glm::f64vec3 { drag_h, drag_v, drag_h });
+
+            double a = physics.acceleration * (1.0 - (1.0 - drag_v)) / drag_v;
+            if (physics.flags.apply_drag_after_accel)
+                a *= (1.0 - drag_v);
+            new_velocity = v_f - glm::f64vec3 { 0.0, a, 0.0 };
+        }
+
+        if (physics.flags.update_velocity_before_position)
+            physics.vel = new_velocity;
+
+        glm::f64vec3 delta = physics.vel - glm::f64vec3(0.0, ((physics.flags.apply_accel_to_position) ? physics.acceleration : 0.0f), 0.0);
+
+        /* TODO: Collision checking here */
+
+        /* Write out values */
+        transform.pos += delta;
+        physics.vel = new_velocity;
+    }
+
+    foot_pos = ecs.get<entity_transform_t>(player_eid).pos;
 }

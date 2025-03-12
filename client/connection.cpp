@@ -741,10 +741,20 @@ void connection_t::run(level_t* const level)
                     break;
 
                 /* Wiki.vg says that the packet velocity units are believed to be 1/32000 blocks per server tick(200ms) */
-                level->ecs.emplace_or_replace<entity_velocity_t>(entity,
-                    entity_velocity_t {
-                        .vel = glm::f64vec3(p->vel_x, p->vel_y, p->vel_z) * 32000.0 * 0.25,
-                    });
+                if (!level->ecs.all_of<entity_physics_t>(entity))
+                {
+                    entity_id_t* id = level->ecs.try_get<entity_id_t>(entity);
+                    if (!id)
+                        break;
+
+                    entity_physics_t physics;
+                    physics.reset_to_entity_defaults(*id);
+
+                    level->ecs.emplace<entity_physics_t>(entity, physics);
+                }
+
+                level->ecs.patch<entity_physics_t>(
+                    entity, [&p](entity_physics_t& physics) { physics.vel = glm::f64vec3(p->vel_x, p->vel_y, p->vel_z) / (32000.0 * 4.0); });
                 break;
             }
             case PACKET_ID_ENT_ENSURE_SPAWN:
@@ -790,6 +800,11 @@ void connection_t::run(level_t* const level)
                         .yaw = 0.0f,
                         .roll = 0.0f,
                     });
+
+                entity_physics_t physics;
+                physics.reset_to_entity_defaults(entity_id_t(entity_base_t::mc_id_to_id(p->type, 1)));
+
+                level->ecs.emplace<entity_physics_t>(entity, physics);
                 break;
             }
             /* TODO: Handle beyond missing */
@@ -806,6 +821,11 @@ void connection_t::run(level_t* const level)
                         .yaw = p->yaw * 360.0f / 256.0f,
                         .roll = 0.0f,
                     });
+
+                entity_physics_t physics;
+                physics.reset_to_entity_defaults(entity_id_t(entity_base_t::mc_id_to_id(p->type, 0)));
+
+                level->ecs.emplace<entity_physics_t>(entity, physics);
                 break;
             }
             /* TODO: Handle beyond missing */
@@ -822,6 +842,11 @@ void connection_t::run(level_t* const level)
                         .yaw = 0.0f,
                         .roll = 0.0f,
                     });
+
+                entity_physics_t physics;
+                physics.reset_to_entity_defaults(ENT_ID_XP);
+
+                level->ecs.emplace<entity_physics_t>(entity, physics);
                 break;
             }
             /* TODO: Handle beyond missing */
@@ -838,6 +863,11 @@ void connection_t::run(level_t* const level)
                         .yaw = p->rotation * 360.0f / 256.0f,
                         .roll = p->roll * 360.0f / 256.0f,
                     });
+
+                entity_physics_t physics;
+                physics.reset_to_entity_defaults(ENT_ID_ITEM);
+
+                level->ecs.emplace<entity_physics_t>(entity, physics);
                 break;
             }
             /* TODO: Handle beyond missing */
@@ -870,6 +900,11 @@ void connection_t::run(level_t* const level)
                         .yaw = p->rotation * 360.0f / 256.0f,
                         .roll = 0.0f,
                     });
+
+                entity_physics_t physics;
+                physics.reset_to_entity_defaults(ENT_ID_PLAYER);
+
+                level->ecs.emplace<entity_physics_t>(entity, physics);
                 break;
             }
             case PACKET_ID_ENT_MOVE_REL:

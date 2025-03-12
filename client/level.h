@@ -25,7 +25,7 @@
 #define TETRA_CLIENT_LEVEL_H_INCLUDED
 
 #include "chunk_cubic.h"
-#include "entity.h"
+#include "entity/entity.h"
 #include "lightmap.h"
 #include "shaders/shaders.h"
 #include "shared/ids.h"
