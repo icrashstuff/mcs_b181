@@ -438,6 +438,9 @@ void connection_t::run(level_t* const level)
                 if (old_health)
                     last_health = old_health->cur;
 
+                if (last_health > p->health)
+                    level->damage_tilt = 1.0f;
+
                 level->ecs.emplace_or_replace<entity_food_t>(level->player_eid,
                     entity_food_t {
                         .update_effect_counter = 4,

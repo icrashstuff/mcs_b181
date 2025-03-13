@@ -761,7 +761,7 @@ static void normal_loop()
         ImGui::SetCurrentContext(last_ctx);
         game->level->lightmap.update();
         game->level->get_terrain()->update();
-        game->level->render(win_size);
+        game->level->render(win_size, delta_time);
         ImGui::SetCurrentContext(imgui_ctx_main_menu);
 
         render_world_overlays(game->level, bg_draw_list);
@@ -1457,7 +1457,7 @@ void profile_light()
 
         dc_log("Emptiness: %.3f%%", double((emptiness * 1000000) / total) / 10000.0);
 
-        game.level->render({ 128, 20 });
+        game.level->render({ 128, 20 }, 0.0f);
 
         /* Add to individual counters */
         timers[using_sdl_rand][0] += game.level->last_perf_light_pass1;
@@ -1738,6 +1738,12 @@ int main(const int argc, const char** argv)
                 ImGui::InputFloat("Foot X", &level->foot_pos.x, 1.0f);
                 ImGui::InputFloat("Foot Y", &level->foot_pos.y, 1.0f);
                 ImGui::InputFloat("Foot Z", &level->foot_pos.z, 1.0f);
+
+                static bool cause_damage_tilt = 0;
+                ImGui::Checkbox("Force damage tilt", &cause_damage_tilt);
+                ImGui::SameLine();
+                if (ImGui::Button("Cause damage tilt") || cause_damage_tilt)
+                    level->damage_tilt = 1.0f;
 
                 if (ImGui::Button("Rebuild resources"))
                 {

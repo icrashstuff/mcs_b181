@@ -233,8 +233,9 @@ struct level_t
      * Renders the world and entities
      *
      * @param win_size Window size (used for projection matrix)
+     * @param delta_time Time since last frame in seconds
      */
-    void render(const glm::ivec2 win_size);
+    void render(const glm::ivec2 win_size, const float delta_time);
 
     inline glm::vec3 get_camera_pos() const { return foot_pos + glm::vec3(0, camera_offset_height, 0) + camera_direction * camera_offset_radius; }
 
@@ -282,6 +283,8 @@ struct level_t
 
     /** Used for the ambience sounds (https://minecraft.wiki/w/Ambience#Mood_algorithm) */
     float mood = 0;
+
+    float damage_tilt = 0.0f;
 
 private:
     mc_id::gamemode_t gamemode = mc_id::GAMEMODE_SPECTATOR;

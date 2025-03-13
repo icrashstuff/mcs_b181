@@ -1284,7 +1284,25 @@ void level_t::render_entities()
     glBindVertexArray(0);
 }
 
-void level_t::render(const glm::ivec2 win_size)
+static convar_float_t cvr_r_damage_tilt_magnitude {
+    "r_damage_tilt_magnitude",
+    15.f,
+    0.f,
+    45.f,
+    "Magnitude in degrees of the damage tilt",
+    CONVAR_FLAG_SAVE,
+};
+
+static convar_float_t cvr_r_damage_tilt_rate {
+    "r_damage_tilt_rate",
+    10.f,
+    1.f,
+    100.f,
+    "Duration in milliseconds/degree of the damage tilt",
+    CONVAR_FLAG_SAVE,
+};
+
+void level_t::render(const glm::ivec2 win_size, const float delta_time)
 {
     const int render_distance = (render_distance_override > 0) ? render_distance_override : r_render_distance.get();
 
@@ -1295,10 +1313,15 @@ void level_t::render(const glm::ivec2 win_size)
     tick();
 
     glUseProgram(shader_terrain->id);
-    const glm::mat4 mat_proj = glm::perspective(glm::radians(fov), (float)win_size.x / (float)win_size.y, 0.03125f, render_distance * 32.0f);
+    glm::mat4 mat_proj = glm::perspective(glm::radians(fov), (float)win_size.x / (float)win_size.y, 0.03125f, render_distance * 32.0f);
     shader_terrain->set_projection(mat_proj);
 
-    const glm::mat4 mat_cam = glm::lookAt(get_camera_pos(), get_camera_pos() + camera_direction, camera_up);
+    glm::mat4 mat_cam = glm::lookAt(get_camera_pos(), get_camera_pos() + camera_direction, camera_up);
+    damage_tilt = SDL_clamp(damage_tilt, 0.0f, 1.0f);
+    if (gamemode == mc_id::GAMEMODE_CREATIVE || gamemode == mc_id::GAMEMODE_SPECTATOR)
+        damage_tilt = 0.0f;
+    mat_cam = glm::rotate(glm::mat4(1.0f), -glm::radians(damage_tilt * cvr_r_damage_tilt_magnitude.get()), glm::vec3(0.f, 0.f, 1.f)) * mat_cam;
+    damage_tilt -= delta_time / (cvr_r_damage_tilt_magnitude.get() * cvr_r_damage_tilt_rate.get() / 1000.0f);
     shader_terrain->set_camera(mat_cam);
 
     shader_terrain->set_model(glm::mat4(1.0f));
