@@ -23,7 +23,7 @@
 #include "convar_file.h"
 #include "convar.h"
 
-#include "tetra/gui/console.h"
+#include "tetra/log.h"
 
 #include "physfs.h"
 

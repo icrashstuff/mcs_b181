@@ -21,8 +21,8 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include "styles.h"
-#include "console.h"
 #include "gui_registrar.h"
+#include "tetra/log.h"
 #include "tetra/util/convar.h"
 
 #define style_change_func(name) ImVec4 name(ImVec4 in)
