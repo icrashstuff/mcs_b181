@@ -23,9 +23,10 @@
 #ifndef MCS_B181_MISC_H
 #define MCS_B181_MISC_H
 
-#include "tetra/gui/console.h"
+#include "tetra/log.h"
 #include <SDL3/SDL_stdinc.h>
 #include <assert.h>
+#include <functional>
 #include <string>
 #include <vector>
 

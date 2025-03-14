@@ -25,7 +25,7 @@
 #include "mc_gui.h"
 #include "mc_gui_internal.h"
 
-#include "tetra/gui/console.h"
+#include "tetra/log.h"
 #include "tetra/tetra_gl.h"
 #include "tetra/util/stbi.h"
 

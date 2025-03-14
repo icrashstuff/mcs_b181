@@ -26,7 +26,6 @@
 
 #include "texture_terrain.h"
 
-#include "tetra/gui/console.h"
 #include "tetra/gui/imgui.h"
 #include "tetra/util/stb_rect_pack.h"
 
@@ -34,6 +33,7 @@
 #include "tetra/util/physfs/physfs.h"
 #include "tetra/util/stbi.h"
 
+#include "tetra/log.h"
 #include "tetra/tetra_gl.h"
 
 #include "jzon/Jzon.h"

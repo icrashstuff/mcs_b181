@@ -38,7 +38,7 @@
 #include <string>
 #include <vector>
 
-#include "tetra/gui/console.h"
+#include "tetra/log.h"
 #include "tetra/tetra.h"
 #include "tetra/util/convar.h"
 

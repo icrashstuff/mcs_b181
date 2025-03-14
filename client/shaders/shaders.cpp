@@ -26,7 +26,7 @@
 
 #include "shaders.h"
 
-#include "tetra/gui/console.h"
+#include "tetra/log.h"
 #include "tetra/util/physfs/physfs.h"
 
 #define READ_FILE_CHUNK 1024

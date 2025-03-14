@@ -25,8 +25,8 @@
 
 #include <SDL3/SDL.h>
 
-#include "tetra/gui/console.h"
 #include "tetra/gui/imgui.h"
+#include "tetra/log.h"
 #include "tetra/tetra_gl.h"
 #include "tetra/util/stbi.h"
 
