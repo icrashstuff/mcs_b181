@@ -161,13 +161,34 @@ struct level_t
 
     /**
      * Sets the block at the provided position and if necessary marks adjacent chunks for rebuilding/relighting
+     *
+     * @param pos Position of block in block coordinates
+     * @param type Type for the block to set
+     * @param metadata Metadata for the block to set
      */
-    void set_block(const glm::ivec3 pos, const block_id_t type, Uint8 metadata);
+    inline void set_block(const glm::ivec3 pos, const block_id_t type, Uint8 metadata) { set_block(pos, { .id = type, .damage = metadata }); }
 
     /**
      * Sets the block at the provided position and if necessary marks adjacent chunks for rebuilding/relighting
+     *
+     * @param pos Position of block in block coordinates
+     * @param block Block data
      */
-    inline void set_block(const glm::ivec3 pos, const itemstack_t item) { set_block(pos, item.id, item.damage); }
+    inline void set_block(const glm::ivec3 pos, const itemstack_t block)
+    {
+        chunk_cubic_t* c = NULL;
+        set_block(pos, block, c);
+    }
+
+    /**
+     * Sets the block at the provided position and if necessary marks adjacent chunks for rebuilding/relighting,
+     * while caching the origin chunk for nearby future calls
+     *
+     * @param pos Position of block in block coordinates
+     * @param block Block data
+     * @param cache Pointer to last used chunk (NOTE: Pointer validity is only guaranteed in the absence of level_t::remove_chunk() calls)
+     */
+    void set_block(const glm::ivec3 pos, const itemstack_t block, chunk_cubic_t*& cache);
 
     /**
      * Gets the block data at the provided position

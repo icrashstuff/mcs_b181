@@ -1051,38 +1051,44 @@ bypass_sse2:
 #pragma GCC pop_options
 #endif
 
-void level_t::set_block(const glm::ivec3 pos, const block_id_t type, const Uint8 metadata)
+void level_t::set_block(const glm::ivec3 pos, const itemstack_t block, chunk_cubic_t*& cache)
 {
+    const block_id_t type = block.id;
+    const Uint8 metadata = block.damage;
+
     if (!mc_id::is_block(type))
     {
-        dc_log_error("Preposterous id field %d:%u at <%d, %d, %d>", type, metadata, pos.x, pos.y, pos.z);
+        TRACE("Preposterous id field %d:%u at <%d, %d, %d>", type, metadata, pos.x, pos.y, pos.z);
         return;
     }
     if (metadata > 15)
     {
         const char* name = mc_id::get_name_from_item_id(type, metadata);
-        dc_log_error("Preposterous metadata field %d(%s):%u at <%d, %d, %d>", type, name, metadata, pos.x, pos.y, pos.z);
+        TRACE("Preposterous metadata field %d(%s):%u at <%d, %d, %d>", type, name, metadata, pos.x, pos.y, pos.z);
         return;
     }
 
-    /* Attempt to find chunk */
+    /* Attempt to find chunk, if cache doesn't match */
     glm::ivec3 chunk_pos = pos >> 4;
     glm::ivec3 block_pos = pos & 0x0F;
-    auto it = cmap.find(chunk_pos);
-    if (it == cmap.end())
+    if (!cache || cache->pos != chunk_pos)
     {
-        dc_log_error("Unable to find chunk <%d, %d, %d>", chunk_pos.x, chunk_pos.y, chunk_pos.z);
-        return;
+        auto it = cmap.find(chunk_pos);
+        if (it == cmap.end())
+        {
+            TRACE("Unable to find chunk <%d, %d, %d>", chunk_pos.x, chunk_pos.y, chunk_pos.z);
+            return;
+        }
+
+        cache = it->second;
     }
 
-    chunk_cubic_t* c = it->second;
-
     /* Get existing blocks data to help determine which chunks need rebuilding */
-    block_id_t old_type = c->get_type(block_pos.x, block_pos.y, block_pos.z);
+    block_id_t old_type = cache->get_type(block_pos.x, block_pos.y, block_pos.z);
 
     /* Set type */
-    c->set_type(block_pos.x, block_pos.y, block_pos.z, type);
-    c->set_metadata(block_pos.x, block_pos.y, block_pos.z, metadata);
+    cache->set_type(block_pos.x, block_pos.y, block_pos.z, type);
+    cache->set_metadata(block_pos.x, block_pos.y, block_pos.z, metadata);
 
     /* Surrounding chunks do not need updating if the replacement has an equal effect on lighting */
     if (mc_id::is_transparent(old_type) == mc_id::is_transparent(type) && mc_id::get_light_level(old_type) == mc_id::get_light_level(type))
@@ -1099,7 +1105,10 @@ void level_t::set_block(const glm::ivec3 pos, const block_id_t type, const Uint8
         const int iy = (i >> 1) & 1;
         const int iz = i & 1;
 
-        c = ((it = cmap.find(chunk_pos + glm::ivec3(diff_x * ix, diff_y * iy, diff_z * iz))) != cmap.end()) ? it->second : NULL;
+        auto it = cmap.find(chunk_pos + glm::ivec3(diff_x * ix, diff_y * iy, diff_z * iz));
+        chunk_cubic_t* c = NULL;
+        if (it != cmap.end())
+            c = it->second;
 
         chunk_cubic_t::dirty_level_t dirt_face = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
 
