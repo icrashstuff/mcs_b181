@@ -26,10 +26,9 @@
 
 #include "texture_terrain.h"
 
-#define STBRP_STATIC
 #include "tetra/gui/console.h"
-#include "tetra/gui/imgui-1.91.1/imstb_rectpack.h"
 #include "tetra/gui/imgui.h"
+#include "tetra/util/stb_rect_pack.h"
 
 #include "tetra/util/convar.h"
 #include "tetra/util/physfs/physfs.h"
@@ -838,6 +837,3 @@ GLenum terrain_vertex_t::create_vbo(GLuint* const vbo, GLuint* const ebo, const 
         return GL_UNSIGNED_INT;
     }
 }
-
-#define STB_RECT_PACK_IMPLEMENTATION
-#include "tetra/gui/imgui-1.91.1/imstb_rectpack.h"

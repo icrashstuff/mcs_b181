@@ -1,3 +1,5 @@
+# SPDX-License-Identifier: 0BSD
+# SPDX-FileCopyrightText: Copyright 2024 - 2025 Ian Hangartner
 cmake_minimum_required(VERSION 3.27)
 
 # Make option() honor normal variables
@@ -54,12 +56,14 @@ set(tetra_SRC
     ${TETRA_DIR}/gui/overlay_loading.cpp
     ${TETRA_DIR}/gui/overlay_performance.cpp
 
-    ${TETRA_DIR}/util/stbi.c
     ${TETRA_DIR}/util/misc.cpp
     ${TETRA_DIR}/util/convar.cpp
-    ${TETRA_DIR}/util/stb_sprintf.h
     ${TETRA_DIR}/util/cli_parser.cpp
     ${TETRA_DIR}/util/convar_file.cpp
+
+    ${TETRA_DIR}/util/stb/stbi.c
+    ${TETRA_DIR}/util/stb/stb_sprintf.c
+    ${TETRA_DIR}/util/stb/stb_rect_pack.c
 
     ${imgui_SRC}
     PARENT_SCOPE
@@ -74,8 +78,6 @@ function (add_tetra_executable target_name target_SRC)
     add_executable(${target_name} "${target_SRC}" "${tetra_SRC}")
 
     target_compile_options(${target_name} PUBLIC -Wall -Wextra)
-
-    set_source_files_properties(${TETRA_DIR}/util/stb_sprintf.h PROPERTIES COMPILE_DEFINITIONS "STB_SPRINTF_IMPLEMENTATION")
 
     # -WShadow spits out a warning for code like:
     # int i = 0;

@@ -23,7 +23,7 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 
-#include "stbi.h"
+#include "../stbi.h"
 
 #ifdef STB_IMAGE_IMPLEMENTATION
 
