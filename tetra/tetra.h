@@ -36,7 +36,7 @@
  *     int done = 0;
  *     while (!done)
  *     {
- *         tetra::start_frame();
+ *         done = !tetra::start_frame();
  *
  *         ImGui::Begin("Hello");
  *         ImGui::Text("Hello world from tetra!");
@@ -66,8 +66,10 @@
  * # Tetra must be in the "tetra" subfolder
  * add_subdirectory(tetra/)
  *
- * # If you don't use quotes around ${your_app_here_SRC} then the executable won't build
- * add_tetra_executable(tetra_example "${tetra_example_SRC}")
+ * add_executable(tetra_example ${tetra_example_SRC})
+ *
+ * target_link_libraries(tetra_example tetra_core)
+ * target_link_libraries(tetra_example tetra_gl)
  */
 
 #ifndef MCS_B181_TETRA_H
