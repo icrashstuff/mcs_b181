@@ -57,6 +57,7 @@ set(tetra_SRC
     ${TETRA_DIR}/util/stbi.c
     ${TETRA_DIR}/util/misc.cpp
     ${TETRA_DIR}/util/convar.cpp
+    ${TETRA_DIR}/util/stb_sprintf.h
     ${TETRA_DIR}/util/cli_parser.cpp
     ${TETRA_DIR}/util/convar_file.cpp
 
@@ -73,6 +74,8 @@ function (add_tetra_executable target_name target_SRC)
     add_executable(${target_name} "${target_SRC}" "${tetra_SRC}")
 
     target_compile_options(${target_name} PUBLIC -Wall -Wextra)
+
+    set_source_files_properties(${TETRA_DIR}/util/stb_sprintf.h PROPERTIES COMPILE_DEFINITIONS "STB_SPRINTF_IMPLEMENTATION")
 
     # -WShadow spits out a warning for code like:
     # int i = 0;

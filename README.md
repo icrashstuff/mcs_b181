@@ -44,6 +44,10 @@ This project vendors and makes use of the following external software components
   - Copyright (c) 2010 - 2024 Sean Barrett, and others
   - MIT License or Unlicense Public Domain (full text under tetra/util/stb/stb_image_write.h)
 
+- stb_sprintf
+  - Copyright (c) 2015 - 2024 Sean Barrett, and others
+  - MIT License or Unlicense Public Domain (full text under tetra/util/stb_sprintf.h)
+
 - Jzon
   - Copyright (c) 2015 Johannes Häggqvist
   - MIT license (full text under client/jzon)

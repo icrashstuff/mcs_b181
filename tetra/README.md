@@ -20,6 +20,9 @@ This repository contains useful components from an abandoned project of mine tha
 - stb_image_write
   - Copyright (c) 2010 - 2024 Sean Barrett, and others
   - MIT License or Unlicense Public Domain (full text under util/stb/stb_image_write.h)
+- stb_sprintf
+  - Copyright (c) 2015 - 2024 Sean Barrett, and others
+  - MIT License or Unlicense Public Domain (full text under util/stb_sprintf.h)
 
 ## License
 
