@@ -16,8 +16,8 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-find_package(PkgConfig REQUIRED)
-pkg_check_modules(zlib REQUIRED zlib)
+find_package(glm REQUIRED)
+find_package(ZLIB REQUIRED)
 
 set(mcs_b181_server_SRC
     server/main_server.cpp
@@ -114,9 +114,8 @@ function(add_bin_common name)
 
     target_compile_options(${name} PUBLIC -Wall -Wextra -DSDL_DISABLE_OLD_NAMES=1)
 
-    target_link_libraries(${name} ${zlib_LIBRARIES})
-    target_compile_options(${name} PUBLIC ${zlib_CFLAGS_OTHER})
-
+    target_link_libraries(${name} glm::glm)
+    target_link_libraries(${name} ZLIB::ZLIB)
     target_link_libraries(${name} SDL3_net::SDL3_net-static)
 endfunction()
 
