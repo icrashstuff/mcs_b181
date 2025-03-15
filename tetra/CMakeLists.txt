@@ -98,7 +98,7 @@ endfunction()
 option(TETRA_BUILD_GL_COMPONENT "Build tetra_gl" ON)
 
 ### BEGIN: Target: tetra_core
-add_library(tetra_core STATIC ${tetra_core_SRC})
+add_library(tetra_core OBJECT ${tetra_core_SRC})
 
 tetra_common_compile_options(tetra_core)
 
@@ -114,7 +114,7 @@ if(TETRA_BUILD_GL_COMPONENT)
     find_package(OpenGL REQUIRED)
     find_package(GLEW REQUIRED)
 
-    add_library(tetra_gl STATIC ${tetra_gl_SRC})
+    add_library(tetra_gl OBJECT ${tetra_gl_SRC})
 
     tetra_common_compile_options(tetra_gl)
 
