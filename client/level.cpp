@@ -1094,32 +1094,29 @@ void level_t::set_block(const glm::ivec3 pos, const itemstack_t block, chunk_cub
     if (mc_id::is_transparent(old_type) == mc_id::is_transparent(type) && mc_id::get_light_level(old_type) == mc_id::get_light_level(type))
         return;
 
-    int diff_x = ((block_pos.x & 0x0F) < 8) ? -1 : 1;
-    int diff_y = ((block_pos.y & 0x0F) < 8) ? -1 : 1;
-    int diff_z = ((block_pos.z & 0x0F) < 8) ? -1 : 1;
-
-    /* TODO: Mark all continuous chunks below as invalid */
-    for (int i = 0; i < 8; i++)
+    /* Update surrounding chunks (This also updates *ALL* above and below) */
+    for (chunk_cubic_t* c : chunks_light_order)
     {
-        const int ix = (i >> 2) & 1;
-        const int iy = (i >> 1) & 1;
-        const int iz = i & 1;
-
-        auto it = cmap.find(chunk_pos + glm::ivec3(diff_x * ix, diff_y * iy, diff_z * iz));
-        chunk_cubic_t* c = NULL;
-        if (it != cmap.end())
-            c = it->second;
-
-        chunk_cubic_t::dirty_level_t dirt_face = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
-
-        /* Lower the amount of compute passes */
-        int itotal = ix + iy + iz;
-        if (itotal == 2)
+        chunk_cubic_t::dirty_level_t dirt_face = chunk_cubic_t::DIRTY_LEVEL_NONE;
+        switch (abs(chunk_pos.x - c->pos.x) + abs(chunk_pos.z - c->pos.z))
+        {
+        case 0:
+        case 1:
+            dirt_face = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
+            break;
+        case 2:
             dirt_face = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0;
-        else if (itotal == 3)
+            break;
+        case 3:
             dirt_face = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_1;
-
-        if (c && c->dirty_level < dirt_face)
+            break;
+        case 4:
+            dirt_face = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_2;
+            break;
+        default:
+            break;
+        }
+        if (c->dirty_level < dirt_face)
             c->dirty_level = dirt_face;
     }
 }
