@@ -300,6 +300,26 @@ bool sound_resources_t::get_sound(const std::string sound_id, sound_info_t& out)
         ACTION;                       \
         break;
 
+const char* sound_info_t::sound_category_to_str(sound_category_t category)
+{
+    const char* category_name = "Unknown";
+    switch (category)
+    {
+        ADD_SWITCH_CASE(sound_info_t::SOUND_CATEGORY_MASTER, category_name = "master");
+        ADD_SWITCH_CASE(sound_info_t::SOUND_CATEGORY_MUSIC, category_name = "music");
+        ADD_SWITCH_CASE(sound_info_t::SOUND_CATEGORY_WEATHER, category_name = "weather");
+        ADD_SWITCH_CASE(sound_info_t::SOUND_CATEGORY_HOSTILE, category_name = "hostile");
+        ADD_SWITCH_CASE(sound_info_t::SOUND_CATEGORY_PLAYER, category_name = "player");
+        ADD_SWITCH_CASE(sound_info_t::SOUND_CATEGORY_RECORD, category_name = "record");
+        ADD_SWITCH_CASE(sound_info_t::SOUND_CATEGORY_BLOCKS, category_name = "block");
+        ADD_SWITCH_CASE(sound_info_t::SOUND_CATEGORY_NEUTRAL, category_name = "neutral");
+        ADD_SWITCH_CASE(sound_info_t::SOUND_CATEGORY_AMBIENT, category_name = "ambient");
+    default:
+        break;
+    }
+    return category_name;
+}
+
 #define FIELD(name, fmt, ...)            \
     do                                   \
     {                                    \
@@ -355,22 +375,7 @@ void sound_resources_t::imgui_contents(bool& play_sound, sound_info_t& sound_to_
             FIELD("Weight", "%d/%d (%.*f%%)", it_sound.weight, it_event.second.total_weight, weight_percentage_decimals, weight_percentage);
             if (!it_sound.flags.is_event)
             {
-                const char* category_name = "Unknown";
-                switch (it_sound.category)
-                {
-                    ADD_SWITCH_CASE(sound_info_t::SOUND_CATEGORY_MASTER, category_name = "master");
-                    ADD_SWITCH_CASE(sound_info_t::SOUND_CATEGORY_MUSIC, category_name = "music");
-                    ADD_SWITCH_CASE(sound_info_t::SOUND_CATEGORY_WEATHER, category_name = "weather");
-                    ADD_SWITCH_CASE(sound_info_t::SOUND_CATEGORY_HOSTILE, category_name = "hostile");
-                    ADD_SWITCH_CASE(sound_info_t::SOUND_CATEGORY_PLAYER, category_name = "player");
-                    ADD_SWITCH_CASE(sound_info_t::SOUND_CATEGORY_RECORD, category_name = "record");
-                    ADD_SWITCH_CASE(sound_info_t::SOUND_CATEGORY_BLOCKS, category_name = "block");
-                    ADD_SWITCH_CASE(sound_info_t::SOUND_CATEGORY_NEUTRAL, category_name = "neutral");
-                    ADD_SWITCH_CASE(sound_info_t::SOUND_CATEGORY_AMBIENT, category_name = "ambient");
-                default:
-                    break;
-                }
-                FIELD("Category", "%d (%s)", it_sound.category, category_name);
+                FIELD("Category", "%d (%s)", it_sound.category, sound_info_t::sound_category_to_str(it_sound.category));
 
                 FIELD("Is Stream", "%s", it_sound.flags.stream ? "true" : "false");
                 FIELD("Is Event", "%s", it_sound.flags.is_event ? "true" : "false");

@@ -42,7 +42,11 @@ struct sound_info_t
         SOUND_CATEGORY_BLOCKS,
         SOUND_CATEGORY_NEUTRAL,
         SOUND_CATEGORY_AMBIENT,
+
+        SOUND_CATEGORY_COUNT,
     };
+
+    static const char* sound_category_to_str(sound_category_t);
 
     /** Rarity weighting */
     int weight = 1;
