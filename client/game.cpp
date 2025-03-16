@@ -36,6 +36,7 @@ void game_resources_t::reload()
 
     terrain_atlas = new texture_terrain_t("/_resources/assets/minecraft/textures/");
     terrain_shader = new shader_t("/shaders/terrain.vert", "/shaders/terrain.frag");
+    sound_resources = new sound_resources_t("/assets/", "/_resources/assets/");
 
     terrain_shader->build();
     glUseProgram(terrain_shader->id);
@@ -47,9 +48,11 @@ void game_resources_t::destroy()
 {
     delete terrain_atlas;
     delete terrain_shader;
+    delete sound_resources;
 
     terrain_atlas = NULL;
     terrain_shader = NULL;
+    sound_resources = NULL;
 }
 
 game_resources_t::~game_resources_t() { destroy(); }

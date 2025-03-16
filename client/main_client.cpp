@@ -67,7 +67,7 @@
 static convar_string_t cvr_username("username", "", "Username (duh)", CONVAR_FLAG_SAVE);
 static convar_string_t cvr_dir_assets("dir_assets", "", "Path to assets (ex: \"~/.minecraft/assets/\")", CONVAR_FLAG_SAVE);
 static convar_string_t cvr_path_resource_pack(
-    "path_base_resources", "", "File/Dir to use for base resources (ex: \"~/.minecraft/versions/1.6.4/1.6.4.jar\")", CONVAR_FLAG_SAVE);
+    "path_base_resources", "", "File/Dir to use for base resources (ex: \"~/.minecraft/versions/1.8.9/1.8.9.jar\")", CONVAR_FLAG_SAVE);
 static convar_string_t cvr_dir_game("dir_game", "", "Path to store game files (Not mandatory)", CONVAR_FLAG_SAVE);
 
 static convar_int_t cvr_autoconnect("dev_autoconnect", 0, 0, 1, "Auto connect to server", CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_DEV_ONLY);
@@ -1227,6 +1227,7 @@ static void process_event(SDL_Event& event, bool* done)
 static convar_int_t cvr_gui_renderer("gui_renderer", 0, 0, 1, "Show renderer internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 static convar_int_t cvr_gui_lightmap("gui_lightmap", 0, 0, 1, "Show lightmap internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 static convar_int_t cvr_gui_panorama("gui_panorama", 0, 0, 1, "Show panorama internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
+static convar_int_t cvr_gui_sound("gui_sound", 0, 0, 1, "Show sound engine internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 static convar_int_t cvr_gui_engine_state("gui_engine_state", 0, 0, 1, "Show engine state menu", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 static convar_int_t cvr_gui_inventory("gui_inventory", 0, 0, 1, "Show primitive inventory window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 
@@ -1662,7 +1663,8 @@ int main(const int argc, const char** argv)
 
             ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), viewport->WorkSize);
             ImGui::SetNextWindowPos(viewport->GetWorkCenter(), ImGuiCond_Always, ImVec2(0.5, 0.5));
-            ImGui::Begin("Configuration Required!", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
+            ImGui::Begin("Configuration Required! (Resources for Minecraft Release 1.7.x/1.8.x (Not beta) are required)", NULL,
+                ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
 
             float width = viewport->WorkSize.x * 0.75f;
 
@@ -1770,6 +1772,18 @@ int main(const int argc, const char** argv)
 
                 level->get_terrain()->imgui_view();
 
+                ImGui::End();
+            }
+
+            if (game_resources && game_resources->sound_resources && cvr_gui_sound.get())
+            {
+                bool play_sound = 0;
+                sound_info_t sound_to_play;
+
+                ImGui::SetNextWindowPos(viewport->Size * ImVec2(0.0075f, 0.1875f), ImGuiCond_FirstUseEver, ImVec2(0.0, 0.0));
+                ImGui::SetNextWindowSize(viewport->Size * ImVec2(0.425f, 0.8f), ImGuiCond_FirstUseEver);
+                ImGui::BeginCVR("Sound", &cvr_gui_sound);
+                game_resources->sound_resources->imgui_contents(play_sound, sound_to_play);
                 ImGui::End();
             }
 

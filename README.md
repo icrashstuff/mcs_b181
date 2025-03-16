@@ -2,6 +2,10 @@
 
 A minecraft beta 1.8.x server / bridge / client. This project is purely for my own entertainment
 
+## Notes on the client
+
+- The client requires the assets of minecraft 1.7 or 1.8 (The full releases not the betas)
+
 ## License
 - This project (mcs_b181) is largely licensed under the MIT License
   - Copyright (c) 2024 - 2025 Ian Hangartner
@@ -35,6 +39,10 @@ This project vendors and makes use of the following external software components
 - Cubiomes
   - Copyright (c) 2020-2024 Cubitect, and others
   - MIT License (full text under shared/cubiomes/)
+
+- stb_vorbis
+  - Copyright (c) 2007 - 2024 Sean Barrett, and others
+  - MIT License or Unlicense Public Domain (full text under client/sound/stb_vorbis.c)
 
 - stb_image
   - Copyright (c) 2006 - 2024 Sean Barrett, and others

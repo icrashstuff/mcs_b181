@@ -25,11 +25,14 @@
 
 #include "connection.h"
 #include "level.h"
+#include "sound/sound_resources.h"
 
 struct game_resources_t
 {
     shader_t* terrain_shader = nullptr;
     texture_terrain_t* terrain_atlas = nullptr;
+
+    sound_resources_t* sound_resources = nullptr;
 
     int ao_algorithm = 1;
     int use_texture = 1;
