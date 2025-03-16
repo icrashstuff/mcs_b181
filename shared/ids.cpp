@@ -1000,7 +1000,7 @@ glm::vec3 mc_id::get_biome_color_sky(int biome_id)
         ADD_NAME(mc_id::BIOME_TAIGA, (glm::vec3 { 0.4902f, 0.6392f, 1.0000f }));
         ADD_NAME(mc_id::BIOME_SWAMP, (glm::vec3 { 0.4706f, 0.6549f, 1.0000f }));
         ADD_NAME(mc_id::BIOME_RIVER, (glm::vec3 { 0.4824f, 0.6431f, 1.0000f }));
-        ADD_NAME(mc_id::BIOME_NETHER_WASTES, (glm::vec3 { 0.4314f, 0.6941f, 1.0000f }));
+        ADD_NAME(mc_id::BIOME_NETHER_WASTES, (glm::vec3 { 0.3199f, 0.0501f, 0.0501f }));
         ADD_NAME(mc_id::BIOME_THE_END, (glm::vec3 { 0.0000f, 0.0000f, 0.0000f }));
 
     default:
