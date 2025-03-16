@@ -1,9 +1,9 @@
 // clang-format off
 /* Changes by MCS_B181 are denoted by comments with [MCS_B181] */
 /* Primary changes by MCS_B181 are:
+ * - Use PHYSFS instead of stdio
  * - Split stb_vorbis into a header and source file (To make KDevelop happy)
  */
-
 
 // Ogg Vorbis audio decoder - v1.22 - public domain
 // http://nothings.org/stb_vorbis/
@@ -80,6 +80,9 @@
 
 #ifndef STB_VORBIS_INCLUDE_STB_VORBIS_H
 #define STB_VORBIS_INCLUDE_STB_VORBIS_H
+
+/* [MCS_B181] */
+#include "tetra/util/physfs/physfs.h"
 
 #if defined(STB_VORBIS_NO_CRT) && !defined(STB_VORBIS_NO_STDIO)
 #define STB_VORBIS_NO_STDIO 1
@@ -280,23 +283,26 @@ extern stb_vorbis * stb_vorbis_open_memory(const unsigned char *data, int len,
 #ifndef STB_VORBIS_NO_STDIO
 extern stb_vorbis * stb_vorbis_open_filename(const char *filename,
                                   int *error, const stb_vorbis_alloc *alloc_buffer);
-// create an ogg vorbis decoder from a filename via fopen(). on failure,
+/* [MCS_B181]: FILE -> PHYSFS_File */
+// create an ogg vorbis decoder from a filename via PHYSFS_openRead(). on failure,
 // returns NULL and sets *error (possibly to VORBIS_file_open_failure).
 
-extern stb_vorbis * stb_vorbis_open_file(FILE *f, int close_handle_on_close,
+extern stb_vorbis * stb_vorbis_open_file(PHYSFS_File *f, int close_handle_on_close,
                                   int *error, const stb_vorbis_alloc *alloc_buffer);
+/* [MCS_B181]: FILE -> PHYSFS_File */
 // create an ogg vorbis decoder from an open FILE *, looking for a stream at
-// the _current_ seek point (ftell). on failure, returns NULL and sets *error.
+// the _current_ seek point (PHYSFS_tell). on failure, returns NULL and sets *error.
 // note that stb_vorbis must "own" this stream; if you seek it in between
 // calls to stb_vorbis, it will become confused. Moreover, if you attempt to
 // perform stb_vorbis_seek_*() operations on this file, it will assume it
 // owns the _entire_ rest of the file after the start point. Use the next
 // function, stb_vorbis_open_file_section(), to limit it.
 
-extern stb_vorbis * stb_vorbis_open_file_section(FILE *f, int close_handle_on_close,
+extern stb_vorbis * stb_vorbis_open_file_section(PHYSFS_File *f, int close_handle_on_close,
                 int *error, const stb_vorbis_alloc *alloc_buffer, unsigned int len);
+/* [MCS_B181]: FILE -> PHYSFS_File */
 // create an ogg vorbis decoder from an open FILE *, looking for a stream at
-// the _current_ seek point (ftell); the stream will be of length 'len' bytes.
+// the _current_ seek point (PHYSFS_tell); the stream will be of length 'len' bytes.
 // on failure, returns NULL and sets *error. note that stb_vorbis must "own"
 // this stream; if you seek it in between calls to stb_vorbis, it will become
 // confused.

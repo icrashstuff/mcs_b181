@@ -1,6 +1,7 @@
 // clang-format off
 /* Changes by MCS_B181 are denoted by comments with [MCS_B181] */
 /* Primary changes by MCS_B181 are:
+ * - Use PHYSFS instead of stdio
  * - Split stb_vorbis into a header and source file (To make KDevelop happy)
  */
 
@@ -454,7 +455,8 @@ struct stb_vorbis
 
   // input config
 #ifndef STB_VORBIS_NO_STDIO
-   FILE *f;
+/* [MCS_B181]: FILE -> PHYSFS_File */
+   PHYSFS_File *f;
    uint32 f_start;
    int close_on_free;
 #endif
@@ -999,8 +1001,9 @@ static uint8 get8(vorb *z)
 
    #ifndef STB_VORBIS_NO_STDIO
    {
-   int c = fgetc(z->f);
-   if (c == EOF) { z->eof = TRUE; return 0; }
+   unsigned char c = 0;
+   PHYSFS_readBytes(z->f, &c, 1);
+   if (PHYSFS_eof(z->f)) { z->eof = TRUE; return 0; }
    return c;
    }
    #endif
@@ -1026,7 +1029,7 @@ static int getn(vorb *z, uint8 *data, int n)
    }
 
    #ifndef STB_VORBIS_NO_STDIO
-   if (fread(data, n, 1, z->f) == 1)
+   if (PHYSFS_read(z->f, data, n, 1) == 1)
       return 1;
    else {
       z->eof = 1;
@@ -1044,8 +1047,8 @@ static void skip(vorb *z, int n)
    }
    #ifndef STB_VORBIS_NO_STDIO
    {
-      long x = ftell(z->f);
-      fseek(z->f, x+n, SEEK_SET);
+      long x = PHYSFS_tell(z->f);
+      PHYSFS_seek(z->f, x+n);
    }
    #endif
 }
@@ -1073,10 +1076,10 @@ static int set_file_offset(stb_vorbis *f, unsigned int loc)
    } else {
       loc += f->f_start;
    }
-   if (!fseek(f->f, loc, SEEK_SET))
+   if (!PHYSFS_seek(f->f, loc))
       return 1;
    f->eof = 1;
-   fseek(f->f, f->f_start, SEEK_END);
+   PHYSFS_seek(f->f, PHYSFS_fileLength(f->f) - f->f_start);
    return 0;
    #endif
 }
@@ -3920,7 +3923,7 @@ static void vorbis_deinit(stb_vorbis *p)
       setup_free(p, p->bit_reverse[i]);
    }
    #ifndef STB_VORBIS_NO_STDIO
-   if (p->close_on_free) fclose(p->f);
+   if (p->close_on_free) PHYSFS_close(p->f);
    #endif
 }
 
@@ -4205,7 +4208,7 @@ unsigned int stb_vorbis_get_file_offset(stb_vorbis *f)
    #endif
    if (USE_MEMORY(f)) return (unsigned int) (f->stream - f->stream_start);
    #ifndef STB_VORBIS_NO_STDIO
-   return (unsigned int) (ftell(f->f) - f->f_start);
+   return (unsigned int) (PHYSFS_tell(f->f) - f->f_start);
    #endif
 }
 
@@ -4705,12 +4708,13 @@ int stb_vorbis_get_frame_float(stb_vorbis *f, int *channels, float ***output)
 
 #ifndef STB_VORBIS_NO_STDIO
 
-stb_vorbis * stb_vorbis_open_file_section(FILE *file, int close_on_free, int *error, const stb_vorbis_alloc *alloc, unsigned int length)
+/* [MCS_B181]: FILE -> PHYSFS_File */
+stb_vorbis * stb_vorbis_open_file_section(PHYSFS_File *file, int close_on_free, int *error, const stb_vorbis_alloc *alloc, unsigned int length)
 {
    stb_vorbis *f, p;
    vorbis_init(&p, alloc);
    p.f = file;
-   p.f_start = (uint32) ftell(file);
+   p.f_start = (uint32) PHYSFS_tell(file);
    p.stream_len   = length;
    p.close_on_free = close_on_free;
    if (start_decoder(&p)) {
@@ -4726,25 +4730,22 @@ stb_vorbis * stb_vorbis_open_file_section(FILE *file, int close_on_free, int *er
    return NULL;
 }
 
-stb_vorbis * stb_vorbis_open_file(FILE *file, int close_on_free, int *error, const stb_vorbis_alloc *alloc)
+/* [MCS_B181]: FILE -> PHYSFS_File */
+stb_vorbis * stb_vorbis_open_file(PHYSFS_File *file, int close_on_free, int *error, const stb_vorbis_alloc *alloc)
 {
    unsigned int len, start;
-   start = (unsigned int) ftell(file);
-   fseek(file, 0, SEEK_END);
-   len = (unsigned int) (ftell(file) - start);
-   fseek(file, start, SEEK_SET);
+   start = (unsigned int) PHYSFS_tell(file);
+   len = PHYSFS_fileLength(file);
+   PHYSFS_seek(file, start);
    return stb_vorbis_open_file_section(file, close_on_free, error, alloc, len);
 }
 
+/* [MCS_B181]: FILE -> PHYSFS_File */
 stb_vorbis * stb_vorbis_open_filename(const char *filename, int *error, const stb_vorbis_alloc *alloc)
 {
-   FILE *f;
-#if defined(_WIN32) && defined(__STDC_WANT_SECURE_LIB__)
-   if (0 != fopen_s(&f, filename, "rb"))
-      f = NULL;
-#else
-   f = fopen(filename, "rb");
-#endif
+   PHYSFS_File *f;
+   f = PHYSFS_openRead(filename);
+
    if (f)
       return stb_vorbis_open_file(f, TRUE, error, alloc);
    if (error) *error = VORBIS_file_open_failure;
