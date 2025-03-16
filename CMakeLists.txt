@@ -49,6 +49,7 @@ set(mcs_b181_client_SRC
     client/game.cpp
     client/time_blended_modifer.cpp
 
+    client/sound/stb_vorbis.c
     client/sound/sound_resources.cpp
 
     client/jzon/Jzon.cpp
