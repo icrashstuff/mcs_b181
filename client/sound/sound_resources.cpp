@@ -348,11 +348,14 @@ void sound_resources_t::imgui_contents(bool& play_sound, sound_info_t& sound_to_
         ImGui::TableNextColumn();
         const bool tree_open_it_event = ImGui::TreeNode(it_event.first.c_str());
         ImGui::TableNextColumn();
+        ImGui::PushID(it_event.first.c_str());
         if (ImGui::Button("Play event"))
             play_sound = get_sound(it_event.first, sound_to_play);
+        ImGui::PopID();
         if (!tree_open_it_event)
             continue;
 
+        ImGui::PushID(it_event.first.c_str());
         for (const auto& it_sound : it_event.second.entries)
         {
             ImGui::TableNextRow();
@@ -361,11 +364,13 @@ void sound_resources_t::imgui_contents(bool& play_sound, sound_info_t& sound_to_
             if (!it_sound.flags.is_event)
             {
                 ImGui::TableNextColumn();
+                ImGui::PushID(it_sound.name.c_str());
                 if (ImGui::Button("Play File"))
                 {
                     play_sound = 1;
                     sound_to_play = it_sound;
                 }
+                ImGui::PopID();
             }
             if (!tree_open_it_sound)
                 continue;
@@ -394,6 +399,7 @@ void sound_resources_t::imgui_contents(bool& play_sound, sound_info_t& sound_to_
 
             ImGui::TreePop();
         } /* for (const auto& it_sound : it_event.second) */
+        ImGui::PopID();
 
         ImGui::TreePop();
     }
