@@ -77,13 +77,13 @@ public:
 
     ~convar_t();
 
-    inline CONVAR_TYPE get_convar_type() { return _type; }
+    inline CONVAR_TYPE get_convar_type() const { return _type; }
 
-    inline CONVAR_FLAGS get_convar_flags() { return _flags; }
+    inline CONVAR_FLAGS get_convar_flags() const { return _flags; }
 
-    inline const char* get_help_string() { return _help_string; }
+    inline const char* get_help_string() const { return _help_string; }
 
-    inline const char* get_name() { return _name; }
+    inline const char* get_name() const { return _name; }
 
     /**
      * Returns true if the dev convar is set
@@ -143,13 +143,13 @@ public:
     convar_int_t(
         const char* name, int default_value, int min, int max, const char* help_string, CONVAR_FLAGS flags = 0, std::function<void()> post_callback = NULL);
 
-    inline int get() { return _value; }
+    inline int get() const { return _value; }
 
-    inline int get_min() { return _min; }
+    inline int get_min() const { return _min; }
 
-    inline int get_max() { return _max; }
+    inline int get_max() const { return _max; }
 
-    inline int get_default() { return _default; }
+    inline int get_default() const { return _default; }
 
     /**
      * Steps:
@@ -211,13 +211,13 @@ public:
     convar_float_t(const char* name, float default_value, float min, float max, const char* help_string, CONVAR_FLAGS flags = 0,
         std::function<void()> post_callback = NULL);
 
-    inline float get() { return _value; }
+    inline float get() const { return _value; }
 
-    inline float get_min() { return _min; }
+    inline float get_min() const { return _min; }
 
-    inline float get_max() { return _max; }
+    inline float get_max() const { return _max; }
 
-    inline float get_default() { return _default; }
+    inline float get_default() const { return _default; }
 
     /**
      * Steps:
@@ -278,9 +278,9 @@ class convar_string_t : public convar_t
 public:
     convar_string_t(const char* name, std::string default_value, const char* help_string, CONVAR_FLAGS flags = 0, std::function<void()> post_callback = NULL);
 
-    inline std::string get() { return _value; }
+    inline std::string get() const { return _value; }
 
-    inline std::string get_default() { return _default; }
+    inline std::string get_default() const { return _default; }
 
     /**
      * Steps:
