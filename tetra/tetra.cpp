@@ -531,21 +531,21 @@ void tetra::end_frame(bool clear_frame, void (*cb_screenshot)(void))
 
     SDL_GL_SwapWindow(window);
 
-    Uint64 now = SDL_GetTicks();
+    Uint64 now = SDL_GetTicksNS();
     static Uint64 reference_time = 0;
     static Uint64 frames_since_reference = 0;
     if (r_fps_limiter.get())
     {
-        Uint64 elasped_time_ideal = frames_since_reference * 1000 / r_fps_limiter.get();
+        Uint64 elasped_time_ideal = frames_since_reference * 1000ul * 1000ul * 1000ul / r_fps_limiter.get();
         Sint64 delay = reference_time + elasped_time_ideal - now;
         // Reset when difference between the real and ideal worlds gets problematic
-        if (delay < -100 || 100 < delay)
+        if (delay < -100l * 1000l * 1000l || 100l * 1000l * 1000l < delay)
         {
             reference_time = now;
             frames_since_reference = 0;
         }
-        else if (delay > 0)
-            SDL_Delay(delay);
+        else if (delay > 1000)
+            SDL_DelayNS(delay);
     }
     frames_since_reference += 1;
 }
