@@ -95,6 +95,7 @@ static std::vector<game_t*> games;
 static game_t* game_pano = nullptr;
 static game_t* game_selected = nullptr;
 static game_resources_t* game_resources = nullptr;
+static int game_selected_idx = 0;
 
 static ImGuiContext* imgui_ctx_main_menu = NULL;
 
@@ -577,8 +578,6 @@ static void normal_loop()
         new_game->create_light_test_sdl_rand({ 16, 8, 16 });
         games.push_back(new_game);
     }
-
-    static int game_selected_idx = 0;
 
     for (auto it = games.begin(); it != games.end();)
     {
@@ -1587,6 +1586,34 @@ int main(const int argc, const char** argv)
             dc_log("Failed to send message!");
             return 1;
         }
+
+        return 0;
+    });
+    dev_console::add_command("game_external", [=](int argc, const char** argv) -> int {
+        if (argc != 2 && argc != 3)
+        {
+            dc_log_error("Usage: %s address [port]", argv[0]);
+            return 1;
+        }
+
+        int port = 25565;
+        if (argc == 3 && !int_from_str(argv[2], port))
+        {
+            dc_log_error("Unable to parse \"%s\" as int", argv[2]);
+            return 1;
+        }
+
+        if (port < 0 || port >= 0xFFFF)
+        {
+            dc_log_warn("Port must be in range [0,65535]");
+            return 1;
+        }
+
+        dc_log("Creating external game, addr: \"%s\", port: %d", argv[1], port);
+
+        game_t* new_game = new game_t(argv[1], port, cvr_username.get(), game_resources);
+        games.push_back(new_game);
+        game_selected_idx = new_game->game_id;
 
         return 0;
     });

@@ -69,6 +69,8 @@ game_t::game_t(const std::string addr, const Uint16 port, const std::string user
     connection->init(addr, port, username);
 
     reload_resources(_resources);
+
+    dc_log("Created external game with id: %d, addr: \"%s\", port: %d, username: \"%s\"", game_id, addr.c_str(), port, username.c_str());
 }
 
 game_t::game_t(const game_resources_t* const _resources)
@@ -78,6 +80,8 @@ game_t::game_t(const game_resources_t* const _resources)
     level->lightmap.set_world_time(1000);
 
     reload_resources(_resources);
+
+    dc_log("Created internal game with id %d", game_id);
 }
 
 /**
