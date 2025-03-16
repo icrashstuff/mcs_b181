@@ -1617,18 +1617,23 @@ int main(const int argc, const char** argv)
         glViewport(0, 0, win_width, win_height);
         if (game_selected)
         {
-            switch (game_selected->level->dimension_get())
+            glm::vec3 col(0.0f);
+            const glm::vec3 pos = game_selected->level->get_camera_pos();
+            const float kernel[] = { 0.1f, 0.125f, 0.175f, 0.20f, 0.175f, 0.125f, 0.1f };
+            const int offsets[IM_ARRAYSIZE(kernel)] = { -2, -1, 0, 1, 2 };
+            for (int v = 0; v < IM_ARRAYSIZE(kernel) * IM_ARRAYSIZE(kernel) * IM_ARRAYSIZE(kernel); v++)
             {
-            case mc_id::DIMENSION_OVERWORLD:
-                glClearColor(0.452f, 0.677f, 1.0f, 1.0f);
-                break;
-            case mc_id::DIMENSION_NETHER:
-                glClearColor(0.2f, 0.03f, 0.03f, 1.0f);
-                break;
-            case mc_id::DIMENSION_END:
-                glClearColor(0.0f, 0.0f, 0.0f, 1.0f);
-                break;
+                const int i = v % IM_ARRAYSIZE(kernel);
+                const int j = (v / IM_ARRAYSIZE(kernel)) % IM_ARRAYSIZE(kernel);
+                const int k = v / (IM_ARRAYSIZE(kernel) * IM_ARRAYSIZE(kernel));
+
+                const glm::vec3 offset(offsets[i], offsets[j], offsets[k]);
+                const float blur = kernel[i] * kernel[j] * kernel[k];
+
+                col += mc_id::get_biome_color_sky(game_selected->level->get_biome_at(glm::round(pos + offset))) * blur;
             }
+
+            glClearColor(col.r, col.g, col.b, 1.0f);
         }
         else
             glClearColor(0.1f, 0.1f, 0.1f, 1.0f);
