@@ -763,7 +763,12 @@ void connection_t::run(level_t* const level)
             case PACKET_ID_ENT_ENSURE_SPAWN:
             {
                 CAST_PACK_TO_P(packet_ent_create_t);
-                ADD_ENT_TO_MAP_OR_RESET_ENT();
+
+                if (ent_id_map.find(p->eid) != ent_id_map.end())
+                    break;
+
+                auto entity = level->ecs.create();
+                ent_id_map.insert(ent_id_map.end(), std::make_pair(p->eid, entity));
                 level->ecs.emplace<entity_id_t>(entity, ENT_ID_NONE);
                 break;
             }
