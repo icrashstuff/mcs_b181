@@ -70,7 +70,7 @@ static ImTextureID load_texture(void* data, int x, int y, std::string label, GLe
         delete[] data_missing;
     }
 
-    return reinterpret_cast<ImTextureID>(ret);
+    return ImTextureID(ret);
 }
 
 static ImTextureID load_gui_texture(std::string path, GLenum edge = GL_CLAMP_TO_EDGE, std::string prefix = "/_resources/assets/minecraft/textures/gui/")

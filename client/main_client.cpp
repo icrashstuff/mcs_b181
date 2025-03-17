@@ -285,7 +285,7 @@ void render_world_overlays(level_t* level, ImDrawList* const bg_draw_list)
 
     if (type == BLOCK_ID_WATER_FLOWING || type == BLOCK_ID_WATER_SOURCE)
     {
-        ImTextureID tex_id = reinterpret_cast<ImTextureID>(mc_gui::global_ctx->tex_id_water);
+        ImTextureID tex_id(mc_gui::global_ctx->tex_id_water);
         bg_draw_list->AddRectFilled(ImVec2(-32, -32), ImGui::GetMainViewport()->Size + ImVec2(32, 32), IM_COL32(0, 0, 64, 255 * 0.5f));
         bg_draw_list->AddImage(tex_id, pos0, pos1, uv0, uv1, IM_COL32(255, 255, 255, 0.125f * 255));
     }
@@ -296,7 +296,7 @@ void render_world_overlays(level_t* level, ImDrawList* const bg_draw_list)
     }
     else if (mc_id::is_block(type) && !mc_id::is_transparent(type) && game_resources && game_resources->terrain_atlas)
     {
-        ImTextureID tex_id = reinterpret_cast<ImTextureID>(game_resources->terrain_atlas->tex_id_main);
+        ImTextureID tex_id(game_resources->terrain_atlas->tex_id_main);
         mc_id::terrain_face_t face = game_resources->terrain_atlas->get_face(mc_id::FACE_STONE);
 #define BLOCK_OVERLAY(ID, FACE_ID)                               \
     case ID:                                                     \
