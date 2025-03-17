@@ -23,7 +23,7 @@
 
 #include "game.h"
 
-#include "tetra/tetra.h"
+#include "tetra/tetra_core.h"
 #include "tetra/tetra_gl.h"
 
 #include <algorithm>
@@ -1980,9 +1980,11 @@ int main(const int argc, const char** argv)
     for (game_t* g : games)
         delete g;
 
-    tetra::deinit();
     SDLNet_Quit();
-    SDL_Quit();
+    tetra::deinit_gui();
+    tetra::deinit();
+
+    return 0;
 }
 
 void play_gui_button_sound()

@@ -21,15 +21,15 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef TETRA_TETRA_INTERNAL_H_INCLUDED
-#define TETRA_TETRA_INTERNAL_H_INCLUDED
-
-#include "tetra.h"
-#include "tetra_gl.h"
+#ifndef TETRA_TETRA_STATE_H_INCLUDED
+#define TETRA_TETRA_STATE_H_INCLUDED
 
 namespace tetra
 {
-extern bool is_available_glObjectLabel;
+namespace internal
+{
+    extern bool is_initialized_core();
+}
 }
 
 #endif

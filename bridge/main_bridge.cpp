@@ -39,7 +39,8 @@
 #include <vector>
 
 #include "tetra/log.h"
-#include "tetra/tetra.h"
+#include "tetra/tetra_core.h"
+#include "tetra/tetra_gl.h"
 #include "tetra/util/convar.h"
 
 #include "shared/build_info.h"
@@ -1637,6 +1638,8 @@ int main(int argc, const char** argv)
     SDLNet_DestroyServer(server);
 
     SDLNet_Quit();
+    tetra::deinit_gui();
     tetra::deinit();
-    SDL_Quit();
+
+    return 0;
 }

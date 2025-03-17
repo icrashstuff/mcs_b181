@@ -21,14 +21,6 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-// Dear ImGui: standalone example application for SDL3 + OpenGL
-// (SDL is a cross-platform general purpose library for handling windows, inputs, OpenGL/Vulkan/Metal graphics context creation, etc.)
-
-// Learn about Dear ImGui:
-// - FAQ                  https://dearimgui.com/faq
-// - Getting Started      https://dearimgui.com/getting-started
-// - Documentation        https://dearimgui.com/docs (same as your local docs/ folder).
-// - Introduction, links and more at the top of imgui.cpp
 
 #include "gui/imgui.h"
 #include "gui/imgui/backends/imgui_impl_opengl3.h"
@@ -45,21 +37,29 @@
 #include <SDL3/SDL_opengl.h>
 #endif
 
-#include "tetra.h"
-#include "tetra/util/cli_parser.h"
-#include "tetra/util/convar.h"
-#include "tetra/util/convar_file.h"
-#include "tetra/util/misc.h"
-#include "tetra/util/physfs/physfs.h"
+#include "tetra_core.h"
+#include "tetra_gl.h"
+#include "util/cli_parser.h"
+#include "util/convar.h"
+#include "util/convar_file.h"
+#include "util/misc.h"
+#include "util/physfs/physfs.h"
 
-#include "tetra/gui/console.h"
-#include "tetra/gui/gui_registrar.h"
-#include "tetra/gui/proggy_tiny.cpp"
-#include "tetra/gui/styles.h"
+#include "gui/console.h"
+#include "gui/gui_registrar.h"
+#include "gui/proggy_tiny.cpp"
+#include "gui/styles.h"
 
 #include "tetra_internal.h"
 
-bool tetra::is_available_glObjectLabel = 0;
+namespace tetra
+{
+namespace gl
+{
+    bool is_available_glObjectLabel = 0;
+    int init_counter = 0;
+}
+}
 
 SDL_Window* tetra::window = NULL;
 SDL_GLContext tetra::gl_context = NULL;
@@ -67,12 +67,10 @@ SDL_GLContext tetra::gl_context = NULL;
 static ImGuiContext* im_ctx_main = NULL;
 static ImGuiContext* im_ctx_overlay = NULL;
 
+static bool gamepad_was_init = false;
+
 static bool im_ctx_shown_main = true;
 static bool im_ctx_shown_overlay = true;
-
-static bool was_init = false;
-static bool was_init_gui = false;
-static bool was_deinit = false;
 
 static tetra::render_api_t render_api = tetra::RENDER_API_GL_CORE;
 static int render_api_version_major = 3;
@@ -94,10 +92,6 @@ static convar_int_t r_vsync("r_vsync", 1, 0, 1, "Enable/Disable vsync", CONVAR_F
 static convar_int_t r_adapative_vsync("r_adapative_vsync", 1, 0, 1, "Enable disable adaptive vsync", CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_SAVE);
 static convar_int_t gui_demo_window("gui_demo_window", 0, 0, 1, "Show Dear ImGui demo window", CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_DEV_ONLY);
 
-ImFont* dev_console::overlay_font = NULL;
-
-std::atomic<float> dev_console::add_log_font_width = { 7.0f };
-
 /**
  * Calculate a new value for dev_console::add_log_font_width by dividing the width of the string by it's length and adding some padding
  */
@@ -107,105 +101,9 @@ static void calc_dev_font_width(const char* str)
     dev_console::add_log_font_width = (ImGui::CalcTextSize(str).x / len) + ImGui::GetStyle().ItemSpacing.x * 2;
 }
 
-void tetra::init(const char* organization, const char* appname, const char* cfg_path_prefix, int argc, const char** argv)
-{
-    if (was_init)
-        return;
-
-    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, appname);
-    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING, __DATE__);
-    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_CREATOR_STRING, organization);
-
-    dc_log("Init main");
-
-    was_init = true;
-
-    convar_t::atexit_init();
-    atexit(convar_t::atexit_callback);
-
-    /* Parse command line */
-    cli_parser::parse(argc, argv);
-
-    {
-        convar_int_t* dev = (convar_int_t*)convar_t::get_convar("dev");
-
-        /* Set dev before any other variables in case their callbacks require dev */
-        if (cli_parser::get_value(dev->get_name()))
-            dev->set(1);
-        dev->set_pre_callback([=](int, int) -> bool { return false; });
-    }
-
-    if (convar_t::dev())
-    {
-        /* KDevelop fully buffers the output and will not display anything */
-        setvbuf(stdout, NULL, _IONBF, 0);
-        setvbuf(stderr, NULL, _IONBF, 0);
-        fflush(stdout);
-        fflush(stderr);
-        dc_log("Developer convar set");
-
-        convar_int_t* console_overlay = (convar_int_t*)convar_t::get_convar("console_overlay");
-
-        if (console_overlay)
-            console_overlay->set(3);
-    }
-
-    PHYSFS_init(argv[0]);
-    PHYSFS_setSaneConfig(organization, appname, NULL, 0, 0);
-
-    /* Set convars from config */
-    convar_file_parser::set_config_prefix(cfg_path_prefix);
-    convar_file_parser::read();
-
-    /* Set convars from command line */
-    cli_parser::apply();
-
-    if (cli_parser::get_value("-help") || cli_parser::get_value("help") || cli_parser::get_value("h"))
-    {
-        dc_log_internal("Usage: %s [ -convar_name [convar_value], ...]", argv[0]);
-        dc_log_internal("\n");
-        dc_log_internal("Examples:");
-        dc_log_internal("  %s -dev -%s %d", argv[0], r_vsync.get_name(), r_vsync.get());
-        dc_log_internal("  %s -%s %d -%s %d", argv[0], cvr_x.get_name(), cvr_x.get(), cvr_y.get_name(), cvr_y.get());
-        dc_log_internal("\n");
-        dc_log_internal("List of all console variables *without* the flag CONVAR_FLAG_DEV_ONLY and associated help text (In no particular order)");
-        dc_log_internal("=======================================================================================================================");
-        std::vector<convar_t*>* cvrs = convar_t::get_convar_list();
-        for (size_t i = 0; i < cvrs->size(); i++)
-        {
-            if (cvrs->at(i)->get_convar_flags() & CONVAR_FLAG_DEV_ONLY)
-                continue;
-            cvrs->at(i)->log_help();
-            dc_log_internal("\n");
-        }
-        if (convar_t::dev())
-        {
-            dc_log_internal("List of all console variables with the flag CONVAR_FLAG_DEV_ONLY and associated help text (In no particular order)");
-            dc_log_internal("==================================================================================================================");
-            for (size_t i = 0; i < cvrs->size(); i++)
-            {
-                if (!(cvrs->at(i)->get_convar_flags() & CONVAR_FLAG_DEV_ONLY))
-                    continue;
-                cvrs->at(i)->log_help();
-                dc_log_internal("\n");
-            }
-        }
-        else
-        {
-            dc_log_internal("Console variables with flag CONVAR_FLAG_DEV_ONLY omitted, add `-dev` to the command line to list them.");
-        }
-        exit(0);
-    }
-
-    const PHYSFS_ArchiveInfo** supported_archives = PHYSFS_supportedArchiveTypes();
-
-    for (int i = 0; supported_archives[i] != NULL; i++)
-        dc_log("Supported archive: [%s]", supported_archives[i]->extension);
-}
-
 void tetra::set_render_api(render_api_t api, int major, int minor)
 {
-    if (was_init_gui)
+    if (tetra::gl::init_counter)
         return;
     render_api = api;
     render_api_version_major = major;
@@ -223,7 +121,7 @@ static void GLAPIENTRY debug_msg_callback(GLenum source, GLenum type, GLuint id,
 
 void tetra::gl_obj_label(GLenum identifier, GLuint name, const GLchar* fmt, ...)
 {
-    if (!is_available_glObjectLabel)
+    if (!gl::is_available_glObjectLabel)
         return;
 
     /** Spec says the minimum max label length is 256 characters, which seems like a reasonable place to limit this buffer */
@@ -240,20 +138,27 @@ void tetra::gl_obj_label(GLenum identifier, GLuint name, const GLchar* fmt, ...)
 
 int tetra::init_gui(const char* window_title)
 {
-    if (was_init_gui || !was_init)
+    if (!tetra::internal::is_initialized_core())
+    {
+        dc_log_error("[tetra_gl]: Tetra core *must* be initialized before initializing tetra_gl");
         return 0;
+    }
 
-    dc_log("Init gui");
+    if (tetra::gl::init_counter++)
+    {
+        dc_log_warn("[tetra_gl]: Skipping initialization as tetra_gl has already been initialized (You are probably doing something wrong!)");
+        return 0;
+    }
+
+    dc_log("[tetra_gl]: Init started");
 
     Uint64 start_tick = SDL_GetTicksNS();
-
-    was_init_gui = true;
 
     // Setup SDL
     if (!SDL_Init(SDL_INIT_VIDEO))
         util::die("Error: SDL_Init(SDL_INIT_VIDEO):\n%s\n", SDL_GetError());
 
-    bool gamepad_was_init = SDL_Init(SDL_INIT_GAMEPAD);
+    gamepad_was_init = SDL_Init(SDL_INIT_GAMEPAD);
     if (!gamepad_was_init)
         dc_log_error("Error: Unable to initialize SDL Gamepad Subsystem:\n%s\n", SDL_GetError());
 
@@ -332,7 +237,7 @@ int tetra::init_gui(const char* window_title)
 
         glDebugMessageCallback(debug_msg_callback, NULL);
 
-        is_available_glObjectLabel = true;
+        gl::is_available_glObjectLabel = true;
     }
 
     SDL_GL_MakeCurrent(tetra::window, tetra::gl_context);
@@ -420,14 +325,14 @@ int tetra::init_gui(const char* window_title)
     }
     ImGui::SetCurrentContext(im_ctx_main);
 
-    dc_log("Init gui finished in %.1f ms", ((SDL_GetTicksNS() - start_tick) / 100000) / 10.0f);
+    dc_log("[tetra_gl]: Init finished in %.1f ms", ((SDL_GetTicksNS() - start_tick) / 100000) / 10.0f);
 
     return 0;
 }
 
 bool tetra::process_event(SDL_Event event)
 {
-    if (!was_init_gui)
+    if (!tetra::gl::init_counter)
         return false;
 
     ImGui::SetCurrentContext(im_ctx_main);
@@ -449,7 +354,7 @@ bool tetra::process_event(SDL_Event event)
 
 int tetra::start_frame(bool event_loop)
 {
-    if (!was_init_gui)
+    if (!tetra::gl::init_counter)
         return -1;
 
     bool done = false;
@@ -480,7 +385,7 @@ void tetra::show_imgui_ctx_overlay(bool shown) { im_ctx_shown_overlay = shown; }
 
 void tetra::end_frame(bool clear_frame, void (*cb_screenshot)(void))
 {
-    if (!was_init_gui)
+    if (!tetra::gl::init_counter)
         return;
 
     ImGuiIO& io = ImGui::GetIO();
@@ -531,50 +436,50 @@ void tetra::end_frame(bool clear_frame, void (*cb_screenshot)(void))
 
     SDL_GL_SwapWindow(window);
 
-    Uint64 now = SDL_GetTicksNS();
-    static Uint64 reference_time = 0;
-    static Uint64 frames_since_reference = 0;
-    if (r_fps_limiter.get())
-    {
-        Uint64 elasped_time_ideal = frames_since_reference * 1000ul * 1000ul * 1000ul / r_fps_limiter.get();
-        Sint64 delay = reference_time + elasped_time_ideal - now;
-        // Reset when difference between the real and ideal worlds gets problematic
-        if (delay < -100l * 1000l * 1000l || 100l * 1000l * 1000l < delay)
-        {
-            reference_time = now;
-            frames_since_reference = 0;
-        }
-        else if (delay > 1000)
-            SDL_DelayNS(delay);
-    }
-    frames_since_reference += 1;
+    static tetra::iteration_limiter_t limiter;
+
+    limiter.set_limit(r_fps_limiter.get());
+    limiter.wait();
 }
 
-void tetra::deinit()
+void tetra::deinit_gui()
 {
-    if (was_deinit)
-        return;
-    was_deinit = true;
+    if (!tetra::internal::is_initialized_core())
+        dc_log_warn("[tetra_gl]: Tetra core should be deinitialized *after* tetra_gl");
 
-    convar_file_parser::write();
+    tetra::gl::init_counter--;
 
-    convar_t::atexit_callback();
-
-    if (was_init_gui)
+    if (tetra::gl::init_counter < 0)
     {
-        ImGui::SetCurrentContext(im_ctx_overlay);
-        ImGui_ImplOpenGL3_Shutdown();
-        ImGui_ImplSDL3_Shutdown();
-        ImGui::DestroyContext();
-
-        ImGui::SetCurrentContext(im_ctx_main);
-        ImGui_ImplOpenGL3_Shutdown();
-        ImGui_ImplSDL3_Shutdown();
-        ImGui::DestroyContext();
-
-        SDL_GL_DestroyContext(gl_context);
-        SDL_DestroyWindow(window);
+        dc_log_error("[tetra_gl]: Init counter is less than 0, resetting to 0");
+        tetra::gl::init_counter = 0;
+        return;
     }
 
-    PHYSFS_deinit();
+    if (tetra::gl::init_counter != 0)
+        return;
+
+    ImGui::SetCurrentContext(im_ctx_overlay);
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDL3_Shutdown();
+    ImGui::DestroyContext();
+    im_ctx_overlay = NULL;
+
+    ImGui::SetCurrentContext(im_ctx_main);
+    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDL3_Shutdown();
+    ImGui::DestroyContext();
+    im_ctx_main = NULL;
+
+    SDL_GL_DestroyContext(gl_context);
+    gl_context = NULL;
+    SDL_DestroyWindow(window);
+    window = NULL;
+
+    SDL_QuitSubSystem(SDL_INIT_VIDEO);
+    if (gamepad_was_init)
+    {
+        SDL_QuitSubSystem(SDL_INIT_GAMEPAD);
+        gamepad_was_init = false;
+    }
 }

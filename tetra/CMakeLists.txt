@@ -65,11 +65,13 @@ set(tetra_core_SRC
     ${TETRA_DIR}util/stb/stb_sprintf.c
     ${TETRA_DIR}util/stb/stb_rect_pack.c
 
+    ${TETRA_DIR}tetra_core.cpp
+
     ${imgui_SRC}
 )
 
 set(tetra_gl_SRC
-    ${TETRA_DIR}tetra.cpp
+    ${TETRA_DIR}tetra_gl.cpp
 
     ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
     ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp

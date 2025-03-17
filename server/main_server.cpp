@@ -42,7 +42,7 @@
 #include "shared/misc.h"
 #include "shared/packet.h"
 
-#include "tetra/tetra.h"
+#include "tetra/tetra_core.h"
 #include "tetra/util/convar.h"
 
 #include "shared/chunk.h"
@@ -1665,12 +1665,6 @@ int main(const int argc, const char** argv)
 
     LOG("Hello");
 
-    if (!SDL_Init(0))
-    {
-        LOG("SDL_Init: %s", SDL_GetError());
-        exit(1);
-    }
-
     if (!SDLNet_Init())
     {
         LOG("SDLNet_Init: %s", SDL_GetError());
@@ -2551,5 +2545,7 @@ int main(const int argc, const char** argv)
     SDLNet_DestroyServer(server);
 
     SDLNet_Quit();
-    SDL_Quit();
+    tetra::deinit();
+
+    return 0;
 }

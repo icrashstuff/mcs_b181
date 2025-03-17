@@ -114,11 +114,14 @@ git_path_is_dirty("shared" GIT_DIRTY_SHARED)
 configure_file("${CMAKE_CURRENT_SOURCE_DIR}/shared/build_info.cpp.in" "${CMAKE_CURRENT_BINARY_DIR}/shared/build_info.cpp" @ONLY)
 
 function(add_bin_common name)
-    add_tetra_executable(${name} "${${name}_SRC};shared/build_info.cpp")
+    add_executable(${name} "${${name}_SRC};shared/build_info.cpp")
+
+    tetra_common_compile_options(${name})
 
     target_compile_options(${name} PUBLIC -Wall -Wextra -DSDL_DISABLE_OLD_NAMES=1)
 
     target_link_libraries(${name} glm::glm)
+    target_link_libraries(${name} tetra_core)
     target_link_libraries(${name} ZLIB::ZLIB)
     target_link_libraries(${name} SDL3_net::SDL3_net-static)
 endfunction()
@@ -130,5 +133,8 @@ add_bin_common(mcs_b181_client)
 target_link_libraries(mcs_b181_client OpenAL::OpenAL)
 target_link_libraries(mcs_b181_client EnTT::EnTT)
 target_link_libraries(mcs_b181_client cubiomes_static)
+target_link_libraries(mcs_b181_client tetra_gl)
+
+target_link_libraries(mcs_b181_bridge tetra_gl)
 
 target_link_libraries(mcs_b181_server cubiomes_static)
