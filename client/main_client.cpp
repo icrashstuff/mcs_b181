@@ -32,9 +32,9 @@
 #include <GL/glu.h>
 #include <SDL3/SDL_opengl.h>
 
-#include "tetra/gui/imgui-1.91.1/backends/imgui_impl_opengl3.h"
-#include "tetra/gui/imgui-1.91.1/backends/imgui_impl_sdl3.h"
 #include "tetra/gui/imgui.h"
+#include "tetra/gui/imgui/backends/imgui_impl_opengl3.h"
+#include "tetra/gui/imgui/backends/imgui_impl_sdl3.h"
 
 #include "tetra/gui/console.h"
 #include "tetra/gui/gui_registrar.h"

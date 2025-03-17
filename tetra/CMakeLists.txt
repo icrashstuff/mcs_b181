@@ -36,13 +36,15 @@ set(CMAKE_C_STANDARD_REQUIRED ON)
 
 set(TETRA_DIR "")
 
+set(IMGUI_DIR "${TETRA_DIR}gui/imgui")
+
 set(imgui_SRC
-    ${TETRA_DIR}gui/imgui-1.91.1/imgui.cpp
-    ${TETRA_DIR}gui/imgui-1.91.1/imgui_demo.cpp
-    ${TETRA_DIR}gui/imgui-1.91.1/imgui_draw.cpp
-    ${TETRA_DIR}gui/imgui-1.91.1/imgui_tables.cpp
-    ${TETRA_DIR}gui/imgui-1.91.1/imgui_widgets.cpp
-    ${TETRA_DIR}gui/imgui-1.91.1/misc/cpp/imgui_stdlib.cpp
+    ${IMGUI_DIR}/imgui.cpp
+    ${IMGUI_DIR}/imgui_demo.cpp
+    ${IMGUI_DIR}/imgui_draw.cpp
+    ${IMGUI_DIR}/imgui_tables.cpp
+    ${IMGUI_DIR}/imgui_widgets.cpp
+    ${IMGUI_DIR}/misc/cpp/imgui_stdlib.cpp
 )
 
 set(tetra_core_SRC
@@ -69,8 +71,8 @@ set(tetra_core_SRC
 set(tetra_gl_SRC
     ${TETRA_DIR}tetra.cpp
 
-    ${TETRA_DIR}gui/imgui-1.91.1/backends/imgui_impl_sdl3.cpp
-    ${TETRA_DIR}gui/imgui-1.91.1/backends/imgui_impl_opengl3.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
 )
 
 function(tetra_common_compile_options target_name)

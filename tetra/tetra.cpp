@@ -30,9 +30,9 @@
 // - Documentation        https://dearimgui.com/docs (same as your local docs/ folder).
 // - Introduction, links and more at the top of imgui.cpp
 
-#include "gui/imgui-1.91.1/backends/imgui_impl_opengl3.h"
-#include "gui/imgui-1.91.1/backends/imgui_impl_sdl3.h"
 #include "gui/imgui.h"
+#include "gui/imgui/backends/imgui_impl_opengl3.h"
+#include "gui/imgui/backends/imgui_impl_sdl3.h"
 #include <SDL3/SDL.h>
 #include <stdio.h>
 
