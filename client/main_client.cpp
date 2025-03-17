@@ -1581,6 +1581,15 @@ int main(const int argc, const char** argv)
 
     tetra::init_gui(window_title);
 
+    SDL_SetLogPriorityPrefix(SDL_LOG_PRIORITY_INVALID, "[SDL_LOG][UNKNOWN]: ");
+    SDL_SetLogPriorityPrefix(SDL_LOG_PRIORITY_TRACE, "[SDL_LOG][TRACE]: ");
+    SDL_SetLogPriorityPrefix(SDL_LOG_PRIORITY_VERBOSE, "[SDL_LOG][VERBOSE]: ");
+    SDL_SetLogPriorityPrefix(SDL_LOG_PRIORITY_DEBUG, "[SDL_LOG][DEBUG]: ");
+    SDL_SetLogPriorityPrefix(SDL_LOG_PRIORITY_INFO, "[SDL_LOG][INFO]: ");
+    SDL_SetLogPriorityPrefix(SDL_LOG_PRIORITY_WARN, "[SDL_LOG][WARN]: ");
+    SDL_SetLogPriorityPrefix(SDL_LOG_PRIORITY_ERROR, "[SDL_LOG][ERROR]: ");
+    SDL_SetLogPriorityPrefix(SDL_LOG_PRIORITY_CRITICAL, "[SDL_LOG][CRITICAL]: ");
+
     /* No reason to allow cvr_profile_light in non-dev environments */
     if (!convar_t::dev())
         cvr_profile_light.set(0);
