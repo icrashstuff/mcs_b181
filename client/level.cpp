@@ -108,6 +108,8 @@ void level_t::cull_chunks(const glm::ivec2 win_size, const int render_distance)
     }
     for (chunk_cubic_t* c : chunks_render_order)
     {
+        CULL_REJECT_IF(c->renderer_hint_uniform_air);
+
         const glm::vec3 chunk_center = glm::vec3((c->pos << 1) - camera_half_chunk_pos);
 
         /* Beyond render distance culling */
@@ -220,7 +222,10 @@ void level_t::build_dirty_meshes()
             continue;
         light_pass(c->pos.x, c->pos.y, c->pos.z, false);
         light_pass_sky(c->pos.x, c->pos.y, c->pos.z, false);
-        c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
+        if (c->renderer_hint_uniform_air)
+            c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_NONE;
+        else
+            c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
         built++;
     }
     PASS_TIMER_STOP(enable_timer_log_light, "Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 4)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
@@ -353,6 +358,7 @@ void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z
     for (int i = 0; i < IM_ARRAYSIZE(light_levels); i++)
         light_levels[i] = mc_id::get_light_level(i);
 
+    Uint32 total_block = 0;
     Uint32 total = 0;
     Uint8 min_level = 15;
     Uint8 max_level = 0;
@@ -364,6 +370,8 @@ void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z
         const int x = (dat_it >> 8) & 0x0F;
 
         Uint8 type = cross.c->get_type(x, y, z);
+
+        total_block += type;
 
         Uint8 lvl = light_levels[type];
 
@@ -449,6 +457,8 @@ void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z
         max_level = SDL_max(max_level, lvl);
         total += lvl;
     }
+
+    cross.c->renderer_hint_uniform_air = total_block == 0;
 
     /* If the light level is uniform then no propagation is required for a local pass */
     if (local_only && total % SUBCHUNK_SIZE_VOLUME == 0)

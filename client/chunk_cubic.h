@@ -67,6 +67,15 @@ struct chunk_cubic_t
      */
     bool visible = 1;
 
+    /**
+     * Chunk is uniformly made of air
+     *
+     * If this is true then a transition of DIRTY_LEVEL_LIGHT_PASS_EXT_0 -> DIRTY_LEVEL_NONE is possible
+     *
+     * To be filled in by DIRTY_LEVEL_LIGHT_PASS_INTERNAL
+     */
+    bool renderer_hint_uniform_air = 0;
+
     GLuint vao = 0;
     GLuint vbo = 0;
     GLuint ebo_translucent = 0;
