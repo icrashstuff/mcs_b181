@@ -484,10 +484,12 @@ void sound_world_t::source_kill(const source_id_t id)
     ALC_CALL(alcMakeContextCurrent(context));
     if (source_is_valid(id))
     {
-        slots[id & 0xFFFF].in_use = 0;
-        if (slots[id & 0xFFFF].stream_decoder)
-            stb_vorbis_close(slots[id & 0xFFFF].stream_decoder);
-        reset_al_source(slots[id & 0xFFFF].al_source);
+        slot_t& slot = slots[id & 0xFFFF];
+        slot.in_use = 0;
+        if (slot.stream_decoder)
+            stb_vorbis_close(slot.stream_decoder);
+        slot.stream_decoder = NULL;
+        reset_al_source(slot.al_source);
     }
     ALC_CALL(alcMakeContextCurrent(NULL));
 }
@@ -505,6 +507,9 @@ void sound_world_t::kill_all()
         if (it.al_source)
             reset_al_source(it.al_source);
         it.in_use = 0;
+        if (it.stream_decoder)
+            stb_vorbis_close(it.stream_decoder);
+        it.stream_decoder = NULL;
     }
     ALC_CALL(alcMakeContextCurrent(NULL));
 }
