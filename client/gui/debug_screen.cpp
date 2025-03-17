@@ -154,7 +154,8 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
     cursor_r.y += get_y_spacing();
 
     int num_cores = SDL_GetNumLogicalCPUCores();
-    add_text(ctx, drawlist, 1, cursor_r, "CPU: %dx", num_cores);
+    add_text(ctx, drawlist, 1, cursor_r, "CPU: %dx, RAM: %.1f GiB", num_cores, SDL_GetSystemRAM() / 1024.f);
+    add_text(ctx, drawlist, 1, cursor_r, "OS: %s", SDL_GetPlatform());
 
     cursor_r.y += get_y_spacing();
 
