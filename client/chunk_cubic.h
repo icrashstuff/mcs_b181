@@ -70,11 +70,32 @@ struct chunk_cubic_t
     /**
      * Chunk is uniformly made of air
      *
-     * If this is true then a transition of DIRTY_LEVEL_LIGHT_PASS_EXT_0 -> DIRTY_LEVEL_NONE is possible
+     * If this is true then remapping DIRTY_LEVEL_MESH -> DIRTY_LEVEL_NONE is possible
      *
      * To be filled in by DIRTY_LEVEL_LIGHT_PASS_INTERNAL
      */
     bool renderer_hint_uniform_air = 0;
+
+    /**
+     * Sides of chunk are fully opaque
+     *
+     * If this is true then remapping [DIRTY_LEVEL_LIGHT_PASS_EXT_0, DIRTY_LEVEL_LIGHT_PASS_EXT_2] -> DIRTY_LEVEL_MESH is possible
+     *
+     * To be filled in by DIRTY_LEVEL_LIGHT_PASS_INTERNAL
+     */
+    bool renderer_hint_opaque_sides = 0;
+
+    /**
+     * Chunk is fully opaque
+     *
+     * If this is true then remapping [DIRTY_LEVEL_LIGHT_PASS_EXT_0, DIRTY_LEVEL_LIGHT_PASS_EXT_2] -> DIRTY_LEVEL_MESH is possible
+     *
+     * If this is true and the surrounding +XYZ, -XYZ chunks have renderer_hint_opaque_sides or renderer_hint_uniform_opaque then remapping
+     * [DIRTY_LEVEL_LIGHT_PASS_EXT_0, DIRTY_LEVEL_MESH] -> DIRTY_LEVEL_NONE is possible
+     *
+     * To be filled in by DIRTY_LEVEL_LIGHT_PASS_INTERNAL
+     */
+    bool renderer_hint_uniform_opaque = 0;
 
     GLuint vao = 0;
     GLuint vbo = 0;

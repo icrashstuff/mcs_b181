@@ -181,6 +181,17 @@ void level_t::build_dirty_meshes()
     last_perf_light_pass1.duration = elapsed;
     last_perf_light_pass1.built = built;
 
+    /* Fast-forward cull pass */
+    for (auto it = chunks_light_order.begin(); it != chunks_light_order.end(); it++)
+    {
+        chunk_cubic_t* c = *it;
+        if (BETWEEN_INCL(c->dirty_level, chunk_cubic_t::DIRTY_LEVEL_MESH, chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0))
+        {
+            if (c->renderer_hint_opaque_sides || c->renderer_hint_uniform_opaque)
+                c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
+        }
+    }
+
     /* Second Light Pass */
     PASS_TIMER_START();
     for (auto it = chunks_light_order.begin(); it != chunks_light_order.end(); it++)
@@ -359,6 +370,7 @@ void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z
         light_levels[i] = mc_id::get_light_level(i);
 
     Uint32 total_block = 0;
+    Uint32 total_block_opaqueness = 0;
     Uint32 total = 0;
     Uint8 min_level = 15;
     Uint8 max_level = 0;
@@ -375,7 +387,11 @@ void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z
 
         Uint8 lvl = light_levels[type];
 
-        if (!is_transparent[type])
+        const bool is_opaque = !is_transparent[type];
+
+        total_block_opaqueness += is_opaque;
+
+        if (is_opaque)
         {
             if (lvl != 0)
                 cross.c->set_light_block(x, y, z, lvl);
@@ -459,6 +475,9 @@ void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z
     }
 
     cross.c->renderer_hint_uniform_air = total_block == 0;
+    cross.c->renderer_hint_uniform_opaque = total_block_opaqueness == SUBCHUNK_SIZE_VOLUME;
+    if (cross.c->renderer_hint_uniform_opaque)
+        cross.c->renderer_hint_opaque_sides = 1;
 
     /* If the light level is uniform then no propagation is required for a local pass */
     if (local_only && total % SUBCHUNK_SIZE_VOLUME == 0)
