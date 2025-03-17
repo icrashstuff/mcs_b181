@@ -52,6 +52,7 @@ static float get_y_spacing() { return ImGui::GetStyle().ItemSpacing.y; }
 
 void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist)
 {
+    const level_t* const lvl = game->level;
     ImVec2 cursor_l(ctx->menu_scale * 2, ctx->menu_scale * 1.5f);
     ImVec2 cursor_r(ImGui::GetMainViewport()->Size.x - ctx->menu_scale * 2, ctx->menu_scale * 1.5f);
 
@@ -108,6 +109,8 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
     add_text(ctx, drawlist, 0, cursor_l, "Biome: %s", mc_id::get_biome_name(game->level->get_biome_at(game->level->foot_pos)));
     add_text(ctx, drawlist, 0, cursor_l, "Time: %ld (Day: %ld)", ((game->level->mc_time % 24000) + 24000) % 24000, game->level->mc_time / 24000);
     add_text(ctx, drawlist, 0, cursor_l, "Mood: %.0f%%", game->level->mood * 100.0f);
+    add_text(ctx, drawlist, 0, cursor_l, "Sound: %d/%d, Music: %.0f%%%s", lvl->sound_engine.get_num_slots_active(), lvl->sound_engine.get_num_slots(),
+        lvl->music * 100.0f, (lvl->sound_engine.is_music_playing() ? " (Music Playing)" : ""));
 
     /* ======================== RIGHT SIDE ======================== */
 

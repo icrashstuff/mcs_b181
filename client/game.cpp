@@ -99,6 +99,8 @@ void game_t::reload_resources(const game_resources_t* const _resources, const bo
     {
         level->set_terrain(resources ? resources->terrain_atlas : NULL);
         level->shader_terrain = resources ? resources->terrain_shader : NULL;
+        level->sound_resources = resources ? resources->sound_resources : NULL;
+        level->sound_engine.kill_all();
     }
 }
 

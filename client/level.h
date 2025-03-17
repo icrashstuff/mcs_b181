@@ -30,6 +30,7 @@
 #include "shaders/shaders.h"
 #include "shared/ids.h"
 #include "shared/inventory.h"
+#include "sound/sound_world.h"
 #include "texture_terrain.h"
 #include "time_blended_modifer.h"
 #include <GL/glew.h>
@@ -305,7 +306,14 @@ struct level_t
     /** Used for the ambience sounds (https://minecraft.wiki/w/Ambience#Mood_algorithm) */
     float mood = 0;
 
+    /** When music >= 1.0f, music will begin playing */
+    float music = 0.6f;
+
     float damage_tilt = 0.0f;
+
+    sound_world_t sound_engine;
+
+    sound_resources_t* sound_resources = nullptr;
 
 private:
     mc_id::gamemode_t gamemode = mc_id::GAMEMODE_SPECTATOR;

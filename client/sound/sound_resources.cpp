@@ -336,8 +336,15 @@ void sound_resources_t::imgui_contents(bool& play_sound, sound_info_t& sound_to_
     if (text_filter)
         text_filter->Draw("Event Filter (inc,-exc)");
 
+    ImGui::Separator();
+
+    ImGui::BeginChild("sound_resources::imgui_contents Sound List", ImGui::GetContentRegionAvail());
+
     if (!ImGui::BeginTable("sound_resources_t::imgui_contents table", 2, ImGuiTableFlags_Borders | ImGuiTableFlags_RowBg))
+    {
+        ImGui::EndChild();
         return;
+    }
 
     for (const auto& it_event : sounds)
     {
@@ -388,8 +395,8 @@ void sound_resources_t::imgui_contents(bool& play_sound, sound_info_t& sound_to_
                 FIELD("Volume multiplier", "%.4f", it_sound.volume);
                 FIELD("Pitch multiplier", "%.4f", it_sound.pitch);
 
-                FIELD("Resource ID: Sound", it_sound.id_sound.c_str());
-                FIELD("Resource ID: Subtitle", it_sound.id_sub.c_str());
+                FIELD("Resource ID: Sound", "%s", it_sound.id_sound.c_str());
+                FIELD("Resource ID: Subtitle", "%s", it_sound.id_sub.c_str());
                 FIELD("Path", "%s", it_sound.path.c_str());
             }
             else
@@ -404,4 +411,5 @@ void sound_resources_t::imgui_contents(bool& play_sound, sound_info_t& sound_to_
         ImGui::TreePop();
     }
     ImGui::EndTable();
+    ImGui::EndChild();
 }

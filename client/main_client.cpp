@@ -96,6 +96,10 @@ static game_t* game_pano = nullptr;
 static game_t* game_selected = nullptr;
 static game_resources_t* game_resources = nullptr;
 static int game_selected_idx = 0;
+static float music_counter = 0;
+
+/* This should probably be replaced by a direct to SDL system */
+static SDL_DEPRECATED sound_world_t* sound_engine_main_menu = nullptr;
 
 static ImGuiContext* imgui_ctx_main_menu = NULL;
 
@@ -127,6 +131,8 @@ static bool initialize_resources()
 
     compile_shaders();
 
+    sound_engine_main_menu = new sound_world_t();
+
     for (game_t* g : games)
         if (g)
             g->reload_resources(game_resources);
@@ -136,6 +142,7 @@ static bool initialize_resources()
 
 static bool deinitialize_resources()
 {
+    delete sound_engine_main_menu;
     delete game_resources;
     delete panorama;
 
@@ -147,6 +154,7 @@ static bool deinitialize_resources()
         if (g)
             g->reload_resources(nullptr, true);
 
+    sound_engine_main_menu = NULL;
     panorama = NULL;
     game_resources = 0;
     return true;
@@ -599,8 +607,15 @@ static void normal_loop()
     game_selected = nullptr;
 
     for (game_t* g : games)
+    {
         if (g->game_id == game_selected_idx)
+        {
             game_selected = g;
+            game_selected->level->sound_engine.resume();
+        }
+        else
+            g->level->sound_engine.suspend();
+    }
 
     if (!game_selected && games.size())
     {
@@ -611,6 +626,27 @@ static void normal_loop()
     ImGui::End();
 
     game_t* game = game_selected;
+
+    music_counter -= delta_time;
+
+    /* Decide main menu music stuff immediately */
+    {
+        if (game)
+            sound_engine_main_menu->kill_music();
+        else if (music_counter < 0)
+        {
+            /* Try to spawn music again in 0.5min-1.5min */
+            music_counter = 30.0f + SDL_randf() * 60.0f;
+
+            sound_info_t sinfo;
+
+            if (sound_engine_main_menu && game_resources && game_resources->sound_resources && !sound_engine_main_menu->is_music_playing())
+            {
+                if (game_resources->sound_resources->get_sound("minecraft:music.menu", sinfo))
+                    sound_engine_main_menu->request_source(sinfo, glm::f64vec3(0.0), 1);
+            }
+        }
+    }
 
     if (game && !client_menu_manager.stack_size() && (!game->connection || game->connection->get_in_world()))
         mouse_grabbed = 1;
@@ -1517,6 +1553,8 @@ void profile_light()
                 timers[j][i].duration / timers[j][i].built / 1000.0, i % 5);
 }
 
+#include "sound/sound_world.h"
+
 int main(const int argc, const char** argv)
 {
     /* KDevelop fully buffers the output and will not display anything */
@@ -1755,6 +1793,8 @@ int main(const int argc, const char** argv)
                 break;
             }
 
+            normal_loop();
+
             if (game_selected && game_selected->level && cvr_gui_renderer.get())
             {
                 level_t* level = game_selected->level;
@@ -1807,16 +1847,62 @@ int main(const int argc, const char** argv)
                 ImGui::End();
             }
 
-            if (game_resources && game_resources->sound_resources && cvr_gui_sound.get())
+            if (game_resources && (game_selected || sound_engine_main_menu) && game_resources->sound_resources && cvr_gui_sound.get())
             {
-                bool play_sound = 0;
-                sound_info_t sound_to_play;
-
                 ImGui::SetNextWindowPos(viewport->Size * ImVec2(0.0075f, 0.1875f), ImGuiCond_FirstUseEver, ImVec2(0.0, 0.0));
                 ImGui::SetNextWindowSize(viewport->Size * ImVec2(0.425f, 0.8f), ImGuiCond_FirstUseEver);
                 ImGui::BeginCVR("Sound", &cvr_gui_sound);
-                game_resources->sound_resources->imgui_contents(play_sound, sound_to_play);
-                ImGui::End();
+
+                sound_world_t* sound_engine = nullptr;
+
+                {
+                    ImGui::BeginChild("Sound Slots", ImGui::GetContentRegionAvail() * ImVec2(0.5f, 1.0f), ImGuiChildFlags_Borders);
+
+                    static int use_game_sound_engine = 1;
+                    static const char* sound_engine_names[] = { "Main menu sound engine", "Current game sound engine", NULL };
+                    ImGui::Combo("Sound engine selector", &use_game_sound_engine, sound_engine_names, 2);
+
+                    if (!use_game_sound_engine)
+                    {
+                        sound_engine = sound_engine_main_menu;
+                        ImGui::Text("music_counter: %.0f", music_counter);
+                        ImGui::SameLine();
+                        if (ImGui::Button("Clear music_counter"))
+                            music_counter = 0.0;
+                    }
+                    else if (game_selected)
+                    {
+                        sound_engine = &game_selected->level->sound_engine;
+                        ImGui::Text("music: %.1f%%", game_selected->level->music * 100.0f);
+                        ImGui::SameLine();
+                        if (ImGui::Button("music = 0.0"))
+                            game_selected->level->music = 0.0;
+                        ImGui::SameLine();
+                        if (ImGui::Button("music = 1.0"))
+                            game_selected->level->music = 1.0;
+                    }
+                    ImGui::Separator();
+
+                    if (sound_engine)
+                        sound_engine->imgui_contents();
+                    else
+                        ImGui::Text("Sound engine not connected");
+                    ImGui::EndChild();
+                }
+                ImGui::SameLine();
+                {
+                    bool play_sound = 0;
+                    sound_info_t sound_to_play;
+
+                    ImGui::BeginChild("Sound List", ImGui::GetContentRegionAvail() * ImVec2(0.0f, 1.0f), ImGuiChildFlags_Borders);
+                    game_resources->sound_resources->imgui_contents(play_sound, sound_to_play);
+                    ImGui::EndChild();
+
+                    if (play_sound && sound_engine)
+                        sound_engine->request_source(sound_to_play, glm::f64vec3(0.0f), true);
+
+                    ImGui::End();
+                }
             }
 
             if (panorama && cvr_gui_panorama.get())
@@ -1852,7 +1938,11 @@ int main(const int argc, const char** argv)
                 ImGui::End();
             }
 
-            normal_loop();
+            if (game_selected)
+                game_selected->level->sound_engine.update(glm::f64vec3(0, 0, 0), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
+
+            if (sound_engine_main_menu)
+                sound_engine_main_menu->update(glm::f64vec3(0, 0, 0), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
 
             break;
         }
@@ -1884,4 +1974,14 @@ int main(const int argc, const char** argv)
     tetra::deinit();
     SDLNet_Quit();
     SDL_Quit();
+}
+
+void play_gui_button_sound()
+{
+    if (!(sound_engine_main_menu && game_resources && game_resources->sound_resources))
+        return;
+
+    sound_info_t sinfo;
+    if (game_resources->sound_resources->get_sound("minecraft:gui.button.press", sinfo))
+        sound_engine_main_menu->request_source(sinfo, glm::f64vec3(0.0f), true);
 }

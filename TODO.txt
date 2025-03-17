@@ -12,14 +12,12 @@ Client TODO:
   - 1.3+ Style Creative window
   - Button sounds
   - Inventory windows
+  - Finish Item rendering
 - Proper block placing/destroying
 - Entity rendering
   - Including lighting
 - Entity physics
 - Audio
-  - Music
-  - Ambience (mood)
-  - Button sounds
   - Block place/destroy
   - Entity sounds
     - Ambient entity

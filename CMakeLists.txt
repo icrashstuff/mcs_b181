@@ -50,6 +50,7 @@ set(mcs_b181_client_SRC
     client/time_blended_modifer.cpp
 
     client/sound/stb_vorbis.c
+    client/sound/sound_world.cpp
     client/sound/sound_resources.cpp
 
     client/jzon/Jzon.cpp

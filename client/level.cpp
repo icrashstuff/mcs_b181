@@ -1614,6 +1614,11 @@ level_t::dimension_switch_result level_t::dimension_switch(const int dim)
 
     dc_log("Switching dimension from %d to %d", dimension, new_dim);
 
+    if (music < 0.6f)
+        music = 0.7f;
+
+    sound_engine.kill_all();
+
     dimension = new_dim;
 
     clear();
@@ -1664,6 +1669,8 @@ static convar_int_t cvr_mc_enable_physics {
 };
 
 static convar_int_t cvr_a_delay_mood { "a_delay_mood", 6000, 20, 30000, "Maximum value for mood counter (MC Ticks)", CONVAR_FLAG_SAVE };
+static convar_int_t cvr_a_delay_min_music_game { "a_delay_min_music_game", 3000, 20, 30000, "Minimum value for music counter (MC Ticks)", CONVAR_FLAG_SAVE };
+static convar_int_t cvr_a_delay_max_music_game { "a_delay_max_music_game", 6000, 20, 30000, "Maximum value for music counter (MC Ticks)", CONVAR_FLAG_SAVE };
 
 void level_t::tick_real()
 {
@@ -1693,8 +1700,49 @@ void level_t::tick_real()
 
         if (mood >= 1.0f)
         {
-            dc_log("Play cave ambience");
+            sound_info_t sinfo;
+            if (sound_resources && sound_resources->get_sound("minecraft:ambient.cave.cave", sinfo))
+                sound_engine.request_source(sinfo, glm::vec3(0), true);
             mood = 0.0f;
+        }
+    }
+
+    /* Modify music counter */
+    {
+        const float coeff_min = 1.0f / cvr_a_delay_min_music_game.get();
+        const float coeff_max = 1.0f / cvr_a_delay_max_music_game.get();
+        const float coeff = glm::mix(coeff_min, coeff_max, SDL_randf());
+
+        music = SDL_max(0.0f, music + coeff);
+
+        if (music >= 1.0f && sound_resources)
+        {
+            sound_info_t sinfo;
+            bool acquired_sound = 0;
+            switch (dimension_get())
+            {
+            case mc_id::DIMENSION_END:
+                acquired_sound = sound_resources->get_sound("minecraft:music.game.end", sinfo);
+                break;
+            case mc_id::DIMENSION_NETHER:
+                acquired_sound = sound_resources->get_sound("minecraft:music.game.nether", sinfo);
+                break;
+            case mc_id::DIMENSION_OVERWORLD:
+                switch (gamemode_get())
+                {
+                case mc_id::GAMEMODE_SPECTATOR:
+                case mc_id::GAMEMODE_CREATIVE:
+                    acquired_sound = sound_resources->get_sound("minecraft:music.game.creative", sinfo);
+                    break;
+                default:
+                    acquired_sound = sound_resources->get_sound("minecraft:music.game", sinfo);
+                    break;
+                }
+                break;
+            }
+            if (acquired_sound)
+                sound_engine.request_source(sinfo, glm::f64vec3(0.0), 1);
+            music = 0.0f;
         }
     }
 

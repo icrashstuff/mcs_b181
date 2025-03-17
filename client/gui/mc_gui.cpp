@@ -286,6 +286,9 @@ void mc_gui::render_text_clipped(const ImVec2& pos_min, const ImVec2& pos_max, c
     ImGui::RenderTextClipped(pos_min, pos_max, text, text_display_end, text_size_if_known, align, clip_rect);
 }
 
+/* Defined in main_client.cpp */
+void play_gui_button_sound();
+
 /* Slightly modified version of ImGui::ButtonEx */
 ImGuiButtonFlags mc_gui::button(const char* translation_id, const ImVec2& size_arg, ImGuiButtonFlags flags)
 {
@@ -363,6 +366,9 @@ ImGuiButtonFlags mc_gui::button(const char* translation_id, const ImVec2& size_a
 
     if (pressed && !ret)
         ret = ImGuiButtonFlags_MouseButtonLeft;
+
+    if (ret)
+        play_gui_button_sound();
 
     return ret;
 }
