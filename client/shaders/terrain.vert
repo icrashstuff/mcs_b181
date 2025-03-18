@@ -45,7 +45,7 @@ layout(location = 1) in uint vtx_coloring;
  */
 layout(location = 2) in uint vtx_texturing;
 
-out vec3 frag_color;
+out vec4 frag_color;
 out vec2 frag_uv;
 out float frag_ao;
 out float frag_light_block;
@@ -71,6 +71,7 @@ void main()
     frag_color.r = tint.r * float((vtx_coloring) & 255u) / 255.0;
     frag_color.g = tint.g * float((vtx_coloring >> 8) & 255u) / 255.0;
     frag_color.b = tint.b * float((vtx_coloring >> 16) & 255u) / 255.0;
+    frag_color.a = tint.a;
 
     frag_light_block = float((vtx_coloring >> 24) & 15u) / 15.0;
     frag_light_sky = float((vtx_coloring >> 28) & 15u) / 15.0;

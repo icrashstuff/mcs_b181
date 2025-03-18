@@ -21,7 +21,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-in vec3 frag_color;
+in vec4 frag_color;
 in vec2 frag_uv;
 in float frag_ao;
 in float frag_light_block;
@@ -38,7 +38,7 @@ uniform bool allow_translucency = true;
 
 void main()
 {
-    out_color = vec4(frag_color.xyz, 1.0);
+    out_color = frag_color;
 
     if (use_texture)
         out_color *= texture2D(tex_atlas, frag_uv);
