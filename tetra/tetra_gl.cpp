@@ -370,6 +370,26 @@ int tetra::start_frame(bool event_loop)
     ImGui::NewFrame();
 
     ImGui::SetCurrentContext(im_ctx_main);
+
+    bool show_main = (im_ctx_shown_main || dev_console::shown);
+    static bool show_main_last = show_main;
+
+    /* Prevent main context from messing with the cursor */
+    if (show_main)
+        ImGui::GetIO().ConfigFlags &= ~ImGuiConfigFlags_NoMouseCursorChange;
+    else
+        ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
+
+    /* Reset cursor if necessary */
+    if (show_main == false && show_main_last == true)
+    {
+        if (ImGui::GetMouseCursor() != ImGuiMouseCursor_Arrow)
+            SDL_SetCursor(SDL_GetDefaultCursor());
+        if (!ImGui::GetIO().MouseDrawCursor)
+            SDL_ShowCursor();
+    }
+    show_main_last = show_main;
+
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
