@@ -520,7 +520,7 @@ void ImGui_ImplSDLGPU3_CreateDeviceObjects()
         // Bilinear sampling is required by default. Set 'io.Fonts->Flags |= ImFontAtlasFlags_NoBakedLines' or 'style.AntiAliasedLinesUseTex = false' to allow point/nearest sampling.
         SDL_GPUSamplerCreateInfo sampler_info = {};
         sampler_info.min_filter = SDL_GPU_FILTER_LINEAR;
-        sampler_info.mag_filter = SDL_GPU_FILTER_LINEAR;
+        sampler_info.mag_filter = SDL_GPU_FILTER_NEAREST;
         sampler_info.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
         sampler_info.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
         sampler_info.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
