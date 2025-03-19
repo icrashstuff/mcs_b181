@@ -384,21 +384,21 @@ private:
     /**
      * Build and or replace the mesh for the corresponding chunk
      */
-    void build_mesh(const int chunk_x, const int chunk_y, const int chunk_z);
+    void build_mesh(chunk_cubic_t* const chunk);
 
     /**
      * Conduct a lighting pass on corresponding chunk
      *
      * 4 Light passes are necessary for light to correctly jump chunks
      */
-    void light_pass(const int chunk_x, const int chunk_y, const int chunk_z, const bool local_only);
+    void light_pass(chunk_cubic_t* const chunk, const bool local_only);
 
     /**
      * Conduct a lighting pass on corresponding chunk
      *
      * 4 Light passes are necessary for light to correctly jump chunks
      */
-    void light_pass_sky(const int chunk_x, const int chunk_y, const int chunk_z, const bool local_only);
+    void light_pass_sky(chunk_cubic_t* const chunk, const bool local_only);
 
     /** Items should probably be removed from terrain **/
     texture_terrain_t* terrain;

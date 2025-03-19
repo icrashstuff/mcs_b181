@@ -63,26 +63,11 @@ static convar_int_t cvr_r_biome_oversample {
 #pragma GCC optimize("Og")
 #endif
 
-void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z)
+void level_t::build_mesh(chunk_cubic_t* const center)
 {
-    /** Index: [x+1][y+1][z+1] */
-    chunk_cubic_t* rubik[3][3][3];
-
-    for (int i = 0; i < 27; i++)
-    {
-        const int ix = (i / 9) % 3 - 1;
-        const int iy = (i / 3) % 3 - 1;
-        const int iz = i % 3 - 1;
-
-        auto it = cmap.find(glm::ivec3(chunk_x, chunk_y, chunk_z) + glm::ivec3(ix, iy, iz));
-        rubik[ix + 1][iy + 1][iz + 1] = ((it != cmap.end()) ? it->second : NULL);
-    }
-
-    chunk_cubic_t* center = rubik[1][1][1];
-
     if (!center)
     {
-        dc_log_error("Attempt made to build unloaded chunk at chunk coordinates: %d, %d, %d", chunk_x, chunk_y, chunk_z);
+        dc_log_error("Attempt made to mesh NULL chunk");
         return;
     }
 
@@ -90,6 +75,37 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
     {
         dc_log_error("A texture atlas is required to build a chunk");
         return;
+    }
+
+    const int chunk_x = center->pos.x;
+    const int chunk_y = center->pos.y;
+    const int chunk_z = center->pos.z;
+
+    /** Index: [x+1][y+1][z+1] */
+    chunk_cubic_t* rubik[3][3][3] = { { { 0 }, { 0 }, { 0 } }, { { 0 }, { 0 }, { 0 } }, { { 0 }, { 0 }, { 0 } } };
+
+    rubik[1][1][1] = center;
+
+    rubik[2][1][1] = center->neighbors.pos_x;
+    rubik[1][2][1] = center->neighbors.pos_y;
+    rubik[1][1][2] = center->neighbors.pos_z;
+    rubik[0][1][1] = center->neighbors.neg_x;
+    rubik[1][0][1] = center->neighbors.neg_y;
+    rubik[1][1][0] = center->neighbors.neg_z;
+
+    for (int i = 0; i < 27; i++)
+    {
+        const int ix = (i / 9) % 3 - 1;
+        const int iy = (i / 3) % 3 - 1;
+        const int iz = i % 3 - 1;
+
+        /* Skip the cells we have already assigned */
+        if (abs(ix) + abs(iy) + abs(iz) <= 1)
+            continue;
+        assert(rubik[ix + 1][iy + 1][iz + 1] == NULL);
+
+        auto it = cmap.find(center->pos + glm::ivec3(ix, iy, iz));
+        rubik[ix + 1][iy + 1][iz + 1] = ((it != cmap.end()) ? it->second : NULL);
     }
 
     std::vector<terrain_vertex_t> vtx_solid;
@@ -113,7 +129,7 @@ void level_t::build_mesh(const int chunk_x, const int chunk_y, const int chunk_z
     glm::vec3 biome_colors[18][18];
     float biome_temperature[18][18];
     float biome_downfall[18][18];
-    generate_climate_colors(glm::ivec3(chunk_x, chunk_y, chunk_z), biome_colors, biome_temperature, biome_downfall);
+    generate_climate_colors(center->pos, biome_colors, biome_temperature, biome_downfall);
 
     /** Index: [x+1][y+1][z+1] */
     block_id_t stypes[3][3][3];

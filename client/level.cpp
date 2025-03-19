@@ -183,8 +183,8 @@ void level_t::build_dirty_meshes()
         chunk_cubic_t* c = *it;
         if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL)
             continue;
-        light_pass(c->pos.x, c->pos.y, c->pos.z, true);
-        light_pass_sky(c->pos.x, c->pos.y, c->pos.z, true);
+        light_pass(c, true);
+        light_pass_sky(c, true);
         c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0;
         built++;
     }
@@ -210,8 +210,8 @@ void level_t::build_dirty_meshes()
         chunk_cubic_t* c = *it;
         if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0)
             continue;
-        light_pass(c->pos.x, c->pos.y, c->pos.z, false);
-        light_pass_sky(c->pos.x, c->pos.y, c->pos.z, false);
+        light_pass(c, false);
+        light_pass_sky(c, false);
         c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_1;
         built++;
     }
@@ -226,8 +226,8 @@ void level_t::build_dirty_meshes()
         chunk_cubic_t* c = *it;
         if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_1)
             continue;
-        light_pass(c->pos.x, c->pos.y, c->pos.z, false);
-        light_pass_sky(c->pos.x, c->pos.y, c->pos.z, false);
+        light_pass(c, false);
+        light_pass_sky(c, false);
         c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_2;
         built++;
     }
@@ -242,8 +242,8 @@ void level_t::build_dirty_meshes()
         chunk_cubic_t* c = *it;
         if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_2)
             continue;
-        light_pass(c->pos.x, c->pos.y, c->pos.z, false);
-        light_pass_sky(c->pos.x, c->pos.y, c->pos.z, false);
+        light_pass(c, false);
+        light_pass_sky(c, false);
         if (c->renderer_hints.uniform_air)
             c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_NONE;
         else
@@ -262,7 +262,7 @@ void level_t::build_dirty_meshes()
         chunk_cubic_t* c = *it;
         if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_MESH || !c->visible)
             continue;
-        build_mesh(c->pos.x, c->pos.y, c->pos.z);
+        build_mesh(c);
         c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_NONE;
         built++;
         throttle--;
@@ -341,34 +341,27 @@ static void verify_packed_8_in_range(const __m128i& vec, Uint8 min, Uint8 max)
 
 #endif /* #if defined(__SSE2__) && LEVEL_T_ENABLE_SSE2 */
 
-void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z, const bool local_only)
+void level_t::light_pass(chunk_cubic_t* const chunk, const bool local_only)
 {
     /** Index: C +XYZ -XYZ */
     chunk_cross_t cross;
 
-    auto it = cmap.find(glm::ivec3(chunk_x, chunk_y, chunk_z) + glm::ivec3(0, 0, 0));
-    cross.c = ((it != cmap.end()) ? it->second : NULL);
-
-    if (!local_only)
-    {
-        it = cmap.find(glm::ivec3(chunk_x, chunk_y, chunk_z) + glm::ivec3(+1, +0, +0));
-        cross.pos_x = it != cmap.end() ? it->second : NULL;
-        it = cmap.find(glm::ivec3(chunk_x, chunk_y, chunk_z) + glm::ivec3(-1, +0, +0));
-        cross.neg_x = it != cmap.end() ? it->second : NULL;
-        it = cmap.find(glm::ivec3(chunk_x, chunk_y, chunk_z) + glm::ivec3(+0, +1, +0));
-        cross.pos_y = it != cmap.end() ? it->second : NULL;
-        it = cmap.find(glm::ivec3(chunk_x, chunk_y, chunk_z) + glm::ivec3(+0, -1, +0));
-        cross.neg_y = it != cmap.end() ? it->second : NULL;
-        it = cmap.find(glm::ivec3(chunk_x, chunk_y, chunk_z) + glm::ivec3(+0, +0, +1));
-        cross.pos_z = it != cmap.end() ? it->second : NULL;
-        it = cmap.find(glm::ivec3(chunk_x, chunk_y, chunk_z) + glm::ivec3(+0, +0, -1));
-        cross.neg_z = it != cmap.end() ? it->second : NULL;
-    }
+    cross.c = chunk;
 
     if (!cross.c)
     {
-        dc_log_error("Attempt made to update lighting for unloaded chunk at chunk coordinates: %d, %d, %d", chunk_x, chunk_y, chunk_z);
+        dc_log_error("Attempt made to update block lighting for NULL chunk");
         return;
+    }
+
+    if (!local_only)
+    {
+        cross.pos_x = cross.c->neighbors.pos_x;
+        cross.pos_y = cross.c->neighbors.pos_y;
+        cross.pos_z = cross.c->neighbors.pos_z;
+        cross.neg_x = cross.c->neighbors.neg_x;
+        cross.neg_y = cross.c->neighbors.neg_y;
+        cross.neg_z = cross.c->neighbors.neg_z;
     }
 
     bool is_transparent[256];
@@ -696,38 +689,32 @@ bypass_sse2:
     }
 }
 
-void level_t::light_pass_sky(const int chunk_x, const int chunk_y, const int chunk_z, const bool local_only)
+void level_t::light_pass_sky(chunk_cubic_t* const chunk, const bool local_only)
 {
     /** Index: C +XYZ -XYZ */
     chunk_cross_t cross;
 
-    auto it = cmap.find(glm::ivec3(chunk_x, chunk_y, chunk_z) + glm::ivec3(0, 0, 0));
-    cross.c = ((it != cmap.end()) ? it->second : NULL);
+    cross.c = chunk;
+
+    if (!cross.c)
+    {
+        dc_log_error("Attempt made to update sky lighting for NULL chunk");
+        return;
+    }
 
     Uint8 top_light = 0;
 
     if (!local_only)
     {
-        it = cmap.find(glm::ivec3(chunk_x, chunk_y, chunk_z) + glm::ivec3(+1, +0, +0));
-        cross.pos_x = it != cmap.end() ? it->second : NULL;
-        it = cmap.find(glm::ivec3(chunk_x, chunk_y, chunk_z) + glm::ivec3(-1, +0, +0));
-        cross.neg_x = it != cmap.end() ? it->second : NULL;
-        it = cmap.find(glm::ivec3(chunk_x, chunk_y, chunk_z) + glm::ivec3(+0, +1, +0));
-        cross.pos_y = it != cmap.end() ? it->second : NULL;
+        cross.pos_x = cross.c->neighbors.pos_x;
+        cross.pos_y = cross.c->neighbors.pos_y;
+        cross.pos_z = cross.c->neighbors.pos_z;
+        cross.neg_x = cross.c->neighbors.neg_x;
+        cross.neg_y = cross.c->neighbors.neg_y;
+        cross.neg_z = cross.c->neighbors.neg_z;
+
         if (!cross.pos_y)
             top_light = 15;
-        it = cmap.find(glm::ivec3(chunk_x, chunk_y, chunk_z) + glm::ivec3(+0, -1, +0));
-        cross.neg_y = it != cmap.end() ? it->second : NULL;
-        it = cmap.find(glm::ivec3(chunk_x, chunk_y, chunk_z) + glm::ivec3(+0, +0, +1));
-        cross.pos_z = it != cmap.end() ? it->second : NULL;
-        it = cmap.find(glm::ivec3(chunk_x, chunk_y, chunk_z) + glm::ivec3(+0, +0, -1));
-        cross.neg_z = it != cmap.end() ? it->second : NULL;
-    }
-
-    if (!cross.c)
-    {
-        dc_log_error("Attempt made to update lighting for unloaded chunk at chunk coordinates: %d, %d, %d", chunk_x, chunk_y, chunk_z);
-        return;
     }
 
     bool is_transparent[256];
