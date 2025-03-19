@@ -731,7 +731,9 @@ void level_t::light_pass_sky(const int chunk_x, const int chunk_y, const int chu
     }
 
     bool is_transparent[256];
-    bool non_decaying_types[256] = { 1 };
+    Uint8 non_decaying_types[256];
+
+    memset(non_decaying_types, 1, sizeof(non_decaying_types));
 
     /* Move this out to something like mc_id::get_sky_light_attenuation() */
     non_decaying_types[BLOCK_ID_LEAVES] = 0;
