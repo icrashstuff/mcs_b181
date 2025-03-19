@@ -177,6 +177,38 @@ struct chunk_cubic_t
 
     void update_renderer_hints();
 
+    /**
+     * Check if light can propagate from this chunk to others
+     *
+     * NOTE: Something to keep in mind is that if this function returns true,
+     * that does not mean that the neighbors don't need their meshes updated
+     * (TLDR: Be cautious when using this for skipping the mesh stage)
+     *
+     * @returns True if light can propagate (out of or into) the chunk, False otherwise
+     */
+    CHUNK_CUBIC_INLINE bool can_light_leave() const
+    {
+        bool ret = 1;
+
+        /* Pseudo-code:
+         * 1) If face opaque then visible = 0, else continue
+         * 2) If not neighbor then visible = 1, if neighbor then continue
+         * 3) If neighbor then visible = (bordering face from neighbor is transparent)
+         */
+        /*                Check for transparency on face   || (Check for neighbor || Check for transparency on neighbors face ) */
+        bool vis_pos_x = (!renderer_hints.opaque_face_pos_x || (!neighbors.pos_x || !neighbors.pos_x->renderer_hints.opaque_face_neg_x));
+        bool vis_pos_y = (!renderer_hints.opaque_face_pos_y || (!neighbors.pos_y || !neighbors.pos_y->renderer_hints.opaque_face_neg_y));
+        bool vis_pos_z = (!renderer_hints.opaque_face_pos_z || (!neighbors.pos_z || !neighbors.pos_z->renderer_hints.opaque_face_neg_z));
+        bool vis_neg_x = (!renderer_hints.opaque_face_neg_x || (!neighbors.neg_x || !neighbors.neg_x->renderer_hints.opaque_face_pos_x));
+        bool vis_neg_y = (!renderer_hints.opaque_face_neg_y || (!neighbors.neg_y || !neighbors.neg_y->renderer_hints.opaque_face_pos_y));
+        bool vis_neg_z = (!renderer_hints.opaque_face_neg_z || (!neighbors.neg_z || !neighbors.neg_z->renderer_hints.opaque_face_pos_z));
+
+        if ((vis_pos_x | vis_pos_y | vis_pos_z | vis_neg_x | vis_neg_y | vis_neg_z) == 0)
+            ret = 0;
+
+        return ret;
+    }
+
     void free_gl()
     {
         glDeleteVertexArrays(1, &vao);

@@ -198,24 +198,14 @@ void level_t::build_dirty_meshes()
         chunk_cubic_t* c = *it;
         if (BETWEEN_INCL(c->dirty_level, chunk_cubic_t::DIRTY_LEVEL_MESH, chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0))
         {
-            if (c->renderer_hints.opaque_sides)
+            bool light_can_leave = c->can_light_leave();
+            if (c->renderer_hints.opaque_sides || !light_can_leave)
                 c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
             if (c->renderer_hints.uniform_opaque)
             {
                 c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
 
-                /* Pseudo-code:
-                 * 1) If not neighbor then visible = 1
-                 * 2) If neighbor then visible = (bordering face from neighbor is transparent)
-                 */
-                bool vis_pos_x = !c->neighbors.pos_x || !c->neighbors.pos_x->renderer_hints.opaque_face_neg_x;
-                bool vis_pos_y = !c->neighbors.pos_y || !c->neighbors.pos_y->renderer_hints.opaque_face_neg_y;
-                bool vis_pos_z = !c->neighbors.pos_z || !c->neighbors.pos_z->renderer_hints.opaque_face_neg_z;
-                bool vis_neg_x = !c->neighbors.neg_x || !c->neighbors.neg_x->renderer_hints.opaque_face_pos_x;
-                bool vis_neg_y = !c->neighbors.neg_y || !c->neighbors.neg_y->renderer_hints.opaque_face_pos_y;
-                bool vis_neg_z = !c->neighbors.neg_z || !c->neighbors.neg_z->renderer_hints.opaque_face_pos_z;
-
-                if ((vis_pos_x | vis_pos_y | vis_pos_z | vis_neg_x | vis_neg_y | vis_neg_z) == 0)
+                if (!light_can_leave)
                 {
                     c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_NONE;
                     c->free_gl();
