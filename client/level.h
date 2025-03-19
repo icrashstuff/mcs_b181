@@ -312,7 +312,7 @@ struct level_t
     float mood = 0;
 
     /** When music >= 1.0f, music will begin playing */
-    float music = 0.6f;
+    float music = 0.0f;
 
     float damage_tilt = 0.0f;
 

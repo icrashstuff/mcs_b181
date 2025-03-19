@@ -1640,6 +1640,8 @@ level_t::level_t(texture_terrain_t* const _terrain)
     ecs.emplace<entity_physics_t>(player_eid, physics);
     ecs.emplace<entity_transform_t>(player_eid, entity_transform_t { .pos = { -30.0, 1280.0, -30.0 } });
 
+    music = glm::mix(0.125f, 0.825f, SDL_randf());
+
     generator_create();
 }
 
@@ -1698,8 +1700,8 @@ level_t::dimension_switch_result level_t::dimension_switch(const int dim)
 
     dc_log("Switching dimension from %d to %d", dimension, new_dim);
 
-    if (music < 0.6f)
-        music = 0.7f;
+    if (music < glm::mix(0.3f, 0.6f, SDL_randf()))
+        music = glm::mix(0.4f, 0.7f, SDL_randf());
 
     sound_engine.kill_all();
 
