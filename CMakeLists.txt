@@ -67,6 +67,7 @@ set(mcs_b181_client_SRC
     client/connection.cpp
     client/game.cpp
     client/time_blended_modifer.cpp
+    client/chunk_cubic.cpp
 
     client/sound/stb_vorbis.c
     client/sound/sound_world.cpp
@@ -95,6 +96,10 @@ set(mcs_b181_client_SRC
 )
 
 SET_SOURCE_FILES_PROPERTIES(shared/simplex_noise/SimplexNoise.cpp PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS_RELEASE}")
+
+SET_SOURCE_FILES_PROPERTIES(client/chunk_cubic.cpp PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS_RELEASE}")
+
+# SET_SOURCE_FILES_PROPERTIES(client/chunk_cubic.cpp PROPERTIES COMPILE_OPTIONS "-fopt-info-vec-all")
 
 configure_file(client/shaders/terrain.frag shaders/terrain.frag COPYONLY)
 configure_file(client/shaders/terrain.vert shaders/terrain.vert COPYONLY)

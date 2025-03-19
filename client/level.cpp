@@ -75,6 +75,7 @@ void level_t::clear_mesh(const bool free_gl)
 /* Ideally this would use the Gribb/Hartmann method to extract the planes from a projection/camera matrix to get the plane normals */
 void level_t::cull_chunks(const glm::ivec2 win_size, const int render_distance)
 {
+    update_chunk_renderer_hints();
     camera_direction.x = SDL_cosf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
     camera_direction.y = SDL_sinf(glm::radians(pitch));
     camera_direction.z = SDL_sinf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
@@ -108,7 +109,7 @@ void level_t::cull_chunks(const glm::ivec2 win_size, const int render_distance)
     }
     for (chunk_cubic_t* c : chunks_render_order)
     {
-        CULL_REJECT_IF(c->renderer_hint_uniform_air);
+        CULL_REJECT_IF(c->renderer_hints.uniform_air);
 
         const glm::vec3 chunk_center = glm::vec3((c->pos << 1) - camera_half_chunk_pos);
 
@@ -126,6 +127,16 @@ void level_t::cull_chunks(const glm::ivec2 win_size, const int render_distance)
         c->visible = 1;
     }
 #undef CULL_REJECT_IF
+}
+
+void level_t::update_chunk_renderer_hints()
+{
+    for (chunk_cubic_t* c : chunks_light_order)
+    {
+        if (c->renderer_hints.hints_set)
+            continue;
+        c->update_renderer_hints();
+    }
 }
 
 void level_t::build_dirty_meshes()
@@ -187,7 +198,7 @@ void level_t::build_dirty_meshes()
         chunk_cubic_t* c = *it;
         if (BETWEEN_INCL(c->dirty_level, chunk_cubic_t::DIRTY_LEVEL_MESH, chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0))
         {
-            if (c->renderer_hint_opaque_sides || c->renderer_hint_uniform_opaque)
+            if (c->renderer_hints.opaque_sides || c->renderer_hints.uniform_opaque)
                 c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
         }
     }
@@ -233,7 +244,7 @@ void level_t::build_dirty_meshes()
             continue;
         light_pass(c->pos.x, c->pos.y, c->pos.z, false);
         light_pass_sky(c->pos.x, c->pos.y, c->pos.z, false);
-        if (c->renderer_hint_uniform_air)
+        if (c->renderer_hints.uniform_air)
             c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_NONE;
         else
             c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
@@ -369,8 +380,6 @@ void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z
     for (int i = 0; i < IM_ARRAYSIZE(light_levels); i++)
         light_levels[i] = mc_id::get_light_level(i);
 
-    Uint32 total_block = 0;
-    Uint32 total_block_opaqueness = 0;
     Uint32 total = 0;
     Uint8 min_level = 15;
     Uint8 max_level = 0;
@@ -383,15 +392,9 @@ void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z
 
         Uint8 type = cross.c->get_type(x, y, z);
 
-        total_block += type;
-
         Uint8 lvl = light_levels[type];
 
-        const bool is_opaque = !is_transparent[type];
-
-        total_block_opaqueness += is_opaque;
-
-        if (is_opaque)
+        if (!is_transparent[type])
         {
             if (lvl != 0)
                 cross.c->set_light_block(x, y, z, lvl);
@@ -473,11 +476,6 @@ void level_t::light_pass(const int chunk_x, const int chunk_y, const int chunk_z
         max_level = SDL_max(max_level, lvl);
         total += lvl;
     }
-
-    cross.c->renderer_hint_uniform_air = total_block == 0;
-    cross.c->renderer_hint_uniform_opaque = total_block_opaqueness == SUBCHUNK_SIZE_VOLUME;
-    if (cross.c->renderer_hint_uniform_opaque)
-        cross.c->renderer_hint_opaque_sides = 1;
 
     /* If the light level is uniform then no propagation is required for a local pass */
     if (local_only && total % SUBCHUNK_SIZE_VOLUME == 0)
@@ -1529,6 +1527,8 @@ void level_t::add_chunk(chunk_cubic_t* const c)
     chunks_light_order.push_back(c);
     chunks_render_order.push_back(c);
     cmap[c->pos] = c;
+
+    c->renderer_hints.hints_set = 0;
 
     request_render_order_sort = 1;
     request_light_order_sort = 1;

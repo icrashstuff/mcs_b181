@@ -32,6 +32,7 @@
 
 /* Like SDL_FORCE_INLINE but without static */
 #ifndef CHUNK_CUBIC_INLINE
+
 #ifdef _MSC_VER
 #define CHUNK_CUBIC_INLINE __forceinline
 #elif ((defined(__GNUC__) && (__GNUC__ >= 4)) || defined(__clang__))
@@ -39,7 +40,8 @@
 #else
 #define CHUNK_CUBIC_INLINE SDL_INLINE
 #endif
-#endif /* CHUNK_CUBIC_INLINE not defined */
+
+#endif /* #ifndef CHUNK_CUBIC_INLINE */
 
 #define SUBCHUNK_INDEX(X, Y, Z) ((Y) + ((Z) * (SUBCHUNK_SIZE_Y)) + ((X) * (SUBCHUNK_SIZE_Y) * (SUBCHUNK_SIZE_Z)))
 
@@ -67,35 +69,62 @@ struct chunk_cubic_t
      */
     bool visible = 1;
 
-    /**
-     * Chunk is uniformly made of air
-     *
-     * If this is true then remapping DIRTY_LEVEL_MESH -> DIRTY_LEVEL_NONE is possible
-     *
-     * To be filled in by DIRTY_LEVEL_LIGHT_PASS_INTERNAL
-     */
-    bool renderer_hint_uniform_air = 0;
+    struct
+    {
+        /**
+         * To be set to 1 by a renderer hint pass
+         * To be set to 0 by a block or metadata update
+         */
+        bool hints_set : 1;
 
-    /**
-     * Sides of chunk are fully opaque
-     *
-     * If this is true then remapping [DIRTY_LEVEL_LIGHT_PASS_EXT_0, DIRTY_LEVEL_LIGHT_PASS_EXT_2] -> DIRTY_LEVEL_MESH is possible
-     *
-     * To be filled in by DIRTY_LEVEL_LIGHT_PASS_INTERNAL
-     */
-    bool renderer_hint_opaque_sides = 0;
+        /**
+         * Chunk is uniformly made of air
+         *
+         * If this is true then remapping DIRTY_LEVEL_MESH -> DIRTY_LEVEL_NONE is possible
+         *
+         * To be filled in by a renderer hint pass
+         */
+        bool uniform_air : 1;
 
-    /**
-     * Chunk is fully opaque
-     *
-     * If this is true then remapping [DIRTY_LEVEL_LIGHT_PASS_EXT_0, DIRTY_LEVEL_LIGHT_PASS_EXT_2] -> DIRTY_LEVEL_MESH is possible
-     *
-     * If this is true and the surrounding +XYZ, -XYZ chunks have renderer_hint_opaque_sides or renderer_hint_uniform_opaque then remapping
-     * [DIRTY_LEVEL_LIGHT_PASS_EXT_0, DIRTY_LEVEL_MESH] -> DIRTY_LEVEL_NONE is possible
-     *
-     * To be filled in by DIRTY_LEVEL_LIGHT_PASS_INTERNAL
-     */
-    bool renderer_hint_uniform_opaque = 0;
+        /**
+         * Sides of chunk are fully opaque
+         *
+         * If this is true then remapping [DIRTY_LEVEL_LIGHT_PASS_EXT_0, DIRTY_LEVEL_LIGHT_PASS_EXT_2] -> DIRTY_LEVEL_MESH is possible
+         *
+         * To be filled in by a renderer hint pass
+         */
+        bool opaque_sides : 1;
+
+        /**
+         * Chunk is fully opaque
+         *
+         * If this is true then remapping [DIRTY_LEVEL_LIGHT_PASS_EXT_0, DIRTY_LEVEL_LIGHT_PASS_EXT_2] -> DIRTY_LEVEL_MESH is possible
+         *
+         * If this is true and the surrounding +XYZ, -XYZ chunks have renderer_hint_opaque_sides or renderer_hint_uniform_opaque then remapping
+         * [DIRTY_LEVEL_LIGHT_PASS_EXT_0, DIRTY_LEVEL_MESH] -> DIRTY_LEVEL_NONE is possible
+         *
+         * To be filled in by a renderer hint pass
+         */
+        bool uniform_opaque : 1;
+
+        /** Face of blocks where (x = SUBCHUNK_SIZE_X - 1) is opaque */
+        bool opaque_face_pos_x : 1;
+
+        /** Face of blocks where (y = SUBCHUNK_SIZE_Y - 1) is opaque */
+        bool opaque_face_pos_y : 1;
+
+        /** Face of blocks where (z = SUBCHUNK_SIZE_Z - 1) is opaque */
+        bool opaque_face_pos_z : 1;
+
+        /** Face of blocks where (x = 0) is opaque */
+        bool opaque_face_neg_x : 1;
+
+        /** Face of blocks where (y = 0) is opaque */
+        bool opaque_face_neg_y : 1;
+
+        /** Face of blocks where (z = 0) is opaque */
+        bool opaque_face_neg_z : 1;
+    } renderer_hints = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
     GLuint vao = 0;
     GLuint vbo = 0;
@@ -126,15 +155,17 @@ struct chunk_cubic_t
 
     glm::ivec3 pos = { 0, 0, 0 };
 
-    /* The 64 byte alignment is to assist auto-vectorization */
-    alignas(64) Uint8 data_block[SUBCHUNK_SIZE_VOLUME] = { 0 };
-    alignas(64) Uint8 data_light_block[SUBCHUNK_SIZE_VOLUME / 2] = { 0 };
-    alignas(64) Uint8 data_light_sky[SUBCHUNK_SIZE_VOLUME / 2] = { 0 };
-    alignas(64) Uint8 data_metadata[SUBCHUNK_SIZE_VOLUME / 2] = { 0 };
+    /* The 128 byte alignment is to assist auto-vectorization */
+    alignas(128) Uint8 data_block[SUBCHUNK_SIZE_VOLUME] = { 0 };
+    alignas(128) Uint8 data_light_block[SUBCHUNK_SIZE_VOLUME / 2] = { 0 };
+    alignas(128) Uint8 data_light_sky[SUBCHUNK_SIZE_VOLUME / 2] = { 0 };
+    alignas(128) Uint8 data_metadata[SUBCHUNK_SIZE_VOLUME / 2] = { 0 };
 
     chunk_cubic_t() { }
 
     ~chunk_cubic_t() { free_gl(); }
+
+    void update_renderer_hints();
 
     void free_gl()
     {
@@ -181,6 +212,8 @@ struct chunk_cubic_t
 
         const int index = SUBCHUNK_INDEX(x, y, z);
 
+        renderer_hints.hints_set = 0;
+
         /* We don't assert because this function may process uninitialized data */
         if (type < BLOCK_ID_NUM_USED)
             data_block[index] = type;
@@ -217,6 +250,8 @@ struct chunk_cubic_t
         assert(z < SUBCHUNK_SIZE_Z);
 
         const int index = SUBCHUNK_INDEX(x, y, z);
+
+        renderer_hints.hints_set = 0;
 
         if (index % 2 == 1)
             data_metadata[index / 2] = ((metadata & 0x0F) << 4) | (data_metadata[index / 2] & 0x0F);

@@ -88,6 +88,11 @@ struct level_t
     void add_chunk(chunk_cubic_t* const c);
 
     /**
+     * Updates the renderer hints for any chunks that need their hints reset
+     */
+    void update_chunk_renderer_hints();
+
+    /**
      * Get chunk
      */
     inline chunk_cubic_t* get_chunk(const glm::ivec3 pos)
