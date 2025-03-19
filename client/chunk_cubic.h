@@ -126,6 +126,16 @@ struct chunk_cubic_t
         bool opaque_face_neg_z : 1;
     } renderer_hints = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
 
+    struct
+    {
+        chunk_cubic_t* pos_x = NULL;
+        chunk_cubic_t* pos_y = NULL;
+        chunk_cubic_t* pos_z = NULL;
+        chunk_cubic_t* neg_x = NULL;
+        chunk_cubic_t* neg_y = NULL;
+        chunk_cubic_t* neg_z = NULL;
+    } neighbors;
+
     GLuint vao = 0;
     GLuint vbo = 0;
     GLuint ebo_translucent = 0;

@@ -1493,12 +1493,26 @@ void level_t::remove_chunk(const glm::ivec3 pos)
 
     for (auto it_vec = chunks_render_order.begin(); it_vec != chunks_render_order.end();)
     {
+        /* Remove self as neighbor from neighbors */
+        /* It would more efficient to do this by traversing mapped_del's neighbors, but this is more thorough */
+        // clang-format off
+        if ((*it_vec)->neighbors.neg_x == mapped_del) (*it_vec)->neighbors.neg_x = NULL;
+        if ((*it_vec)->neighbors.pos_x == mapped_del) (*it_vec)->neighbors.pos_x = NULL;
+        if ((*it_vec)->neighbors.neg_y == mapped_del) (*it_vec)->neighbors.neg_y = NULL;
+        if ((*it_vec)->neighbors.pos_y == mapped_del) (*it_vec)->neighbors.pos_y = NULL;
+        if ((*it_vec)->neighbors.neg_z == mapped_del) (*it_vec)->neighbors.neg_z = NULL;
+        if ((*it_vec)->neighbors.pos_z == mapped_del) (*it_vec)->neighbors.pos_z = NULL;
+        // clang-format on
+
         if ((*it_vec)->pos != pos)
             it_vec++;
         else
         {
             if (*it_vec != mapped_del)
+            {
+                dc_log_warn("Duplicate chunk <%d, %d, %d> erased!", (*it_vec)->pos.x, (*it_vec)->pos.y, (*it_vec)->pos.z);
                 delete *it_vec;
+            }
             it_vec = chunks_render_order.erase(it_vec);
         }
     }
@@ -1510,7 +1524,10 @@ void level_t::remove_chunk(const glm::ivec3 pos)
         else
         {
             if (*it_vec != mapped_del)
+            {
+                dc_log_warn("Duplicate chunk <%d, %d, %d> erased!", (*it_vec)->pos.x, (*it_vec)->pos.y, (*it_vec)->pos.z);
                 delete *it_vec;
+            }
             it_vec = chunks_light_order.erase(it_vec);
         }
     }
@@ -1526,11 +1543,39 @@ void level_t::add_chunk(chunk_cubic_t* const c)
         dc_log_error("Chunk is NULL!");
         return;
     }
-    chunks_light_order.push_back(c);
-    chunks_render_order.push_back(c);
+
+    decltype(cmap)::iterator it = cmap.find(c->pos);
+
+    if (it != cmap.end())
+    {
+        dc_log_error("Chunk is duplicate!");
+        return;
+    }
+
     cmap[c->pos] = c;
 
     c->renderer_hints.hints_set = 0;
+
+    chunks_light_order.push_back(c);
+    chunks_render_order.push_back(c);
+
+    /* Assign neighbors */
+    c->neighbors.pos_x = (it = cmap.find(c->pos + glm::ivec3(+1, +0, +0))) != cmap.end() ? it->second : NULL;
+    c->neighbors.neg_x = (it = cmap.find(c->pos + glm::ivec3(-1, +0, +0))) != cmap.end() ? it->second : NULL;
+    c->neighbors.pos_y = (it = cmap.find(c->pos + glm::ivec3(+0, +1, +0))) != cmap.end() ? it->second : NULL;
+    c->neighbors.neg_y = (it = cmap.find(c->pos + glm::ivec3(+0, -1, +0))) != cmap.end() ? it->second : NULL;
+    c->neighbors.pos_z = (it = cmap.find(c->pos + glm::ivec3(+0, +0, +1))) != cmap.end() ? it->second : NULL;
+    c->neighbors.neg_z = (it = cmap.find(c->pos + glm::ivec3(+0, +0, -1))) != cmap.end() ? it->second : NULL;
+
+    /* Assign self as neighbor to neighbors */
+    // clang-format off
+    if (c->neighbors.pos_x != NULL) c->neighbors.pos_x->neighbors.neg_x = c;
+    if (c->neighbors.neg_x != NULL) c->neighbors.neg_x->neighbors.pos_x = c;
+    if (c->neighbors.pos_y != NULL) c->neighbors.pos_y->neighbors.neg_y = c;
+    if (c->neighbors.neg_y != NULL) c->neighbors.neg_y->neighbors.pos_y = c;
+    if (c->neighbors.pos_z != NULL) c->neighbors.pos_z->neighbors.neg_z = c;
+    if (c->neighbors.neg_z != NULL) c->neighbors.neg_z->neighbors.pos_z = c;
+    // clang-format on
 
     request_render_order_sort = 1;
     request_light_order_sort = 1;
