@@ -1328,7 +1328,6 @@ static void init()
     {
         ImGui::SetCurrentContext(imgui_ctx_main_menu);
         ImGui::GetIO().IniFilename = NULL;
-        ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
         if (!ImGui_ImplSDL3_InitForOpenGL(tetra::window, tetra::gl_context))
             util::die("Failed to initialize Dear Imgui SDL3 backend\n");
         if (!ImGui_ImplOpenGL3_Init("#version 330 core"))
