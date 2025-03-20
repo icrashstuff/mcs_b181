@@ -1455,7 +1455,7 @@ void profile_light()
         { 4, 8, 4 },
     };
 
-    level_t::performance_timer_t timers[3][6];
+    level_t::performance_timer_t timers[3][5];
 
     /* Nothing special about this seed value */
     Uint64 r_state = 0x41a870ef60fef764;
@@ -1499,12 +1499,10 @@ void profile_light()
         timers[using_sdl_rand][0] += game.level->last_perf_light_pass1;
         timers[using_sdl_rand][1] += game.level->last_perf_light_pass2;
         timers[using_sdl_rand][2] += game.level->last_perf_light_pass3;
-        timers[using_sdl_rand][3] += game.level->last_perf_light_pass4;
-        timers[using_sdl_rand][4] += game.level->last_perf_mesh_pass;
-        timers[using_sdl_rand][5] += timers[using_sdl_rand][0];
-        timers[using_sdl_rand][5] += timers[using_sdl_rand][1];
-        timers[using_sdl_rand][5] += timers[using_sdl_rand][2];
-        timers[using_sdl_rand][5] += timers[using_sdl_rand][3];
+        timers[using_sdl_rand][3] += game.level->last_perf_mesh_pass;
+        timers[using_sdl_rand][4] += timers[using_sdl_rand][0];
+        timers[using_sdl_rand][4] += timers[using_sdl_rand][1];
+        timers[using_sdl_rand][4] += timers[using_sdl_rand][2];
         overall_block_emptiness[using_sdl_rand] += emptiness;
         overall_block_total[using_sdl_rand] += total;
 
@@ -1512,12 +1510,10 @@ void profile_light()
         timers[2][0] += game.level->last_perf_light_pass1;
         timers[2][1] += game.level->last_perf_light_pass2;
         timers[2][2] += game.level->last_perf_light_pass3;
-        timers[2][3] += game.level->last_perf_light_pass4;
-        timers[2][4] += game.level->last_perf_mesh_pass;
-        timers[2][5] += timers[2][0];
-        timers[2][5] += timers[2][1];
-        timers[2][5] += timers[2][2];
-        timers[2][5] += timers[2][3];
+        timers[2][3] += game.level->last_perf_mesh_pass;
+        timers[2][4] += timers[2][0];
+        timers[2][4] += timers[2][1];
+        timers[2][4] += timers[2][2];
         overall_block_emptiness[2] += emptiness;
         overall_block_total[2] += total;
     }
@@ -1527,7 +1523,7 @@ void profile_light()
     /* chunk.cpp world */
     dc_log(SPACER " Results (SimplexNoise + SDL_rand_bits world) " SPACER);
     dc_log("Emptiness: %.3f%%", double((overall_block_emptiness[j] * 1000000) / overall_block_total[j]) / 10000.0);
-    for (; i < 4; i++)
+    for (; i < 3; i++)
         if (timers[j][i].built)
             dc_log("Lit %zu chunks in %.2f ms (%.2f us per) (Pass %d)", timers[j][i].built, timers[j][i].duration / 1000.0 / 1000.0,
                 timers[j][i].duration / timers[j][i].built / 1000.0, i % 5);
@@ -1537,7 +1533,7 @@ void profile_light()
     /* SDL_rand_bits world */
     dc_log(SPACER " Results (SDL_rand_bits world) " SPACER);
     dc_log("Emptiness: %.3f%%", double((overall_block_emptiness[j] * 1000000) / overall_block_total[j]) / 10000.0);
-    for (; i < 4; i++)
+    for (; i < 3; i++)
         if (timers[j][i].built)
             dc_log("Lit %zu chunks in %.2f ms (%.2f us per) (Pass %d)", timers[j][i].built, timers[j][i].duration / 1000.0 / 1000.0,
                 timers[j][i].duration / timers[j][i].built / 1000.0, i % 5);
@@ -1547,7 +1543,7 @@ void profile_light()
     /* Both worlds */
     dc_log(SPACER " Results (Both worlds) " SPACER);
     dc_log("Emptiness: %.3f%%", double((overall_block_emptiness[j] * 1000000) / overall_block_total[j]) / 10000.0);
-    for (; i < 4; i++)
+    for (; i < 3; i++)
         if (timers[j][i].built)
             dc_log("Lit %zu chunks in %.2f ms (%.2f us per) (Pass %d)", timers[j][i].built, timers[j][i].duration / 1000.0 / 1000.0,
                 timers[j][i].duration / timers[j][i].built / 1000.0, i % 5);
