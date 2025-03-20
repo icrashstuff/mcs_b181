@@ -131,6 +131,8 @@ void level_t::update_chunk_renderer_hints()
 
 void level_t::build_dirty_meshes()
 {
+    update_chunk_renderer_hints();
+
     size_t built;
     Uint64 elapsed;
     Uint64 tick_start;
@@ -152,6 +154,33 @@ void level_t::build_dirty_meshes()
         last_light_order_sort_time = SDL_GetTicks();
         request_light_order_sort = 0;
     }
+
+    /* Dirty level propagation pass (Backwards and forwards, twice just to be sure) */
+    PASS_TIMER_START();
+    for (int i = chunks_light_order.size() * 2 - 1, vec_size = chunks_light_order.size(), i_min = -vec_size * 2; i > i_min; i--)
+    {
+        chunk_cubic_t* c = chunks_light_order[abs(i) % vec_size];
+        if (c->dirty_level <= chunk_cubic_t::DIRTY_LEVEL_MESH)
+            continue;
+
+        chunk_cubic_t::dirty_level_t adj_dirt_level = chunk_cubic_t::dirty_level_t(c->dirty_level - 1);
+
+        assert(adj_dirt_level != chunk_cubic_t::DIRTY_LEVEL_NONE);
+
+#define ASSIGN_DIRT_LVL_IF(WHO, LVL, COND)             \
+    if ((WHO) && (COND) && (WHO)->dirty_level < (LVL)) \
+    (WHO)->dirty_level = (LVL)
+        ASSIGN_DIRT_LVL_IF(c->neighbors.pos_x, adj_dirt_level, !c->renderer_hints.opaque_face_pos_x);
+        ASSIGN_DIRT_LVL_IF(c->neighbors.pos_y, adj_dirt_level, !c->renderer_hints.opaque_face_pos_y);
+        ASSIGN_DIRT_LVL_IF(c->neighbors.pos_z, adj_dirt_level, !c->renderer_hints.opaque_face_pos_z);
+        ASSIGN_DIRT_LVL_IF(c->neighbors.neg_x, adj_dirt_level, !c->renderer_hints.opaque_face_neg_x);
+        ASSIGN_DIRT_LVL_IF(c->neighbors.neg_y, c->dirty_level, !c->renderer_hints.opaque_face_neg_y);
+        ASSIGN_DIRT_LVL_IF(c->neighbors.neg_z, adj_dirt_level, !c->renderer_hints.opaque_face_neg_z);
+#undef ASSIGN_DIRT_LVL_IF
+
+        built++;
+    }
+    PASS_TIMER_STOP(0, "Propagated dirty level for %zu chunks in %.2f ms (%.2f ms per)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
 
     /* Clear Light Pass */
     PASS_TIMER_START();
@@ -309,47 +338,6 @@ void level_t::set_block(const glm::ivec3 pos, const itemstack_t block, chunk_cub
 
     if (cache->dirty_level < chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL)
         cache->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
-
-    bool within_bounds_x = BETWEEN_INCL(block_pos.x, 1, SUBCHUNK_SIZE_X - 1);
-    bool within_bounds_y = BETWEEN_INCL(block_pos.y, 1, SUBCHUNK_SIZE_Y - 1);
-    bool within_bounds_z = BETWEEN_INCL(block_pos.z, 1, SUBCHUNK_SIZE_Z - 1);
-
-    bool within_bounds = (within_bounds_x && within_bounds_y && within_bounds_z);
-
-    /* No reason to poke other chunks if they won't get affected */
-    if (within_bounds && cache->renderer_hints.opaque_sides)
-        return;
-
-    bool affects_sky_light = (!within_bounds_y || !cache->renderer_hints.opaque_face_neg_y);
-
-    /* Update surrounding chunks (This also updates *ALL* above and below if the chunk update affects sky light) */
-    /* TODO: This is horribly inefficient, consider a dirty level propagation algorithm */
-    for (chunk_cubic_t* c : chunks_light_order)
-    {
-        chunk_cubic_t::dirty_level_t dirt_face = chunk_cubic_t::DIRTY_LEVEL_NONE;
-        int dist = abs(chunk_pos.x - c->pos.x) + abs(chunk_pos.z - c->pos.z);
-
-        if (!affects_sky_light)
-            dist += abs(chunk_pos.y - c->pos.y);
-
-        switch (dist)
-        {
-        case 0:
-        case 1:
-            dirt_face = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
-            break;
-        case 2:
-            dirt_face = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0;
-            break;
-        case 3:
-            dirt_face = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_1;
-            break;
-        default:
-            break;
-        }
-        if (c->dirty_level < dirt_face)
-            c->dirty_level = dirt_face;
-    }
 }
 
 bool level_t::get_block(const glm::ivec3 pos, block_id_t& type, Uint8& metadata)
