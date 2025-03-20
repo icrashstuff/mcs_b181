@@ -104,8 +104,7 @@ void level_t::build_mesh(chunk_cubic_t* const center)
             continue;
         assert(rubik[ix + 1][iy + 1][iz + 1] == NULL);
 
-        auto it = cmap.find(center->pos + glm::ivec3(ix, iy, iz));
-        rubik[ix + 1][iy + 1][iz + 1] = ((it != cmap.end()) ? it->second : NULL);
+        rubik[ix + 1][iy + 1][iz + 1] = center->find_chunk(center, center->pos + glm::ivec3(ix, iy, iz));
     }
 
     std::vector<terrain_vertex_t> vtx_solid;
