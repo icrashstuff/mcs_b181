@@ -54,8 +54,6 @@ struct chunk_cubic_t
         /** Internal use only */
         DIRTY_LEVEL_MESH,
         /** Internal use only */
-        DIRTY_LEVEL_LIGHT_PASS_EXT_2,
-        /** Internal use only */
         DIRTY_LEVEL_LIGHT_PASS_EXT_1,
         /** Internal use only */
         DIRTY_LEVEL_LIGHT_PASS_EXT_0,
@@ -175,7 +173,53 @@ struct chunk_cubic_t
 
     ~chunk_cubic_t() { free_gl(); }
 
+    /**
+     * Update renderer hints
+     *
+     * This must be called before any of the lighting pass functions
+     */
     void update_renderer_hints();
+
+    /**
+     * Sets block light levels according to block type
+     *
+     * Pseudo-code for block light passes (where chunks is a container with all the chunks in the level):
+     * 1) for(c: chunks) c->clear_light_block()
+     * 2) for(c: chunks) c->light_pass_block_set_according_to_type()
+     * 3) for(c: chunks) c->light_pass_block_propagate_internals()
+     * 4) for(i in range(4))
+     * 4.1) for(c: chunks) c->light_pass_block_grab_from_neighbors()
+     * 4.2) for(c: chunks) c->light_pass_block_propagate_internals()
+     */
+    void light_pass_block_setup();
+
+    /**
+     * Internally propagate block light
+     */
+    void light_pass_block_propagate_internals();
+
+    /**
+     * Grab block light from neighbors
+     */
+    void light_pass_block_grab_from_neighbors();
+
+    /**
+     * Grab sky light from neighbors
+     *
+     * Pseudo-code for block light passes (where chunks is a container with all the chunks in the level):
+     * 1) for(c: chunks) c->clear_light_sky()
+     * 2) for(c: chunks) c->light_pass_sky_propagate_internals()
+     * 3) for(i in range(4))
+     * 3.1) for(c: chunks) c->light_pass_sky_grab_from_neighbors()
+     * 3.2) for(c: chunks) c->light_pass_sky_propagate_internals()
+     */
+
+    void light_pass_sky_grab_from_neighbors();
+
+    /**
+     * Internally propagate sky light
+     */
+    void light_pass_sky_propagate_internals();
 
     /**
      * Check if light can propagate from this chunk to others

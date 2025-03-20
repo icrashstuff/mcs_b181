@@ -101,6 +101,15 @@ struct level_t
         return (it == cmap.end()) ? NULL : it->second;
     }
 
+    /**
+     * Get chunk
+     */
+    inline chunk_cubic_t* get_chunk(const glm::ivec3 pos) const
+    {
+        auto it = cmap.find(pos);
+        return (it == cmap.end()) ? NULL : it->second;
+    }
+
     entt::registry ecs;
 
     typedef decltype(ecs)::entity_type ent_id_t;
@@ -300,7 +309,6 @@ struct level_t
     performance_timer_t last_perf_light_pass1;
     performance_timer_t last_perf_light_pass2;
     performance_timer_t last_perf_light_pass3;
-    performance_timer_t last_perf_light_pass4;
     performance_timer_t last_perf_mesh_pass;
 
     inventory_player_t inventory;
@@ -375,6 +383,11 @@ private:
     void build_dirty_meshes();
 
     /**
+     * Propagate dirty levels between chunks (Basically light propagation)
+     */
+    void propagate_dirty_levels();
+
+    /**
      * Culls all chunks that are behind the camera or outside of the render distance
      *
      * TODO: An equivalent for entities
@@ -385,20 +398,6 @@ private:
      * Build and or replace the mesh for the corresponding chunk
      */
     void build_mesh(chunk_cubic_t* const chunk);
-
-    /**
-     * Conduct a lighting pass on corresponding chunk
-     *
-     * 4 Light passes are necessary for light to correctly jump chunks
-     */
-    void light_pass(chunk_cubic_t* const chunk, const bool local_only);
-
-    /**
-     * Conduct a lighting pass on corresponding chunk
-     *
-     * 4 Light passes are necessary for light to correctly jump chunks
-     */
-    void light_pass_sky(chunk_cubic_t* const chunk, const bool local_only);
 
     /** Items should probably be removed from terrain **/
     texture_terrain_t* terrain;

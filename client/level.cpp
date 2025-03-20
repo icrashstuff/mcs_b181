@@ -34,14 +34,6 @@
 
 #include "tetra/tetra_gl.h"
 
-#ifndef NDEBUG
-#define FORCE_OPT_LIGHT 1
-#define FORCE_OPT_MESH 1
-#else
-#define FORCE_OPT_LIGHT 0
-#define FORCE_OPT_MESH 0
-#endif
-
 #define PASS_TIMER_START()             \
     do                                 \
     {                                  \
@@ -169,6 +161,7 @@ void level_t::build_dirty_meshes()
         if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL)
             continue;
         c->clear_light_block(0);
+        c->light_pass_block_setup();
         c->clear_light_sky(0);
         built++;
     }
@@ -181,8 +174,10 @@ void level_t::build_dirty_meshes()
         chunk_cubic_t* c = *it;
         if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL)
             continue;
-        light_pass(c, true);
-        light_pass_sky(c, true);
+        c->light_pass_block_grab_from_neighbors();
+        c->light_pass_block_propagate_internals();
+        c->light_pass_sky_grab_from_neighbors();
+        c->light_pass_sky_propagate_internals();
         c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0;
         built++;
     }
@@ -219,8 +214,10 @@ void level_t::build_dirty_meshes()
         chunk_cubic_t* c = *it;
         if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0)
             continue;
-        light_pass(c, false);
-        light_pass_sky(c, false);
+        c->light_pass_block_grab_from_neighbors();
+        c->light_pass_block_propagate_internals();
+        c->light_pass_sky_grab_from_neighbors();
+        c->light_pass_sky_propagate_internals();
         c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_1;
         built++;
     }
@@ -235,33 +232,19 @@ void level_t::build_dirty_meshes()
         chunk_cubic_t* c = *it;
         if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_1)
             continue;
-        light_pass(c, false);
-        light_pass_sky(c, false);
-        c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_2;
-        built++;
-    }
-    PASS_TIMER_STOP(enable_timer_log_light, "Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 3)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
-    last_perf_light_pass3.duration = elapsed;
-    last_perf_light_pass3.built = built;
-
-    /* Fourth Light Pass */
-    PASS_TIMER_START();
-    for (auto it = chunks_light_order.begin(); it != chunks_light_order.end(); it++)
-    {
-        chunk_cubic_t* c = *it;
-        if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_2)
-            continue;
-        light_pass(c, false);
-        light_pass_sky(c, false);
+        c->light_pass_block_grab_from_neighbors();
+        c->light_pass_block_propagate_internals();
+        c->light_pass_sky_grab_from_neighbors();
+        c->light_pass_sky_propagate_internals();
         if (c->renderer_hints.uniform_air)
             c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_NONE;
         else
             c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
         built++;
     }
-    PASS_TIMER_STOP(enable_timer_log_light, "Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 4)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
-    last_perf_light_pass4.duration = elapsed;
-    last_perf_light_pass4.built = built;
+    PASS_TIMER_STOP(enable_timer_log_light, "Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 3)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
+    last_perf_light_pass3.duration = elapsed;
+    last_perf_light_pass3.built = built;
 
     /* Mesh Pass */
     PASS_TIMER_START();
@@ -280,467 +263,6 @@ void level_t::build_dirty_meshes()
     last_perf_mesh_pass.duration = elapsed;
     last_perf_mesh_pass.built = built;
 }
-
-/**
- * Force inlining in debug builds
- *
- * Without this debug builds are *very*, *very* slow (~6x slower)
- */
-#if (FORCE_OPT_LIGHT)
-#pragma GCC push_options
-#pragma GCC optimize("O3")
-#endif
-
-struct chunk_cross_t
-{
-    chunk_cubic_t* c = NULL;
-    chunk_cubic_t* pos_x = NULL;
-    chunk_cubic_t* pos_y = NULL;
-    chunk_cubic_t* pos_z = NULL;
-    chunk_cubic_t* neg_x = NULL;
-    chunk_cubic_t* neg_y = NULL;
-    chunk_cubic_t* neg_z = NULL;
-
-    chunk_cross_t() { }
-};
-
-void level_t::light_pass(chunk_cubic_t* const chunk, const bool local_only)
-{
-    /** Index: C +XYZ -XYZ */
-    chunk_cross_t cross;
-
-    cross.c = chunk;
-
-    if (!cross.c)
-    {
-        dc_log_error("Attempt made to update block lighting for NULL chunk");
-        return;
-    }
-
-    if (!local_only)
-    {
-        cross.pos_x = cross.c->neighbors.pos_x;
-        cross.pos_y = cross.c->neighbors.pos_y;
-        cross.pos_z = cross.c->neighbors.pos_z;
-        cross.neg_x = cross.c->neighbors.neg_x;
-        cross.neg_y = cross.c->neighbors.neg_y;
-        cross.neg_z = cross.c->neighbors.neg_z;
-    }
-
-    bool is_transparent[256];
-    Uint8 light_levels[256];
-
-    for (int i = 0; i < IM_ARRAYSIZE(is_transparent); i++)
-        is_transparent[i] = mc_id::is_transparent(i);
-
-    for (int i = 0; i < IM_ARRAYSIZE(light_levels); i++)
-        light_levels[i] = mc_id::get_light_level(i);
-
-    Uint32 total = 0;
-    Uint8 min_level = 15;
-    Uint8 max_level = 0;
-    /* Initial scan of light levels */
-    for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_VOLUME; dat_it++)
-    {
-        const int y = (dat_it) & 0x0F;
-        const int z = (dat_it >> 4) & 0x0F;
-        const int x = (dat_it >> 8) & 0x0F;
-
-        Uint8 type = cross.c->get_type(x, y, z);
-
-        Uint8 lvl = light_levels[type];
-
-        if (!is_transparent[type])
-        {
-            if (lvl != 0)
-                cross.c->set_light_block(x, y, z, lvl);
-            continue;
-        }
-
-        /* Shift light value from range [0, 15] to [1, 16] */
-        lvl++;
-
-        /** Index: +XYZ -XYZ, all values are *ALWAYS* in the range [1, 16] */
-        Uint8 sur_levels[6] = { 0 };
-
-        switch (x)
-        {
-        case 0:
-            sur_levels[0] = Uint8(cross.c->get_light_block(x + 1, y, z));
-            sur_levels[3] = cross.neg_x ? (Uint8(cross.neg_x->get_light_block(SUBCHUNK_SIZE_X - 1, y, z))) : 0;
-            break;
-        case (SUBCHUNK_SIZE_X - 1):
-            sur_levels[0] = cross.pos_x ? (Uint8(cross.pos_x->get_light_block(0, y, z))) : 0;
-            sur_levels[3] = Uint8(cross.c->get_light_block(x - 1, y, z));
-            break;
-        default:
-            sur_levels[0] = Uint8(cross.c->get_light_block(x + 1, y, z));
-            sur_levels[3] = Uint8(cross.c->get_light_block(x - 1, y, z));
-            break;
-        }
-
-        switch (y)
-        {
-        case 0:
-            sur_levels[1] = Uint8(cross.c->get_light_block(x, y + 1, z));
-            sur_levels[4] = cross.neg_y ? (Uint8(cross.neg_y->get_light_block(x, SUBCHUNK_SIZE_Y - 1, z))) : 0;
-            break;
-        case (SUBCHUNK_SIZE_Y - 1):
-            sur_levels[1] = cross.pos_y ? (Uint8(cross.pos_y->get_light_block(x, 0, z))) : 0;
-            sur_levels[4] = Uint8(cross.c->get_light_block(x, y - 1, z));
-            break;
-        default:
-            sur_levels[1] = Uint8(cross.c->get_light_block(x, y + 1, z));
-            sur_levels[4] = Uint8(cross.c->get_light_block(x, y - 1, z));
-            break;
-        }
-
-        switch (z)
-        {
-        case 0:
-            sur_levels[2] = Uint8(cross.c->get_light_block(x, y, z + 1));
-            sur_levels[5] = cross.neg_z ? (Uint8(cross.neg_z->get_light_block(x, y, SUBCHUNK_SIZE_Z - 1))) : 0;
-            break;
-        case (SUBCHUNK_SIZE_Z - 1):
-            sur_levels[2] = cross.pos_z ? (Uint8(cross.pos_z->get_light_block(x, y, 0))) : 0;
-            sur_levels[5] = Uint8(cross.c->get_light_block(x, y, z - 1));
-            break;
-        default:
-            sur_levels[2] = Uint8(cross.c->get_light_block(x, y, z + 1));
-            sur_levels[5] = Uint8(cross.c->get_light_block(x, y, z - 1));
-            break;
-        }
-
-        /* Shift light value from range [0, 15] to [1, 16] */
-        lvl = SDL_max(lvl, cross.c->get_light_block(x, y, z) + 1);
-
-        /* This SDL_max() isn't necessary because lvl is guaranteed to be at least one by now */
-        // lvl = SDL_max(1, lvl);
-
-        lvl = SDL_max(lvl, sur_levels[0]);
-        lvl = SDL_max(lvl, sur_levels[1]);
-        lvl = SDL_max(lvl, sur_levels[2]);
-        lvl = SDL_max(lvl, sur_levels[3]);
-        lvl = SDL_max(lvl, sur_levels[4]);
-        lvl = SDL_max(lvl, sur_levels[5]);
-
-        /* Move lvl from range [1,16] to [0,15] */
-        lvl--;
-
-        cross.c->set_light_block(x, y, z, lvl);
-        min_level = SDL_min(min_level, lvl);
-        max_level = SDL_max(max_level, lvl);
-        total += lvl;
-    }
-
-    /* If the light level is uniform then no propagation is required for a local pass */
-    if (local_only && total % SUBCHUNK_SIZE_VOLUME == 0)
-        return;
-
-    /* Propagate light (Block) */
-    for (int dat_it = SUBCHUNK_SIZE_VOLUME - 1; dat_it >= 0; dat_it--)
-    {
-        const int y = (dat_it) & 0x0F;
-        const int z = (dat_it >> 4) & 0x0F;
-        const int x = (dat_it >> 8) & 0x0F;
-
-        if (!is_transparent[cross.c->get_type(x, y, z)])
-            continue;
-
-        /** Index: +XYZ -XYZ, all values are *ALWAYS* in the range [1, 16] */
-        Uint8 sur_levels[6] = { 0 };
-
-        switch (x)
-        {
-        case 0:
-            sur_levels[0] = Uint8(cross.c->get_light_block(x + 1, y, z));
-            sur_levels[3] = 0;
-            break;
-        case (SUBCHUNK_SIZE_X - 1):
-            sur_levels[0] = 0;
-            sur_levels[3] = Uint8(cross.c->get_light_block(x - 1, y, z));
-            break;
-        default:
-            sur_levels[0] = Uint8(cross.c->get_light_block(x + 1, y, z));
-            sur_levels[3] = Uint8(cross.c->get_light_block(x - 1, y, z));
-            break;
-        }
-
-        switch (y)
-        {
-        case 0:
-            sur_levels[1] = Uint8(cross.c->get_light_block(x, y + 1, z));
-            sur_levels[4] = 0;
-            break;
-        case (SUBCHUNK_SIZE_Y - 1):
-            sur_levels[1] = 0;
-            sur_levels[4] = Uint8(cross.c->get_light_block(x, y - 1, z));
-            break;
-        default:
-            sur_levels[1] = Uint8(cross.c->get_light_block(x, y + 1, z));
-            sur_levels[4] = Uint8(cross.c->get_light_block(x, y - 1, z));
-            break;
-        }
-
-        switch (z)
-        {
-        case 0:
-            sur_levels[2] = Uint8(cross.c->get_light_block(x, y, z + 1));
-            sur_levels[5] = 0;
-            break;
-        case (SUBCHUNK_SIZE_Z - 1):
-            sur_levels[2] = 0;
-            sur_levels[5] = Uint8(cross.c->get_light_block(x, y, z - 1));
-            break;
-        default:
-            sur_levels[2] = Uint8(cross.c->get_light_block(x, y, z + 1));
-            sur_levels[5] = Uint8(cross.c->get_light_block(x, y, z - 1));
-            break;
-        }
-
-        /* Shift light value from range [0, 15] to [1, 16] */
-        Uint8 lvl = cross.c->get_light_block(x, y, z) + 1;
-
-        /* This SDL_max() isn't necessary because lvl is guaranteed to be at least one by now */
-        // lvl = SDL_max(1, lvl);
-
-        lvl = SDL_max(lvl, sur_levels[0]);
-        lvl = SDL_max(lvl, sur_levels[1]);
-        lvl = SDL_max(lvl, sur_levels[2]);
-        lvl = SDL_max(lvl, sur_levels[3]);
-        lvl = SDL_max(lvl, sur_levels[4]);
-        lvl = SDL_max(lvl, sur_levels[5]);
-
-        /* Move lvl from range [1,16] to [0,15] */
-        lvl--;
-
-        cross.c->set_light_block(x, y, z, lvl);
-    }
-}
-
-void level_t::light_pass_sky(chunk_cubic_t* const chunk, const bool local_only)
-{
-    /** Index: C +XYZ -XYZ */
-    chunk_cross_t cross;
-
-    cross.c = chunk;
-
-    if (!cross.c)
-    {
-        dc_log_error("Attempt made to update sky lighting for NULL chunk");
-        return;
-    }
-
-    Uint8 top_light = 0;
-
-    if (!local_only)
-    {
-        cross.pos_x = cross.c->neighbors.pos_x;
-        cross.pos_y = cross.c->neighbors.pos_y;
-        cross.pos_z = cross.c->neighbors.pos_z;
-        cross.neg_x = cross.c->neighbors.neg_x;
-        cross.neg_y = cross.c->neighbors.neg_y;
-        cross.neg_z = cross.c->neighbors.neg_z;
-
-        if (!cross.pos_y)
-            top_light = 15;
-    }
-
-    bool is_transparent[256];
-    Uint8 non_decaying_types[256];
-
-    memset(non_decaying_types, 1, sizeof(non_decaying_types));
-
-    /* Move this out to something like mc_id::get_sky_light_attenuation() */
-    non_decaying_types[BLOCK_ID_LEAVES] = 0;
-    non_decaying_types[BLOCK_ID_WATER_FLOWING] = 0;
-    non_decaying_types[BLOCK_ID_WATER_SOURCE] = 0;
-
-    for (int i = 0; i < IM_ARRAYSIZE(is_transparent); i++)
-        is_transparent[i] = mc_id::is_transparent(i);
-
-    Uint32 total = 0;
-    Uint8 min_level = 15;
-    Uint8 max_level = 0;
-    /* Initial scan of light levels */
-    for (int dat_it = 0; dat_it < SUBCHUNK_SIZE_VOLUME; dat_it++)
-    {
-        const int y = (dat_it) & 0x0F;
-        const int z = (dat_it >> 4) & 0x0F;
-        const int x = (dat_it >> 8) & 0x0F;
-
-        Uint8 type = cross.c->get_type(x, y, z);
-
-        if (!is_transparent[type])
-            continue;
-
-        /** Index: +XYZ -XYZ, all values are *ALWAYS* in the range [1, 16] */
-        Uint8 sur_levels[6] = { 0 };
-
-        switch (x)
-        {
-        case 0:
-            sur_levels[0] = Uint8(cross.c->get_light_sky(x + 1, y, z));
-            sur_levels[3] = cross.neg_x ? (Uint8(cross.neg_x->get_light_sky(SUBCHUNK_SIZE_X - 1, y, z))) : 0;
-            break;
-        case (SUBCHUNK_SIZE_X - 1):
-            sur_levels[0] = cross.pos_x ? (Uint8(cross.pos_x->get_light_sky(0, y, z))) : 0;
-            sur_levels[3] = Uint8(cross.c->get_light_sky(x - 1, y, z));
-            break;
-        default:
-            sur_levels[0] = Uint8(cross.c->get_light_sky(x + 1, y, z));
-            sur_levels[3] = Uint8(cross.c->get_light_sky(x - 1, y, z));
-            break;
-        }
-
-        switch (y)
-        {
-        case 0:
-            sur_levels[1] = Uint8(cross.c->get_light_sky(x, y + 1, z));
-            sur_levels[4] = cross.neg_y ? (Uint8(cross.neg_y->get_light_sky(x, SUBCHUNK_SIZE_Y - 1, z))) : 0;
-            break;
-        case (SUBCHUNK_SIZE_Y - 1):
-            /* Fallback to full sky light if there is no chunk above */
-            sur_levels[1] = cross.pos_y ? (Uint8(cross.pos_y->get_light_sky(x, 0, z))) : top_light;
-            sur_levels[4] = Uint8(cross.c->get_light_sky(x, y - 1, z));
-            break;
-        default:
-            sur_levels[1] = Uint8(cross.c->get_light_sky(x, y + 1, z));
-            sur_levels[4] = Uint8(cross.c->get_light_sky(x, y - 1, z));
-            break;
-        }
-
-        switch (z)
-        {
-        case 0:
-            sur_levels[2] = Uint8(cross.c->get_light_sky(x, y, z + 1));
-            sur_levels[5] = cross.neg_z ? (Uint8(cross.neg_z->get_light_sky(x, y, SUBCHUNK_SIZE_Z - 1))) : 0;
-            break;
-        case (SUBCHUNK_SIZE_Z - 1):
-            sur_levels[2] = cross.pos_z ? (Uint8(cross.pos_z->get_light_sky(x, y, 0))) : 0;
-            sur_levels[5] = Uint8(cross.c->get_light_sky(x, y, z - 1));
-            break;
-        default:
-            sur_levels[2] = Uint8(cross.c->get_light_sky(x, y, z + 1));
-            sur_levels[5] = Uint8(cross.c->get_light_sky(x, y, z - 1));
-            break;
-        }
-
-        /* Shift light value from range [0, 15] to [1, 16] */
-        Uint8 lvl = cross.c->get_light_sky(x, y, z) + 1;
-
-        /* This SDL_max() isn't necessary because lvl is guaranteed to be at least one by now */
-        // lvl = SDL_max(1, lvl);
-
-        lvl = SDL_max(lvl, sur_levels[0]);
-        lvl = SDL_max(lvl, sur_levels[2]);
-        lvl = SDL_max(lvl, sur_levels[3]);
-        lvl = SDL_max(lvl, sur_levels[4]);
-        lvl = SDL_max(lvl, sur_levels[5]);
-
-        /* Sky light does not decay downward through air */
-        lvl = SDL_max(lvl, sur_levels[1] + non_decaying_types[type]);
-
-        /* Move lvl from range [1,16] to [0,15] */
-        lvl--;
-
-        cross.c->set_light_sky(x, y, z, lvl);
-        min_level = SDL_min(min_level, lvl);
-        max_level = SDL_max(max_level, lvl);
-        total += lvl;
-    }
-
-    /* If the light level is uniform then no propagation is required for a local pass */
-    if (local_only && total % SUBCHUNK_SIZE_VOLUME == 0)
-        return;
-
-    /* Propagate light (Sky) */
-    for (int dat_it = SUBCHUNK_SIZE_VOLUME - 1; dat_it >= 0; dat_it--)
-    {
-        const int y = (dat_it) & 0x0F;
-        const int z = (dat_it >> 4) & 0x0F;
-        const int x = (dat_it >> 8) & 0x0F;
-
-        Uint8 type = cross.c->get_type(x, y, z);
-
-        if (!is_transparent[type])
-            continue;
-
-        /** Index: +XYZ -XYZ, all values are *ALWAYS* in the range [1, 16] */
-        Uint8 sur_levels[6] = { 0 };
-
-        switch (x)
-        {
-        case 0:
-            sur_levels[0] = Uint8(cross.c->get_light_sky(x + 1, y, z));
-            sur_levels[3] = 0;
-            break;
-        case (SUBCHUNK_SIZE_X - 1):
-            sur_levels[0] = 0;
-            sur_levels[3] = Uint8(cross.c->get_light_sky(x - 1, y, z));
-            break;
-        default:
-            sur_levels[0] = Uint8(cross.c->get_light_sky(x + 1, y, z));
-            sur_levels[3] = Uint8(cross.c->get_light_sky(x - 1, y, z));
-            break;
-        }
-
-        switch (y)
-        {
-        case 0:
-            sur_levels[1] = Uint8(cross.c->get_light_sky(x, y + 1, z));
-            sur_levels[4] = 0;
-            break;
-        case (SUBCHUNK_SIZE_Y - 1):
-            sur_levels[1] = 0;
-            sur_levels[4] = Uint8(cross.c->get_light_sky(x, y - 1, z));
-            break;
-        default:
-            sur_levels[1] = Uint8(cross.c->get_light_sky(x, y + 1, z));
-            sur_levels[4] = Uint8(cross.c->get_light_sky(x, y - 1, z));
-            break;
-        }
-
-        switch (z)
-        {
-        case 0:
-            sur_levels[2] = Uint8(cross.c->get_light_sky(x, y, z + 1));
-            sur_levels[5] = 0;
-            break;
-        case (SUBCHUNK_SIZE_Z - 1):
-            sur_levels[2] = 0;
-            sur_levels[5] = Uint8(cross.c->get_light_sky(x, y, z - 1));
-            break;
-        default:
-            sur_levels[2] = Uint8(cross.c->get_light_sky(x, y, z + 1));
-            sur_levels[5] = Uint8(cross.c->get_light_sky(x, y, z - 1));
-            break;
-        }
-
-        /* Shift light value from range [0, 15] to [1, 16] */
-        Uint8 lvl = cross.c->get_light_sky(x, y, z) + 1;
-
-        /* This SDL_max() isn't necessary because lvl is guaranteed to be at least one by now */
-        // lvl = SDL_max(1, lvl);
-
-        lvl = SDL_max(lvl, sur_levels[0]);
-        lvl = SDL_max(lvl, sur_levels[2]);
-        lvl = SDL_max(lvl, sur_levels[3]);
-        lvl = SDL_max(lvl, sur_levels[4]);
-        lvl = SDL_max(lvl, sur_levels[5]);
-
-        /* Sky light does not decay downward through air */
-        lvl = SDL_max(lvl, sur_levels[1] + non_decaying_types[type]);
-
-        /* Move lvl from range [1,16] to [0,15] */
-        lvl--;
-
-        cross.c->set_light_sky(x, y, z, lvl);
-    }
-}
-#if (FORCE_OPT_LIGHT)
-#pragma GCC pop_options
-#endif
 
 void level_t::set_block(const glm::ivec3 pos, const itemstack_t block, chunk_cubic_t*& cache)
 {
@@ -821,9 +343,6 @@ void level_t::set_block(const glm::ivec3 pos, const itemstack_t block, chunk_cub
             break;
         case 3:
             dirt_face = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_1;
-            break;
-        case 4:
-            dirt_face = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_2;
             break;
         default:
             break;

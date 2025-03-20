@@ -103,6 +103,29 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
     add_text(ctx, drawlist, 0, cursor_l, "f: %d (%.0f)", (int(game->level->yaw + 360.f - 45.f) % 360) / 90, game->level->yaw);
 
     cursor_l.y += get_y_spacing();
+    {
+        glm::ivec3 p_eye(glm::round(lvl->get_camera_pos()));
+        chunk_cubic_t* c_eye = lvl->get_chunk(p_eye >> 4);
+        Uint8 l_eye_b = 0, l_eye_s = 0;
+        if (c_eye)
+        {
+            l_eye_b = c_eye->get_light_block(p_eye.x & 0x0F, p_eye.y & 0x0F, p_eye.z & 0x0F);
+            l_eye_s = c_eye->get_light_sky(p_eye.x & 0x0F, p_eye.y & 0x0F, p_eye.z & 0x0F);
+        }
+
+        glm::ivec3 p_foot(glm::round(lvl->foot_pos));
+        chunk_cubic_t* c_foot = lvl->get_chunk(p_foot >> 4);
+        Uint8 l_foot_b = 0, l_foot_s = 0;
+        if (c_foot)
+        {
+            l_foot_b = c_foot->get_light_block(p_foot.x & 0x0F, p_foot.y & 0x0F, p_foot.z & 0x0F);
+            l_foot_s = c_foot->get_light_sky(p_foot.x & 0x0F, p_foot.y & 0x0F, p_foot.z & 0x0F);
+        }
+
+        add_text(ctx, drawlist, 0, cursor_l, "Light (Eye): B: %d, S: %d", l_eye_b, l_eye_s);
+        add_text(ctx, drawlist, 0, cursor_l, "Light (Foot): B: %d, S: %d", l_foot_b, l_foot_s);
+    }
+    cursor_l.y += get_y_spacing();
 
     add_text(ctx, drawlist, 0, cursor_l, "Seed: %ld", game->level->mc_seed);
 
