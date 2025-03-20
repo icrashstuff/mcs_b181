@@ -85,7 +85,9 @@ void assemble_long(std::vector<Uint8>& dat, const Sint64 in)
 
 void assemble_float(std::vector<Uint8>& dat, const float in)
 {
-    Uint32 temp = SDL_Swap32BE(*(Uint32*)&in);
+    Uint32 temp;
+    memcpy(&temp, &in, sizeof(in));
+    temp = SDL_Swap32BE(temp);
     size_t loc = dat.size();
     dat.resize(dat.size() + sizeof(temp));
     memcpy(dat.data() + loc, &temp, sizeof(temp));
@@ -93,7 +95,9 @@ void assemble_float(std::vector<Uint8>& dat, const float in)
 
 void assemble_double(std::vector<Uint8>& dat, const double in)
 {
-    Uint64 temp = SDL_Swap64BE(*(Uint64*)&in);
+    Uint64 temp;
+    memcpy(&temp, &in, sizeof(in));
+    temp = SDL_Swap64BE(temp);
     size_t loc = dat.size();
     dat.resize(dat.size() + sizeof(temp));
     memcpy(dat.data() + loc, &temp, sizeof(temp));
@@ -197,10 +201,9 @@ bool read_float(SDLNet_StreamSocket* const sock, float* const out)
         return 0;
 
     Uint32 temp = SDL_Swap32BE(*((Uint32*)buf_fixed));
-    ;
 
     if (out)
-        *out = *(float*)&temp;
+        *(Uint32*)out = temp;
 
     return 1;
 }
@@ -212,10 +215,9 @@ bool read_double(SDLNet_StreamSocket* const sock, double* const out)
         return 0;
 
     Uint64 temp = SDL_Swap64BE(*((Uint64*)buf_fixed));
-    ;
 
     if (out)
-        *out = *(double*)&temp;
+        *(Uint64*)out = temp;
 
     return 1;
 }
@@ -310,7 +312,7 @@ SDL_FORCE_INLINE bool read_float(const std::vector<Uint8>& dat, size_t& pos, flo
     Uint32 temp = SDL_Swap32BE(*((Uint32*)(dat.data() + pos)));
 
     if (out)
-        *out = *(float*)&temp;
+        *(Uint32*)out = temp;
 
     pos = pos + 4;
     return 1;
@@ -323,7 +325,7 @@ SDL_FORCE_INLINE bool read_double(const std::vector<Uint8>& dat, size_t& pos, do
     Uint64 temp = SDL_Swap64BE(*((Uint64*)(dat.data() + pos)));
 
     if (out)
-        *out = *(double*)&temp;
+        *(Uint64*)out = temp;
 
     pos = pos + 8;
     return 1;
@@ -388,28 +390,28 @@ SDL_FORCE_INLINE bool read_metadata(const std::vector<Uint8>& dat, size_t& pos, 
         {
         case 0:
         {
-            jbyte r;
+            jbyte r = 0;
             err += !read_byte(dat, pos, &r);
             assemble_byte(out, r);
             break;
         }
         case 1:
         {
-            jshort r;
+            jshort r = 0;
             err += !read_short(dat, pos, &r);
             assemble_short(out, r);
             break;
         }
         case 2:
         {
-            jint r;
+            jint r = 0;
             err += !read_int(dat, pos, &r);
             assemble_int(out, r);
             break;
         }
         case 3:
         {
-            jfloat r;
+            jfloat r = 0;
             err += !read_float(dat, pos, &r);
             assemble_float(out, r);
             break;
@@ -423,9 +425,9 @@ SDL_FORCE_INLINE bool read_metadata(const std::vector<Uint8>& dat, size_t& pos, 
         }
         case 5:
         {
-            jshort r0;
-            jbyte r1;
-            jshort r2;
+            jshort r0 = 0;
+            jbyte r1 = 0;
+            jshort r2 = 0;
             err += !read_short(dat, pos, &r0);
             err += !read_byte(dat, pos, &r1);
             err += !read_short(dat, pos, &r2);
@@ -438,9 +440,9 @@ SDL_FORCE_INLINE bool read_metadata(const std::vector<Uint8>& dat, size_t& pos, 
         }
         case 6:
         {
-            jint r0;
-            jint r1;
-            jint r2;
+            jint r0 = 0;
+            jint r1 = 0;
+            jint r2 = 0;
             err += !read_int(dat, pos, &r0);
             err += !read_int(dat, pos, &r1);
             err += !read_int(dat, pos, &r2);
@@ -993,7 +995,7 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* const sock)
     if (buf_size != len || var_len > 0)
         return NULL;
 
-    TRACE("Packet 0x%02x(%s) has size: %zu(%zu) bytes", packet_type, len, buf_size, packet_t::get_name_for_id(packet_type));
+    TRACE("Packet 0x%02x(%s) has size: %zu(%zu) bytes", packet_type, packet_t::get_name_for_id(packet_type), len, buf_size);
 
     /* This section handles the actual packet parsing*/
     buf.resize(buf_size);
@@ -1075,7 +1077,7 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* const sock)
             err += !read_byte(buf, pos, &p->size_y);
             err += !read_byte(buf, pos, &p->size_z);
 
-            int compressed_size;
+            int compressed_size = 0;
 
             err += !read_int(buf, pos, &compressed_size);
 
@@ -1096,7 +1098,7 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* const sock)
             err += !read_int(buf, pos, &p->chunk_x);
             err += !read_int(buf, pos, &p->chunk_z);
 
-            short payload_size;
+            short payload_size = 0;
 
             err += !read_short(buf, pos, &payload_size);
 
@@ -1109,7 +1111,7 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* const sock)
 
                 for (short i = 0; i < payload_size; i++)
                 {
-                    short coord;
+                    short coord = 0;
                     err += !read_short(buf, pos, &coord);
 
                     p->payload[i].x = (coord >> 12) & 0x08;
@@ -1139,7 +1141,7 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* const sock)
             err += !read_double(buf, pos, &p->z);
             err += !read_float(buf, pos, &p->radius);
 
-            int record_count;
+            int record_count = 0;
 
             err += !read_int(buf, pos, &record_count);
 
@@ -1218,7 +1220,7 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* const sock)
 
             err += !read_byte(buf, pos, &p->window_id);
 
-            short payload_size;
+            short payload_size = 0;
 
             err += !read_short(buf, pos, &payload_size);
 
@@ -1250,7 +1252,7 @@ packet_t* packet_handler_t::get_next_packet(SDLNet_StreamSocket* const sock)
             err += !read_short(buf, pos, &p->item_type);
             err += !read_short(buf, pos, &p->item_id);
 
-            jubyte text_len;
+            jubyte text_len = 0;
 
             err += !read_ubyte(buf, pos, &text_len);
 
