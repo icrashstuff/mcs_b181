@@ -272,6 +272,40 @@ struct chunk_cubic_t
         index_type_translucent = GL_NONE;
     }
 
+    /**
+     * Finds a chunk by recursively searching from the origin
+     *
+     * @param origin Chunk to start from
+     * @param target Coordinates of target chunk
+     *
+     * @returns Target chunk if found, NULL otherwise
+     */
+    static inline chunk_cubic_t* find_chunk(chunk_cubic_t* const origin, const decltype(chunk_cubic_t::pos) target)
+    {
+        if (!origin)
+            return NULL;
+        const decltype(chunk_cubic_t::pos) diff = target - origin->pos;
+        chunk_cubic_t* t = NULL;
+
+        if (diff == decltype(chunk_cubic_t::pos)(0))
+            return origin;
+
+        if (origin->neighbors.pos_x && diff.x > 0 && (t = find_chunk(origin->neighbors.pos_x, target)) && t->pos == target)
+            return t;
+        if (origin->neighbors.pos_y && diff.y > 0 && (t = find_chunk(origin->neighbors.pos_y, target)) && t->pos == target)
+            return t;
+        if (origin->neighbors.pos_z && diff.z > 0 && (t = find_chunk(origin->neighbors.pos_z, target)) && t->pos == target)
+            return t;
+        if (origin->neighbors.neg_x && diff.x < 0 && (t = find_chunk(origin->neighbors.neg_x, target)) && t->pos == target)
+            return t;
+        if (origin->neighbors.neg_y && diff.y < 0 && (t = find_chunk(origin->neighbors.neg_y, target)) && t->pos == target)
+            return t;
+        if (origin->neighbors.neg_z && diff.z < 0 && (t = find_chunk(origin->neighbors.neg_z, target)) && t->pos == target)
+            return t;
+
+        return NULL;
+    }
+
     CHUNK_CUBIC_INLINE Uint8 get_type(const int x, const int y, const int z)
     {
         assert(x >= 0);
