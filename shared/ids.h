@@ -27,6 +27,24 @@
 #include "misc.h"
 #include <glm/glm.hpp>
 
+#ifndef MC_ID_CONST
+#if defined(__GNUC__) || (defined(__has_attribute) && __has_attribute(const))
+#define MC_ID_CONST __attribute__((__const__))
+#else
+#define MC_ID_CONST
+#warning No MC_ID_CONST
+#endif
+#endif
+
+#ifndef MC_ID_PURE
+#if defined(__GNUC__) || (defined(__has_attribute) && __has_attribute(pure))
+#define MC_ID_PURE __attribute__((__pure__))
+#else
+#define MC_ID_PURE
+#warning No MC_ID_PURE
+#endif
+#endif
+
 enum damage_id_t : Uint8
 {
     WOOL_ID_WHITE = 0,
@@ -430,20 +448,20 @@ enum biome_t : int
     BIOME_NUM_BIOMES,
 };
 
-bool gamemode_is_valid(int x);
+MC_ID_CONST bool gamemode_is_valid(const int x);
 
-const char* gamemode_get_trans_id(gamemode_t x);
+MC_ID_CONST const char* gamemode_get_trans_id(const gamemode_t x);
 
-bool dimension_is_valid(int x);
+MC_ID_CONST bool dimension_is_valid(const int x);
 
-const char* get_name_vehicle(jbyte id);
+MC_ID_CONST const char* get_name_vehicle(const jbyte id);
 
-const char* get_name_mob(jbyte id);
+MC_ID_CONST const char* get_name_mob(const jbyte id);
 
 /**
  * Returns the name of the item with any changes applied by damage (eg. wool or dye)
  */
-const char* get_name_from_item_id(short item_id, short damage);
+MC_ID_CONST const char* get_name_from_item_id(const short item_id, const short damage);
 
 struct block_return_t
 {
@@ -453,69 +471,69 @@ struct block_return_t
     Uint8 quantity_max;
 };
 
-SDL_FORCE_INLINE bool is_block(short block_id) { return BETWEEN_EXCL(block_id, BLOCK_ID_NONE, BLOCK_ID_NUM_USED); };
+MC_ID_CONST SDL_FORCE_INLINE bool is_block(const short block_id) { return BETWEEN_EXCL(block_id, BLOCK_ID_NONE, BLOCK_ID_NUM_USED); };
 
-bool is_fluid(short block_id);
+MC_ID_CONST bool is_fluid(const short block_id);
 
-bool is_transparent(short block_id);
+MC_ID_CONST bool is_transparent(const short block_id);
 
-bool is_leaves_style_transparent(short block_id);
+MC_ID_CONST bool is_leaves_style_transparent(const short block_id);
 
-bool is_translucent(short block_id);
+MC_ID_CONST bool is_translucent(const short block_id);
 
-bool can_host_hanging(short block_id);
+MC_ID_CONST bool can_host_hanging(const short block_id);
 
-bool can_host_rail(short block_id);
+MC_ID_CONST bool can_host_rail(const short block_id);
 
-Uint8 get_food_value(short item_id);
+MC_ID_CONST Uint8 get_food_value(const short item_id);
 
-float get_food_staturation_ratio(short item_id);
+MC_ID_CONST float get_food_staturation_ratio(const short item_id);
 
 /**
  * For blocks like rails, ladders, torches, signs, flowers, buttons, pressure plates, levers, and such
  */
-bool block_has_collision(short block_id);
+MC_ID_CONST bool block_has_collision(const short block_id);
 
 /**
  * Get the corresponding light value for a block
  *
  * Data pulled from the table at https://minecraft.wiki/w/Light?oldid=161926#Light-emitting_blocks
  */
-Uint8 get_light_level(short block_id);
+MC_ID_CONST Uint8 get_light_level(const short block_id);
 
-glm::vec3 get_light_color(short block_id);
+MC_ID_CONST glm::vec3 get_light_color(const short block_id);
 
 /**
  * Get the corresponding return data for a block id
  */
-block_return_t get_return_from_block(short item_id, short damage, bool silk_touch = false);
+MC_ID_CONST block_return_t get_return_from_block(const short item_id, const short damage, const bool silk_touch = false);
 
-int is_shovel(short item_id);
+MC_ID_CONST int is_shovel(const short item_id);
 
-int is_sword(short item_id);
+MC_ID_CONST int is_sword(const short item_id);
 
-int is_axe(short item_id);
+MC_ID_CONST int is_axe(const short item_id);
 
-int is_pickaxe(short item_id);
+MC_ID_CONST int is_pickaxe(const short item_id);
 
-int is_hoe(short item_id);
+MC_ID_CONST int is_hoe(const short item_id);
 
-int is_misc_tool(short item_id);
+MC_ID_CONST int is_misc_tool(const short item_id);
 
-SDL_FORCE_INLINE int is_tool(short item_id)
+MC_ID_CONST SDL_FORCE_INLINE int is_tool(const short item_id)
 {
     return is_shovel(item_id) || is_sword(item_id) || is_axe(item_id) || is_pickaxe(item_id) || is_hoe(item_id) || is_misc_tool(item_id);
 }
 
-int is_armor_helmet(short item_id);
+MC_ID_CONST int is_armor_helmet(const short item_id);
 
-int is_armor_chestplate(short item_id);
+MC_ID_CONST int is_armor_chestplate(const short item_id);
 
-int is_armor_leggings(short item_id);
+MC_ID_CONST int is_armor_leggings(const short item_id);
 
-int is_armor_boots(short item_id);
+MC_ID_CONST int is_armor_boots(const short item_id);
 
-SDL_FORCE_INLINE int is_armor(short item_id)
+MC_ID_CONST SDL_FORCE_INLINE int is_armor(const short item_id)
 {
     return is_armor_helmet(item_id) || is_armor_chestplate(item_id) || is_armor_leggings(item_id) || is_armor_boots(item_id);
 }
@@ -523,51 +541,51 @@ SDL_FORCE_INLINE int is_armor(short item_id)
 /**
  * Get max stack size for a given id
  */
-Uint8 get_max_quantity_for_id(short item_id);
+MC_ID_CONST Uint8 get_max_quantity_for_id(const short item_id);
 
 /**
  * Gets the downfall value for a corresponding biome id
  */
-float get_biome_downfall(int biome_id);
+MC_ID_CONST float get_biome_downfall(const int biome_id);
 
 /**
  * Gets the temperature value for a corresponding biome id
  */
-float get_biome_temperature(int biome_id);
+MC_ID_CONST float get_biome_temperature(const int biome_id);
 
 /**
  * Gets the name for a corresponding biome id
  */
-const char* get_biome_name(int biome_id);
+MC_ID_CONST const char* get_biome_name(const int biome_id);
 
 /**
  * Gets the grass color for a corresponding biome id
  */
-glm::vec3 get_biome_color_grass(int biome_id);
+MC_ID_CONST glm::vec3 get_biome_color_grass(const int biome_id);
 
 /**
  * Gets the foliage color for a corresponding biome id
  */
-glm::vec3 get_biome_color_foliage(int biome_id);
+MC_ID_CONST glm::vec3 get_biome_color_foliage(const int biome_id);
 
 /**
  * Gets the sky color for a corresponding biome id
  */
-glm::vec3 get_biome_color_sky(int biome_id);
+MC_ID_CONST glm::vec3 get_biome_color_sky(const int biome_id);
 
 /**
  * Gets the water color for a corresponding biome id
  */
-glm::vec3 get_biome_color_water(int biome_id);
+MC_ID_CONST glm::vec3 get_biome_color_water(const int biome_id);
 
 /**
  * Gets the water fog color for a corresponding biome id
  */
-glm::vec3 get_biome_color_fog_water(int biome_id);
+MC_ID_CONST glm::vec3 get_biome_color_fog_water(const int biome_id);
 
 /**
  * Gets the fog color for a corresponding biome id
  */
-glm::vec3 get_biome_color_fog(int biome_id);
+MC_ID_CONST glm::vec3 get_biome_color_fog(const int biome_id);
 }
 #endif

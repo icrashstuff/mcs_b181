@@ -27,7 +27,7 @@
     case id:               \
         return name
 
-const char* mc_id::get_name_vehicle(jbyte id)
+MC_ID_CONST const char* mc_id::get_name_vehicle(const jbyte id)
 {
     switch (id)
     {
@@ -47,7 +47,7 @@ const char* mc_id::get_name_vehicle(jbyte id)
     }
 }
 
-const char* mc_id::get_name_mob(jbyte id)
+MC_ID_CONST const char* mc_id::get_name_mob(const jbyte id)
 {
     switch (id)
     {
@@ -73,7 +73,7 @@ const char* mc_id::get_name_mob(jbyte id)
     }
 }
 
-const char* mc_id::get_name_from_item_id(short item_id, short damage)
+MC_ID_CONST const char* mc_id::get_name_from_item_id(const short item_id, const short damage)
 {
     switch (item_id)
     {
@@ -444,7 +444,7 @@ const char* mc_id::get_name_from_item_id(short item_id, short damage)
         return { ITEM, DMG, QTY_MIN, QTY_MAX }
 #define MAP_RETURN(BLOCK, ITEM) MAP_RETURNQ(BLOCK, ITEM, 0, 1, 1)
 
-mc_id::block_return_t mc_id::get_return_from_block(short item_id, short damage, bool silk)
+MC_ID_CONST mc_id::block_return_t mc_id::get_return_from_block(const short item_id, const short damage, const bool silk)
 {
     if (silk)
     {
@@ -487,19 +487,19 @@ mc_id::block_return_t mc_id::get_return_from_block(short item_id, short damage, 
     }
 }
 
-#define ADD_IS_ARMOR(is_name, NAME)              \
-    int mc_id::is_name(short item_id)            \
-    {                                            \
-        switch (item_id)                         \
-        {                                        \
-            ADD_NAME(ITEM_ID_LEATHER_##NAME, 1); \
-            ADD_NAME(ITEM_ID_CHAIN_##NAME, 2);   \
-            ADD_NAME(ITEM_ID_IRON_##NAME, 3);    \
-            ADD_NAME(ITEM_ID_GOLD_##NAME, 4);    \
-            ADD_NAME(ITEM_ID_DIAMOND_##NAME, 5); \
-        default:                                 \
-            return 0;                            \
-        }                                        \
+#define ADD_IS_ARMOR(is_name, NAME)                     \
+    MC_ID_CONST int mc_id::is_name(const short item_id) \
+    {                                                   \
+        switch (item_id)                                \
+        {                                               \
+            ADD_NAME(ITEM_ID_LEATHER_##NAME, 1);        \
+            ADD_NAME(ITEM_ID_CHAIN_##NAME, 2);          \
+            ADD_NAME(ITEM_ID_IRON_##NAME, 3);           \
+            ADD_NAME(ITEM_ID_GOLD_##NAME, 4);           \
+            ADD_NAME(ITEM_ID_DIAMOND_##NAME, 5);        \
+        default:                                        \
+            return 0;                                   \
+        }                                               \
     }
 
 ADD_IS_ARMOR(is_armor_helmet, CAP);
@@ -507,19 +507,19 @@ ADD_IS_ARMOR(is_armor_chestplate, TUNIC);
 ADD_IS_ARMOR(is_armor_leggings, PANTS);
 ADD_IS_ARMOR(is_armor_boots, BOOTS);
 
-#define ADD_IS_TOOLS(is_name, NAME)              \
-    int mc_id::is_name(short item_id)            \
-    {                                            \
-        switch (item_id)                         \
-        {                                        \
-            ADD_NAME(ITEM_ID_WOOD_##NAME, 1);    \
-            ADD_NAME(ITEM_ID_STONE_##NAME, 2);   \
-            ADD_NAME(ITEM_ID_IRON_##NAME, 3);    \
-            ADD_NAME(ITEM_ID_GOLD_##NAME, 4);    \
-            ADD_NAME(ITEM_ID_DIAMOND_##NAME, 5); \
-        default:                                 \
-            return 0;                            \
-        }                                        \
+#define ADD_IS_TOOLS(is_name, NAME)                     \
+    MC_ID_CONST int mc_id::is_name(const short item_id) \
+    {                                                   \
+        switch (item_id)                                \
+        {                                               \
+            ADD_NAME(ITEM_ID_WOOD_##NAME, 1);           \
+            ADD_NAME(ITEM_ID_STONE_##NAME, 2);          \
+            ADD_NAME(ITEM_ID_IRON_##NAME, 3);           \
+            ADD_NAME(ITEM_ID_GOLD_##NAME, 4);           \
+            ADD_NAME(ITEM_ID_DIAMOND_##NAME, 5);        \
+        default:                                        \
+            return 0;                                   \
+        }                                               \
     }
 
 ADD_IS_TOOLS(is_shovel, SHOVEL);
@@ -528,7 +528,7 @@ ADD_IS_TOOLS(is_pickaxe, PICK);
 ADD_IS_TOOLS(is_sword, SWORD);
 ADD_IS_TOOLS(is_hoe, HOE);
 
-int mc_id::is_misc_tool(short item_id)
+MC_ID_CONST int mc_id::is_misc_tool(const short item_id)
 {
     switch (item_id)
     {
@@ -540,7 +540,7 @@ int mc_id::is_misc_tool(short item_id)
     }
 }
 
-Uint8 mc_id::get_max_quantity_for_id(short item_id)
+MC_ID_CONST Uint8 mc_id::get_max_quantity_for_id(const short item_id)
 {
     if (is_tool(item_id) || is_armor(item_id))
         return 1;
@@ -556,7 +556,7 @@ Uint8 mc_id::get_max_quantity_for_id(short item_id)
     }
 }
 
-bool mc_id::is_translucent(short block_id)
+MC_ID_CONST bool mc_id::is_translucent(const short block_id)
 {
     switch (block_id)
     {
@@ -569,7 +569,7 @@ bool mc_id::is_translucent(short block_id)
     }
 }
 
-bool mc_id::is_fluid(short block_id)
+MC_ID_CONST bool mc_id::is_fluid(const short block_id)
 {
     switch (block_id)
     {
@@ -582,7 +582,7 @@ bool mc_id::is_fluid(short block_id)
     }
 }
 
-bool mc_id::is_transparent(short block_id)
+MC_ID_CONST bool mc_id::is_transparent(const short block_id)
 {
     switch (block_id)
     {
@@ -630,7 +630,7 @@ bool mc_id::is_transparent(short block_id)
     }
 }
 
-bool mc_id::is_leaves_style_transparent(short block_id)
+MC_ID_CONST bool mc_id::is_leaves_style_transparent(const short block_id)
 {
     switch (block_id)
     {
@@ -640,7 +640,7 @@ bool mc_id::is_leaves_style_transparent(short block_id)
     }
 }
 
-bool mc_id::block_has_collision(short block_id)
+MC_ID_CONST bool mc_id::block_has_collision(const short block_id)
 {
     switch (block_id)
     {
@@ -673,7 +673,7 @@ bool mc_id::block_has_collision(short block_id)
     }
 }
 
-bool mc_id::can_host_hanging(short block_id)
+MC_ID_CONST bool mc_id::can_host_hanging(const short block_id)
 {
     switch (block_id)
     {
@@ -729,7 +729,7 @@ bool mc_id::can_host_hanging(short block_id)
     }
 }
 
-bool mc_id::can_host_rail(short block_id)
+MC_ID_CONST bool mc_id::can_host_rail(const short block_id)
 {
     switch (block_id)
     {
@@ -742,7 +742,7 @@ bool mc_id::can_host_rail(short block_id)
     }
 }
 
-Uint8 mc_id::get_light_level(short block_id)
+MC_ID_CONST Uint8 mc_id::get_light_level(const short block_id)
 {
     switch (block_id)
     {
@@ -770,7 +770,7 @@ Uint8 mc_id::get_light_level(short block_id)
     }
 }
 
-glm::vec3 mc_id::get_light_color(short block_id)
+MC_ID_CONST glm::vec3 mc_id::get_light_color(const short block_id)
 {
     switch (block_id)
     {
@@ -798,7 +798,7 @@ glm::vec3 mc_id::get_light_color(short block_id)
     }
 }
 
-Uint8 mc_id::get_food_value(short item_id)
+MC_ID_CONST Uint8 mc_id::get_food_value(const short item_id)
 {
     switch (item_id)
     {
@@ -825,7 +825,7 @@ Uint8 mc_id::get_food_value(short item_id)
     }
 }
 
-float mc_id::get_food_staturation_ratio(short item_id)
+MC_ID_CONST float mc_id::get_food_staturation_ratio(const short item_id)
 {
     switch (item_id)
     {
@@ -852,7 +852,7 @@ float mc_id::get_food_staturation_ratio(short item_id)
     }
 }
 
-const char* mc_id::gamemode_get_trans_id(gamemode_t x)
+MC_ID_CONST const char* mc_id::gamemode_get_trans_id(const gamemode_t x)
 {
     switch (x)
     {
@@ -865,9 +865,9 @@ const char* mc_id::gamemode_get_trans_id(gamemode_t x)
     return "Unknown game mode";
 }
 
-bool mc_id::gamemode_is_valid(int a) { return GAMEMODE_SURVIVAL <= a && a <= GAMEMODE_SPECTATOR; }
+MC_ID_CONST bool mc_id::gamemode_is_valid(const int a) { return GAMEMODE_SURVIVAL <= a && a <= GAMEMODE_SPECTATOR; }
 
-bool mc_id::dimension_is_valid(int a) { return DIMENSION_NETHER == a || a == DIMENSION_OVERWORLD; }
+MC_ID_CONST bool mc_id::dimension_is_valid(const int a) { return DIMENSION_NETHER == a || a == DIMENSION_OVERWORLD; }
 
 #include <shared/cubiomes/biomes.h>
 
@@ -883,7 +883,7 @@ static_assert((int)mc_id::BIOME_NETHER_WASTES == (int)nether_wastes);
 static_assert((int)mc_id::BIOME_THE_END == (int)the_end);
 
 /* Values pulled from the biome data files for 1.21.4 */
-float mc_id::get_biome_downfall(int biome_id)
+MC_ID_CONST float mc_id::get_biome_downfall(const int biome_id)
 {
     switch (biome_id)
     {
@@ -904,7 +904,7 @@ float mc_id::get_biome_downfall(int biome_id)
 }
 
 /* Values pulled from the biome data files for 1.21.4 */
-float mc_id::get_biome_temperature(int biome_id)
+MC_ID_CONST float mc_id::get_biome_temperature(const int biome_id)
 {
     switch (biome_id)
     {
@@ -925,7 +925,7 @@ float mc_id::get_biome_temperature(int biome_id)
     };
 }
 
-const char* mc_id::get_biome_name(int biome_id)
+MC_ID_CONST const char* mc_id::get_biome_name(const int biome_id)
 {
     switch (biome_id)
     {
@@ -946,7 +946,7 @@ const char* mc_id::get_biome_name(int biome_id)
 }
 
 /* Values pulled from the biome data files for 1.21.4 or the wiki */
-glm::vec3 mc_id::get_biome_color_grass(int biome_id)
+MC_ID_CONST glm::vec3 mc_id::get_biome_color_grass(const int biome_id)
 {
     switch (biome_id)
     {
@@ -967,7 +967,7 @@ glm::vec3 mc_id::get_biome_color_grass(int biome_id)
 }
 
 /* Values pulled from the biome data files for 1.21.4 or the wiki */
-glm::vec3 mc_id::get_biome_color_foliage(int biome_id)
+MC_ID_CONST glm::vec3 mc_id::get_biome_color_foliage(const int biome_id)
 {
     switch (biome_id)
     {
@@ -988,7 +988,7 @@ glm::vec3 mc_id::get_biome_color_foliage(int biome_id)
 }
 
 /* Values pulled from the biome data files for 1.21.4 or the wiki */
-glm::vec3 mc_id::get_biome_color_sky(int biome_id)
+MC_ID_CONST glm::vec3 mc_id::get_biome_color_sky(const int biome_id)
 {
     switch (biome_id)
     {
@@ -1009,7 +1009,7 @@ glm::vec3 mc_id::get_biome_color_sky(int biome_id)
 }
 
 /* Values pulled from the biome data files for 1.21.4 or the wiki */
-glm::vec3 mc_id::get_biome_color_water(int biome_id)
+MC_ID_CONST glm::vec3 mc_id::get_biome_color_water(const int biome_id)
 {
     switch (biome_id)
     {
@@ -1030,7 +1030,7 @@ glm::vec3 mc_id::get_biome_color_water(int biome_id)
 }
 
 /* Values pulled from the biome data files for 1.21.4 or the wiki */
-glm::vec3 mc_id::get_biome_color_fog_water(int biome_id)
+MC_ID_CONST glm::vec3 mc_id::get_biome_color_fog_water(const int biome_id)
 {
     switch (biome_id)
     {
@@ -1051,7 +1051,7 @@ glm::vec3 mc_id::get_biome_color_fog_water(int biome_id)
 }
 
 /* Values pulled from the biome data files for 1.21.4 or the wiki */
-glm::vec3 mc_id::get_biome_color_fog(int biome_id)
+MC_ID_CONST glm::vec3 mc_id::get_biome_color_fog(const int biome_id)
 {
     switch (biome_id)
     {
