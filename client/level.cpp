@@ -278,10 +278,14 @@ void level_t::build_dirty_meshes()
     /* Mesh Pass */
     PASS_TIMER_START();
     int throttle = r_mesh_throttle.get();
-    for (auto it = chunks_render_order.rbegin(); it != chunks_render_order.rend() && throttle > 0; it++)
+    glm::ivec3 pos_cam(glm::ivec3(glm::round(get_camera_pos())) >> 4);
+    for (auto it = chunks_render_order.rbegin(); it != chunks_render_order.rend(); it++)
     {
         chunk_cubic_t* c = *it;
         if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_MESH || !c->visible)
+            continue;
+        /* Bypass mesh throttle for nearby chunks (To stop holes from being punched in the world) */
+        if (throttle < 0 && (abs(c->pos.x - pos_cam.x) > 1 || abs(c->pos.y - pos_cam.y) > 1 || abs(c->pos.z - pos_cam.z) > 1))
             continue;
         build_mesh(c);
         c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_NONE;
