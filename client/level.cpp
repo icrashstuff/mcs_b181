@@ -342,6 +342,31 @@ void level_t::set_block(const glm::ivec3 pos, const itemstack_t block, chunk_cub
 
     if (cache->dirty_level < chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL)
         cache->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
+
+    bool within_bounds_x = BETWEEN_INCL(block_pos.x, 1, SUBCHUNK_SIZE_X - 1);
+    bool within_bounds_y = BETWEEN_INCL(block_pos.y, 1, SUBCHUNK_SIZE_Y - 1);
+    bool within_bounds_z = BETWEEN_INCL(block_pos.z, 1, SUBCHUNK_SIZE_Z - 1);
+
+    bool within_bounds = (within_bounds_x && within_bounds_y && within_bounds_z);
+
+    /* No reason to poke other chunks if they won't get affected */
+    if (within_bounds && cache->renderer_hints.opaque_sides)
+        return;
+
+    /* This isn't efficient, but it works the best, so */
+    for (int i = 0; i < 27; i++)
+    {
+        const int ix = (i / 9) % 3 - 1;
+        const int iy = (i / 3) % 3 - 1;
+        const int iz = i % 3 - 1;
+
+        chunk_cubic_t* c = cache->find_chunk(cache, chunk_pos + glm::ivec3(ix, iy, iz));
+
+        chunk_cubic_t::dirty_level_t dirt_face = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
+
+        if (c && c->dirty_level < dirt_face)
+            c->dirty_level = dirt_face;
+    }
 }
 
 bool level_t::get_block(const glm::ivec3 pos, block_id_t& type, Uint8& metadata)
