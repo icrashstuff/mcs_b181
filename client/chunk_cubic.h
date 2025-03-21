@@ -164,12 +164,18 @@ struct chunk_cubic_t
     glm::ivec3 pos = { 0, 0, 0 };
 
     /* The 128 byte alignment is to assist auto-vectorization */
-    alignas(128) Uint8 data_block[SUBCHUNK_SIZE_VOLUME] = { 0 };
-    alignas(128) Uint8 data_light_block[SUBCHUNK_SIZE_VOLUME / 2] = { 0 };
-    alignas(128) Uint8 data_light_sky[SUBCHUNK_SIZE_VOLUME / 2] = { 0 };
-    alignas(128) Uint8 data_metadata[SUBCHUNK_SIZE_VOLUME / 2] = { 0 };
+    alignas(128) Uint8 data_block[SUBCHUNK_SIZE_VOLUME];
+    alignas(128) Uint8 data_light_block[SUBCHUNK_SIZE_VOLUME / 2];
+    alignas(128) Uint8 data_light_sky[SUBCHUNK_SIZE_VOLUME / 2];
+    alignas(128) Uint8 data_metadata[SUBCHUNK_SIZE_VOLUME / 2];
 
-    chunk_cubic_t() { }
+    chunk_cubic_t()
+    {
+        memset(data_block, 0, sizeof(data_block));
+        memset(data_light_block, 0, sizeof(data_light_block));
+        memset(data_light_sky, 0, sizeof(data_light_sky));
+        memset(data_metadata, 0, sizeof(data_metadata));
+    }
 
     ~chunk_cubic_t() { free_gl(); }
 
