@@ -584,15 +584,11 @@ void connection_t::run(level_t* const level)
                 }
                 else
                 {
-                    std::vector<int> exists;
-                    exists.resize(max_cy);
-                    for (chunk_cubic_t* c : level->get_chunk_vec())
-                        if (c->pos.x == p->chunk_x && c->pos.z == p->chunk_z && 0 <= c->pos.y && c->pos.y < max_cy)
-                            exists[c->pos.y] = 1;
+                    decltype(level->get_chunk_map()) cmap = level->get_chunk_map();
 
                     for (int i = 0; i < max_cy; i++)
                     {
-                        if (exists[i])
+                        if (cmap->find(glm::ivec3(p->chunk_x, i, p->chunk_z)) == cmap->end())
                             continue;
                         chunk_cubic_t* c = new chunk_cubic_t();
                         c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_NONE;
