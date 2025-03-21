@@ -26,10 +26,10 @@
 #include "tetra/log.h"
 
 #include "physfs.h"
+#include "physfs/physfssdl3.h"
 
 #define CFG_NEWLINE "\n"
 #define CFG_NEWLINE_LEN 1
-#define CFG_MAX_FILE_SIZE (128 * 1024)
 
 static convar_string_t user_config_path("user_config_path", "/user_cfg.txt", "PHYSFS path to user config", CONVAR_FLAG_HIDDEN, convar_file_parser::read);
 
@@ -102,16 +102,24 @@ bool convar_file_parser::write()
 
 void convar_file_parser::read()
 {
-    PHYSFS_file* fd = PHYSFS_openRead(user_config_path.get().c_str());
-    if (!fd)
+    SDL_IOStream* stream = PHYSFSSDL3_openRead(user_config_path.get().c_str());
+    if (!stream)
+    {
+        dc_log_error("Error loading convar file: %s", SDL_GetError());
         return;
+    }
 
-    std::vector<Uint8> data;
-    data.resize(CFG_MAX_FILE_SIZE);
-    Sint64 bytes_read = PHYSFS_readBytes(fd, data.data(), data.size());
+    size_t bytes_read = 0;
+    Uint8* data = (Uint8*)SDL_LoadFile_IO(stream, &bytes_read, true);
 
-    char* line_start = (char*)data.data();
-    for (Sint64 i = 0; i < bytes_read; i++)
+    if (!data)
+    {
+        dc_log_error("Error loading convar file: %s", SDL_GetError());
+        return;
+    }
+
+    char* line_start = (char*)data;
+    for (size_t i = 0; i < bytes_read; i++)
     {
         char c = data[i];
         if (c == '\n' || c == '\r')
@@ -119,11 +127,11 @@ void convar_file_parser::read()
             data[i] = '\0';
             if (line_start && line_start[0] != '#')
                 dev_console::run_command("%s", line_start);
-            line_start = (char*)data.data() + i + 1;
+            line_start = (char*)data + i + 1;
         }
     }
     if (line_start && line_start[0] != '#')
         dev_console::run_command("%s", line_start);
 
-    PHYSFS_close(fd);
+    SDL_free(data);
 }
