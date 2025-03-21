@@ -29,7 +29,7 @@
 #include <functional> // std::function
 #include <limits.h> // INT_MIN, INT_MAX
 #include <math.h> // sqrtf, powf, cosf, sinf, floorf, ceilf
-#include <stdio.h> // vsnprintf, sscanf, printf
+#include <stdio.h> // sscanf, printf
 #include <stdlib.h> // NULL, malloc, free, atoi
 #include <unordered_map> // std::unordered_map
 #if defined(_MSC_VER) && _MSC_VER <= 1500 // MSVC 2008 or earlier
@@ -43,12 +43,19 @@
 #include <mutex>
 #include <vector>
 
+#include "tetra/util/stb_sprintf.h"
+
 #include "console.h"
 #include "tetra/util/convar.h"
 
 #define VA_BUF_LEN 2048
 #define ITEM_COUNT_SHRINK_AT 50000
 #define ITEM_COUNT_SHRINK_AMOUNT (ITEM_COUNT_SHRINK_AT / 10)
+
+#define sprintf stbsp_sprintf
+#define snprintf stbsp_snprintf
+#define vsprintf stbsp_vsprintf
+#define vsnprintf stbsp_vsnprintf
 
 #define decode_variadic_to_buffer(BUFFER, FMT)              \
     do                                                      \
