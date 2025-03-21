@@ -84,6 +84,8 @@ set(tetra_core_SRC
     ${TETRA_DIR}util/stb/stb_sprintf.c
     ${TETRA_DIR}util/stb/stb_rect_pack.c
 
+    ${TETRA_DIR}util/physfs/physfs-74c3054/extras/physfssdl3.c
+
     ${TETRA_DIR}tetra_core.cpp
 
     ${imgui_SRC}
