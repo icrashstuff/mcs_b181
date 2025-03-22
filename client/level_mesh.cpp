@@ -2298,11 +2298,10 @@ void level_t::build_mesh(chunk_cubic_t* const center)
     center->index_count_overlay = vtx_overlay.size() / 4 * 6;
     center->index_count_translucent = vtx_translucent.size() / 4 * 6;
 
-    for (terrain_vertex_t v : vtx_overlay)
-        vtx_solid.push_back(v);
-
-    for (terrain_vertex_t v : vtx_translucent)
-        vtx_solid.push_back(v);
+    /* Combine vectors into one */
+    vtx_solid.reserve(vtx_solid.size() + vtx_overlay.size() + vtx_translucent.size());
+    vtx_solid.insert(vtx_solid.end(), vtx_overlay.begin(), vtx_overlay.end());
+    vtx_solid.insert(vtx_solid.end(), vtx_translucent.begin(), vtx_translucent.end());
 
     glBindBuffer(GL_ARRAY_BUFFER, center->vbo);
     glBufferData(GL_ARRAY_BUFFER, vtx_solid.size() * sizeof(vtx_solid[0]), vtx_solid.data(), GL_STATIC_DRAW);
