@@ -58,24 +58,6 @@ bool send_buffer(SDLNet_StreamSocket* const sock, const std::vector<Uint8>& dat)
 
 bool send_chat(SDLNet_StreamSocket* const sock, const char* fmt, ...);
 
-bool consume_bytes(SDLNet_StreamSocket* const sock, const int len);
-
-bool read_ubyte(SDLNet_StreamSocket* const sock, Uint8* const out);
-
-bool read_byte(SDLNet_StreamSocket* const sock, Sint8* const out);
-
-bool read_short(SDLNet_StreamSocket* const sock, Sint16* const out);
-
-bool read_int(SDLNet_StreamSocket* const sock, Sint32* const out);
-
-bool read_long(SDLNet_StreamSocket* const sock, Sint64* const out);
-
-bool read_float(SDLNet_StreamSocket* const sock, float* const out);
-
-bool read_double(SDLNet_StreamSocket* const sock, double* const out);
-
-bool read_string16(SDLNet_StreamSocket* const sock, std::string& out);
-
 enum packet_id_t : jubyte
 {
     PACKET_ID_KEEP_ALIVE = 0x00,
