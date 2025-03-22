@@ -87,7 +87,20 @@ void assemble_float(std::vector<Uint8>& dat, const float in)
 {
     Uint32 temp;
     memcpy(&temp, &in, sizeof(in));
-    temp = SDL_Swap32BE(temp);
+#ifdef __STDC_IEC_559__
+    union
+    {
+        float f;
+        Uint8 u[4];
+    } const float_check = { .f = 0.25f };
+    static_assert(sizeof(float_check.f) == sizeof(float_check.u));
+
+    if (float_check.u[3] == 0x3e && float_check.u[2] == 0x80)
+        temp = SDL_Swap32(temp);
+#else
+#error "Conversion to non-IEEE 754 floating point numbers not implemented"
+#endif
+
     size_t loc = dat.size();
     dat.resize(dat.size() + sizeof(temp));
     memcpy(dat.data() + loc, &temp, sizeof(temp));
@@ -97,7 +110,20 @@ void assemble_double(std::vector<Uint8>& dat, const double in)
 {
     Uint64 temp;
     memcpy(&temp, &in, sizeof(in));
-    temp = SDL_Swap64BE(temp);
+#ifdef __STDC_IEC_559__
+    union
+    {
+        double f;
+        Uint8 u[8];
+    } const double_check = { .f = 0.25 };
+    static_assert(sizeof(double_check.f) == sizeof(double_check.u));
+
+    if (double_check.u[7] == 0x3f && double_check.u[6] == 0xd0)
+        temp = SDL_Swap64(temp);
+#else
+#error "Conversion to non-IEEE 754 floating point numbers not implemented"
+#endif
+
     size_t loc = dat.size();
     dat.resize(dat.size() + sizeof(temp));
     memcpy(dat.data() + loc, &temp, sizeof(temp));
@@ -195,10 +221,25 @@ SDL_FORCE_INLINE bool read_float(const std::vector<Uint8>& dat, size_t& pos, flo
 {
     BAIL_READ(4);
 
-    Uint32 temp = SDL_Swap32BE(*((Uint32*)(dat.data() + pos)));
+#ifdef __STDC_IEC_559__
+    union
+    {
+        float f;
+        Uint8 u[4];
+    } const float_check = { .f = 0.25f };
+    static_assert(sizeof(float_check.f) == sizeof(float_check.u));
+
+    Uint32 temp;
+    if (float_check.u[3] == 0x3e && float_check.u[2] == 0x80)
+        temp = SDL_Swap32(*((Uint32*)(dat.data() + pos)));
+    else
+        temp = (*((Uint32*)(dat.data() + pos)));
 
     if (out)
         *(Uint32*)out = temp;
+#else
+#error "Conversion from non-IEEE 754 floating point numbers not implemented"
+#endif
 
     pos = pos + 4;
     return 1;
@@ -208,10 +249,25 @@ SDL_FORCE_INLINE bool read_double(const std::vector<Uint8>& dat, size_t& pos, do
 {
     BAIL_READ(8);
 
-    Uint64 temp = SDL_Swap64BE(*((Uint64*)(dat.data() + pos)));
+#ifdef __STDC_IEC_559__
+    union
+    {
+        double f;
+        Uint8 u[8];
+    } const double_check = { .f = 0.25 };
+    static_assert(sizeof(double_check.f) == sizeof(double_check.u));
+
+    Uint64 temp;
+    if (double_check.u[7] == 0x3f && double_check.u[6] == 0xd0)
+        temp = SDL_Swap64(*((Uint64*)(dat.data() + pos)));
+    else
+        temp = *((Uint64*)(dat.data() + pos));
 
     if (out)
         *(Uint64*)out = temp;
+#else
+#error "Conversion from non-IEEE 754 floating point numbers not implemented"
+#endif
 
     pos = pos + 8;
     return 1;
