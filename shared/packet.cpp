@@ -98,7 +98,7 @@ void assemble_float(std::vector<Uint8>& dat, const float in)
     if (float_check.u[3] == 0x3e && float_check.u[2] == 0x80)
         temp = SDL_Swap32(temp);
 #else
-#error "Conversion to non-IEEE 754 floating point numbers not implemented"
+#error "Conversion from non-IEEE 754 floating point numbers not implemented"
 #endif
 
     size_t loc = dat.size();
@@ -121,7 +121,7 @@ void assemble_double(std::vector<Uint8>& dat, const double in)
     if (double_check.u[7] == 0x3f && double_check.u[6] == 0xd0)
         temp = SDL_Swap64(temp);
 #else
-#error "Conversion to non-IEEE 754 floating point numbers not implemented"
+#error "Conversion from non-IEEE 754 floating point numbers not implemented"
 #endif
 
     size_t loc = dat.size();
@@ -238,7 +238,7 @@ SDL_FORCE_INLINE bool read_float(const std::vector<Uint8>& dat, size_t& pos, flo
     if (out)
         *(Uint32*)out = temp;
 #else
-#error "Conversion from non-IEEE 754 floating point numbers not implemented"
+#error "Conversion to non-IEEE 754 floating point numbers not implemented"
 #endif
 
     pos = pos + 4;
@@ -266,7 +266,7 @@ SDL_FORCE_INLINE bool read_double(const std::vector<Uint8>& dat, size_t& pos, do
     if (out)
         *(Uint64*)out = temp;
 #else
-#error "Conversion from non-IEEE 754 floating point numbers not implemented"
+#error "Conversion to non-IEEE 754 floating point numbers not implemented"
 #endif
 
     pos = pos + 8;
