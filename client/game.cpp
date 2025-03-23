@@ -23,6 +23,12 @@
 
 #include "game.h"
 
+#include "connection.h"
+#include "level.h"
+#include "shaders/shaders.h"
+#include "sound/sound_resources.h"
+#include "texture_terrain.h"
+
 #include "tetra/util/convar.h"
 
 #include "shared/chunk.h"

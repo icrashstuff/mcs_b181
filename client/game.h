@@ -23,9 +23,16 @@
 #ifndef MCS_B181_CLIENT_GAME_H
 #define MCS_B181_CLIENT_GAME_H
 
-#include "connection.h"
-#include "level.h"
-#include "sound/sound_resources.h"
+#include <SDL3/SDL_stdinc.h>
+#include <glm/glm.hpp>
+#include <string>
+
+/* Forward declaration */
+struct level_t;
+struct connection_t;
+struct shader_t;
+struct texture_terrain_t;
+struct sound_resources_t;
 
 struct game_resources_t
 {

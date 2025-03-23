@@ -21,6 +21,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
+#include "client/connection.h"
 #include "client/game.h"
 #include "client/gui/mc_gui.h"
 #include "shared/build_info.h"
