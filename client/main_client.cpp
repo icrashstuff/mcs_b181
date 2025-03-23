@@ -60,7 +60,6 @@
 #include "texture_terrain.h"
 
 #include "gui/mc_gui.h"
-#include "gui/panorama.h"
 
 #include "shaders/shaders.h"
 
@@ -86,7 +85,6 @@ static convar_int_t cvr_r_overlay_inblock("r_overlay_inblock", 1, 0, 1, "Display
 static convar_int_t cvr_mc_gui_style_editor(
     "mc_gui_style_editor", 0, 0, 1, "Show style editor for the MC GUI system", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 
-static panorama_t* panorama = NULL;
 static bool take_screenshot = 0;
 
 static void compile_shaders() { shader_t::build_all(); }
@@ -120,8 +118,6 @@ static bool initialize_resources()
     /* In the future parsing of one of the indexes at /assets/indexes/ will need to happen here (For sound) */
     game_resources = new game_resources_t();
 
-    panorama = new panorama_t();
-
     mc_gui::global_ctx->load_resources();
 
     /* Ideally we would just reload the font here rather than completely restarting the mc_gui/ImGui context.
@@ -144,7 +140,6 @@ static bool deinitialize_resources()
 {
     delete sound_engine_main_menu;
     delete game_resources;
-    delete panorama;
 
     mc_gui::global_ctx->unload_resources();
 
@@ -155,7 +150,6 @@ static bool deinitialize_resources()
             g->reload_resources(nullptr, true);
 
     sound_engine_main_menu = NULL;
-    panorama = NULL;
     game_resources = 0;
     return true;
 }
@@ -525,6 +519,9 @@ void render_world_overlays(level_t* level, ImDrawList* const bg_draw_list)
 void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist);
 void do_debug_crosshair(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist);
 
+static ImVec2 dvec2_to_ImVec2(const glm::dvec2 x) { return ImVec2(x.x, x.y); }
+static glm::dvec2 ImVec2_to_dvec2(const ImVec2 x) { return glm::dvec2(x.x, x.y); }
+
 static void normal_loop()
 {
     bool warp_mouse_to_center = 0;
@@ -835,16 +832,23 @@ static void normal_loop()
             bg_draw_list->AddRectFilled(ImVec2(-32, -32), ImGui::GetMainViewport()->Size + ImVec2(32, 32), IM_COL32(32, 32, 32, 255 * 0.5f));
     }
 
-    if (menu_ret.allow_pano && !in_world)
-        panorama->render(win_size);
+    bool display_pano = (menu_ret.allow_pano && !in_world);
+    bool display_dirt = (menu_ret.allow_dirt && ((!menu_ret.allow_pano && !in_world) || (in_world && !menu_ret.allow_world)));
 
-    if (menu_ret.allow_dirt && ((!menu_ret.allow_pano && !in_world) || (in_world && !menu_ret.allow_world)))
+    if (display_pano || display_dirt)
     {
         ImTextureID tex_id = reinterpret_cast<ImTextureID>(mc_gui::global_ctx->tex_id_bg);
-        ImVec2 pos0 = ImVec2(-32, -32);
-        ImVec2 pos1 = ImGui::GetMainViewport()->Size + ImVec2(32, 32);
-        bg_draw_list->AddImage(tex_id, pos0, pos1, ImVec2(0, 0), pos1 / (32.0f * float(SDL_max(1, mc_gui::global_ctx->menu_scale))));
-        bg_draw_list->AddRectFilled(pos0, pos1, IM_COL32(0, 0, 0, 255 * 0.75f));
+
+        double side_len = 32.0 * double(SDL_max(1, mc_gui::global_ctx->menu_scale));
+
+        glm::dvec2 pos0 = glm::dvec2(0);
+        glm::dvec2 pos1 = ImVec2_to_dvec2(ImGui::GetMainViewport()->Size) + glm::dvec2(side_len);
+
+        glm::dvec2 uv0(0.0);
+        glm::dvec2 uv1 = pos1 / side_len;
+
+        bg_draw_list->AddImage(tex_id, dvec2_to_ImVec2(pos0), dvec2_to_ImVec2(pos1), dvec2_to_ImVec2(uv0), dvec2_to_ImVec2(uv1));
+        bg_draw_list->AddRectFilled(dvec2_to_ImVec2(pos0), dvec2_to_ImVec2(pos1), IM_COL32(0, 0, 0, 255 * 0.75f));
     }
 
     bg_draw_list->ChannelsMerge();
@@ -1261,7 +1265,6 @@ static void process_event(SDL_Event& event, bool* done)
 
 static convar_int_t cvr_gui_renderer("gui_renderer", 0, 0, 1, "Show renderer internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 static convar_int_t cvr_gui_lightmap("gui_lightmap", 0, 0, 1, "Show lightmap internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
-static convar_int_t cvr_gui_panorama("gui_panorama", 0, 0, 1, "Show panorama internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 static convar_int_t cvr_gui_sound("gui_sound", 0, 0, 1, "Show sound engine internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 static convar_int_t cvr_gui_engine_state("gui_engine_state", 0, 0, 1, "Show engine state menu", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 static convar_int_t cvr_gui_inventory("gui_inventory", 0, 0, 1, "Show primitive inventory window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
@@ -1908,15 +1911,6 @@ int main(const int argc, const char** argv)
 
                     ImGui::End();
                 }
-            }
-
-            if (panorama && cvr_gui_panorama.get())
-            {
-                ImGui::SetNextWindowPos(viewport->Size * ImVec2(0.0075f, 0.1875f), ImGuiCond_FirstUseEver, ImVec2(0.0, 0.0));
-                ImGui::SetNextWindowSize(viewport->Size * ImVec2(0.425f, 0.8f), ImGuiCond_FirstUseEver);
-                ImGui::BeginCVR("Panorama", &cvr_gui_panorama);
-                panorama->imgui_widgets();
-                ImGui::End();
             }
 
             if (game_selected && game_selected->level && cvr_gui_lightmap.get())
