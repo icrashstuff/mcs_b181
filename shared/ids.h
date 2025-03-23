@@ -448,6 +448,19 @@ enum biome_t : int
     BIOME_NUM_BIOMES,
 };
 
+enum direction_t
+{
+    DIR_F0 = 0,
+    DIR_F1 = 1,
+    DIR_F2 = 2,
+    DIR_F3 = 3,
+
+    DIR_TOWARDS_POS_Z = DIR_F0,
+    DIR_TOWARDS_NEG_X = DIR_F1,
+    DIR_TOWARDS_NEG_Z = DIR_F2,
+    DIR_TOWARDS_POS_X = DIR_F3,
+};
+
 MC_ID_CONST bool gamemode_is_valid(const int x);
 
 MC_ID_CONST const char* gamemode_get_trans_id(const gamemode_t x);
@@ -474,6 +487,8 @@ struct block_return_t
 MC_ID_CONST SDL_FORCE_INLINE bool is_block(const short block_id) { return BETWEEN_EXCL(block_id, BLOCK_ID_NONE, BLOCK_ID_NUM_USED); };
 
 MC_ID_CONST bool is_fluid(const short block_id);
+
+MC_ID_CONST bool is_rail(const short block_id);
 
 MC_ID_CONST bool is_transparent(const short block_id);
 

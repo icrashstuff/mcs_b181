@@ -57,7 +57,18 @@ namespace mc_id
 
 struct terrain_face_t
 {
+    /** Ex: glm::vec2(0, 0), glm::vec2(1, 0), glm::vec2(0, 1), glm::vec2(1, 1) */
     glm::vec2 corners[4];
+
+    /** Rotate face by 90 degrees (Not sure which way, don't care) */
+    inline void rotate_90()
+    {
+        glm::vec2 t = corners[0];
+        corners[0] = corners[1];
+        corners[1] = corners[3];
+        corners[3] = corners[2];
+        corners[2] = t;
+    }
 };
 
 #define MCS_B181_CLIENT_TEXTURE_IDS_H_FUNC

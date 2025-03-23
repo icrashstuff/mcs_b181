@@ -582,6 +582,18 @@ MC_ID_CONST bool mc_id::is_fluid(const short block_id)
     }
 }
 
+MC_ID_CONST bool mc_id::is_rail(const short block_id)
+{
+    switch (block_id)
+    {
+        ADD_NAME(BLOCK_ID_RAIL, 1);
+        ADD_NAME(BLOCK_ID_RAIL_DETECTOR, 1);
+        ADD_NAME(BLOCK_ID_RAIL_POWERED, 1);
+    default:
+        return 0;
+    }
+}
+
 MC_ID_CONST bool mc_id::is_transparent(const short block_id)
 {
     switch (block_id)

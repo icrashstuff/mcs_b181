@@ -425,8 +425,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
             BLOCK_TNT(BLOCK_ID_SANDSTONE, mc_id::FACE_SANDSTONE_TOP, mc_id::FACE_SANDSTONE_BOTTOM, mc_id::FACE_SANDSTONE_NORMAL)
             BLOCK_SIMPLE(BLOCK_ID_NOTE_BLOCK, mc_id::FACE_NOTEBLOCK);
             BLOCK_SIMPLE(BLOCK_ID_BED, mc_id::FACE_BED_HEAD_TOP);
-            BLOCK_SIMPLE(BLOCK_ID_RAIL_POWERED, mc_id::FACE_RAIL_GOLDEN_POWERED);
-            BLOCK_SIMPLE(BLOCK_ID_RAIL_DETECTOR, mc_id::FACE_RAIL_DETECTOR);
+        case BLOCK_ID_RAIL_POWERED:
+        {
+            if (metadata > 7)
+                BLOCK_SIMPLE_NO_CASE(mc_id::FACE_RAIL_GOLDEN_POWERED);
+            else
+                BLOCK_SIMPLE_NO_CASE(mc_id::FACE_RAIL_GOLDEN);
+            break;
+        }
+        case BLOCK_ID_RAIL_DETECTOR:
+        {
+            if (metadata > 7)
+                BLOCK_SIMPLE_NO_CASE(mc_id::FACE_RAIL_DETECTOR_POWERED);
+            else
+                BLOCK_SIMPLE_NO_CASE(mc_id::FACE_RAIL_DETECTOR);
+            break;
+        }
             BLOCK_SIMPLE(BLOCK_ID_PISTON_STICKY, mc_id::FACE_PISTON_TOP_STICKY);
             BLOCK_SIMPLE(BLOCK_ID_COBWEB, mc_id::FACE_WEB);
         case BLOCK_ID_FOLIAGE:
@@ -550,7 +564,14 @@ void level_t::build_mesh(chunk_cubic_t* const center)
             BLOCK_SIMPLE(BLOCK_ID_SIGN_STANDING, mc_id::FACE_DEBUG);
             BLOCK_SIMPLE(BLOCK_ID_DOOR_WOOD, mc_id::FACE_DOOR_WOOD_UPPER);
             BLOCK_SIMPLE(BLOCK_ID_LADDER, mc_id::FACE_LADDER);
-            BLOCK_SIMPLE(BLOCK_ID_RAIL, mc_id::FACE_RAIL_NORMAL);
+        case BLOCK_ID_RAIL:
+        {
+            if (metadata > 5)
+                BLOCK_SIMPLE_NO_CASE(mc_id::FACE_RAIL_NORMAL_TURNED);
+            else
+                BLOCK_SIMPLE_NO_CASE(mc_id::FACE_RAIL_NORMAL);
+            break;
+        }
             BLOCK_SIMPLE(BLOCK_ID_STAIRS_COBBLESTONE, mc_id::FACE_COBBLESTONE); //----
             BLOCK_SIMPLE(BLOCK_ID_SIGN_WALL, mc_id::FACE_DEBUG);
             BLOCK_SIMPLE(BLOCK_ID_LEVER, mc_id::FACE_DEBUG);
@@ -1754,6 +1775,148 @@ void level_t::build_mesh(chunk_cubic_t* const center)
             }
         }
         /* ============ END: IS_CACTI ============ */
+        /* ============ BEGIN: IS_RAIL ============ */
+        else if (mc_id::is_rail(type))
+        {
+            /* For powered and detector rails: only the bottom 3 bits determine model */
+            Uint8 rail_meta = metadata & ((type == BLOCK_ID_RAIL) ? 0x0F : 0x07);
+
+            /** If slanted then this is the direction it faces down towards */
+            mc_id::direction_t rail_dir = mc_id::DIR_F0;
+
+            switch (rail_meta)
+            {
+            case 0: /* Flat */
+                rail_dir = mc_id::DIR_F2;
+                break;
+            case 1: /* Flat */
+            case 2: /* Down towards DIR_F1 */
+                rail_dir = mc_id::DIR_F1;
+                break;
+            case 3: /* Down towards DIR_F3 */
+                rail_dir = mc_id::DIR_F3;
+                break;
+            case 4: /* Down towards DIR_F0 */
+                rail_dir = mc_id::DIR_F0;
+                break;
+            case 5: /* Down towards DIR_F2 */
+                rail_dir = mc_id::DIR_F2;
+                break;
+            case 6: /* Curved */
+                rail_dir = mc_id::DIR_F0;
+                break;
+            case 7: /* Curved */
+                rail_dir = mc_id::DIR_F1;
+                break;
+            case 8: /* Curved */
+                rail_dir = mc_id::DIR_F2;
+                break;
+            case 9: /* Curved */
+                rail_dir = mc_id::DIR_F3;
+                break;
+            default: /* Whatever goes */
+                rail_dir = mc_id::DIR_F0;
+                break;
+            }
+
+            bool slanted = 0;
+
+            if (rail_meta >= 2 && rail_meta <= 5)
+                slanted = 1;
+
+            int y_x0_z0 = 1;
+            int y_x1_z0 = 1;
+            int y_x0_z1 = 1;
+            int y_x1_z1 = 1;
+
+            if (slanted)
+            {
+                switch (rail_dir)
+                {
+                case mc_id::DIR_TOWARDS_NEG_X:
+                    y_x1_z0 = 17;
+                    y_x1_z1 = 17;
+                    break;
+                case mc_id::DIR_TOWARDS_NEG_Z:
+                    y_x0_z1 = 17;
+                    y_x1_z1 = 17;
+                    break;
+                case mc_id::DIR_TOWARDS_POS_X:
+                    y_x0_z0 = 17;
+                    y_x0_z1 = 17;
+                    break;
+                case mc_id::DIR_TOWARDS_POS_Z:
+                    y_x0_z0 = 17;
+                    y_x1_z0 = 17;
+                    break;
+                }
+            }
+
+            switch (rail_dir)
+            {
+            case mc_id::DIR_F3: /* fall-through */
+                faces[0].rotate_90();
+            case mc_id::DIR_F0: /* fall-through */
+                faces[0].rotate_90();
+            case mc_id::DIR_F1: /* fall-through */
+                faces[0].rotate_90();
+            case mc_id::DIR_F2: /* fall-through */
+                break;
+            }
+
+            Uint8 bl_x0_z0 = slight_block[1][1][1];
+            Uint8 bl_x1_z0 = slight_block[1][1][1];
+            Uint8 bl_x0_z1 = slight_block[1][1][1];
+            Uint8 bl_x1_z1 = slight_block[1][1][1];
+
+            Uint8 sl_x0_z0 = slight_sky[1][1][1];
+            Uint8 sl_x1_z0 = slight_sky[1][1][1];
+            Uint8 sl_x0_z1 = slight_sky[1][1][1];
+            Uint8 sl_x1_z1 = slight_sky[1][1][1];
+
+            vtx->push_back({
+                { 1, Sint16(x * 16 + 16), Sint16(y * 16 + y_x1_z1), Sint16(z * 16 + 16), 0 },
+                { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl_x1_z1, sl_x1_z1 },
+                faces[0].corners[0],
+            });
+            vtx->push_back({
+                { 1, Sint16(x * 16 + 16), Sint16(y * 16 + y_x1_z0), Sint16(z * 16 + 00), 0 },
+                { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl_x1_z0, sl_x1_z0 },
+                faces[0].corners[2],
+            });
+            vtx->push_back({
+                { 1, Sint16(x * 16 + 00), Sint16(y * 16 + y_x0_z1), Sint16(z * 16 + 16), 0 },
+                { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl_x0_z1, sl_x0_z1 },
+                faces[0].corners[1],
+            });
+            vtx->push_back({
+                { 1, Sint16(x * 16 + 00), Sint16(y * 16 + y_x0_z0), Sint16(z * 16 + 00), 0 },
+                { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl_x0_z0, sl_x0_z0 },
+                faces[0].corners[3],
+            });
+
+            vtx->push_back({
+                { 1, Sint16(x * 16 + 00), Sint16(y * 16 + y_x0_z0), Sint16(z * 16 + 00), 0 },
+                { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl_x0_z0, sl_x0_z0 },
+                faces[0].corners[3],
+            });
+            vtx->push_back({
+                { 1, Sint16(x * 16 + 16), Sint16(y * 16 + y_x1_z0), Sint16(z * 16 + 00), 0 },
+                { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl_x1_z0, sl_x1_z0 },
+                faces[0].corners[2],
+            });
+            vtx->push_back({
+                { 1, Sint16(x * 16 + 00), Sint16(y * 16 + y_x0_z1), Sint16(z * 16 + 16), 0 },
+                { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl_x0_z1, sl_x0_z1 },
+                faces[0].corners[1],
+            });
+            vtx->push_back({
+                { 1, Sint16(x * 16 + 16), Sint16(y * 16 + y_x1_z1), Sint16(z * 16 + 16), 0 },
+                { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl_x1_z1, sl_x1_z1 },
+                faces[0].corners[0],
+            });
+        }
+        /* ============ END: IS_RAIL ============ */
         /* ============ BEGIN: IS_NORMAL ============ */
         else
         {
