@@ -847,8 +847,7 @@ static void normal_loop()
         glm::dvec2 uv0(0.0);
         glm::dvec2 uv1 = pos1 / side_len;
 
-        bg_draw_list->AddImage(tex_id, dvec2_to_ImVec2(pos0), dvec2_to_ImVec2(pos1), dvec2_to_ImVec2(uv0), dvec2_to_ImVec2(uv1));
-        bg_draw_list->AddRectFilled(dvec2_to_ImVec2(pos0), dvec2_to_ImVec2(pos1), IM_COL32(0, 0, 0, 255 * 0.75f));
+        bg_draw_list->AddImage(tex_id, dvec2_to_ImVec2(pos0), dvec2_to_ImVec2(pos1), dvec2_to_ImVec2(uv0), dvec2_to_ImVec2(uv1), IM_COL32(64, 64, 64, 255));
     }
 
     bg_draw_list->ChannelsMerge();
