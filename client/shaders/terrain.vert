@@ -22,11 +22,10 @@
  * DEALINGS IN THE SOFTWARE.
  */
 /**
- * X:  [0....8]
- * Y:  [9...17]
- * Z:  [18..26]
- * AO: [27..29]
- * Unused: [30..31]
+ * X:  [0....9]
+ * Y:  [10..19]
+ * Z:  [20..29]
+ * AO: [30..31]
  */
 layout(location = 0) in uint vtx_pos_ao;
 /**
@@ -60,13 +59,13 @@ uniform vec4 tint = vec4(1.0, 1.0, 1.0, 1.0);
 void main()
 {
     vec3 pos;
-    pos.x = float(int((vtx_pos_ao      ) & 511u ) - 128) / 16.0;
-    pos.y = float(int((vtx_pos_ao >>  9) & 511u ) - 128) / 16.0;
-    pos.z = float(int((vtx_pos_ao >> 18) & 511u ) - 128) / 16.0;
+    pos.x = float(int((vtx_pos_ao      ) & 1023u ) - 256) / 32.0;
+    pos.y = float(int((vtx_pos_ao >> 10) & 1023u ) - 256) / 32.0;
+    pos.z = float(int((vtx_pos_ao >> 20) & 1023u ) - 256) / 32.0;
     vec4 position = camera * model * vec4(pos, 1.0);
     gl_Position = projection * position;
 
-    frag_ao = float((vtx_pos_ao >> 27) & 3u) / 3.0;
+    frag_ao = float((vtx_pos_ao >> 30) & 3u) / 3.0;
 
     frag_color.r = tint.r * float((vtx_coloring) & 255u) / 255.0;
     frag_color.g = tint.g * float((vtx_coloring >> 8) & 255u) / 255.0;

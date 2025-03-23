@@ -55,10 +55,10 @@ struct terrain_vertex_t
             x += 128;
             y += 128;
             z += 128;
-            dat |= ((x & 0x01FF));
-            dat |= ((y & 0x01FF) << 9);
-            dat |= ((z & 0x01FF) << 18);
-            dat |= ((ao & 0x03) << 27);
+            dat |= (x << 1);
+            dat |= (y << 11);
+            dat |= (z << 21);
+            dat |= ((ao & 0x03) << 30);
         }
     } pos;
 
