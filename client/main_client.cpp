@@ -821,9 +821,9 @@ static void normal_loop()
             const ImVec2 uv0(240.0f / 256.0f, 0.0f);
             const ImVec2 uv1(1.0f, 16.0f / 256.0f);
             if (cvr_r_crosshair_widgets.get())
-                bg_draw_list->AddImage(reinterpret_cast<ImTextureID>(mc_gui::global_ctx->tex_id_widgets), pos0, pos1, uv0, uv1);
+                bg_draw_list->AddImage(mc_gui::global_ctx->tex_id_widgets, pos0, pos1, uv0, uv1);
             else
-                bg_draw_list->AddImage(reinterpret_cast<ImTextureID>(mc_gui::global_ctx->tex_id_crosshair), pos0, pos1);
+                bg_draw_list->AddImage(mc_gui::global_ctx->tex_id_crosshair, pos0, pos1);
             bg_draw_list->AddCallback(ImDrawCallback_ResetRenderState, NULL);
         }
 
@@ -837,7 +837,7 @@ static void normal_loop()
 
     if (display_pano || display_dirt)
     {
-        ImTextureID tex_id = reinterpret_cast<ImTextureID>(mc_gui::global_ctx->tex_id_bg);
+        ImTextureID tex_id = mc_gui::global_ctx->tex_id_bg;
 
         double side_len = 32.0 * double(SDL_max(1, mc_gui::global_ctx->menu_scale));
 

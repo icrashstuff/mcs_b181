@@ -679,13 +679,13 @@ bool texture_terrain_t::imgui_view(const char* title)
 
     ImVec2 pos = ImGui::GetCursorScreenPos();
     if (imgui_selected_face == mc_id::FACE_ATLAS)
-        ImGui::Image((ImTextureID)(size_t)tex_id_main, ImVec2(my_tex_w, my_tex_h), ImVec2(0, 0), ImVec2(1, 1), ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 1));
+        ImGui::Image(tex_id_main, ImVec2(my_tex_w, my_tex_h), ImVec2(0, 0), ImVec2(1, 1), ImVec4(1, 1, 1, 1), ImVec4(1, 1, 1, 1));
     else
     {
         texture_post_pack_t t = texture_faces[imgui_selected_face];
         ImVec2 corner0(t.face.corners[0].x, t.face.corners[0].y);
         ImVec2 corner1(t.face.corners[3].x, t.face.corners[3].y);
-        ImGui::Image((ImTextureID)(size_t)tex_id_main, ImVec2(t.w * 4, t.h * 4), corner0, corner1);
+        ImGui::Image(tex_id_main, ImVec2(t.w * 4, t.h * 4), corner0, corner1);
         ImGui::SameLine();
         ImGui::Text("%s\nSize: %dx%d", mc_id::get_face_fname(imgui_selected_face), t.w, t.h);
     }
@@ -710,7 +710,7 @@ bool texture_terrain_t::imgui_view(const char* title)
         ImVec2 uv1 = ImVec2((region_x + region_sz) / my_tex_w, (region_y + region_sz) / my_tex_h);
         ImGui::Text("Min: (%.2f, %.2f)", tex_base_width * uv0.x, tex_base_height * uv0.y);
         ImGui::Text("Max: (%.2f, %.2f)", tex_base_width * uv1.x, tex_base_height * uv1.y);
-        ImGui::Image((ImTextureID)(size_t)tex_id_main, ImVec2(region_sz * zoom, region_sz * zoom), uv0, uv1);
+        ImGui::Image(tex_id_main, ImVec2(region_sz * zoom, region_sz * zoom), uv0, uv1);
         ImGui::EndTooltip();
     }
 

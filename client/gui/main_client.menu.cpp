@@ -343,7 +343,7 @@ static void do_in_game_menu__player_list(mc_gui::mc_gui_ctx* const ctx, connecti
         if (it == list.end())
             continue;
 
-        draw_list->AddImage(reinterpret_cast<ImTextureID>(ctx->tex_id_bg), cursor, cursor + img_size);
+        draw_list->AddImage(ctx->tex_id_bg, cursor, cursor + img_size);
 
         cursor.x += img_size.x + spacer_width;
 
@@ -372,7 +372,7 @@ static void do_in_game_menu__player_list(mc_gui::mc_gui_ctx* const ctx, connecti
         ImVec2 uv0(00.0f / 256.0f, (56 - strength * 8) / 256.0f);
         ImVec2 uv1(10.0f / 256.0f, (64 - strength * 8) / 256.0f);
 
-        draw_list->AddImage(reinterpret_cast<ImTextureID>(ctx->tex_id_icons), cursor, cursor + conn_size, uv0, uv1);
+        draw_list->AddImage(ctx->tex_id_icons, cursor, cursor + conn_size, uv0, uv1);
 
         it++;
     }

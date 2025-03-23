@@ -341,7 +341,7 @@ ImGuiButtonFlags mc_gui::button(const char* translation_id, const ImVec2& size_a
 
     ImVec2 tcords_min(0, float(66 + ((held || hovered || pressed) ? 20 : 0)));
     ImVec2 tcords_max(200, float(86 + ((held || hovered || pressed) ? 20 : 0)));
-    render_widget(bb.Min, bb.Max, (ImTextureID)(uintptr_t)global_ctx->tex_id_widgets, tcords_min, tcords_max, ImVec2(256, 256));
+    render_widget(bb.Min, bb.Max, global_ctx->tex_id_widgets, tcords_min, tcords_max, ImVec2(256, 256));
 
     if (g.LogEnabled)
         ImGui::LogSetNextTextDecoration("[", "]");

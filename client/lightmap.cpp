@@ -163,9 +163,9 @@ void lightmap_t::imgui_contents()
 
     float tex_size = ImGui::GetContentRegionAvail().x / 2.2f;
 
-    ImGui::Image((ImTextureID)(size_t)tex_id_nearest, ImVec2(tex_size, tex_size), ImVec2(0, 0), ImVec2(1, 1));
+    ImGui::Image(tex_id_nearest, ImVec2(tex_size, tex_size), ImVec2(0, 0), ImVec2(1, 1));
     ImGui::SameLine();
-    ImGui::Image((ImTextureID)(size_t)tex_id_linear, ImVec2(tex_size, tex_size), ImVec2(0, 0), ImVec2(1, 1));
+    ImGui::Image(tex_id_linear, ImVec2(tex_size, tex_size), ImVec2(0, 0), ImVec2(1, 1));
 
     ImGui::EndGroup();
 }
