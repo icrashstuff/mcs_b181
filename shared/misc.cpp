@@ -158,9 +158,9 @@ void util::parallel_for(const int start, const int end, std::function<void(const
     assert(int(tdata.size()) <= max_new_threads);
 
     SDL_ThreadFunction thread_func = [](void* data) -> int {
-        thread_data_t* tdata = (thread_data_t*)data;
-        TRACE("Thread: for(int i = %d; i < %d; i++) { do_something(); }", tdata->start, tdata->end);
-        tdata->func(tdata->start, tdata->end);
+        thread_data_t* tdata_elem = (thread_data_t*)data;
+        TRACE("Thread: for(int i = %d; i < %d; i++) { do_something(); }", tdata_elem->start, tdata_elem->end);
+        tdata_elem->func(tdata_elem->start, tdata_elem->end);
         return 0;
     };
 
