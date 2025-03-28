@@ -117,7 +117,6 @@ struct terrain_vertex_t
 };
 
 /**
- * TODO: Mimmaping - The structure is there it just needs to be implemented
  * TODO-OPT: Make animation code less fragile
  * TODO: Merge later updates clock and compass into single texture?
  */

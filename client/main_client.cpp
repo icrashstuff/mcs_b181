@@ -940,7 +940,6 @@ static void process_event(SDL_Event& event, bool* done)
     {
         if (mouse_grabbed)
         {
-            // TODO: Add place block function
             glm::dvec3 cam_dir;
             cam_dir.x = SDL_cos(glm::radians(level->yaw)) * SDL_cos(glm::radians(level->pitch));
             cam_dir.y = SDL_sin(glm::radians(level->pitch));
@@ -969,6 +968,7 @@ static void process_event(SDL_Event& event, bool* done)
                 }
             }
 
+            /* TODO: Determine correct block face */
             if (event.button.button == 1)
             {
                 connection_t::tentative_block_t t;
@@ -1050,6 +1050,7 @@ static void process_event(SDL_Event& event, bool* done)
                 if (connection)
                     connection->send_packet(pack_inv_action);
             }
+            /* TODO: Determine correct block face */
             else if (event.button.button == 3)
             {
                 connection_t::tentative_block_t t;

@@ -118,9 +118,6 @@ struct level_t
 
     lightmap_t lightmap;
 
-    /* TODO: Use this for sky calculations */
-    int world_height = 0;
-
     inline mc_id::gamemode_t gamemode_get() { return gamemode; }
 
     /**
@@ -375,10 +372,8 @@ private:
     /**
      * Runs the culling pass and builds all visible/near visible dirty meshes
      *
-     * TODO: Honor visibility for lighting?
      * TODO: Throttle light?
      * TODO: Wait for either a timeout to pass or all surrounding chunks to be loaded before building
-     * TODO: Rebuild clean meshes that surround dirty ones
      */
     void build_dirty_meshes();
 

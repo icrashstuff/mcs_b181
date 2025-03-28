@@ -133,7 +133,7 @@ public:
     void correct_grass();
 
     /**
-     * TODO: Multi stage generation
+     * TODO: Finish or redo multi stage generation
      *
      * 0: Simple noise (BLOCK_ID_STONE, BLOCK_ID_NETHERRACK)
      * 1: Mountains (Still basic building blocks) (If biomes are implemented then they should be used here)

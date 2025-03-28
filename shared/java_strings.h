@@ -41,7 +41,4 @@ SDL_FORCE_INLINE std::string UCS2_to_UTF8(const char16_t* const str, const int l
  */
 std::u16string UTF8_to_UCS2(const char* str);
 
-// TODO: std::vector<char> UTF8_to_MUTF8(const char* str);
-// TODO: std::vector<char> MUTF8_to_UTF8(const char* str);
-
 #endif

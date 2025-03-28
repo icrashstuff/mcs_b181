@@ -207,7 +207,6 @@ static void decompress_chunk_packet(level_t* const level, const packet_chunk_t* 
     }
 
     /* Mark surrounding chunks for re-meshing */
-    /* TODO: Mark all continuous chunks below as invalid */
     for (int x = min_chunk_x - 1; x <= max_chunk_x + 1; x++)
     {
         for (int y = min_chunk_y - 1; y <= max_chunk_y + 1; y++)
