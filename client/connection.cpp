@@ -638,8 +638,7 @@ void connection_t::run(level_t* const level)
             case PACKET_ID_CHUNK_MAP:
             {
                 CAST_PACK_TO_P(packet_chunk_t);
-                static std::vector<Uint8> buf;
-                decompress_chunk_packet(level, p, buf);
+                decompress_chunk_packet(level, p, chunk_decompression_buffer);
 
                 /* Mark as fulfilled to delay erasing until after packet handling is finished */
                 for (tentative_block_t& it : tentative_blocks)

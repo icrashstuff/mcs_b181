@@ -37,8 +37,9 @@
  *
  * The way this fits into the architecture is that the connection is fed a level_t which it will then modify
  *
- * WARNING: All connections share a chunk input buffer
- * WARNING: All connections *MUST* be accessed from the same thread
+ * Thread-Safety
+ * It is not safe to access an instance of connection_t from multiple threads at once
+ * It is probably safe to access different instances of connection_t from multiple threads at once
  */
 struct connection_t
 {
@@ -190,6 +191,8 @@ private:
     bool sent_init = false;
     Uint64 last_update_tick_build = 0;
     Uint64 last_update_tick_camera = 0;
+
+    std::vector<Uint8> chunk_decompression_buffer;
 
     /**
      * Stores blocks that the client placed/destroyed that the server will hopefully honor,
