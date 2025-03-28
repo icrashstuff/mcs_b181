@@ -118,6 +118,8 @@ struct level_t
 
     lightmap_t lightmap;
 
+    int world_height = 0;
+
     inline mc_id::gamemode_t gamemode_get() { return gamemode; }
 
     /**
