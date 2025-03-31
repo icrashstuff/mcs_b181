@@ -244,7 +244,7 @@ int tetra::init_gui(const char* window_title)
 
     SDL_ShowWindow(window);
 
-    /* This weirdness is to trick DWM into making the window floating */
+    /* This weirdness is to trick DWM (The suckless project not the windows component) into making the window floating */
     if (convar_t::dev())
         SDL_SetWindowResizable(window, cvr_resizable.get());
 
@@ -420,6 +420,8 @@ void tetra::end_frame(bool clear_frame, void (*cb_screenshot)(void))
 
     gui_registrar::render_menus();
 
+    ImGui::SetCurrentContext(im_ctx_main);
+    calc_dev_font_width("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~");
     dev_console::render();
 
     // Rendering
@@ -448,8 +450,6 @@ void tetra::end_frame(bool clear_frame, void (*cb_screenshot)(void))
     else
         ImGui::EndFrame();
     ImGui::SetCurrentContext(im_ctx_main);
-
-    calc_dev_font_width("abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!\"#$%&'()*+,-./:;<=>?@[\\]^_`{|}~");
 
     if (cb_screenshot)
         cb_screenshot();

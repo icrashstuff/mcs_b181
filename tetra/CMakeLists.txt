@@ -98,6 +98,13 @@ set(tetra_gl_SRC
     ${IMGUI_DIR}/backends/imgui_impl_opengl3.cpp
 )
 
+set(tetra_sdl_gpu_SRC
+    ${TETRA_DIR}tetra_sdl_gpu.cpp
+
+    ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_sdlgpu3.cpp
+)
+
 function(tetra_common_compile_options target_name)
     target_compile_options(${target_name} PUBLIC -Wall -Wextra)
 
@@ -110,17 +117,18 @@ function(tetra_common_compile_options target_name)
     # the clang flag -Weverything is useful for finding them
     target_compile_options(${target_name} PUBLIC -Wshadow)
 
-    if(ENABLE_NATIVE_OPTIMIZATION AND NOT MSVC)
+    if(TETRA_ENABLE_NATIVE_OPTIMIZATION AND NOT MSVC)
         target_compile_options(${target_name} PRIVATE -march=native -mtune=native)
     endif()
 
-    if(DISABLE_STACK_PROTECTOR AND "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" AND NOT MSVC)
+    if(TETRA_DISABLE_STACK_PROTECTOR AND "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" AND NOT MSVC)
         message(WARNING "Disabling stack protector")
-        target_compile_options(${target_name} PRIVATE -fno-stack-protector)
+        target_compile_options(${target_name} PUBLIC -fno-stack-protector)
     endif()
 endfunction()
 
-option(TETRA_BUILD_GL_COMPONENT "Build tetra_gl" ON)
+option(TETRA_BUILD_GL_COMPONENT "Build tetra::gl (tetra_gl)" OFF)
+option(TETRA_BUILD_SDL_GPU_COMPONENT "Build tetra::sdl_gpu (tetra_sdl_gpu)" OFF)
 
 ### BEGIN: Target: tetra_core
 add_library(tetra_core OBJECT ${tetra_core_SRC})
@@ -131,6 +139,8 @@ target_include_directories(tetra_core PRIVATE ../)
 
 target_link_libraries(tetra_core PUBLIC PhysFS::PhysFS-static)
 target_link_libraries(tetra_core PUBLIC SDL3::SDL3)
+
+add_library(tetra::core ALIAS tetra_core)
 ### END: Target: tetra_core
 
 ### BEGIN: Target: tetra_gl
@@ -149,17 +159,21 @@ if(TETRA_BUILD_GL_COMPONENT)
     target_link_libraries(tetra_gl PUBLIC OpenGL::GLU)
     target_link_libraries(tetra_gl PUBLIC GLEW::GLEW)
     target_link_libraries(tetra_gl PUBLIC tetra_core)
+
+    add_library(tetra::gl ALIAS tetra_gl)
 endif()
 ### END: Target: tetra_gl
 
-function (add_tetra_executable target_name target_SRC)
-    add_executable(${target_name} "${target_SRC}" "${tetra_SRC}")
+### BEGIN: Target: tetra_sdl_gpu
+if(TETRA_BUILD_SDL_GPU_COMPONENT)
+    add_library(tetra_sdl_gpu OBJECT ${tetra_sdl_gpu_SRC})
 
-    tetra_common_compile_options(${target_name})
+    tetra_common_compile_options(tetra_sdl_gpu)
 
-    target_link_libraries(${target_name} tetra_core)
+    target_include_directories(tetra_sdl_gpu PRIVATE ../)
 
-    if(TETRA_BUILD_GL_COMPONENT)
-        target_link_libraries(${target_name} tetra_gl)
-    endif()
-endfunction()
+    target_link_libraries(tetra_sdl_gpu PUBLIC tetra_core)
+
+    add_library(tetra::sdl_gpu ALIAS tetra_sdl_gpu)
+endif()
+### END: Target: tetra_sdl_gpu

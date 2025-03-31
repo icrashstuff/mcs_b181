@@ -25,12 +25,10 @@
  * ========
  * #include "tetra/gui/imgui.h"
  * #include "tetra/tetra_core.h"
- * #include "tetra/tetra_gl.h"
+ * #include "tetra/tetra_sdl_gpu.h"
  * int main(const int argc, const char** argv)
  * {
  *     tetra::init("icrashstuff", "Tetra example", "config_prefix", argc, argv);
- *
- *     tetra::set_render_api(tetra::RENDER_API_GL_CORE, 3, 0);
  *
  *     tetra::init_gui("Hello World");
  *
@@ -64,7 +62,7 @@
  *     main.cpp
  * )
  *
- * set(TETRA_BUILD_GL_COMPONENT ON)
+ * set(TETRA_BUILD_SDL_GPU_COMPONENT ON)
  *
  * # Tetra must be in the "tetra" subfolder
  * add_subdirectory(tetra/)
@@ -72,39 +70,27 @@
  * add_executable(tetra_example ${tetra_example_SRC})
  *
  * target_link_libraries(tetra_example tetra::core)
- * target_link_libraries(tetra_example tetra::gl)
+ * target_link_libraries(tetra_example tetra::sdl_gpu)
  */
 
-#ifndef TETRA_TETRA_GL_H_INCLUDED
-#define TETRA_TETRA_GL_H_INCLUDED
+#ifndef TETRA__TETRA_SDL_GPU_H__INCLUDED
+#define TETRA__TETRA_SDL_GPU_H__INCLUDED
 
-#include <GL/glew.h>
 #include <SDL3/SDL.h>
-#include <SDL3/SDL_opengl.h>
 
 namespace tetra
 {
-
-enum render_api_t
-{
-    RENDER_API_GL_CORE,
-    RENDER_API_GL_COMPATIBILITY,
-    RENDER_API_GL_ES,
-};
+SDL_GPUShaderFormat get_imgui_shader_formats();
 
 /**
- * Set render api and version for tetra to use
+ * Obtains/Sets up an SDL_GPUDevice and SDL_Window
  *
- * Must be called before tetra::init_gui()
+ * @param window_title Initial window title
+ * @param shader_formats Shader formats supported by the application
  *
- * NOTE: No checks are made for invalid variables
+ * @returns 0 on successful init, some non-zero value on failure (Though it will likely call util::die() if an error occurs)
  */
-void set_render_api(render_api_t api, int major, int minor);
-
-/**
- * Returns 0 on successful init, some non-zero value on failure
- */
-int init_gui(const char* window_title);
+int init_gui(const char* const window_title, const SDL_GPUShaderFormat shader_formats = get_imgui_shader_formats());
 
 /**
  * Deinit gui, call this before tetra::deinit()
@@ -150,21 +136,32 @@ bool imgui_ctx_main_wants_input();
 void show_imgui_ctx_overlay(bool shown);
 
 /**
- * Renders the frame, and optionally limits the frame rate if gui_fps_limiter is set
+ * Simple version of tetra::end_frame()
  *
- * @param clear_frame Clear OpenGL color buffer
- * @param cb_screenshot Callback to be called immediately before SDL_GL_SwapWindow()
+ * Renders the frame, and optionally limits the frame rate if gui_fps_limiter is set
  */
-void end_frame(bool clear_frame = true, void (*cb_screenshot)(void) = NULL);
+void end_frame();
 
 /**
- * Wrapper around glObjectLabel()
+ * Complex version of tetra::end_frame()
  *
- * NOTE: If the OpenGL context version is below 4.3 or r_debug_gl is not set then this function is a no-op
- *
- * NOTE: This is only valid for an OpenGL context created by tetra::init_gui()
+ * @param command_buffer Command buffer to render on (Passing a nullptr is safe)
+ * @param texture Texture to render ImGui to (Passing a nullptr is safe)
+ * @param clear_texture Clear texture to solid black
  */
-void gl_obj_label(GLenum identifier, GLuint name, const GLchar* fmt, ...) SDL_PRINTF_VARARG_FUNCV(3);
+void end_frame(SDL_GPUCommandBuffer* const command_buffer, SDL_GPUTexture* const texture, bool clear_texture);
+
+/**
+ * Reconfigure swapchain if needed (ie. vsync changes)
+ *
+ * NOTE: This function *MUST* be called *BEFORE* acquiring a swapchain texture
+ */
+void configure_swapchain_if_needed();
+
+/**
+ * Limits framerate (ie. This function will attempt to ensure that two calls are spaced at least '(1000.0f / r_fps_limiter.get())' ms apart)
+ */
+void limit_framerate();
 
 /**
  * Window created by tetra::init_gui()
@@ -172,9 +169,9 @@ void gl_obj_label(GLenum identifier, GLuint name, const GLchar* fmt, ...) SDL_PR
 extern SDL_Window* window;
 
 /**
- * OpenGL Context created by tetra::init_gui()
+ * Device acquired by tetra::init_gui()
  */
-extern SDL_GLContext gl_context;
+extern SDL_GPUDevice* gpu_device;
 }
 
 #endif
