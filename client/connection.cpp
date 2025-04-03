@@ -1161,6 +1161,43 @@ bool connection_t::send_packet(packet_t* pack)
     return false;
 }
 
+#include <mutex>
+
+static std::mutex dead_sockets_mutex;
+static std::vector<SDLNet_StreamSocket*> dead_sockets;
+
+void connection_t::cull_dead_sockets(Uint32 timeout)
+{
+    Uint64 sdl_tick_end = SDL_GetTicks() + timeout;
+
+    std::scoped_lock dead_sockets_lock(dead_sockets_mutex);
+    for (auto it = dead_sockets.begin(); it != dead_sockets.end();)
+    {
+        Sint64 delay = static_cast<Sint64>(sdl_tick_end) - static_cast<Sint64>(SDL_GetTicks());
+        delay = SDL_max(delay, 0l);
+        if (SDLNet_WaitUntilStreamSocketDrained(*it, delay) > 0)
+            ++it;
+        else
+        {
+            dc_log_trace("Culling socket");
+            SDLNet_DestroyStreamSocket(*it);
+            it = dead_sockets.erase(it);
+        }
+    }
+
+    for (auto it = dead_sockets.begin(); it != dead_sockets.end();)
+    {
+        if (SDLNet_WaitUntilStreamSocketDrained(*it, 0) > 0)
+            ++it;
+        else
+        {
+            dc_log_trace("Culling socket");
+            SDLNet_DestroyStreamSocket(*it);
+            it = dead_sockets.erase(it);
+        }
+    }
+}
+
 connection_t::~connection_t()
 {
     packet_kick_t pack_disconnect;
@@ -1169,7 +1206,16 @@ connection_t::~connection_t()
 
     SDLNet_UnrefAddress(addr_server);
 
-    /* TODO: Store this in a vector of dying sockets to ensure things are properly closed down */
-    SDLNet_WaitUntilStreamSocketDrained(socket, 100);
-    SDLNet_DestroyStreamSocket(socket);
+    int pending_writes = SDLNet_GetStreamSocketPendingWrites(socket);
+    dc_log("Pending writes: %d", pending_writes);
+    if (pending_writes > 0)
+    {
+        dead_sockets_mutex.lock();
+        dead_sockets.push_back(socket);
+        dead_sockets_mutex.unlock();
+    }
+    else
+        SDLNet_DestroyStreamSocket(socket);
+
+    cull_dead_sockets(0);
 }

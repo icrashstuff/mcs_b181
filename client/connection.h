@@ -146,6 +146,20 @@ struct connection_t
     /** For F3 debug screen */
     inline size_t get_size_ent_id_map() { return ent_id_map.size(); };
 
+    /**
+     * Cull dead sockets from prior instances of connection_t
+     *
+     * Recommended use:
+     * - Call every frame with a timeout value of 0
+     * - Call at application exit with a non-zero timeout value
+     *
+     * Thread-safety:
+     * This function is safe to call from any thread
+     *
+     * @param timeout Number of milliseconds to wait for the sockets to die
+     */
+    static void cull_dead_sockets(Uint32 timeout);
+
 private:
     void set_status_msg(const std::string translation_id, const std::string _sub_status = "");
 

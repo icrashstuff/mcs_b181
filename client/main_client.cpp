@@ -2135,6 +2135,8 @@ int main(const int argc, const char** argv)
             break;
         }
 
+        connection_t::cull_dead_sockets(0);
+
         tetra::end_frame(command_buffer, swapchain_texture, false);
         SDL_SubmitGPUCommandBuffer(command_buffer);
         screenshot_func(win_size);
@@ -2147,6 +2149,8 @@ int main(const int argc, const char** argv)
 
     SDL_ReleaseGPUTexture(state::gpu_device, state::gpu_debug_texture);
     SDL_ReleaseGPUSampler(state::gpu_device, state::gpu_debug_sampler);
+
+    connection_t::cull_dead_sockets(100);
 
     SDLNet_Quit();
     tetra::deinit_gui();
