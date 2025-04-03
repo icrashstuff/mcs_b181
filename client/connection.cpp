@@ -311,6 +311,9 @@ void connection_t::run(level_t* const level)
 
     handle_inactive();
 
+    if (status > connection_status_t::CONNECTION_ACTIVE)
+        loading_button = LOADING_BUTTON_BACK_TO_MENU;
+
     if (status == connection_t::CONNECTION_ACTIVE)
     {
         if (!sent_init)
@@ -565,6 +568,7 @@ void connection_t::run(level_t* const level)
                     level->yaw += 360.0f;
 
                 in_world = true;
+                loading_button = LOADING_BUTTON_NONE;
                 set_status_msg("");
                 last_update_tick_camera = 0;
 
@@ -1061,6 +1065,9 @@ void connection_t::run(level_t* const level)
             it = tentative_blocks.erase(it);
         }
     }
+
+    if (status > connection_status_t::CONNECTION_ACTIVE)
+        loading_button = LOADING_BUTTON_BACK_TO_MENU;
 }
 
 void connection_t::set_status_msg(const std::string _status, const std::string _sub_status)

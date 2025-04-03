@@ -160,6 +160,14 @@ struct connection_t
      */
     static void cull_dead_sockets(Uint32 timeout);
 
+    enum loading_button_t
+    {
+        LOADING_BUTTON_NONE,
+        LOADING_BUTTON_CANCEL,
+        LOADING_BUTTON_BACK_TO_MENU,
+    };
+    loading_button_t loading_button = LOADING_BUTTON_CANCEL;
+
 private:
     void set_status_msg(const std::string translation_id, const std::string _sub_status = "");
 

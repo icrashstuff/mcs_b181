@@ -1086,12 +1086,27 @@ static client_menu_return_t do_loading_menu(mc_gui::mc_gui_ctx* ctx)
 
     ImGui::End();
 
-    if (connection->get_status() != connection_t::CONNECTION_ACTIVE)
+    const char* button_text = NULL;
+
+    switch (connection->loading_button)
+    {
+    case connection_t::LOADING_BUTTON_NONE:
+        button_text = NULL;
+        break;
+    case connection_t::LOADING_BUTTON_CANCEL:
+        button_text = "gui.cancel";
+        break;
+    case connection_t::LOADING_BUTTON_BACK_TO_MENU:
+        button_text = "gui.toMenu";
+        break;
+    }
+
+    if (button_text)
     {
         ImGui::SetNextWindowPos(get_viewport_centered_lower_quarter(), ImGuiCond_Always, ImVec2(0.5, 0.0));
         ImGui::Begin("menu.gui.cancel", NULL, ctx->default_win_flags);
 
-        if (mc_gui::button_big(connection->get_status() < connection_t::CONNECTION_ACTIVE ? "gui.cancel" : "gui.toMenu"))
+        if (mc_gui::button_big(button_text))
         {
             for (auto it = games.begin(); it != games.end();)
             {
