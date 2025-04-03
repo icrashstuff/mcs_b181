@@ -106,7 +106,7 @@ set(tetra_sdl_gpu_SRC
 )
 
 function(tetra_common_compile_options target_name)
-    target_compile_options(${target_name} PUBLIC -Wall -Wextra)
+    target_compile_options(${target_name} PUBLIC -Wall -Wextra -DSDL_DISABLE_OLD_NAMES=1)
 
     # -WShadow spits out a warning for code like:
     # int i = 0;
