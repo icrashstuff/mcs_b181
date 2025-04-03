@@ -40,7 +40,7 @@
 
 #include "tetra/log.h"
 #include "tetra/tetra_core.h"
-#include "tetra/tetra_gl.h"
+#include "tetra/tetra_sdl_gpu.h"
 #include "tetra/util/convar.h"
 
 #include "shared/build_info.h"

@@ -1328,12 +1328,15 @@ static void init()
     {
         ImGui::SetCurrentContext(imgui_ctx_main_menu);
         ImGui::GetIO().IniFilename = NULL;
-        if (!ImGui_ImplSDL3_InitForOpenGL(tetra::window, tetra::gl_context))
-            util::die("Failed to initialize Dear Imgui SDL3 backend\n");
-        if (!ImGui_ImplOpenGL3_Init("#version 330 core"))
-            util::die("Failed to initialize Dear Imgui OpenGL3 backend\n");
-
         global_ctx->load_font_ascii(ImGui::GetIO().Fonts);
+        if (!ImGui_ImplSDL3_InitForSDLGPU(state::window))
+            util::die("Failed to initialize Dear Imgui SDL3 backend\n");
+        ImGui_ImplSDLGPU3_InitInfo init_info = {};
+        init_info.Device = state::gpu_device;
+        init_info.ColorTargetFormat = SDL_GetGPUSwapchainTextureFormat(state::gpu_device, state::window);
+        init_info.MSAASamples = SDL_GPU_SAMPLECOUNT_1;
+        if (!ImGui_ImplSDLGPU3_Init(&init_info))
+            util::die("Failed to initialize Dear Imgui SDLGPU3 backend\n");
 
         ImGuiStyle& style = ImGui::GetStyle();
 
@@ -1382,7 +1385,7 @@ static void deinit()
 
     ImGuiContext* last_ctx = ImGui::GetCurrentContext();
     ImGui::SetCurrentContext(imgui_ctx_main_menu);
-    ImGui_ImplOpenGL3_Shutdown();
+    ImGui_ImplSDLGPU3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext();
     imgui_ctx_main_menu = NULL;

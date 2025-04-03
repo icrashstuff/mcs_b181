@@ -23,7 +23,8 @@
 #ifndef MCS_B181_CLIENT_SHADERS_H
 #define MCS_B181_CLIENT_SHADERS_H
 
-#include <GL/glew.h>
+#include "../migration_gl.h"
+
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 #include <string>

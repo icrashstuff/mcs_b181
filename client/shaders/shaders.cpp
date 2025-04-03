@@ -20,7 +20,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#include "tetra/tetra_gl.h"
+#include "../migration_gl.h"
 
 #include <SDL3/SDL.h>
 

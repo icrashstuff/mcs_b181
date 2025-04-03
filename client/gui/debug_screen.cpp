@@ -28,6 +28,9 @@
 #include "tetra/gui/imgui.h"
 #include "tetra/util/convar.h"
 
+#include "client/state.h"
+#include "tetra/tetra_sdl_gpu.h"
+
 static void IM_FMTARGS(5) add_text(mc_gui::mc_gui_ctx* ctx, ImDrawList* const drawlist, bool right_align, ImVec2& cursor, const char* fmt, ...)
 {
     char buf[2048];
@@ -184,10 +187,9 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
     cursor_r.y += get_y_spacing();
 
     ImVec2 viewport_size = ImGui::GetMainViewport()->Size;
-    add_text(ctx, drawlist, 1, cursor_r, "Viewport: %dx%d (%s)", int(viewport_size.x), int(viewport_size.y), glGetString(GL_VENDOR));
-    add_text(ctx, drawlist, 1, cursor_r, "%s", glGetString(GL_RENDERER));
-    add_text(ctx, drawlist, 1, cursor_r, "%s", glGetString(GL_VERSION));
-    add_text(ctx, drawlist, 1, cursor_r, "GLSL: %s, GLEW %s", glGetString(GL_SHADING_LANGUAGE_VERSION), glewGetString(GLEW_VERSION));
+    add_text(ctx, drawlist, 1, cursor_r, "Viewport: %dx%d", int(viewport_size.x), int(viewport_size.y));
+    add_text(ctx, drawlist, 1, cursor_r, "%s %s", SDL_GetGPUDeviceDriver(state::gpu_device),
+        tetra::SDL_GPUShaderFormat_to_string(SDL_GetGPUShaderFormats(state::gpu_device)).c_str());
 
     /* Highlighted block info */
     {

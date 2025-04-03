@@ -20,9 +20,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#include <GL/glew.h>
-#include <GL/glu.h>
-#include <SDL3/SDL_opengl.h>
+#include "migration_gl.h"
 
 #include "level.h"
 
@@ -31,8 +29,6 @@
 
 #include "tetra/util/convar.h"
 #include <SDL3/SDL.h>
-
-#include "tetra/tetra_gl.h"
 
 #define PASS_TIMER_START()             \
     do                                 \
@@ -56,7 +52,7 @@ void level_t::clear_mesh(const bool free_gl)
     for (chunk_cubic_t* c : chunks_render_order)
     {
         if (free_gl)
-            c->free_gl();
+            c->free_renderer_resources();
         if (c->dirty_level < chunk_cubic_t::DIRTY_LEVEL_MESH)
             c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
     }
@@ -230,7 +226,7 @@ void level_t::build_dirty_meshes()
                 if (!light_can_leave)
                 {
                     c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_NONE;
-                    c->free_gl();
+                    c->free_renderer_resources();
                 }
             }
         }

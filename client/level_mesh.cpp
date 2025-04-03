@@ -20,9 +20,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#include <GL/glew.h>
-#include <GL/glu.h>
-#include <SDL3/SDL_opengl.h>
+#include "migration_gl.h"
 
 #include "level.h"
 
@@ -31,8 +29,6 @@
 
 #include "tetra/util/convar.h"
 #include <SDL3/SDL.h>
-
-#include "tetra/tetra_gl.h"
 
 #ifndef NDEBUG
 #define FORCE_OPT_MESH 1

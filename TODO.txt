@@ -29,7 +29,6 @@ Client TODO:
   - ...
 - Proper assets integration
 - Finish block models
-  - Railing
   - Ladders
   - Torches
   - Doors

@@ -107,6 +107,7 @@ configure_file(client/shaders/terrain.vert shaders/terrain.vert COPYONLY)
 set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(sdl_net/)
 
+set(TETRA_BUILD_SDL_GPU_COMPONENT ON)
 add_subdirectory(tetra/)
 
 add_subdirectory(client/entt)
@@ -140,7 +141,7 @@ function(add_bin_common name)
     target_compile_options(${name} PUBLIC -Wall -Wextra -DSDL_DISABLE_OLD_NAMES=1)
 
     target_link_libraries(${name} glm::glm)
-    target_link_libraries(${name} tetra_core)
+    target_link_libraries(${name} tetra::core)
     target_link_libraries(${name} ZLIB::ZLIB)
     target_link_libraries(${name} SDL3_net::SDL3_net-static)
 endfunction()
@@ -152,8 +153,8 @@ add_bin_common(mcs_b181_client)
 target_link_libraries(mcs_b181_client OpenAL::OpenAL)
 target_link_libraries(mcs_b181_client EnTT::EnTT)
 target_link_libraries(mcs_b181_client cubiomes_static)
-target_link_libraries(mcs_b181_client tetra_gl)
+target_link_libraries(mcs_b181_client tetra::sdl_gpu)
 
-target_link_libraries(mcs_b181_bridge tetra_gl)
+target_link_libraries(mcs_b181_bridge tetra::sdl_gpu)
 
 target_link_libraries(mcs_b181_server cubiomes_static)

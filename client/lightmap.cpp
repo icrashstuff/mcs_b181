@@ -20,7 +20,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#include <GL/glew.h>
+#include "migration_gl.h"
 #include <SDL3/SDL.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
@@ -32,8 +32,6 @@
 #define BASE_B 0.6
 
 #include "tetra/util/convar.h"
-
-#include "tetra/tetra_gl.h"
 
 static convar_float_t r_light_brightness("r_light_brightness", 0.0, 0.0, 1.0, "Lightmap base brightness", CONVAR_FLAG_SAVE);
 

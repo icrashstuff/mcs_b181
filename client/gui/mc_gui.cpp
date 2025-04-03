@@ -21,59 +21,121 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+#include "../state.h"
 
 #include "mc_gui.h"
 #include "mc_gui_internal.h"
 
 #include "tetra/log.h"
-#include "tetra/tetra_gl.h"
 #include "tetra/util/stbi.h"
 
 #include "tetra/gui/imgui_internal.h"
 
-static ImTextureID load_texture(void* data, int x, int y, std::string label, GLenum edge, GLenum format_color = GL_RGBA, GLenum format_data = GL_UNSIGNED_BYTE)
+#include <vector>
+
+static ImTextureID load_texture(SDL_GPUCopyPass* copy_pass, const void* data, const Uint32 x, const Uint32 y, std::string label, SDL_GPUSamplerAddressMode edge)
 {
-    GLuint ret;
-    glGenTextures(1, &ret);
-    glBindTexture(GL_TEXTURE_2D, ret);
-    tetra::gl_obj_label(GL_TEXTURE, ret, label.c_str());
+    if (!data || x == 0 || y == 0 || !copy_pass)
+        return reinterpret_cast<ImTextureID>(new SDL_GPUTextureSamplerBinding {
+            .texture = state::gpu_debug_texture,
+            .sampler = state::gpu_debug_sampler,
+        });
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    SDL_GPUTextureCreateInfo tex_info = {
+        .type = SDL_GPU_TEXTURETYPE_2D,
+        .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+        .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER,
+        .width = x,
+        .height = y,
+        .layer_count_or_depth = 1,
+        .num_levels = 1,
+        .sample_count = SDL_GPU_SAMPLECOUNT_1,
+        .props = SDL_CreateProperties(),
+    };
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, edge);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, edge);
+    SDL_GPUSamplerCreateInfo sampler_info;
+    SDL_zero(sampler_info);
+    sampler_info.min_filter = SDL_GPU_FILTER_LINEAR;
+    sampler_info.mag_filter = SDL_GPU_FILTER_NEAREST;
+    sampler_info.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
+    sampler_info.address_mode_u = edge;
+    sampler_info.address_mode_v = edge;
+    sampler_info.props = SDL_CreateProperties();
 
-    if (data)
-        glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, x, y, 0, format_color, format_data, data);
-    else
+    SDL_SetStringProperty(tex_info.props, SDL_PROP_GPU_TEXTURE_CREATE_NAME_STRING, (label + " (Texture)").c_str());
+    SDL_SetStringProperty(sampler_info.props, SDL_PROP_GPU_SAMPLER_CREATE_NAME_STRING, (label + " (Sampler)").c_str());
+
+    SDL_GPUTransferBuffer* tbo = nullptr;
+    SDL_GPUTextureSamplerBinding* sampler_binding = new SDL_GPUTextureSamplerBinding();
+    if ((sampler_binding->texture = SDL_CreateGPUTexture(state::gpu_device, &tex_info)) == nullptr)
     {
-        tetra::gl_obj_label(GL_TEXTURE, ret, (label + " (Missing)").c_str());
-        Uint8* data_missing = new Uint8[64 * 64 * 4];
-        if (data_missing)
-        {
-            for (y = 0; y < 64; y++)
-                for (x = 0; x < 64; x++)
-                {
-                    data_missing[(y * 64 + x) * 4 + 0] = (x % 2 == y % 2) ? 0 : 255;
-                    data_missing[(y * 64 + x) * 4 + 1] = 0;
-                    data_missing[(y * 64 + x) * 4 + 2] = (x % 2 == y % 2) ? 0 : 255;
-                    data_missing[(y * 64 + x) * 4 + 3] = 255;
-                }
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, x, y, 0, GL_RGBA, GL_UNSIGNED_BYTE, data_missing);
-        }
-        else
-        {
-            Uint8 data_missing_missing[] = { 0xC7, 0, 0, 0xC7 };
-            glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 2, 2, 0, GL_RGB, GL_UNSIGNED_BYTE_3_3_2, data_missing_missing);
-        }
-        delete[] data_missing;
+        dc_log_error("Failed to acquire texture! SDL_CreateGPUTexture: %s", SDL_GetError());
+        sampler_binding->texture = state::gpu_debug_texture;
+    }
+    else /* Texture created: Acquire transfer buffer */
+    {
+        SDL_GPUTransferBufferCreateInfo tbo_info {
+            .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
+            .size = x * y * 4,
+            .props = SDL_CreateProperties(),
+        };
+        SDL_SetStringProperty(tbo_info.props, SDL_PROP_GPU_TRANSFERBUFFER_CREATE_NAME_STRING, (label + " (TBO)").c_str());
+        tbo = SDL_CreateGPUTransferBuffer(state::gpu_device, &tbo_info);
+        if (!tbo)
+            dc_log_error("Failed to acquire transfer buffer, SDL_CreateGPUTransferBuffer: %s", SDL_GetError());
     }
 
-    return ImTextureID(ret);
+    if ((sampler_binding->sampler = SDL_CreateGPUSampler(state::gpu_device, &sampler_info)) == nullptr)
+    {
+        dc_log_error("Failed to acquire sampler! SDL_CreateGPUSampler: %s", SDL_GetError());
+        sampler_binding->sampler = state::gpu_debug_sampler;
+    }
+
+    void* tbo_pointer = nullptr;
+    if (tbo) /* Map transfer buffer */
+    {
+        tbo_pointer = SDL_MapGPUTransferBuffer(state::gpu_device, tbo, false);
+        if (!tbo_pointer)
+            dc_log_error("Failed to map transfer buffer, SDL_MapGPUTransferBuffer: %s", SDL_GetError());
+    }
+
+    if (tbo_pointer) /* Copy data to transfer buffer */
+    {
+        memcpy(tbo_pointer, data, x * y * 4);
+
+        SDL_UnmapGPUTransferBuffer(state::gpu_device, tbo);
+        tbo_pointer = nullptr;
+
+        SDL_GPUTextureTransferInfo region_tbo = {
+            .transfer_buffer = tbo,
+            .offset = 0,
+            .pixels_per_row = tex_info.width,
+            .rows_per_layer = tex_info.height,
+        };
+
+        SDL_GPUTextureRegion region_tex = {
+            .texture = sampler_binding->texture,
+            .mip_level = 0,
+            .layer = 0,
+            .x = 0,
+            .y = 0,
+            .z = 0,
+            .w = tex_info.width,
+            .h = tex_info.height,
+            .d = 1,
+        };
+
+        SDL_UploadToGPUTexture(copy_pass, &region_tbo, &region_tex, false);
+    }
+
+    if (tbo)
+        SDL_ReleaseGPUTransferBuffer(state::gpu_device, tbo);
+
+    return reinterpret_cast<ImTextureID>(sampler_binding);
 }
 
-static ImTextureID load_gui_texture(std::string path, GLenum edge = GL_CLAMP_TO_EDGE, std::string prefix = "/_resources/assets/minecraft/textures/gui/")
+static ImTextureID load_gui_texture(SDL_GPUCopyPass* copy_pass, std::string path, SDL_GPUSamplerAddressMode edge = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE,
+    std::string prefix = "/_resources/assets/minecraft/textures/gui/")
 {
     const std::string label = std::string("[Menu]: Texture: ") + path;
     path = prefix + path;
@@ -84,7 +146,7 @@ static ImTextureID load_gui_texture(std::string path, GLenum edge = GL_CLAMP_TO_
     if (!data_widgets)
         dc_log_error("Unable to load texture: \"%s\"", path.c_str());
 
-    ImTextureID ret = load_texture(data_widgets, x, y, label, edge);
+    ImTextureID ret = load_texture(copy_pass, data_widgets, x, y, label, edge);
 
     stbi_image_free(data_widgets);
 
@@ -192,10 +254,54 @@ void mc_gui::mc_gui_ctx::load_font_ascii(ImFontAtlas* font_atlas)
 
     stbi_image_free(tex_data);
 }
-
-void mc_gui::mc_gui_ctx::load_resources()
+SDL_GPUFence* mc_gui::mc_gui_ctx::load_resources()
 {
     unload_resources();
+
+    SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(state::gpu_device);
+    SDL_GPUCopyPass* copy_pass = (command_buffer ? SDL_BeginGPUCopyPass(command_buffer) : nullptr);
+
+    tex_id_widgets = load_gui_texture(copy_pass, "widgets.png");
+    tex_id_icons = load_gui_texture(copy_pass, "icons.png");
+
+    tex_id_inventory = load_gui_texture(copy_pass, "container/inventory.png");
+    tex_id_creative_tab_search = load_gui_texture(copy_pass, "container/creative_inventory/tab_item_search.png");
+    tex_id_creative_tab_inv = load_gui_texture(copy_pass, "container/creative_inventory/tab_inventory.png");
+    tex_id_creative_tabs = load_gui_texture(copy_pass, "container/creative_inventory/tabs.png");
+    tex_id_creative_tab_items = load_gui_texture(copy_pass, "container/creative_inventory/tab_items.png");
+    tex_id_chest_generic = load_gui_texture(copy_pass, "container/generic_54.png");
+    tex_id_furnace = load_gui_texture(copy_pass, "container/furnace.png");
+    tex_id_crafting_table = load_gui_texture(copy_pass, "container/crafting_table.png");
+
+    tex_id_bg = load_gui_texture(copy_pass, "options_background.png", SDL_GPU_SAMPLERADDRESSMODE_REPEAT);
+    tex_id_water = load_gui_texture(copy_pass, "misc/underwater.png", SDL_GPU_SAMPLERADDRESSMODE_REPEAT, "/_resources/assets/minecraft/textures/");
+    tex_id_selectors_resource = load_gui_texture(copy_pass, "resource_packs.png");
+    tex_id_selectors_server = load_gui_texture(copy_pass, "server_selection.png");
+
+    Uint8 data_crosshair[16 * 16 * 4] = { 0 };
+    for (int i = 3; i < 12; i++)
+    {
+        data_crosshair[(i + 7 * 16) * 4 + 0] = 0xFF;
+        data_crosshair[(7 + i * 16) * 4 + 0] = 0xFF;
+
+        data_crosshair[(i + 7 * 16) * 4 + 1] = 0xFF;
+        data_crosshair[(7 + i * 16) * 4 + 1] = 0xFF;
+
+        data_crosshair[(i + 7 * 16) * 4 + 2] = 0xFF;
+        data_crosshair[(7 + i * 16) * 4 + 2] = 0xFF;
+
+        data_crosshair[(i + 7 * 16) * 4 + 3] = 0xFF;
+        data_crosshair[(7 + i * 16) * 4 + 3] = 0xFF;
+    }
+    tex_id_crosshair = load_texture(copy_pass, data_crosshair, 16, 16, "[Menu]: Texture: Crosshair", SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE);
+
+    if (copy_pass)
+        SDL_EndGPUCopyPass(copy_pass);
+
+    /* Texture upload happens before translation map generation to give the GPU a tiny bit more time */
+    SDL_GPUFence* fence = nullptr;
+    if (command_buffer)
+        fence = SDL_SubmitGPUCommandBufferAndAcquireFence(command_buffer);
 
     /* Load built in translations */
     translation_map_t built_in;
@@ -208,41 +314,27 @@ void mc_gui::mc_gui_ctx::load_resources()
     translations = translation_map_t("/_resources/assets/minecraft/lang/en_US.lang");
     translations.import_keys(built_in, false);
 
-    tex_id_widgets = load_gui_texture("widgets.png");
-    tex_id_icons = load_gui_texture("icons.png");
+    return fence;
+}
 
-    tex_id_inventory = load_gui_texture("container/inventory.png");
-    tex_id_creative_tab_search = load_gui_texture("container/creative_inventory/tab_item_search.png");
-    tex_id_creative_tab_inv = load_gui_texture("container/creative_inventory/tab_inventory.png");
-    tex_id_creative_tabs = load_gui_texture("container/creative_inventory/tabs.png");
-    tex_id_creative_tab_items = load_gui_texture("container/creative_inventory/tab_items.png");
-    tex_id_chest_generic = load_gui_texture("container/generic_54.png");
-    tex_id_furnace = load_gui_texture("container/furnace.png");
-    tex_id_crafting_table = load_gui_texture("container/crafting_table.png");
+static void DEL_TEX(ImTextureID& binding)
+{
+    SDL_GPUTextureSamplerBinding*& _binding = reinterpret_cast<SDL_GPUTextureSamplerBinding*&>(binding);
+    if (!_binding)
+        return;
 
-    tex_id_bg = load_gui_texture("options_background.png", GL_REPEAT);
-    tex_id_water = load_gui_texture("misc/underwater.png", GL_REPEAT, "/_resources/assets/minecraft/textures/");
-    tex_id_selectors_resource = load_gui_texture("resource_packs.png");
-    tex_id_selectors_server = load_gui_texture("server_selection.png");
+    if (_binding->texture != state::gpu_debug_texture)
+        SDL_ReleaseGPUTexture(state::gpu_device, _binding->texture);
+    if (_binding->sampler != state::gpu_debug_sampler)
+        SDL_ReleaseGPUSampler(state::gpu_device, _binding->sampler);
 
-    Uint16 data_crosshair[16 * 16] = { 0 };
-    for (int i = 3; i < 12; i++)
-    {
-        data_crosshair[i + 7 * 16] = 0xFFFF;
-        data_crosshair[7 + i * 16] = 0xFFFF;
-    }
-    tex_id_crosshair = load_texture(data_crosshair, 16, 16, "[Menu]: Texture: Crosshair", GL_CLAMP_TO_EDGE, GL_RGBA, GL_UNSIGNED_SHORT_4_4_4_4);
+    delete _binding;
+    _binding = nullptr;
+    assert(!binding);
 }
 
 void mc_gui::mc_gui_ctx::unload_resources()
 {
-#define DEL_TEX(TEX_ID)                        \
-    do                                         \
-    {                                          \
-        glDeleteTextures(1, (GLuint*)&TEX_ID); \
-        TEX_ID = 0;                            \
-    } while (0)
-
     DEL_TEX(tex_id_widgets);
     DEL_TEX(tex_id_icons);
 

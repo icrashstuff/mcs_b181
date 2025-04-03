@@ -24,11 +24,13 @@
 #ifndef MCS_B181_CLIENT_MC_GUI_H_INCLUDED
 #define MCS_B181_CLIENT_MC_GUI_H_INCLUDED
 
-#include <GL/glew.h>
+#include "../migration_gl.h"
 
 #include "tetra/gui/imgui.h"
 
 #include "client/lang/lang.h"
+
+#include <SDL3/SDL_gpu.h>
 
 #include <map>
 #include <string>
@@ -65,7 +67,16 @@ struct mc_gui_ctx
 
     translation_map_t translations;
 
-    void load_resources();
+    /**
+     * Load all GUI resources
+     *
+     * @returns GPU fence associated with the copy command buffer
+     */
+    SDL_GPUFence* load_resources();
+
+    /**
+     * Unload/free all GUI resources
+     */
     void unload_resources();
 
     static void load_font_ascii(ImFontAtlas* atlas);

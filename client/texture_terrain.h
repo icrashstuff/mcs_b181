@@ -23,7 +23,8 @@
 #ifndef MCS_B181_CLIENT_TEXTURE_TERRAIN_H
 #define MCS_B181_CLIENT_TEXTURE_TERRAIN_H
 
-#include <GL/glew.h>
+#include "migration_gl.h"
+
 #include <SDL3/SDL.h>
 #include <string>
 #include <vector>

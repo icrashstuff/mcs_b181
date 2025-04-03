@@ -23,7 +23,7 @@
 #ifndef MCS_B181_CLIENT_CHUNK_CUBIC_H
 #define MCS_B181_CLIENT_CHUNK_CUBIC_H
 
-#include <GL/glew.h>
+#include "migration_gl.h"
 #include <SDL3/SDL.h>
 #include <glm/glm.hpp>
 
@@ -177,7 +177,7 @@ struct chunk_cubic_t
         memset(data_metadata, 0, sizeof(data_metadata));
     }
 
-    ~chunk_cubic_t() { free_gl(); }
+    ~chunk_cubic_t() { free_renderer_resources(); }
 
     /**
      * Update renderer hints
@@ -259,24 +259,7 @@ struct chunk_cubic_t
         return ret;
     }
 
-    void free_gl()
-    {
-        glDeleteVertexArrays(1, &vao);
-        glDeleteBuffers(1, &vbo);
-        glDeleteBuffers(1, &ebo_translucent);
-
-        vao = 0;
-        vbo = 0;
-        ebo_translucent = 0;
-
-        index_count = 0;
-        index_count_overlay = 0;
-        index_count_translucent = 0;
-
-        index_type = GL_NONE;
-        index_type_overlay = GL_NONE;
-        index_type_translucent = GL_NONE;
-    }
+    void free_renderer_resources();
 
     /**
      * Finds a chunk by recursively searching from the origin

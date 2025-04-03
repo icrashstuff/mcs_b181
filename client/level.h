@@ -33,12 +33,13 @@
 #include "sound/sound_world.h"
 #include "texture_terrain.h"
 #include "time_blended_modifer.h"
-#include <GL/glew.h>
 #include <entt/entt.hpp>
 #include <glm/glm.hpp>
 #include <map>
 #include <memory>
 #include <vector>
+
+#include "migration_gl.h"
 
 /**
  * Handles both level data and the rendering of said level data

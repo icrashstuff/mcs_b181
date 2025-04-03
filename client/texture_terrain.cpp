@@ -34,7 +34,6 @@
 #include "tetra/util/stbi.h"
 
 #include "tetra/log.h"
-#include "tetra/tetra_gl.h"
 
 #include "jzon/Jzon.h"
 
