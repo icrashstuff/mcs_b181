@@ -319,7 +319,7 @@ int tetra::init_gui(const char* const window_title, const SDL_GPUShaderFormat sh
         ImGui::GetIO().ConfigFlags |= ImGuiConfigFlags_NoMouseCursorChange;
         if (!ImGui_ImplSDL3_InitForSDLGPU(window))
             util::die("Failed to initialize Dear Imgui SDL3 backend\n");
-        if (!ImGui_ImplSDLGPU3_Init(&imgui_init_info))
+        if (!ImGui_ImplSDLGPU3_Init(&imgui_init_info)) /* TODO: Replace this with a stub backend */
             util::die("Failed to initialize Dear Imgui SDLGPU3 backend\n");
     }
     ImGui::SetCurrentContext(im_ctx_main);
@@ -411,7 +411,7 @@ void tetra::end_frame()
     tetra::configure_swapchain_if_needed();
 
     SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(tetra::gpu_device);
-    SDL_GPUTexture* swapchain_texture;
+    SDL_GPUTexture* swapchain_texture = nullptr;
     SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer, tetra::window, &swapchain_texture, nullptr, nullptr);
 
     tetra::end_frame(command_buffer, swapchain_texture, true);
@@ -425,8 +425,6 @@ void tetra::end_frame(SDL_GPUCommandBuffer* const command_buffer, SDL_GPUTexture
 {
     if (!tetra::sdl_gpu::init_counter)
         return;
-    if (command_buffer)
-        SDL_PushGPUDebugGroup(command_buffer, "[tetra]: Render ImGui");
 
     bool open = gui_demo_window.get();
     if (open)
@@ -476,29 +474,37 @@ void tetra::end_frame(SDL_GPUCommandBuffer* const command_buffer, SDL_GPUTexture
     target_info.mip_level = 0;
     target_info.layer_or_depth_plane = 0;
     target_info.cycle = false;
-    if (command_buffer != nullptr && texture != nullptr)
+
+    ImDrawData* draw_data = nullptr;
+
+    if (draw_data_main && !draw_data_over)
+        draw_data = draw_data_main;
+
+    if (!draw_data_main && draw_data_over)
+        draw_data = draw_data_over;
+
+    if (draw_data_main && draw_data_over)
     {
-        if (draw_data_main)
-        {
-            Imgui_ImplSDLGPU3_PrepareDrawData(draw_data_main, command_buffer);
-
-            SDL_GPURenderPass* render_pass = SDL_BeginGPURenderPass(command_buffer, &target_info, 1, nullptr);
-            ImGui_ImplSDLGPU3_RenderDrawData(draw_data_main, command_buffer, render_pass);
-            SDL_EndGPURenderPass(render_pass);
-
-            target_info.load_op = SDL_GPU_LOADOP_LOAD;
-        }
-        if (draw_data_over)
-        {
-            Imgui_ImplSDLGPU3_PrepareDrawData(draw_data_over, command_buffer);
-
-            SDL_GPURenderPass* render_pass = SDL_BeginGPURenderPass(command_buffer, &target_info, 1, nullptr);
-            ImGui_ImplSDLGPU3_RenderDrawData(draw_data_over, command_buffer, render_pass);
-            SDL_EndGPURenderPass(render_pass);
-        }
+        draw_data = draw_data_main;
+        for (auto it : draw_data_over->CmdLists)
+            draw_data->AddDrawList(it);
     }
-    if (command_buffer)
+
+    if (draw_data != nullptr && command_buffer != nullptr && texture != nullptr)
+    {
+        SDL_PushGPUDebugGroup(command_buffer, "[tetra]: Render ImGui");
+        ImGui::SetCurrentContext(im_ctx_main);
+        Imgui_ImplSDLGPU3_PrepareDrawData(draw_data, command_buffer);
+
+        SDL_GPURenderPass* render_pass = SDL_BeginGPURenderPass(command_buffer, &target_info, 1, nullptr);
+        if (render_pass)
+        {
+            ImGui_ImplSDLGPU3_RenderDrawData(draw_data, command_buffer, render_pass);
+            SDL_EndGPURenderPass(render_pass);
+        }
+
         SDL_PopGPUDebugGroup(command_buffer);
+    }
 }
 
 void tetra::limit_framerate()
