@@ -97,7 +97,7 @@ static void calc_dev_font_width(const char* str)
             (VAR_STR) += #NAME "|";                              \
         }                                                        \
     } while (0)
-static std::string SDL_GPUShaderFormat_to_string(SDL_GPUShaderFormat x)
+std::string tetra::SDL_GPUShaderFormat_to_string(SDL_GPUShaderFormat x)
 {
     std::string s = "(";
     CHECK_REMOVE_AND_NAME_SHADER_FLAG(x, s, PRIVATE);
@@ -119,7 +119,7 @@ static std::string SDL_GPUShaderFormat_to_string(SDL_GPUShaderFormat x)
 }
 #undef CHECK_REMOVE_AND_NAME_SHADER_FLAG
 
-static SDL_GPUShaderFormat get_shaders_for_driver(const char* driver_name)
+SDL_GPUShaderFormat tetra::get_shaders_supported_by_driver(const char* const driver_name)
 {
     SDL_GPUShaderFormat out = 0;
 
@@ -217,7 +217,7 @@ int tetra::init_gui(const char* const window_title, const SDL_GPUShaderFormat sh
     for (int i = 0; i < SDL_GetNumGPUDrivers(); i++)
     {
         const char* driver_name = SDL_GetGPUDriver(i);
-        dc_log("- Driver %d: \"%s\", Shader formats: %s", i, driver_name, SDL_GPUShaderFormat_to_string(get_shaders_for_driver(driver_name)).c_str());
+        dc_log("- Driver %d: \"%s\", Shader formats: %s", i, driver_name, SDL_GPUShaderFormat_to_string(get_shaders_supported_by_driver(driver_name)).c_str());
     }
 
     const SDL_GPUShaderFormat shader_formats_imgui = get_imgui_shader_formats();

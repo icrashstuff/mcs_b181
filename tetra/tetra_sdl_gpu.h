@@ -77,9 +77,13 @@
 #define TETRA__TETRA_SDL_GPU_H__INCLUDED
 
 #include <SDL3/SDL.h>
+#include <string>
 
 namespace tetra
 {
+/**
+ * Get the shader formats that ImGui supports
+ */
 SDL_GPUShaderFormat get_imgui_shader_formats();
 
 /**
@@ -172,6 +176,20 @@ extern SDL_Window* window;
  * Device acquired by tetra::init_gui()
  */
 extern SDL_GPUDevice* gpu_device;
+
+/**
+ * Convert a shader format flag-set to a string
+ */
+std::string SDL_GPUShaderFormat_to_string(SDL_GPUShaderFormat formats);
+
+/**
+ * Get the shader formats supported by a particular driver
+ *
+ * @param driver_name Driver name as reported by SDL_GetGPUDriver or SDL_GetGPUDeviceDriver
+ *
+ * @returns Supported shader format flag-set for the specified driver
+ */
+SDL_GPUShaderFormat get_shaders_supported_by_driver(const char* const driver_name);
 }
 
 #endif
