@@ -29,7 +29,9 @@ project(tetra CXX C)
 option(TETRA_ENABLE_NATIVE_OPTIMIZATION "Enable native CPU specific compiler optimizations" OFF)
 option(TETRA_DISABLE_STACK_PROTECTOR "Useful for finding out where stack smashing is occurring (Debug builds only)" OFF )
 
-find_package(SDL3 REQUIRED)
+if(NOT TARGET SDL3::SDL3)
+    find_package(SDL3 REQUIRED)
+endif()
 
 # We don't necessarily have to disable most of the archivers but we also don't need them either
 set(PHYSFS_BUILD_SHARED FALSE)
