@@ -72,7 +72,7 @@ struct mc_gui_ctx
      *
      * @returns GPU fence associated with the copy command buffer
      */
-    SDL_GPUFence* load_resources();
+    [[nodiscard]] SDL_GPUFence* load_resources();
 
     /**
      * Unload/free all GUI resources
