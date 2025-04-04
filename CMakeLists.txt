@@ -104,6 +104,27 @@ SET_SOURCE_FILES_PROPERTIES(client/chunk_cubic.cpp PROPERTIES COMPILE_FLAGS "${C
 configure_file(client/shaders/terrain.frag shaders/terrain.frag COPYONLY)
 configure_file(client/shaders/terrain.vert shaders/terrain.vert COPYONLY)
 
+set(VENDORED_EXISTS FALSE)
+if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/SDL/" AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/SDL/CMakeLists.txt")
+    set(VENDORED_EXISTS TRUE)
+endif()
+message(STATUS "VENDORED_EXISTS: ${VENDORED_EXISTS}")
+
+option(MCS_B181_USE_VENDORED_SDL ${VENDORED_EXISTS})
+
+if(MCS_B181_USE_VENDORED_SDL)
+    message(STATUS "Using vendored SDL")
+
+    set(SDL_AUDIO OFF)
+    set(SDL_CAMERA OFF)
+    set(SDL_OPENGL OFF)
+    # set(SDL_OPENGLES OFF) # SDL Refuses to build for some reason if this is disabled
+    set(SDL_SHARED OFF)
+    set(SDL_STATIC ON)
+    set(SDL_VENDOR_INFO "MCS_B181")
+    add_subdirectory(SDL)
+endif()
+
 set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(sdl_net/)
 
