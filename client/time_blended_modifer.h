@@ -35,8 +35,6 @@ class time_blended_modifer_t
 
     Uint64 time_of_change = 0;
 
-    float last_get;
-
 public:
     /**
      * Create a time blended modifier
