@@ -1604,7 +1604,7 @@ void profile_light()
 
 #include "sound/sound_world.h"
 
-static glm::ivec2 win_size(0, 0);
+static glm::uvec2 win_size(0, 0);
 
 SDL_Window* state::window = nullptr;
 SDL_GPUDevice* state::gpu_device = nullptr;
@@ -1825,11 +1825,6 @@ int main(const int argc, const char** argv)
     delta_time = 0;
     while (!done)
     {
-        tetra::configure_swapchain_if_needed();
-        SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(state::gpu_device);
-        SDL_GPUTexture* swapchain_texture;
-        SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer, state::window, &swapchain_texture, nullptr, nullptr);
-
         SDL_Event event;
         bool should_cleanup = false;
         while (SDL_PollEvent(&event))
@@ -1844,10 +1839,14 @@ int main(const int argc, const char** argv)
             reload_resources = 0;
         }
 
+        tetra::configure_swapchain_if_needed();
+        SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(state::gpu_device);
+        SDL_GPUTexture* swapchain_texture;
+        SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer, state::window, &swapchain_texture, &win_size.x, &win_size.y);
+
         tetra::start_frame(false);
         Uint64 loop_start_time = SDL_GetTicksNS();
         delta_time = (double)last_loop_time / 1000000000.0;
-        SDL_GetWindowSize(state::window, &win_size.x, &win_size.y);
 
         ImVec4 clear_color(0.1f, 0.1f, 0.1f, 1.0f);
         if (game_selected)
