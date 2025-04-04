@@ -64,7 +64,10 @@ void tetra::init(const char* organization, const char* appname, const char* cfg_
     dc_log("[tetra_core]: Init started");
 
     convar_t::atexit_init();
-    atexit(convar_t::atexit_callback);
+    atexit([]() {
+        convar_t::atexit_callback();
+        SDL_Quit();
+    });
 
     /* Parse command line */
     cli_parser::parse(argc, argv);
