@@ -188,6 +188,19 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
 
     ImVec2 viewport_size = ImGui::GetMainViewport()->Size;
     add_text(ctx, drawlist, 1, cursor_r, "Viewport: %dx%d", int(viewport_size.x), int(viewport_size.y));
+    SDL_PropertiesID gpu_props = SDL_GetGPUDeviceProperties(state::gpu_device);
+    const char* gpu_name = SDL_GetStringProperty(gpu_props, SDL_PROP_GPU_DEVICE_NAME_STRING, NULL);
+    const char* gpu_driver_name = SDL_GetStringProperty(gpu_props, SDL_PROP_GPU_DEVICE_DRIVER_NAME_STRING, NULL);
+    const char* gpu_driver_version = SDL_GetStringProperty(gpu_props, SDL_PROP_GPU_DEVICE_DRIVER_VERSION_STRING, NULL);
+    const char* gpu_driver_info = SDL_GetStringProperty(gpu_props, SDL_PROP_GPU_DEVICE_DRIVER_INFO_STRING, NULL);
+    if (gpu_name)
+        add_text(ctx, drawlist, 1, cursor_r, "%s", gpu_name);
+    if (gpu_driver_name && gpu_driver_version)
+        add_text(ctx, drawlist, 1, cursor_r, "%s (%s)", gpu_driver_name, gpu_driver_version);
+    else if (gpu_driver_name)
+        add_text(ctx, drawlist, 1, cursor_r, "%s", gpu_driver_name);
+    if (gpu_driver_info)
+        add_text(ctx, drawlist, 1, cursor_r, "%s", gpu_driver_info);
     add_text(ctx, drawlist, 1, cursor_r, "%s %s", SDL_GetGPUDeviceDriver(state::gpu_device),
         tetra::SDL_GPUShaderFormat_to_string(SDL_GetGPUShaderFormats(state::gpu_device)).c_str());
 
