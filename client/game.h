@@ -23,6 +23,7 @@
 #ifndef MCS_B181_CLIENT_GAME_H
 #define MCS_B181_CLIENT_GAME_H
 
+#include <SDL3/SDL_gpu.h>
 #include <SDL3/SDL_stdinc.h>
 #include <glm/glm.hpp>
 #include <string>
@@ -46,7 +47,12 @@ struct game_resources_t
 
     game_resources_t();
 
-    void reload();
+    /**
+     * Reload (or initially load) game resources
+     *
+     * @returns GPU fence associated with any GPU uploads
+     */
+    [[nodiscard]] SDL_GPUFence* reload();
 
     void destroy();
 

@@ -37,6 +37,8 @@
 
 #include "jzon/Jzon.h"
 
+#include "state.h"
+
 static convar_int_t r_dump_mipmaps_terrain("r_dump_mipmaps_terrain", 1, 0, 1, "Dump terrain atlas mipmaps to screenshots folder on atlas rebuild",
     CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_SAVE | CONVAR_FLAG_INT_IS_BOOL);
 
@@ -422,23 +424,37 @@ texture_terrain_t::texture_terrain_t(const std::string path_textures)
         }
     }
 
-    glGenTextures(1, &tex_id_main);
-    glBindTexture(GL_TEXTURE_2D, tex_id_main);
-    tetra::gl_obj_label(GL_TEXTURE, tex_id_main, "[Level][Terrain]: Main Texture");
+    SDL_GPUTextureCreateInfo cinfo_texture = {
+        .type = SDL_GPU_TEXTURETYPE_2D,
+        .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+        .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER,
+        .width = Uint32(tex_base_width),
+        .height = Uint32(tex_base_height),
+        .layer_count_or_depth = 1,
+        .num_levels = Uint32(raw_mipmaps.size()),
+        .sample_count = SDL_GPU_SAMPLECOUNT_1,
+        .props = SDL_CreateProperties(),
+    };
+    SDL_GPUSamplerCreateInfo cinfo_sampler;
+    SDL_zero(cinfo_sampler);
+    cinfo_sampler.min_filter = SDL_GPU_FILTER_LINEAR;
+    cinfo_sampler.mag_filter = SDL_GPU_FILTER_NEAREST;
+    cinfo_sampler.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
+    cinfo_sampler.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+    cinfo_sampler.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
+    cinfo_sampler.min_lod = 0.0;
+    cinfo_sampler.max_lod = raw_mipmaps.size() - 1;
+    cinfo_sampler.enable_anisotropy = 0;
+    cinfo_sampler.props = SDL_CreateProperties();
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST_MIPMAP_LINEAR);
+    SDL_SetStringProperty(cinfo_texture.props, SDL_PROP_GPU_TEXTURE_CREATE_NAME_STRING, "[Level][Terrain]: Main Texture");
+    SDL_SetStringProperty(cinfo_sampler.props, SDL_PROP_GPU_SAMPLER_CREATE_NAME_STRING, "[Level][Terrain]: Main Sampler");
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
+    binding.texture = SDL_CreateGPUTexture(state::gpu_device, &cinfo_texture);
+    binding.sampler = SDL_CreateGPUSampler(state::gpu_device, &cinfo_sampler);
 
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_LOD, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, raw_mipmaps.size() - 1);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, raw_mipmaps.size() - 1);
-    glTexParameterf(GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, -1.0f);
-
-    update();
+    SDL_DestroyProperties(cinfo_texture.props);
+    SDL_DestroyProperties(cinfo_sampler.props);
 
     dc_log("Built terrain atlas in %.1f ms", (double)(SDL_GetTicksNS() - start_tick) / 1000000.0);
 
@@ -446,10 +462,10 @@ texture_terrain_t::texture_terrain_t(const std::string path_textures)
         dump_mipmaps();
 }
 
-void texture_terrain_t::update()
+void texture_terrain_t::update(SDL_GPUCopyPass* copy_pass)
 {
     Uint64 cur_sdl_tick = SDL_GetTicks();
-    if (cur_sdl_tick - time_last_update < 25)
+    if (cur_sdl_tick - time_last_update < 25 || !copy_pass)
         return;
     time_last_update = cur_sdl_tick;
 
@@ -569,10 +585,73 @@ void texture_terrain_t::update()
         }
     }
 
-    glBindTexture(GL_TEXTURE_2D, tex_id_main);
+    SDL_GPUTransferBufferCreateInfo cinfo_tbo = {
+        .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
+        .size = 0,
+        .props = SDL_CreateProperties(),
+    };
+
+    SDL_SetStringProperty(cinfo_tbo.props, SDL_PROP_GPU_TRANSFERBUFFER_CREATE_NAME_STRING, "[Level][Terrain]: TBO");
+
+    Uint32* offsets = SDL_stack_alloc(Uint32, raw_mipmaps.size());
+    Uint32* sizes = SDL_stack_alloc(Uint32, raw_mipmaps.size());
 
     for (size_t i = 0; i < raw_mipmaps.size(); i++)
-        glTexImage2D(GL_TEXTURE_2D, i, GL_RGBA, tex_base_width >> i, tex_base_height >> i, 0, GL_RGBA, GL_UNSIGNED_BYTE, raw_mipmaps[i]);
+    {
+        offsets[i] = cinfo_tbo.size;
+        sizes[i] = (tex_base_width >> i) * (tex_base_height >> i) * 4;
+        cinfo_tbo.size += sizes[i];
+    }
+
+    SDL_GPUTransferBuffer* tbo = SDL_CreateGPUTransferBuffer(state::gpu_device, &cinfo_tbo);
+    Uint8* tbo_pointer = nullptr;
+
+    if (!tbo)
+        dc_log_error("Unable to upload texture, SDL_CreateGPUTransferBuffer: %s", SDL_GetError());
+    else
+        tbo_pointer = static_cast<Uint8*>(SDL_MapGPUTransferBuffer(state::gpu_device, tbo, 0));
+
+    if (!tbo_pointer)
+        dc_log_error("Unable to upload texture, SDL_MapGPUTransferBuffer: %s", SDL_GetError());
+    else
+    {
+        for (size_t i = 0; i < raw_mipmaps.size(); i++)
+        {
+            assert(sizes[i] + offsets[i] <= cinfo_tbo.size);
+            memcpy(tbo_pointer + offsets[i], raw_mipmaps[i], sizes[i]);
+        }
+
+        SDL_UnmapGPUTransferBuffer(state::gpu_device, tbo);
+
+        for (size_t i = 0; i < raw_mipmaps.size(); i++)
+        {
+            SDL_GPUTextureTransferInfo region_tbo = {
+                .transfer_buffer = tbo,
+                .offset = 0,
+                .pixels_per_row = Uint32(tex_base_width >> i),
+                .rows_per_layer = Uint32(tex_base_height >> i),
+            };
+
+            SDL_GPUTextureRegion region_tex = {
+                .texture = binding.texture,
+                .mip_level = Uint32(i),
+                .layer = 0,
+                .x = 0,
+                .y = 0,
+                .z = 0,
+                .w = Uint32(tex_base_width >> i),
+                .h = Uint32(tex_base_height >> i),
+                .d = 1,
+            };
+
+            SDL_UploadToGPUTexture(copy_pass, &region_tbo, &region_tex, 0); /* TODO: I feel like this should use cycling, but it doesn't seem to work */
+        }
+    }
+
+    SDL_ReleaseGPUTransferBuffer(state::gpu_device, tbo);
+
+    SDL_stack_free(sizes);
+    SDL_stack_free(offsets);
 }
 
 void texture_terrain_t::dump_mipmaps()
@@ -601,26 +680,6 @@ static bool DragUint64(const char* const label, Uint64* const v, const float v_s
     return ImGui::DragScalar(label, ImGuiDataType_U64, v, v_speed, &v_min, &v_max, format, flags);
 }
 
-static bool slider_tex_parameteri(const char* name, const GLenum target, const GLenum pname, const int min, const int max)
-{
-    GLint params;
-    glGetTexParameteriv(target, pname, &params);
-    if (!ImGui::SliderInt(name, &params, min, max))
-        return false;
-    glTexParameteri(target, pname, params);
-    return true;
-}
-
-static bool slider_tex_parameterf(const char* name, const GLenum target, const GLenum pname, const float min, const float max)
-{
-    GLfloat params;
-    glGetTexParameterfv(target, pname, &params);
-    if (!ImGui::SliderFloat(name, &params, min, max))
-        return false;
-    glTexParameterf(target, pname, params);
-    return true;
-}
-
 bool texture_terrain_t::imgui_view(const char* title)
 {
     if (title == NULL)
@@ -634,17 +693,6 @@ bool texture_terrain_t::imgui_view(const char* title)
         ImGui::PopID();
         return false;
     }
-
-    ImGuiViewport* viewport = ImGui::GetMainViewport();
-
-    glBindTexture(GL_TEXTURE_2D, tex_id_main);
-    slider_tex_parameteri("GL_TEXTURE_MIN_LOD", GL_TEXTURE_2D, GL_TEXTURE_MIN_LOD, 0, raw_mipmaps.size() - 1);
-    slider_tex_parameteri("GL_TEXTURE_MAX_LOD", GL_TEXTURE_2D, GL_TEXTURE_MAX_LOD, 0, raw_mipmaps.size() - 1);
-    slider_tex_parameteri("GL_TEXTURE_BASE_LEVEL", GL_TEXTURE_2D, GL_TEXTURE_BASE_LEVEL, 0, raw_mipmaps.size() - 1);
-    slider_tex_parameteri("GL_TEXTURE_MAX_LEVEL", GL_TEXTURE_2D, GL_TEXTURE_MAX_LEVEL, 0, raw_mipmaps.size() - 1);
-    float max_lod = 0;
-    glGetFloatv(GL_MAX_TEXTURE_LOD_BIAS, &max_lod);
-    slider_tex_parameterf("GL_TEXTURE_LOD_BIAS", GL_TEXTURE_2D, GL_TEXTURE_LOD_BIAS, -max_lod, max_lod);
 
     ImGui::Text("Num animated textures: %zu", anim_textures.size());
     ImGui::Checkbox("Compass flail", &compass_flail);
@@ -675,6 +723,8 @@ bool texture_terrain_t::imgui_view(const char* title)
     float my_tex_h = (my_tex_w * (double)tex_base_height) / (double)tex_base_width;
 
     ImGui::SetCursorPosX((ImGui::GetStyle().ScrollbarSize + ImGui::GetStyle().WindowPadding.x / 2.0f) / 2.0f);
+
+    ImTextureID tex_id_main(reinterpret_cast<ImTextureID>(&binding));
 
     ImVec2 pos = ImGui::GetCursorScreenPos();
     if (imgui_selected_face == mc_id::FACE_ATLAS)
@@ -720,7 +770,8 @@ bool texture_terrain_t::imgui_view(const char* title)
 
 texture_terrain_t::~texture_terrain_t()
 {
-    glDeleteTextures(1, &tex_id_main);
+    SDL_ReleaseGPUTexture(state::gpu_device, binding.texture);
+    SDL_ReleaseGPUSampler(state::gpu_device, binding.sampler);
 
     for (size_t i = 0; i < raw_mipmaps.size(); i++)
         free(raw_mipmaps[i]);

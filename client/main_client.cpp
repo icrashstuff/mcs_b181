@@ -142,6 +142,7 @@ static bool initialize_resources()
     /* In the future parsing of one of the indexes at /assets/indexes/ will need to happen here (For sound) */
     game_resources = new game_resources_t();
 
+    fences.push_back(game_resources->reload());
     fences.push_back(mc_gui::global_ctx->load_resources());
 
     /* Ideally we would just reload the font here rather than completely restarting the mc_gui/ImGui context.
@@ -316,7 +317,7 @@ void render_world_overlays(level_t* level, ImDrawList* const bg_draw_list)
     }
     else if (mc_id::is_block(type) && !mc_id::is_transparent(type) && game_resources && game_resources->terrain_atlas)
     {
-        ImTextureID tex_id(game_resources->terrain_atlas->tex_id_main);
+        ImTextureID tex_id(reinterpret_cast<ImTextureID>(&game_resources->terrain_atlas->binding));
         mc_id::terrain_face_t face = game_resources->terrain_atlas->get_face(mc_id::FACE_STONE);
 #define BLOCK_OVERLAY(ID, FACE_ID)                               \
     case ID:                                                     \
@@ -817,8 +818,10 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
     if (menu_ret.allow_world && in_world)
     {
         ImGui::SetCurrentContext(last_ctx);
+        SDL_GPUCopyPass* copy_pass = SDL_BeginGPUCopyPass(gpu_command_buffer);
         game->level->lightmap.update();
-        game->level->get_terrain()->update();
+        game_resources->terrain_atlas->update(copy_pass);
+        SDL_EndGPUCopyPass(copy_pass);
         game->level->render(win_size, delta_time);
         ImGui::SetCurrentContext(imgui_ctx_main_menu);
 
@@ -1654,7 +1657,7 @@ static void upload_debug_texture()
 
     Uint8* tbo_pointer = (Uint8*)SDL_MapGPUTransferBuffer(state::gpu_device, tbo, false);
     if (tbo_pointer == nullptr)
-        util::die("Failed to map TBO to upload debug texture, SDL_AcquireGPUCommandBuffer: %s", SDL_GetError());
+        util::die("Failed to map TBO to upload debug texture, SDL_MapGPUTransferBuffer: %s", SDL_GetError());
 
     Uint64 r_state = 0x881abfd3ab1e0024;
     for (Uint32 y = 0; y < tex_info.height; y++)
@@ -1674,7 +1677,7 @@ static void upload_debug_texture()
 
     SDL_GPUCopyPass* copy_pass = SDL_BeginGPUCopyPass(command_buffer);
     if (command_buffer == nullptr)
-        util::die("Failed to acquire copy pass to upload debug texture, SDL_AcquireGPUCommandBuffer: %s", SDL_GetError());
+        util::die("Failed to acquire copy pass to upload debug texture, SDL_BeginGPUCopyPass: %s", SDL_GetError());
 
     SDL_GPUTextureTransferInfo region_tbo = {
         .transfer_buffer = tbo,
@@ -1841,8 +1844,15 @@ int main(const int argc, const char** argv)
 
         tetra::configure_swapchain_if_needed();
         SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(state::gpu_device);
-        SDL_GPUTexture* swapchain_texture;
-        SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer, state::window, &swapchain_texture, &win_size.x, &win_size.y);
+        SDL_GPUTexture* swapchain_texture = nullptr;
+        if (!SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer, state::window, &swapchain_texture, &win_size.x, &win_size.y))
+            swapchain_texture = nullptr;
+
+        if (!swapchain_texture)
+        {
+            tetra::limit_framerate();
+            continue;
+        }
 
         tetra::start_frame(false);
         Uint64 loop_start_time = SDL_GetTicksNS();

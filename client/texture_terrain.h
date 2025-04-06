@@ -119,7 +119,7 @@ struct terrain_vertex_t
 
 /**
  * TODO-OPT: Make animation code less fragile
- * TODO: Merge later updates clock and compass into single texture?
+ * TODO: Split clock and compass textures and remove clock and compass weirdness
  */
 class texture_terrain_t
 {
@@ -130,6 +130,7 @@ public:
      * Must be called inside an active OpenGL context
      *
      * @param path_textures PHYSFS path containing either the subdirectories: blocks/items or block/item (probably: "/_resources/assets/minecraft/textures/")
+     * @param fence Fence associated with the initial upload texture upload
      */
     texture_terrain_t(const std::string path_textures);
 
@@ -156,9 +157,10 @@ public:
      *
      * Must be called inside the same OpenGL context as the constructor
      *
+     * NOTE: It would probably be wise to call this on a background thread
      * NOTE: The time values used for determining animations (except the clock & compass) are to tied SDL_GetTicks()
      */
-    void update();
+    void update(SDL_GPUCopyPass* copy_pass);
 
     /**
      * Show an ImGui child window for inspecting internals
@@ -167,8 +169,7 @@ public:
      */
     bool imgui_view(const char* id = NULL);
 
-    GLuint tex_id_main = 0;
-    GLuint tex_id_data = 0;
+    SDL_GPUTextureSamplerBinding binding = { nullptr, nullptr };
 
     const inline mc_id::terrain_face_t get_face(const mc_id::terrain_face_id_t id)
     {

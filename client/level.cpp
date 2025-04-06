@@ -579,7 +579,7 @@ void level_t::render(const glm::ivec2 win_size, const float delta_time)
     shader_terrain->set_uniform("tex_lightmap", 1);
 
     glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, get_terrain()->tex_id_main);
+    // glBindTexture(GL_TEXTURE_2D, get_terrain()->tex_id_main);
     glActiveTexture(GL_TEXTURE1);
     glBindTexture(GL_TEXTURE_2D, lightmap.tex_id_linear);
     glActiveTexture(GL_TEXTURE0);
@@ -607,9 +607,6 @@ void level_t::render(const glm::ivec2 win_size, const float delta_time)
             last_render_order_cpos = cpos;
         }
     }
-
-    glActiveTexture(GL_TEXTURE0);
-    glBindTexture(GL_TEXTURE_2D, get_terrain()->tex_id_main);
 
     shader_terrain->set_uniform("allow_translucency", 0);
 

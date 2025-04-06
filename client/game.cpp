@@ -34,13 +34,25 @@
 #include "shared/chunk.h"
 #include "shared/misc.h"
 
-game_resources_t::game_resources_t() { reload(); }
+#include "state.h"
 
-void game_resources_t::reload()
+game_resources_t::game_resources_t() { }
+
+SDL_GPUFence* game_resources_t::reload()
 {
     destroy();
 
     terrain_atlas = new texture_terrain_t("/_resources/assets/minecraft/textures/");
+    SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(state::gpu_device);
+    if (!command_buffer)
+        dc_log_error("Unable to upload texture, state::LockedAcquireGPUCommandBuffer: %s", SDL_GetError());
+    else
+    {
+        SDL_GPUCopyPass* copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+        terrain_atlas->update(copy_pass);
+        SDL_EndGPUCopyPass(copy_pass);
+    }
+
     terrain_shader = new shader_t("/shaders/terrain.vert", "/shaders/terrain.frag");
     sound_resources = new sound_resources_t("/assets/", "/_resources/assets/");
 
@@ -48,6 +60,8 @@ void game_resources_t::reload()
     glUseProgram(terrain_shader->id);
     terrain_shader->set_uniform("ao_algorithm", ao_algorithm);
     terrain_shader->set_uniform("use_texture", use_texture);
+
+    return SDL_SubmitGPUCommandBufferAndAcquireFence(command_buffer);
 }
 
 void game_resources_t::destroy()
