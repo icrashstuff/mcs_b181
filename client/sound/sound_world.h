@@ -27,14 +27,13 @@
 #include "sound_resources.h"
 
 #include <SDL3/SDL_stdinc.h>
+#include <al.h>
+#include <alc.h>
 #include <glm/glm.hpp>
 #include <string>
 #include <vector>
 
 /* Forward declarations */
-typedef unsigned int ALuint;
-struct ALCdevice;
-struct ALCcontext;
 struct stb_vorbis;
 
 /** Sound engine, that somewhat mimics the sound engines of java and bedrock */
