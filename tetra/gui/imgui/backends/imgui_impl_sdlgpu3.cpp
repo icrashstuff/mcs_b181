@@ -29,35 +29,6 @@
 #include "imgui_impl_sdlgpu3.h"
 #include "imgui_impl_sdlgpu3_shaders.h"
 
-// SDL_GPU Data
-
-// Reusable buffers used for rendering 1 current in-flight frame, for ImGui_ImplSDLGPU3_RenderDrawData()
-struct ImGui_ImplSDLGPU3_FrameData
-{
-    SDL_GPUBuffer*      VertexBuffer     = nullptr;
-    SDL_GPUBuffer*      IndexBuffer      = nullptr;
-    uint32_t            VertexBufferSize = 0;
-    uint32_t            IndexBufferSize  = 0;
-};
-
-struct ImGui_ImplSDLGPU3_Data
-{
-    ImGui_ImplSDLGPU3_InitInfo   InitInfo;
-
-    // Graphics pipeline & shaders
-    SDL_GPUShader*               VertexShader   = nullptr;
-    SDL_GPUShader*               FragmentShader = nullptr;
-    SDL_GPUGraphicsPipeline*     Pipeline       = nullptr;
-
-    // Font data
-    SDL_GPUSampler*              FontSampler = nullptr;
-    SDL_GPUTexture*              FontTexture = nullptr;
-    SDL_GPUTextureSamplerBinding FontBinding = { nullptr, nullptr };
-
-    // Frame data for main window
-    ImGui_ImplSDLGPU3_FrameData  MainWindowFrameData;
-};
-
 // Forward Declarations
 static void ImGui_ImplSDLGPU3_DestroyFrameData();
 
