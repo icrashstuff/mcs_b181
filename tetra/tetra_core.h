@@ -66,7 +66,7 @@ namespace tetra
 /**
  * Should be called immediately, Can only be called once
  */
-void init(const char* organization, const char* appname, const char* cfg_path, int argc, const char** argv);
+void init(const char* organization, const char* appname, const char* cfg_path, int argc, const char** argv, const bool set_sdl_app_metadata = true);
 
 /**
  * Deinit tetra, can only be called once

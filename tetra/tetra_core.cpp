@@ -49,7 +49,7 @@ std::atomic<float> dev_console::add_log_font_width = { 7.0f };
 
 bool tetra::internal::is_initialized_core() { return init_counter > 0; }
 
-void tetra::init(const char* organization, const char* appname, const char* cfg_path_prefix, int argc, const char** argv)
+void tetra::init(const char* organization, const char* appname, const char* cfg_path_prefix, int argc, const char** argv, const bool set_sdl_app_metadata)
 {
     if (init_counter++)
     {
@@ -57,9 +57,12 @@ void tetra::init(const char* organization, const char* appname, const char* cfg_
         return;
     }
 
-    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, appname);
-    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING, __DATE__);
-    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_CREATOR_STRING, organization);
+    if (set_sdl_app_metadata)
+    {
+        SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, appname);
+        SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING, __DATE__);
+        SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_CREATOR_STRING, organization);
+    }
 
     dc_log("[tetra_core]: Init started");
 
