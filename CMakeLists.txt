@@ -207,3 +207,21 @@ target_link_libraries(mcs_b181_client tetra::sdl_gpu)
 target_link_libraries(mcs_b181_bridge tetra::sdl_gpu)
 
 target_link_libraries(mcs_b181_server cubiomes_static)
+
+function(ios_resource path)
+    if(IOS AND path AND EXISTS "${path}")
+        target_sources(mcs_b181_client PRIVATE "${path}")
+        set_source_files_properties("${path}" PROPERTIES MACOSX_PACKAGE_LOCATION Resources/)
+    endif()
+endfunction()
+
+if(IOS)
+    set(MCS_B181_BUNDLED_RESOURCES "" CACHE STRING "ZIP/JAR File containing all resources")
+    set(MCS_B181_BUNDLED_ASSETS "" CACHE STRING "ZIP File containing all assets")
+    
+    message(STATUS "MCS_B181_BUNDLED_ASSETS: ${MCS_B181_BUNDLED_ASSETS}")
+    message(STATUS "MCS_B181_BUNDLED_RESOURCES: ${MCS_B181_BUNDLED_RESOURCES}")
+    
+    ios_resource("${MCS_B181_BUNDLED_ASSETS}")
+    ios_resource("${MCS_B181_BUNDLED_RESOURCES}")
+endif()

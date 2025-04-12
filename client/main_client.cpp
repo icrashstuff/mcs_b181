@@ -61,10 +61,18 @@
 
 #include "state.h"
 
+#ifdef SDL_PLATFORM_IOS
+#define CVR_PATH_RESOURCE_PACK_DEFAULT "resources.zip"
+#define CVR_DIR_ASSETS_DEFAULT "assets.zip"
+#else
+#define CVR_PATH_RESOURCE_PACK_DEFAULT ""
+#define CVR_DIR_ASSETS_DEFAULT ""
+#endif
+
 static convar_string_t cvr_username("username", "", "Username (duh)", CONVAR_FLAG_SAVE);
-static convar_string_t cvr_dir_assets("dir_assets", "", "Path to assets (ex: \"~/.minecraft/assets/\")", CONVAR_FLAG_SAVE);
-static convar_string_t cvr_path_resource_pack(
-    "path_base_resources", "", "File/Dir to use for base resources (ex: \"~/.minecraft/versions/1.8.9/1.8.9.jar\")", CONVAR_FLAG_SAVE);
+static convar_string_t cvr_dir_assets("dir_assets", CVR_DIR_ASSETS_DEFAULT, "Path to assets (ex: \"~/.minecraft/assets/\")", CONVAR_FLAG_SAVE);
+static convar_string_t cvr_path_resource_pack("path_base_resources", CVR_PATH_RESOURCE_PACK_DEFAULT,
+    "File/Dir to use for base resources (ex: \"~/.minecraft/versions/1.8.9/1.8.9.jar\")", CONVAR_FLAG_SAVE);
 static convar_string_t cvr_dir_game("dir_game", "", "Path to store game files (Not mandatory)", CONVAR_FLAG_SAVE);
 
 static convar_int_t cvr_autoconnect("dev_autoconnect", 0, 0, 1, "Auto connect to server", CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_DEV_ONLY);
