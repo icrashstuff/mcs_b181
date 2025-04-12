@@ -1709,7 +1709,8 @@ static void upload_debug_texture()
     SDL_ReleaseGPUTransferBuffer(state::gpu_device, tbo);
 }
 
-int main(const int argc, const char** argv)
+#include <SDL3/SDL_main.h>
+int main(int argc, char* argv[])
 {
     /* KDevelop fully buffers the output and will not display anything */
     setvbuf(stdout, NULL, _IONBF, 0);
@@ -1728,7 +1729,7 @@ int main(const int argc, const char** argv)
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, "https://github.com/icrashstuff/mcs_b181");
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_TYPE_STRING, "game");
 
-    tetra::init("icrashstuff", "mcs_b181", "mcs_b181_client", argc, argv, false);
+    tetra::init("icrashstuff", "mcs_b181", "mcs_b181_client", argc, (const char**)argv, false);
 
     if (!cvr_username.get().length())
     {
