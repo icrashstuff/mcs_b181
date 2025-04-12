@@ -183,7 +183,7 @@ int tetra::init_gui(const char* const window_title, const SDL_GPUShaderFormat sh
     if (!gamepad_was_init)
         dc_log_error("Error: Unable to initialize SDL Gamepad Subsystem:\n%s\n", SDL_GetError());
 
-    Uint32 window_flags = SDL_WINDOW_HIDDEN;
+    Uint32 window_flags = SDL_WINDOW_HIDDEN | SDL_WINDOW_HIGH_PIXEL_DENSITY;
 
     if (cvr_resizable.get())
         window_flags |= SDL_WINDOW_RESIZABLE;
