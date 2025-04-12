@@ -35,8 +35,44 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_C_STANDARD 99)
 set(CMAKE_C_STANDARD_REQUIRED ON)
 
-find_package(glm REQUIRED)
-find_package(ZLIB REQUIRED)
+set(MCS_B181_VENDORED_LIBS_DIR "" CACHE STRING "Path to search for vendored libs")
+if(NOT "${MCS_B181_VENDORED_LIBS_DIR}" STREQUAL "")
+    message(STATUS "MCS_B181_VENDORED_LIBS_DIR: ${MCS_B181_VENDORED_LIBS_DIR}")
+endif()
+
+function(ensure_target package target)
+    if(TARGET ${target})
+        return()
+    endif()
+
+    if(NOT "${MCS_B181_VENDORED_LIBS_DIR}" STREQUAL "" AND
+    EXISTS "${MCS_B181_VENDORED_LIBS_DIR}/"            AND
+    EXISTS "${MCS_B181_VENDORED_LIBS_DIR}/${package}/" AND
+    EXISTS "${MCS_B181_VENDORED_LIBS_DIR}/${package}/CMakeLists.txt")
+        message(STATUS "${package}: Adding subdirectory")
+        add_subdirectory("${MCS_B181_VENDORED_LIBS_DIR}/${package}/" "bin_${package}")
+    endif()
+
+    if(TARGET ${target})
+        return()
+    endif()
+
+    message(STATUS "${package}: Falling back to find package")
+    find_package(${package} REQUIRED)
+endfunction()
+
+set(SDL_AUDIO OFF)
+set(SDL_CAMERA OFF)
+set(SDL_OPENGL OFF)
+# set(SDL_OPENGLES OFF) # SDL Refuses to build for some reason if this is disabled
+set(SDL_SHARED OFF)
+set(SDL_STATIC ON)
+set(SDL_VENDOR_INFO "MCS_B181")
+
+ensure_target(SDL3   SDL3::SDL3)
+ensure_target(glm    glm::glm)
+ensure_target(ZLIB   ZLIB::ZLIB)
+ensure_target(OpenAL OpenAL::OpenAL)
 
 set(mcs_b181_server_SRC
     server/main_server.cpp
@@ -57,7 +93,6 @@ set(mcs_b181_bridge_SRC
     shared/java_strings.cpp
 )
 
-find_package(OpenAL REQUIRED)
 set(mcs_b181_client_SRC
     client/main_client.cpp
     client/texture_terrain.cpp
@@ -103,27 +138,6 @@ SET_SOURCE_FILES_PROPERTIES(client/chunk_cubic.cpp PROPERTIES COMPILE_FLAGS "${C
 
 configure_file(client/shaders/terrain.frag shaders/terrain.frag COPYONLY)
 configure_file(client/shaders/terrain.vert shaders/terrain.vert COPYONLY)
-
-set(VENDORED_EXISTS FALSE)
-if(EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/SDL/" AND EXISTS "${CMAKE_CURRENT_SOURCE_DIR}/SDL/CMakeLists.txt")
-    set(VENDORED_EXISTS TRUE)
-endif()
-message(STATUS "VENDORED_EXISTS: ${VENDORED_EXISTS}")
-
-option(MCS_B181_USE_VENDORED_SDL ${VENDORED_EXISTS})
-
-if(MCS_B181_USE_VENDORED_SDL)
-    message(STATUS "Using vendored SDL")
-
-    set(SDL_AUDIO OFF)
-    set(SDL_CAMERA OFF)
-    set(SDL_OPENGL OFF)
-    # set(SDL_OPENGLES OFF) # SDL Refuses to build for some reason if this is disabled
-    set(SDL_SHARED OFF)
-    set(SDL_STATIC ON)
-    set(SDL_VENDOR_INFO "MCS_B181")
-    add_subdirectory(SDL)
-endif()
 
 set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(sdl_net/)
