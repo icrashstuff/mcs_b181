@@ -171,16 +171,19 @@ configure_file("${CMAKE_CURRENT_SOURCE_DIR}/shared/build_info.cpp.in" "${CMAKE_C
 function(add_bin_common name)
     add_executable(${name} "${${name}_SRC};shared/build_info.cpp")
 
-    string(TIMESTAMP BUNDLE_TIMESTAMP "%Y.%m.%d.%H.%M" UTC)
-    string(REPLACE "_" "-" bundled_name ${name}) # Xcode complains otherwise
-    set_target_properties(${name} PROPERTIES
-        MACOSX_BUNDLE True
-        MACOSX_BUNDLE_GUI_IDENTIFIER "io.github.icrashstuff.${bundled_name}"
-        MACOSX_BUNDLE_BUNDLE_NAME "${name}"
-        MACOSX_BUNDLE_BUNDLE_VERSION "${BUNDLE_TIMESTAMP}"
-        MACOSX_BUNDLE_SHORT_VERSION_STRING "#${GIT_SHA1_CLIENT}"
-        MACOSX_BUNDLE_LONG_VERSION_STRING "#${GIT_SHA1} (${GIT_REFSPEC})"
-    )
+    if(APPLE)
+        string(TIMESTAMP BUNDLE_TIMESTAMP "%Y.%m.%d-%H%M" UTC)
+        string(REPLACE "_" "-" bundled_name ${name}) # Xcode complains otherwise
+        set_target_properties(${name} PROPERTIES
+            MACOSX_BUNDLE True
+            MACOSX_BUNDLE_GUI_IDENTIFIER "io.github.icrashstuff.${bundled_name}"
+            MACOSX_BUNDLE_BUNDLE_NAME "${name}"
+            MACOSX_BUNDLE_BUNDLE_VERSION "${BUNDLE_TIMESTAMP}"
+            MACOSX_BUNDLE_SHORT_VERSION_STRING "#${GIT_SHA1_CLIENT}"
+            MACOSX_BUNDLE_LONG_VERSION_STRING "#${GIT_SHA1} (${GIT_REFSPEC})"
+            MACOSX_BUNDLE_INFO_PLIST "${CMAKE_CURRENT_SOURCE_DIR}/cmake/info.plist.in"
+        )
+    endif()
 
     tetra_common_compile_options(${name})
 
