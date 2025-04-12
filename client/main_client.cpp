@@ -1740,7 +1740,7 @@ int main(int argc, char* argv[])
     if (!SDLNet_Init())
         util::die("SDLNet_Init: %s", SDL_GetError());
 
-    if (tetra::init_gui(window_title, SDL_GPU_SHADERFORMAT_SPIRV) != 0)
+    if (tetra::init_gui(window_title, SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_METALLIB) != 0)
         util::die("tetra::init_gui");
 
     state::window = tetra::window;
