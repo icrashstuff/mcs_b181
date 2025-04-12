@@ -100,7 +100,33 @@ void tetra::init(const char* organization, const char* appname, const char* cfg_
     }
 
     PHYSFS_init(argv[0]);
-    PHYSFS_setSaneConfig(organization, appname, NULL, 0, 0);
+#ifdef SDL_PLATFORM_IOS
+    bool on_ios = 1;
+#else
+    bool on_ios = 0;
+#endif
+    if (!on_ios)
+        PHYSFS_setSaneConfig(organization, appname, NULL, 0, 0);
+    else /* iOS: Put everything in the documents directory */
+    {
+        const char* basedir = PHYSFS_getBaseDir();
+        char prefdir[4096] = "";
+
+        snprintf(prefdir, SDL_arraysize(prefdir), "%s/write_%s_%s/", SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS), organization, appname);
+
+        dc_log("prefdir: %s", prefdir);
+        dc_log("basedir: %s", basedir);
+
+        SDL_CreateDirectory(prefdir);
+
+#define PHYSFS_CALL(_CALL, COND) \
+    if ((_CALL) == COND)         \
+        dc_log_error("[PHYSFS]: %s", PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode()));
+
+        PHYSFS_CALL(PHYSFS_setWriteDir(prefdir), 0);
+        PHYSFS_CALL(PHYSFS_mount(prefdir, NULL, 0), 0);
+        PHYSFS_CALL(PHYSFS_mount(basedir, NULL, 1), 0);
+    }
 
     /* Set convars from config */
     convar_file_parser::set_config_prefix(cfg_path_prefix);
