@@ -32,6 +32,8 @@
 #include "misc.h"
 #include "packet.h"
 
+#define check_for_iec559(T) static_assert(std::numeric_limits<T>::is_iec559)
+
 void assemble_string16(std::vector<Uint8>& dat, const std::string str)
 {
     /* TODO: Find somewhere else to test the utf8 <-> ucs2 code */
@@ -87,7 +89,7 @@ void assemble_float(std::vector<Uint8>& dat, const float in)
 {
     Uint32 temp;
     memcpy(&temp, &in, sizeof(in));
-#ifdef __STDC_IEC_559__
+    check_for_iec559(float);
     union
     {
         float f;
@@ -97,9 +99,6 @@ void assemble_float(std::vector<Uint8>& dat, const float in)
 
     if (float_check.u[3] == 0x3e && float_check.u[2] == 0x80)
         temp = SDL_Swap32(temp);
-#else
-#error "Conversion from non-IEEE 754 floating point numbers not implemented"
-#endif
 
     size_t loc = dat.size();
     dat.resize(dat.size() + sizeof(temp));
@@ -110,7 +109,7 @@ void assemble_double(std::vector<Uint8>& dat, const double in)
 {
     Uint64 temp;
     memcpy(&temp, &in, sizeof(in));
-#ifdef __STDC_IEC_559__
+    check_for_iec559(double);
     union
     {
         double f;
@@ -120,9 +119,6 @@ void assemble_double(std::vector<Uint8>& dat, const double in)
 
     if (double_check.u[7] == 0x3f && double_check.u[6] == 0xd0)
         temp = SDL_Swap64(temp);
-#else
-#error "Conversion from non-IEEE 754 floating point numbers not implemented"
-#endif
 
     size_t loc = dat.size();
     dat.resize(dat.size() + sizeof(temp));
@@ -221,7 +217,7 @@ SDL_FORCE_INLINE bool read_float(const std::vector<Uint8>& dat, size_t& pos, flo
 {
     BAIL_READ(4);
 
-#ifdef __STDC_IEC_559__
+    check_for_iec559(float);
     union
     {
         float f;
@@ -237,9 +233,6 @@ SDL_FORCE_INLINE bool read_float(const std::vector<Uint8>& dat, size_t& pos, flo
 
     if (out)
         *(Uint32*)out = temp;
-#else
-#error "Conversion to non-IEEE 754 floating point numbers not implemented"
-#endif
 
     pos = pos + 4;
     return 1;
@@ -249,7 +242,7 @@ SDL_FORCE_INLINE bool read_double(const std::vector<Uint8>& dat, size_t& pos, do
 {
     BAIL_READ(8);
 
-#ifdef __STDC_IEC_559__
+    check_for_iec559(double);
     union
     {
         double f;
@@ -265,9 +258,6 @@ SDL_FORCE_INLINE bool read_double(const std::vector<Uint8>& dat, size_t& pos, do
 
     if (out)
         *(Uint64*)out = temp;
-#else
-#error "Conversion to non-IEEE 754 floating point numbers not implemented"
-#endif
 
     pos = pos + 8;
     return 1;
