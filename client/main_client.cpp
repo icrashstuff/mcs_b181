@@ -62,9 +62,11 @@
 #include "state.h"
 
 #ifdef SDL_PLATFORM_IOS
+static bool on_ios = 1;
 #define CVR_PATH_RESOURCE_PACK_DEFAULT "resources.zip"
 #define CVR_DIR_ASSETS_DEFAULT "assets.zip"
 #else
+static bool on_ios = 0;
 #define CVR_PATH_RESOURCE_PACK_DEFAULT ""
 #define CVR_DIR_ASSETS_DEFAULT ""
 #endif
@@ -189,6 +191,15 @@ static bool deinitialize_resources()
     return true;
 }
 
+#define can_launch_game_fail(COND)   \
+    do                               \
+    {                                \
+        if (COND)                    \
+        {                            \
+            dc_log(#COND " failed"); \
+            return 0;                \
+        }                            \
+    } while (0)
 /**
  * Quick check to see if the game can be launched, intended for validating if the setup screen can be skipped
  */
@@ -197,22 +208,23 @@ static bool can_launch_game()
     if (!cvr_username.get().length())
         return 0;
 
-    SDL_PathInfo info;
-    if (!SDL_GetPathInfo(cvr_dir_assets.get().c_str(), &info))
-        return 0;
+    dc_log("Documents folder: %s", SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS));
+    dc_log("PHYSFS_getBaseDir(): %s", PHYSFS_getBaseDir());
+    dc_log("cvr_dir_assets: %s", cvr_dir_assets.get().c_str());
+    dc_log("cvr_path_resource_pack: %s", cvr_path_resource_pack.get().c_str());
+    dc_log("cvr_dir_game: %s", cvr_dir_game.get().c_str());
 
-    if (info.type != SDL_PATHTYPE_DIRECTORY)
-        return 0;
+    SDL_PathInfo info;
+    can_launch_game_fail(!SDL_GetPathInfo(cvr_dir_assets.get().c_str(), &info));
 
     SDL_GetPathInfo(cvr_dir_game.get().c_str(), &info);
-    if (info.type != SDL_PATHTYPE_DIRECTORY && info.type != SDL_PATHTYPE_NONE)
-        return 0;
+    can_launch_game_fail(info.type != SDL_PATHTYPE_DIRECTORY && info.type != SDL_PATHTYPE_NONE);
 
-    if (!SDL_GetPathInfo(cvr_path_resource_pack.get().c_str(), &info))
-        return 0;
+    can_launch_game_fail(!SDL_GetPathInfo(cvr_path_resource_pack.get().c_str(), &info));
 
     return 1;
 }
+#undef can_launch_game_fail
 
 enum engine_state_t : int
 {
@@ -1744,6 +1756,18 @@ int main(int argc, char* argv[])
     {
         cvr_username.set_default(std::string("Player") + std::to_string(SDL_rand_bits() % 65536));
         cvr_username.set(cvr_username.get_default());
+    }
+
+    if (on_ios && cvr_path_resource_pack.get() == cvr_path_resource_pack.get_default())
+    {
+        cvr_path_resource_pack.set(SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS) + cvr_path_resource_pack.get_default());
+        cvr_path_resource_pack.set_default(cvr_path_resource_pack.get());
+    }
+
+    if (on_ios && cvr_dir_assets.get() == cvr_dir_assets.get_default())
+    {
+        cvr_dir_assets.set(SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS) + cvr_dir_assets.get_default());
+        cvr_dir_assets.set_default(cvr_dir_assets.get());
     }
 
     if (!SDLNet_Init())
