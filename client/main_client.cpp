@@ -768,7 +768,8 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
 
     int& menu_scale = mc_gui::global_ctx->menu_scale;
     {
-        const glm::ivec2 scales = win_size / menu_scale_step;
+        const ImVec2 viewport_size = ImGui::GetMainViewport()->Size;
+        const glm::ivec2 scales = glm::ivec2(viewport_size.x, viewport_size.y) / menu_scale_step;
         int new_scale = SDL_max(SDL_min(scales.x, scales.y), 1);
 
         if (cvr_mc_gui_scale.get())
