@@ -50,7 +50,8 @@ static bool load_json(const std::string path, Jzon::Node& out)
     {
         char buf[1024];
         num_read = PHYSFS_readBytes(fd, buf, SDL_arraysize(buf));
-        json_dat.append(buf, num_read);
+        if (num_read > 0)
+            json_dat.append(buf, num_read);
     } while (num_read > 0);
     PHYSFS_close(fd);
 
