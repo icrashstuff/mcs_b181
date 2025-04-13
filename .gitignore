@@ -1,7 +1,9 @@
 # ImGui gitignore + mcs_b181 extras
+ideas*.txt
 
 ## OSX artifacts
 .DS_Store
+._*
 
 ## Dear ImGui artifacts
 imgui.ini
@@ -62,11 +64,17 @@ examples/example_sdl2_opengl2/example_sdl2_opengl2
 examples/example_sdl2_opengl3/example_sdl2_opengl3
 examples/example_sdl2_sdlrenderer/example_sdl2_sdlrenderer
 
+## Static SDL copy
+SDL/
+
 ## KDevelop IDE artifacts
 .kdev4/
 .kdev4
 *.kdev4
 *.kate-swp
 
-## I want a place to write stuff artifacts
-ideas*.txt
+## Shader artifacts
+*.spv
+*.msl
+*.metal
+*.metallib
