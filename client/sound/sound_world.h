@@ -26,15 +26,19 @@
 
 #include "sound_resources.h"
 
+#include <SDL3/SDL_atomic.h>
+#include <SDL3/SDL_audio.h>
 #include <SDL3/SDL_stdinc.h>
-#include <al.h>
-#include <alc.h>
 #include <glm/glm.hpp>
 #include <string>
 #include <vector>
 
+/* TODO: Get a unified engine to not crash and burn */
+#define SOUND_WORLD_SEPERATE_ENGINES 1
+
 /* Forward declarations */
-struct stb_vorbis;
+struct ma_engine;
+struct ma_sound;
 
 /** Sound engine, that somewhat mimics the sound engines of java and bedrock */
 class sound_world_t
@@ -121,26 +125,36 @@ private:
     struct slot_t
     {
         bool in_use = 0;
-        /* The exact with of this field doesn't really matter */
+
+        /** Number of times the slot has hosted a sound */
         unsigned long counter = 1;
 
         sound_info_t::sound_category_t category = sound_info_t::SOUND_CATEGORY_MASTER;
 
-        ALuint al_source = 0;
-        stb_vorbis* stream_decoder = NULL;
+        ma_sound* source = nullptr;
 
         bool pos_is_relative = 0;
         glm::f64vec3 pos;
 
         sound_info_t info;
+
+        /** Allocates slot_t::source */
+        void init();
+        /** Frees slot_t::source */
+        void destroy();
     };
 
     std::vector<slot_t> slots;
 
-    glm::f64vec3 pos_listener;
-
-    ALCdevice* device = nullptr;
-    ALCcontext* context = nullptr;
+#if SOUND_WORLD_SEPERATE_ENGINES
+    SDL_AtomicInt engine_ref_counter = { 0 };
+    ma_engine* engine = nullptr;
+    SDL_AudioStream* output = nullptr;
+#else
+    static SDL_AtomicInt engine_ref_counter;
+    static ma_engine* engine;
+    static SDL_AudioStream* output = nullptr;
+#endif
 };
 
 #endif

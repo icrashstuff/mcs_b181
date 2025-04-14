@@ -61,7 +61,7 @@ function(ensure_target package target)
     find_package(${package} REQUIRED)
 endfunction()
 
-set(SDL_AUDIO OFF)
+set(SDL_AUDIO ON)
 set(SDL_CAMERA OFF)
 set(SDL_OPENGL OFF)
 # set(SDL_OPENGLES OFF) # SDL Refuses to build for some reason if this is disabled
@@ -72,7 +72,6 @@ set(SDL_VENDOR_INFO "MCS_B181")
 ensure_target(SDL3   SDL3::SDL3)
 ensure_target(glm    glm::glm)
 ensure_target(ZLIB   ZLIB::ZLIB)
-ensure_target(OpenAL OpenAL::OpenAL)
 
 set(mcs_b181_server_SRC
     server/main_server.cpp
@@ -106,6 +105,7 @@ set(mcs_b181_client_SRC
 
     client/sound/stb_vorbis.c
     client/sound/sound_world.cpp
+    client/sound/miniaudio_impl.c
     client/sound/sound_resources.cpp
 
     client/jzon/Jzon.cpp
@@ -199,7 +199,6 @@ add_bin_common(mcs_b181_server)
 add_bin_common(mcs_b181_bridge)
 add_bin_common(mcs_b181_client)
 
-target_link_libraries(mcs_b181_client OpenAL::OpenAL)
 target_link_libraries(mcs_b181_client EnTT::EnTT)
 target_link_libraries(mcs_b181_client cubiomes_static)
 target_link_libraries(mcs_b181_client tetra::sdl_gpu)
