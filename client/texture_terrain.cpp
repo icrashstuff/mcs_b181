@@ -627,7 +627,7 @@ void texture_terrain_t::update(SDL_GPUCopyPass* copy_pass)
         {
             SDL_GPUTextureTransferInfo region_tbo = {
                 .transfer_buffer = tbo,
-                .offset = 0,
+                .offset = offsets[i],
                 .pixels_per_row = Uint32(tex_base_width >> i),
                 .rows_per_layer = Uint32(tex_base_height >> i),
             };
