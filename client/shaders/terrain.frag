@@ -1,4 +1,4 @@
-#version 330 core
+#version 450 core
 /* SPDX-License-Identifier: MIT
  *
  * SPDX-FileCopyrightText: Copyright (c) 2025 Ian Hangartner <icrashstuff at outlook dot com>
@@ -21,56 +21,74 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-in vec4 frag_color;
-in vec2 frag_uv;
-in float frag_ao;
-in float frag_light_block;
-in float frag_light_sky;
+/* ================ BEGIN Fragment inputs ================ */
+layout(location = 0) in struct
+{
+    vec4 color;
+    vec2 uv;
+    float ao;
+    float light_block;
+    float light_sky;
+} frag;
+/* ================ END Fragment inputs ================ */
 
-out vec4 out_color;
+/* ================ BEGIN Fragment outputs ================ */
+layout(location = 0) out vec4 out_color;
+/* ================ END Fragment outputs ================ */
 
-uniform sampler2D tex_atlas;
-uniform sampler2D tex_lightmap;
+/**
+ * Modified excerpt from SDL_gpu.h about resource bindings
+ *
+ * Fragment shaders:
+ * - set=2: Sampled textures, followed by storage textures, followed by storage buffers
+ * - set=3: Uniform buffers
+ */
 
-uniform int ao_algorithm = 1;
-uniform bool use_texture = true;
-uniform bool allow_translucency = true;
+layout(set = 2, binding = 0) uniform sampler2D tex_atlas;
+layout(set = 2, binding = 1) uniform sampler2D tex_lightmap;
+
+const int ao_algorithm = 1;
+
+layout(std140, set = 3, binding = 0) uniform ubo_frag_t
+{
+    bool use_texture;
+}
+ubo_frag;
 
 void main()
 {
-    out_color = frag_color;
+    out_color = frag.color;
 
-    if (use_texture)
-        out_color *= texture2D(tex_atlas, frag_uv);
+    if (ubo_frag.use_texture)
+        out_color *= texture(tex_atlas, frag.uv, -1.0);
     else
-        out_color.a *= texture2D(tex_atlas, frag_uv).a;
+        out_color.a *= texture(tex_atlas, frag.uv, -1.0).a;
 
+    /* TODO-OPT: Remove this? */
     if (out_color.a < 0.0625)
         discard;
-    else if(!allow_translucency)
-        out_color.a = 1.0;
 
     switch (ao_algorithm)
     {
     case 0:
         break;
     case 1:
-        out_color.xyz *= 1.0 - frag_ao / 10.0;
+        out_color.xyz *= 1.0 - frag.ao / 10.0;
     case 2:
-        out_color.xyz *= clamp(1.1 - (-0.1 / (frag_ao - 1.25)), 0.0, 1.0);
+        out_color.xyz *= clamp(1.1 - (-0.1 / (frag.ao - 1.25)), 0.0, 1.0);
         break;
     case 3:
-        out_color.xyz *= clamp(1.15 - (-0.2 / (frag_ao - 1.25)), 0.0, 1.0);
+        out_color.xyz *= clamp(1.15 - (-0.2 / (frag.ao - 1.25)), 0.0, 1.0);
         break;
     case 4:
-        out_color.xyz *= (1.0 - (pow(64.0, frag_ao / 2.0) - 1) / 64.0);
+        out_color.xyz *= (1.0 - (pow(64.0, frag.ao / 2.0) - 1) / 64.0);
         break;
     case 5:
-        out_color.xyz *= (1.0 - (pow(64.0, frag_ao / 1.5) - 1) / 64.0);
+        out_color.xyz *= (1.0 - (pow(64.0, frag.ao / 1.5) - 1) / 64.0);
         break;
     default:
         break;
     }
 
-    out_color *= texture2D(tex_lightmap,vec2(frag_light_block, frag_light_sky));
+    out_color *= texture(tex_lightmap, vec2(frag.light_block, frag.light_sky));
 }

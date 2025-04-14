@@ -1,4 +1,4 @@
-#version 330 core
+#version 450 core
 /* SPDX-License-Identifier: MIT
  *
  * SPDX-FileCopyrightText: Copyright (c) 2025 Ian Hangartner <icrashstuff at outlook dot com>
@@ -21,6 +21,7 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+/* ================ BEGIN Vertex inputs ================ */
 /**
  * X:  [0....9]
  * Y:  [10..19]
@@ -43,39 +44,65 @@ layout(location = 1) in uint vtx_coloring;
  * V: [16..31] / (2^15 + 1)
  */
 layout(location = 2) in uint vtx_texturing;
+/* ================ END Vertex inputs ================ */
 
-out vec4 frag_color;
-out vec2 frag_uv;
-out float frag_ao;
-out float frag_light_block;
-out float frag_light_sky;
+/* ================ BEGIN Vertex outputs ================ */
+layout(location = 0) out struct
+{
+    vec4 color;
+    vec2 uv;
+    float ao;
+    float light_block;
+    float light_sky;
+} frag;
+/* ================ END Vertex outputs ================ */
 
-uniform mat4 model;
-uniform mat4 camera;
-uniform mat4 projection;
+/**
+ * Modified excerpt from SDL_gpu.h about resource bindings
+ *
+ * Vertex shaders:
+ * - set=0: Sampled textures, followed by storage textures, followed by storage buffers
+ * - set=1: Uniform buffers
+ */
 
-uniform vec4 tint = vec4(1.0, 1.0, 1.0, 1.0);
+layout(std140, set = 1, binding = 0) uniform ubo_world_t
+{
+    mat4 camera;
+    mat4 projection;
+}
+ubo_world;
+
+layout(std140, set = 1, binding = 1) uniform ubo_tint_t
+{
+    vec4 tint;
+}
+ubo_tint;
+
+layout(std140, set = 1, binding = 2) uniform ubo_model_t
+{
+    vec4 model;
+}
+ubo_model;
 
 void main()
 {
     vec3 pos;
-    pos.x = float(int((vtx_pos_ao      ) & 1023u ) - 256) / 32.0;
-    pos.y = float(int((vtx_pos_ao >> 10) & 1023u ) - 256) / 32.0;
-    pos.z = float(int((vtx_pos_ao >> 20) & 1023u ) - 256) / 32.0;
-    vec4 position = camera * model * vec4(pos, 1.0);
-    gl_Position = projection * position;
+    pos.x = float(int((vtx_pos_ao      ) & 1023u) - 256) / 32.0;
+    pos.y = float(int((vtx_pos_ao >> 10) & 1023u) - 256) / 32.0;
+    pos.z = float(int((vtx_pos_ao >> 20) & 1023u) - 256) / 32.0;
+    gl_Position = ubo_world.projection * ubo_world.camera * (vec4(pos, 1.0) + ubo_model.model);
 
-    frag_ao = float((vtx_pos_ao >> 30) & 3u) / 3.0;
+    frag.ao = float((vtx_pos_ao >> 30) & 3u) / 3.0;
 
-    frag_color.r = tint.r * float((vtx_coloring) & 255u) / 255.0;
-    frag_color.g = tint.g * float((vtx_coloring >> 8) & 255u) / 255.0;
-    frag_color.b = tint.b * float((vtx_coloring >> 16) & 255u) / 255.0;
-    frag_color.a = tint.a;
+    frag.color.r = ubo_tint.tint.r * float((vtx_coloring      ) & 255u) / 255.0;
+    frag.color.g = ubo_tint.tint.g * float((vtx_coloring >>  8) & 255u) / 255.0;
+    frag.color.b = ubo_tint.tint.b * float((vtx_coloring >> 16) & 255u) / 255.0;
+    frag.color.a = ubo_tint.tint.a;
 
-    frag_light_block = float((vtx_coloring >> 24) & 15u) / 15.0;
-    frag_light_sky = float((vtx_coloring >> 28) & 15u) / 15.0;
+    frag.light_block = float((vtx_coloring >> 24) & 15u) / 15.0;
+    frag.light_sky   = float((vtx_coloring >> 28) & 15u) / 15.0;
 
-    float u = float((vtx_texturing) & 65535u) / 32768.0;
+    float u = float((vtx_texturing      ) & 65535u) / 32768.0;
     float v = float((vtx_texturing >> 16) & 65535u) / 32768.0;
-    frag_uv = vec2(u, v);
+    frag.uv = vec2(u, v);
 }

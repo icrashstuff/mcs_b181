@@ -21,6 +21,7 @@
  * DEALINGS IN THE SOFTWARE.
  */
 #include "chunk_cubic.h"
+#include "state.h"
 
 #ifndef IM_ARRAYSIZE
 #define IM_ARRAYSIZE(X) (int(SDL_arraysize(X)))
@@ -28,20 +29,16 @@
 
 void chunk_cubic_t::free_renderer_resources()
 {
-    glDeleteVertexArrays(1, &vao);
-    glDeleteBuffers(1, &vbo);
-    glDeleteBuffers(1, &ebo_translucent);
+    SDL_ReleaseGPUBuffer(state::gpu_device, vbo);
+    SDL_ReleaseGPUBuffer(state::gpu_device, ebo_translucent);
 
-    vao = 0;
-    vbo = 0;
-    ebo_translucent = 0;
+    vbo = nullptr;
+    ebo_translucent = nullptr;
 
     index_count = 0;
     index_count_overlay = 0;
     index_count_translucent = 0;
 
-    index_type = GL_NONE;
-    index_type_overlay = GL_NONE;
     index_type_translucent = GL_NONE;
 
     dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;

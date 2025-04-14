@@ -383,6 +383,10 @@ static void do_in_game_menu__player_list(mc_gui::mc_gui_ctx* const ctx, connecti
     ctx->menu_scale = old_menu_scale;
 }
 
+#ifndef GLM_TO_IM
+#define GLM_TO_IM(A) ImVec2((A).x, (A).y)
+#endif
+
 /**
  * Render itemstack
  *
@@ -400,12 +404,19 @@ static void render_item_stack(ImDrawList* const draw_list, const int menu_scale,
     if (item.id == BLOCK_ID_NONE || item.id == BLOCK_ID_AIR)
         return;
 
-    const ImVec2 simple_uv0(0, 0);
-    const ImVec2 simple_uv1(1, 1);
+    ImTextureID tex_id(reinterpret_cast<ImTextureID>(&game_resources->terrain_atlas->binding));
+
+    mc_id::terrain_face_t face_top = game_resources->terrain_atlas->get_face(mc_id::FACE_STONE);
+    mc_id::terrain_face_t face_left = game_resources->terrain_atlas->get_face(mc_id::FACE_STONE);
+    mc_id::terrain_face_t face_right = game_resources->terrain_atlas->get_face(mc_id::FACE_STONE);
 
     /* TODO: Proper rendering of items/blocks */
     if (!mc_id::is_block(item.id) || !mc_id::block_has_collision(item.id))
-        draw_list->AddImage(0, pos0, pos1, simple_uv0, simple_uv1);
+    {
+        ImVec2 uv0(face_top.corners[0].x, face_top.corners[0].y);
+        ImVec2 uv1(face_top.corners[3].x, face_top.corners[3].y);
+        draw_list->AddImage(tex_id, pos0, pos1, uv0, uv1);
+    }
     else
     {
         const ImVec2 size = pos1 - pos0;
@@ -440,21 +451,34 @@ static void render_item_stack(ImDrawList* const draw_list, const int menu_scale,
         const ImVec2 right_upper = pos0 + size * _right_upper;
         const ImVec2 right_lower = pos0 + size * _right_lower;
 
-        const ImTextureID tex_top = mc_gui::global_ctx->tex_id_bg;
-        const ImTextureID tex_left = mc_gui::global_ctx->tex_id_bg;
-        const ImTextureID tex_right = mc_gui::global_ctx->tex_id_bg;
+        face_top.rotate_90();
 
-        ImVec2 uv_top[4] = { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 0, 1 } };
-        ImVec2 uv_left[4] = { { 0, 0 }, { 1, 0 }, { 1, 1 }, { 0, 1 } };
-        ImVec2 uv_right[4] = { { 1, 0 }, { 0, 0 }, { 0, 1 }, { 1, 1 } };
+        ImVec2 uv_top[4] = {
+            GLM_TO_IM(face_top.corners[0]),
+            GLM_TO_IM(face_top.corners[1]),
+            GLM_TO_IM(face_top.corners[3]),
+            GLM_TO_IM(face_top.corners[2]),
+        };
+        ImVec2 uv_left[4] = {
+            GLM_TO_IM(face_left.corners[0]),
+            GLM_TO_IM(face_left.corners[1]),
+            GLM_TO_IM(face_left.corners[3]),
+            GLM_TO_IM(face_left.corners[2]),
+        };
+        ImVec2 uv_right[4] = {
+            GLM_TO_IM(face_right.corners[1]),
+            GLM_TO_IM(face_right.corners[0]),
+            GLM_TO_IM(face_right.corners[2]),
+            GLM_TO_IM(face_right.corners[3]),
+        };
 
         Uint32 col_top = IM_COL32(255, 255, 255, 255);
         Uint32 col_left = IM_COL32(189, 189, 189, 255);
         Uint32 col_right = IM_COL32(216, 216, 216, 255);
 
-        draw_list->AddImageQuad(tex_top, left_upper, mid_mid, right_upper, mid_upper, uv_top[0], uv_top[1], uv_top[2], uv_top[3], col_top);
-        draw_list->AddImageQuad(tex_left, left_upper, mid_mid, mid_lower, left_lower, uv_left[0], uv_left[1], uv_left[2], uv_left[3], col_left);
-        draw_list->AddImageQuad(tex_right, right_upper, mid_mid, mid_lower, right_lower, uv_right[0], uv_right[1], uv_right[2], uv_right[3], col_right);
+        draw_list->AddImageQuad(tex_id, left_upper, mid_mid, right_upper, mid_upper, uv_top[0], uv_top[1], uv_top[2], uv_top[3], col_top);
+        draw_list->AddImageQuad(tex_id, left_upper, mid_mid, mid_lower, left_lower, uv_left[0], uv_left[1], uv_left[2], uv_left[3], col_left);
+        draw_list->AddImageQuad(tex_id, right_upper, mid_mid, mid_lower, right_lower, uv_right[0], uv_right[1], uv_right[2], uv_right[3], col_right);
     }
 
     if (item.quantity == 1 || (!cvr_mc_less_than_one_item_quantities.get() && item.quantity < 0))
@@ -1396,6 +1420,99 @@ static client_menu_return_t do_menu_options_controls(mc_gui::mc_gui_ctx* ctx)
 
 namespace mc_gui
 {
+/* Mostly copy pasted from imgui_impl_sdlgpu3.cpp */
+static void init_mc_gui_shaders()
+{
+    ImGui_ImplSDLGPU3_Data* bd = (ImGui_ImplSDLGPU3_Data*)ImGui::GetIO().BackendRendererUserData;
+    ImGui_ImplSDLGPU3_InitInfo* v = &bd->InitInfo;
+
+    SDL_GPUVertexBufferDescription vertex_buffer_desc[1];
+    vertex_buffer_desc[0].slot = 0;
+    vertex_buffer_desc[0].input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX;
+    vertex_buffer_desc[0].instance_step_rate = 0;
+    vertex_buffer_desc[0].pitch = sizeof(ImDrawVert);
+
+    SDL_GPUVertexAttribute vertex_attributes[3];
+    vertex_attributes[0].buffer_slot = 0;
+    vertex_attributes[0].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
+    vertex_attributes[0].location = 0;
+    vertex_attributes[0].offset = offsetof(ImDrawVert, pos);
+
+    vertex_attributes[1].buffer_slot = 0;
+    vertex_attributes[1].format = SDL_GPU_VERTEXELEMENTFORMAT_FLOAT2;
+    vertex_attributes[1].location = 1;
+    vertex_attributes[1].offset = offsetof(ImDrawVert, uv);
+
+    vertex_attributes[2].buffer_slot = 0;
+    vertex_attributes[2].format = SDL_GPU_VERTEXELEMENTFORMAT_UBYTE4_NORM;
+    vertex_attributes[2].location = 2;
+    vertex_attributes[2].offset = offsetof(ImDrawVert, col);
+
+    SDL_GPUVertexInputState vertex_input_state = {};
+    vertex_input_state.num_vertex_attributes = 3;
+    vertex_input_state.vertex_attributes = vertex_attributes;
+    vertex_input_state.num_vertex_buffers = 1;
+    vertex_input_state.vertex_buffer_descriptions = vertex_buffer_desc;
+
+    SDL_GPURasterizerState rasterizer_state = {};
+    rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
+    rasterizer_state.cull_mode = SDL_GPU_CULLMODE_NONE;
+    rasterizer_state.front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
+    rasterizer_state.enable_depth_bias = false;
+    rasterizer_state.enable_depth_clip = false;
+
+    SDL_GPUMultisampleState multisample_state = {};
+    multisample_state.sample_count = v->MSAASamples;
+    multisample_state.enable_mask = false;
+
+    SDL_GPUDepthStencilState depth_stencil_state = {};
+    depth_stencil_state.enable_depth_test = false;
+    depth_stencil_state.enable_depth_write = false;
+    depth_stencil_state.enable_stencil_test = false;
+
+    SDL_GPUColorTargetBlendState blend_state = {};
+    blend_state.enable_blend = true;
+    blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
+    blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+    blend_state.color_blend_op = SDL_GPU_BLENDOP_ADD;
+    blend_state.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
+    blend_state.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+    blend_state.alpha_blend_op = SDL_GPU_BLENDOP_ADD;
+    blend_state.color_write_mask = SDL_GPU_COLORCOMPONENT_R | SDL_GPU_COLORCOMPONENT_G | SDL_GPU_COLORCOMPONENT_B | SDL_GPU_COLORCOMPONENT_A;
+
+    SDL_GPUColorTargetDescription color_target_desc[1];
+    color_target_desc[0].format = v->ColorTargetFormat;
+    color_target_desc[0].blend_state = blend_state;
+
+    SDL_GPUGraphicsPipelineTargetInfo target_info = {};
+    target_info.num_color_targets = 1;
+    target_info.color_target_descriptions = color_target_desc;
+    target_info.has_depth_stencil_target = true;
+    target_info.depth_stencil_format = state::gpu_tex_format_best_depth_only;
+
+    SDL_GPUGraphicsPipelineCreateInfo pipeline_info = {};
+    pipeline_info.vertex_shader = bd->VertexShader;
+    pipeline_info.fragment_shader = bd->FragmentShader;
+    pipeline_info.vertex_input_state = vertex_input_state;
+    pipeline_info.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST;
+    pipeline_info.rasterizer_state = rasterizer_state;
+    pipeline_info.multisample_state = multisample_state;
+    pipeline_info.depth_stencil_state = depth_stencil_state;
+    pipeline_info.target_info = target_info;
+
+    pipeline_imgui_regular = SDL_CreateGPUGraphicsPipeline(state::gpu_device, &pipeline_info);
+
+    color_target_desc[0].blend_state.color_blend_op = SDL_GPU_BLENDOP_REVERSE_SUBTRACT;
+
+    pipeline_imgui_crosshair = SDL_CreateGPUGraphicsPipeline(state::gpu_device, &pipeline_info);
+}
+
+static void destroy_mc_gui_shaders()
+{
+    SDL_ReleaseGPUGraphicsPipeline(state::gpu_device, pipeline_imgui_regular);
+    SDL_ReleaseGPUGraphicsPipeline(state::gpu_device, pipeline_imgui_crosshair);
+}
+
 static void init()
 {
     mc_gui::global_ctx->menu_scale = 1;
@@ -1413,6 +1530,8 @@ static void init()
         init_info.MSAASamples = SDL_GPU_SAMPLECOUNT_1;
         if (!ImGui_ImplSDLGPU3_Init(&init_info))
             util::die("Failed to initialize Dear Imgui SDLGPU3 backend\n");
+
+        init_mc_gui_shaders();
 
         ImGuiStyle& style = ImGui::GetStyle();
 
@@ -1459,6 +1578,8 @@ static void deinit()
 {
     if (!imgui_ctx_main_menu)
         return;
+
+    destroy_mc_gui_shaders();
 
     ImGuiContext* last_ctx = ImGui::GetCurrentContext();
     ImGui::SetCurrentContext(imgui_ctx_main_menu);

@@ -85,7 +85,8 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
         }
         mem_chunk_guess += cvec.capacity() * sizeof(cvec[0]);
 
-        add_text(ctx, drawlist, 0, cursor_l, "C: %zu/%zu, M: %zu, D: %zu/%zu", num_visible, num_total, num_meshed, num_dirty_visible, num_dirty);
+        add_text(ctx, drawlist, 0, cursor_l, "C: %zu/%zu, M: %zu, D: %zu/%zu, Q: %zu", num_visible, num_total, num_meshed, num_dirty_visible, num_dirty,
+            game->level->get_mesh_queue_size());
     }
 
     /* Entity stats */

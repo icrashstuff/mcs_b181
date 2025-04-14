@@ -118,7 +118,7 @@ set(mcs_b181_client_SRC
     client/entity/entity.cpp
     client/entity/entity_physics.cpp
 
-    client/shaders/shaders.cpp
+    client/shaders/terrain_shader.cpp
 
     shared/ids.cpp
     shared/misc.cpp

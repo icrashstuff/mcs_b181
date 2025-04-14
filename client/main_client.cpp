@@ -57,7 +57,7 @@
 
 #include "gui/mc_gui.h"
 
-#include "shaders/shaders.h"
+#include "shaders/terrain_shader.h"
 
 #include "state.h"
 
@@ -95,7 +95,7 @@ static convar_int_t cvr_mc_gui_style_editor(
 
 static bool take_screenshot = 0;
 
-static void compile_shaders() { shader_t::build_all(); }
+static void compile_shaders() { }
 
 static std::vector<game_t*> games;
 static game_t* game_pano = nullptr;
@@ -108,6 +108,8 @@ static float music_counter = 0;
 static SDL_DEPRECATED sound_world_t* sound_engine_main_menu = nullptr;
 
 static ImGuiContext* imgui_ctx_main_menu = NULL;
+static SDL_GPUGraphicsPipeline* pipeline_imgui_regular = nullptr;
+static SDL_GPUGraphicsPipeline* pipeline_imgui_crosshair = nullptr;
 
 static mc_gui::mc_gui_ctx mc_gui_global_ctx;
 mc_gui::mc_gui_ctx* mc_gui::global_ctx = &mc_gui_global_ctx;
@@ -160,6 +162,8 @@ static bool initialize_resources()
      * (Hours wasted: 2) (This applied specifically to OpenGL) */
     mc_gui::init();
 
+    state::init_terrain_pipelines();
+
     compile_shaders();
 
     sound_engine_main_menu = new sound_world_t();
@@ -181,6 +185,8 @@ static bool deinitialize_resources()
     mc_gui::global_ctx->unload_resources();
 
     mc_gui::deinit();
+
+    state::destroy_terrain_pipelines();
 
     for (game_t* g : games)
         if (g)
@@ -569,7 +575,7 @@ void do_debug_crosshair(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawl
 static ImVec2 dvec2_to_ImVec2(const glm::dvec2 x) { return ImVec2(x.x, x.y); }
 static glm::dvec2 ImVec2_to_dvec2(const ImVec2 x) { return glm::dvec2(x.x, x.y); }
 
-static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture* gpu_target)
+static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture* gpu_target, const ImVec4 clear_color, const glm::ivec2 win_size)
 {
     bool warp_mouse_to_center = 0;
     if (SDL_GetWindowMouseGrab(state::window) != mouse_grabbed)
@@ -723,9 +729,6 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
         held_tab = 0;
     }
 
-    glm::ivec2 win_size;
-    SDL_GetWindowSize(state::window, &win_size.x, &win_size.y);
-
     for (game_t* g : games)
         if (g->connection && g->level)
             g->connection->run(g->level);
@@ -836,15 +839,12 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
     if (in_world && game->connection)
         in_world = game->connection->get_in_world();
 
-    if (menu_ret.allow_world && in_world)
+    bool render_world = menu_ret.allow_world && in_world;
+
+    /* Define this early to pass to ImGui callbacks */
+    SDL_GPURenderPass* render_pass = nullptr;
+    if (render_world)
     {
-        ImGui::SetCurrentContext(last_ctx);
-        SDL_GPUCopyPass* copy_pass = SDL_BeginGPUCopyPass(gpu_command_buffer);
-        game->level->lightmap.update();
-        game_resources->terrain_atlas->update(copy_pass);
-        SDL_EndGPUCopyPass(copy_pass);
-        game->level->render(win_size, delta_time);
-        ImGui::SetCurrentContext(imgui_ctx_main_menu);
 
         render_world_overlays(game->level, bg_draw_list);
 
@@ -858,7 +858,11 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
         else
         {
             /* This blendfunc causes properly made cursors to contrast with the environment better */
-            // bg_draw_list->AddCallback([](const ImDrawList*, const ImDrawCmd*) { glBlendFunc(GL_ONE_MINUS_DST_COLOR, GL_ONE_MINUS_SRC_ALPHA); }, NULL);
+            bg_draw_list->AddCallback(
+                [](const ImDrawList*, const ImDrawCmd* draw_cmd) {
+                    SDL_BindGPUGraphicsPipeline(*static_cast<SDL_GPURenderPass**>(draw_cmd->UserCallbackData), pipeline_imgui_crosshair);
+                },
+                &render_pass);
 
             /* Render crosshair
              * NOTE: If a function called by client_menu_manager.run_last_in_stack() adds to
@@ -874,7 +878,11 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
                 bg_draw_list->AddImage(mc_gui::global_ctx->tex_id_widgets, pos0, pos1, uv0, uv1);
             else
                 bg_draw_list->AddImage(mc_gui::global_ctx->tex_id_crosshair, pos0, pos1);
-            // bg_draw_list->AddCallback(ImDrawCallback_ResetRenderState, NULL);
+            bg_draw_list->AddCallback(
+                [](const ImDrawList*, const ImDrawCmd* draw_cmd) {
+                    SDL_BindGPUGraphicsPipeline(*static_cast<SDL_GPURenderPass**>(draw_cmd->UserCallbackData), pipeline_imgui_regular);
+                },
+                &render_pass);
         }
 
         /* Draw world dim */
@@ -905,26 +913,84 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
     ImGui::Render();
     ImDrawData* draw_data = ImGui::GetDrawData();
     const bool is_minimized = (draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f);
-    if (gpu_target != nullptr && !is_minimized)
+    if (gpu_target == nullptr || is_minimized || gpu_command_buffer == nullptr)
     {
-        SDL_PushGPUDebugGroup(gpu_command_buffer, "[mc_gui]: Render ImGui");
-        Imgui_ImplSDLGPU3_PrepareDrawData(draw_data, gpu_command_buffer);
-
-        // Setup and start a render pass
-        SDL_GPUColorTargetInfo target_info = {};
-        target_info.texture = gpu_target;
-        target_info.load_op = SDL_GPU_LOADOP_LOAD;
-        target_info.store_op = SDL_GPU_STOREOP_STORE;
-        target_info.mip_level = 0;
-        target_info.layer_or_depth_plane = 0;
-        target_info.cycle = false;
-        SDL_GPURenderPass* render_pass = SDL_BeginGPURenderPass(gpu_command_buffer, &target_info, 1, nullptr);
-
-        ImGui_ImplSDLGPU3_RenderDrawData(draw_data, gpu_command_buffer, render_pass);
-
-        SDL_EndGPURenderPass(render_pass);
-        SDL_PopGPUDebugGroup(gpu_command_buffer);
+        ImGui::SetCurrentContext(last_ctx);
+        return;
     }
+
+    SDL_PushGPUDebugGroup(gpu_command_buffer, "[mc_gui]: Copy pass");
+    Imgui_ImplSDLGPU3_PrepareDrawData(draw_data, gpu_command_buffer);
+    SDL_PopGPUDebugGroup(gpu_command_buffer);
+
+    if (render_world)
+    {
+        ImGui::SetCurrentContext(last_ctx);
+        game->level->render_stage_prepare(win_size);
+        SDL_GPUCopyPass* copy_pass = SDL_BeginGPUCopyPass(gpu_command_buffer);
+
+        SDL_PushGPUDebugGroup(gpu_command_buffer, "[Level]: Copy pass");
+        game->level->render_stage_copy(copy_pass);
+        game_resources->terrain_atlas->update(copy_pass);
+        SDL_PopGPUDebugGroup(gpu_command_buffer);
+
+        SDL_EndGPUCopyPass(copy_pass);
+        ImGui::SetCurrentContext(imgui_ctx_main_menu);
+    }
+
+    // TODO: Split render and copy pass into separate functions
+
+    SDL_GPUColorTargetInfo tinfo_color = {};
+    tinfo_color.texture = gpu_target;
+    tinfo_color.clear_color = SDL_FColor { clear_color.x, clear_color.y, clear_color.z, clear_color.w };
+    tinfo_color.load_op = SDL_GPU_LOADOP_CLEAR;
+    tinfo_color.store_op = SDL_GPU_STOREOP_STORE;
+    tinfo_color.mip_level = 0;
+    tinfo_color.layer_or_depth_plane = 0;
+    tinfo_color.cycle = false;
+    SDL_GPUTextureCreateInfo cinfo_depth_tex = {
+        .type = SDL_GPU_TEXTURETYPE_2D,
+        .format = state::gpu_tex_format_best_depth_only,
+        .usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET,
+        .width = Uint32(win_size.x),
+        .height = Uint32(win_size.y),
+        .layer_count_or_depth = 1,
+        .num_levels = 1,
+        .sample_count = SDL_GPU_SAMPLECOUNT_1,
+        .props = 0,
+    };
+    SDL_GPUDepthStencilTargetInfo tinfo_depth = {
+        .texture = SDL_CreateGPUTexture(state::gpu_device, &cinfo_depth_tex),
+        .clear_depth = 1.0,
+        .load_op = SDL_GPU_LOADOP_CLEAR,
+        .store_op = SDL_GPU_STOREOP_DONT_CARE,
+        .stencil_load_op = SDL_GPU_LOADOP_DONT_CARE,
+        .stencil_store_op = SDL_GPU_STOREOP_DONT_CARE,
+        .cycle = 0,
+        .clear_stencil = 0,
+        .padding1 = 0,
+        .padding2 = 0,
+    };
+    render_pass = SDL_BeginGPURenderPass(gpu_command_buffer, &tinfo_color, 1, &tinfo_depth);
+    SDL_ReleaseGPUTexture(state::gpu_device, tinfo_depth.texture);
+
+    if (render_world)
+    {
+        ImGui::SetCurrentContext(last_ctx);
+
+        SDL_PushGPUDebugGroup(gpu_command_buffer, "[Level]: Render pass");
+        game->level->render_stage_render(gpu_command_buffer, render_pass, win_size, delta_time);
+        SDL_PopGPUDebugGroup(gpu_command_buffer);
+
+        ImGui::SetCurrentContext(imgui_ctx_main_menu);
+    }
+
+    SDL_PushGPUDebugGroup(gpu_command_buffer, "[mc_gui]: Render pass");
+    ImGui_ImplSDLGPU3_RenderDrawData(draw_data, gpu_command_buffer, render_pass, pipeline_imgui_regular);
+    SDL_PopGPUDebugGroup(gpu_command_buffer);
+
+    SDL_EndGPURenderPass(render_pass);
+
     ImGui::SetCurrentContext(last_ctx);
 }
 
@@ -1279,14 +1345,12 @@ static void process_event(SDL_Event& event, bool* done)
         {
             game_resources->ao_algorithm = (game_resources->ao_algorithm + 1) % (AO_ALGO_MAX + 1);
             dc_log("Setting ao_algorithm to %d", game_resources->ao_algorithm);
-            game_resources->terrain_shader->set_uniform("ao_algorithm", game_resources->ao_algorithm);
             break;
         }
         case SDL_SCANCODE_X:
         {
             game_resources->use_texture = !game_resources->use_texture;
             dc_log("Setting use_texture to %d", game_resources->use_texture);
-            game_resources->terrain_shader->set_uniform("use_texture", game_resources->use_texture);
             break;
         }
         case SDL_SCANCODE_R:
@@ -1507,7 +1571,7 @@ static void screenshot_func(const glm::ivec2 win_size)
 }
 
 static convar_int_t cvr_profile_light("profile_light", 0, 0, 1, "Profile lighting engine then exit", CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_DEV_ONLY);
-void profile_light()
+static void profile_light()
 {
     game_t game(game_resources);
 
@@ -1570,7 +1634,7 @@ void profile_light()
 
         dc_log("Emptiness: %.3f%%", double((emptiness * 1000000) / total) / 10000.0);
 
-        game.level->render({ 128, 20 }, 0.0f);
+        game.level->render_stage_prepare({ 10, 10 });
 
         /* Add to individual counters */
         timers[using_sdl_rand][0] += game.level->last_perf_light_pass1;
@@ -1634,8 +1698,10 @@ SDL_Window* state::window = nullptr;
 SDL_GPUDevice* state::gpu_device = nullptr;
 SDL_GPUTexture* state::gpu_debug_texture = nullptr;
 SDL_GPUSampler* state::gpu_debug_sampler = nullptr;
+SDL_GPUBuffer* state::gpu_square_ebo = nullptr;
+SDL_GPUTextureFormat state::gpu_tex_format_best_depth_only = SDL_GPU_TEXTUREFORMAT_D16_UNORM;
 
-static void upload_debug_texture()
+static void upload_debug_texture(SDL_GPUCopyPass* const copy_pass)
 {
     SDL_GPUTextureCreateInfo tex_info = {
         .type = SDL_GPU_TEXTURETYPE_2D,
@@ -1692,14 +1758,6 @@ static void upload_debug_texture()
 
     SDL_UnmapGPUTransferBuffer(state::gpu_device, tbo);
 
-    SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(state::gpu_device);
-    if (command_buffer == nullptr)
-        util::die("Failed to acquire command buffer to upload debug texture, SDL_AcquireGPUCommandBuffer: %s", SDL_GetError());
-
-    SDL_GPUCopyPass* copy_pass = SDL_BeginGPUCopyPass(command_buffer);
-    if (command_buffer == nullptr)
-        util::die("Failed to acquire copy pass to upload debug texture, SDL_BeginGPUCopyPass: %s", SDL_GetError());
-
     SDL_GPUTextureTransferInfo region_tbo = {
         .transfer_buffer = tbo,
         .offset = 0,
@@ -1720,14 +1778,106 @@ static void upload_debug_texture()
     };
 
     SDL_UploadToGPUTexture(copy_pass, &region_tbo, &region_tex, false);
+    SDL_ReleaseGPUTransferBuffer(state::gpu_device, tbo);
+}
+
+static void upload_square_ebo(SDL_GPUCopyPass* const copy_pass, const char* name)
+{
+    Uint32 num_quads = CHUNK_SIZE_X * CHUNK_SIZE_Y * CHUNK_SIZE_Z * 6;
+    Uint32 num_idx = num_quads * 6;
+    Uint32 buf_size = num_idx * sizeof(Uint32);
+
+    SDL_GPUBufferCreateInfo cinfo_buf = {
+        .usage = SDL_GPU_BUFFERUSAGE_INDEX,
+        .size = buf_size,
+        .props = SDL_CreateProperties(),
+    };
+
+    SDL_SetStringProperty(cinfo_buf.props, SDL_PROP_GPU_BUFFER_CREATE_NAME_STRING, name);
+
+    if ((state::gpu_square_ebo = SDL_CreateGPUBuffer(state::gpu_device, &cinfo_buf)) == nullptr)
+        util::die("Unable to create debug texture, SDL_CreateGPUBuffer: %s", SDL_GetError());
+
+    SDL_GPUTransferBufferCreateInfo cinfo_tbo = {
+        .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
+        .size = buf_size,
+        .props = 0,
+    };
+
+    SDL_GPUTransferBuffer* tbo = SDL_CreateGPUTransferBuffer(state::gpu_device, &cinfo_tbo);
+    if (tbo == nullptr)
+        util::die("Failed to acquire TBO to upload debug texture");
+
+    Uint32* tbo_pointer = (Uint32*)SDL_MapGPUTransferBuffer(state::gpu_device, tbo, false);
+    if (tbo_pointer == nullptr)
+        util::die("Failed to map TBO to upload debug texture, SDL_MapGPUTransferBuffer: %s", SDL_GetError());
+
+    Uint32 j = 0;
+    for (Uint32 i = 0; i < num_quads; i++)
+    {
+        tbo_pointer[j++] = i * 4 + 0;
+        tbo_pointer[j++] = i * 4 + 1;
+        tbo_pointer[j++] = i * 4 + 2;
+        tbo_pointer[j++] = i * 4 + 2;
+        tbo_pointer[j++] = i * 4 + 1;
+        tbo_pointer[j++] = i * 4 + 3;
+    }
+    assert(j == num_idx);
+
+    SDL_UnmapGPUTransferBuffer(state::gpu_device, tbo);
+
+    SDL_GPUTransferBufferLocation region_tbo = {
+        .transfer_buffer = tbo,
+        .offset = 0,
+    };
+    SDL_GPUBufferRegion region_buf = {
+        .buffer = state::gpu_square_ebo,
+        .offset = 0,
+        .size = buf_size,
+    };
+
+    SDL_UploadToGPUBuffer(copy_pass, &region_tbo, &region_buf, false);
+    SDL_ReleaseGPUTransferBuffer(state::gpu_device, tbo);
+}
+
+void setup_static_gpu_state()
+{
+    state::window = tetra::window;
+    state::gpu_device = tetra::gpu_device;
+
+    SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(state::gpu_device);
+    if (command_buffer == nullptr)
+        util::die("Failed to acquire command buffer to upload debug texture, SDL_AcquireGPUCommandBuffer: %s", SDL_GetError());
+
+    SDL_GPUCopyPass* copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+    if (command_buffer == nullptr)
+        util::die("Failed to acquire copy pass to upload debug texture, SDL_BeginGPUCopyPass: %s", SDL_GetError());
+
+    upload_debug_texture(copy_pass);
+    upload_square_ebo(copy_pass, "[Level]: EBO: 16bit");
 
     SDL_EndGPUCopyPass(copy_pass);
 
     SDL_GPUFence* fence = SDL_SubmitGPUCommandBufferAndAcquireFence(command_buffer);
 
+    SDL_GPUTextureFormat best_depth_formats[] = {
+        SDL_GPU_TEXTUREFORMAT_D32_FLOAT,
+        SDL_GPU_TEXTUREFORMAT_D24_UNORM_S8_UINT,
+        SDL_GPU_TEXTUREFORMAT_D24_UNORM,
+        SDL_GPU_TEXTUREFORMAT_D16_UNORM,
+    };
+    const char* best_depth_formats_str[SDL_arraysize(best_depth_formats)] = { "D32_FLOAT", "D24_UNORM_S8_UINT", "D24_UNORM", "D16_UNORM" };
+    for (int i = 0; i < IM_ARRAYSIZE(best_depth_formats); i++)
+    {
+        if (!SDL_GPUTextureSupportsFormat(state::gpu_device, best_depth_formats[i], SDL_GPU_TEXTURETYPE_2D, SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET))
+            continue;
+        dc_log("Best depth only texture format: SDL_GPU_TEXTUREFORMAT_%s", best_depth_formats_str[i]);
+        state::gpu_tex_format_best_depth_only = best_depth_formats[i];
+        break;
+    }
+
     SDL_WaitForGPUFences(state::gpu_device, true, &fence, 1);
     SDL_ReleaseGPUFence(state::gpu_device, fence);
-    SDL_ReleaseGPUTransferBuffer(state::gpu_device, tbo);
 }
 
 #include <SDL3/SDL_main.h>
@@ -1780,10 +1930,7 @@ int main(int argc, char* argv[])
     if (tetra::init_gui(window_title, SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_METALLIB) != 0)
         util::die("tetra::init_gui");
 
-    state::window = tetra::window;
-    state::gpu_device = tetra::gpu_device;
-
-    upload_debug_texture();
+    setup_static_gpu_state();
 
     SDL_SetLogPriorityPrefix(SDL_LOG_PRIORITY_INVALID, "[SDL_LOG][UNKNOWN]: ");
     SDL_SetLogPriorityPrefix(SDL_LOG_PRIORITY_TRACE, "[SDL_LOG][TRACE]: ");
@@ -1926,19 +2073,6 @@ int main(int argc, char* argv[])
             clear_color = ImVec4(col.r, col.g, col.b, 1.0f);
         }
 
-        if (command_buffer && swapchain_texture)
-        {
-            SDL_GPUColorTargetInfo color_info = {};
-            color_info.texture = swapchain_texture;
-            color_info.clear_color = SDL_FColor { clear_color.x, clear_color.y, clear_color.z, clear_color.w };
-            color_info.load_op = SDL_GPU_LOADOP_CLEAR;
-            color_info.store_op = SDL_GPU_STOREOP_STORE;
-            color_info.mip_level = 0;
-            color_info.layer_or_depth_plane = 0;
-            color_info.cycle = false;
-            SDL_EndGPURenderPass(SDL_BeginGPURenderPass(command_buffer, &color_info, 1, nullptr));
-        }
-
         engine_state_step();
 
         tetra::show_imgui_ctx_main(engine_state_current != ENGINE_STATE_RUNNING);
@@ -2028,7 +2162,7 @@ int main(int argc, char* argv[])
                 break;
             }
 
-            normal_loop(command_buffer, swapchain_texture);
+            normal_loop(command_buffer, swapchain_texture, clear_color, win_size);
 
             if (game_selected && game_selected->level && cvr_gui_renderer.get())
             {
@@ -2191,7 +2325,7 @@ int main(int argc, char* argv[])
 
         connection_t::cull_dead_sockets(0);
 
-        tetra::end_frame(command_buffer, swapchain_texture, false);
+        tetra::end_frame(command_buffer, swapchain_texture, engine_state_current != ENGINE_STATE_RUNNING);
         SDL_SubmitGPUCommandBuffer(command_buffer);
         screenshot_func(win_size);
         tetra::limit_framerate();
@@ -2203,6 +2337,7 @@ int main(int argc, char* argv[])
 
     SDL_ReleaseGPUTexture(state::gpu_device, state::gpu_debug_texture);
     SDL_ReleaseGPUSampler(state::gpu_device, state::gpu_debug_sampler);
+    SDL_ReleaseGPUBuffer(state::gpu_device, state::gpu_square_ebo);
 
     connection_t::cull_dead_sockets(100);
 

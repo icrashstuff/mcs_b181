@@ -30,6 +30,8 @@
 #include "tetra/util/convar.h"
 #include <SDL3/SDL.h>
 
+#include "state.h"
+
 #ifndef NDEBUG
 #define FORCE_OPT_MESH 1
 #else
@@ -103,9 +105,10 @@ void level_t::build_mesh(chunk_cubic_t* const center)
         rubik[ix + 1][iy + 1][iz + 1] = center->find_chunk(center, center->pos + glm::ivec3(ix, iy, iz));
     }
 
-    std::vector<terrain_vertex_t> vtx_solid;
-    std::vector<terrain_vertex_t> vtx_overlay;
-    std::vector<terrain_vertex_t> vtx_translucent;
+    /* We use ImVector instead of std::vector because we can pull the Data variable out */
+    ImVector<terrain_vertex_t> vtx_solid;
+    ImVector<terrain_vertex_t> vtx_overlay;
+    ImVector<terrain_vertex_t> vtx_translucent;
 
     bool is_transparent[256];
     bool is_translucent[256];
@@ -148,7 +151,7 @@ void level_t::build_mesh(chunk_cubic_t* const center)
             continue;
         }
 
-        std::vector<terrain_vertex_t>* vtx = is_translucent[type] ? &vtx_translucent : &vtx_solid;
+        ImVector<terrain_vertex_t>* vtx = is_translucent[type] ? &vtx_translucent : &vtx_solid;
 
         float r = 1.0f, g = 1.0f, b = 1.0f;
         float r_overlay = r, g_overlay = g, b_overlay = b;
@@ -1071,7 +1074,7 @@ void level_t::build_mesh(chunk_cubic_t* const center)
             type = stypes[1][1][1];
 
             bool is_water = (type == BLOCK_ID_WATER_SOURCE);
-            std::vector<terrain_vertex_t>* vtx_fluid = vtx;
+            ImVector<terrain_vertex_t>* vtx_fluid = vtx;
 
             mc_id::terrain_face_t face_flow = terrain->get_face(is_water ? mc_id::FACE_WATER_FLOW : mc_id::FACE_LAVA_FLOW);
             mc_id::terrain_face_t face_still = terrain->get_face(is_water ? mc_id::FACE_WATER_STILL : mc_id::FACE_LAVA_STILL);
@@ -2428,45 +2431,64 @@ void level_t::build_mesh(chunk_cubic_t* const center)
         /* ============ END: IS_NORMAL ============ */
     }
 
-    TRACE("Chunk: <%d, %d, %d>, Vertices (Solid): %zu, Indices: %zu", chunk_x, chunk_y, chunk_z, vtx_solid.size(), vtx_solid.size() / 4 * 6);
-    TRACE("Chunk: <%d, %d, %d>, Vertices (Trans): %zu, Indices: %zu", chunk_x, chunk_y, chunk_z, vtx_translucent.size(), vtx_translucent.size() / 4 * 6);
-    TRACE("Chunk: <%d, %d, %d>, Vertices (Overlay): %zu, Indices: %zu", chunk_x, chunk_y, chunk_z, vtx_overlay.size(), vtx_overlay.size() / 4 * 6);
+    TRACE("Chunk: <%d, %d, %d>, Vertices (Solid): %d, Indices: %d", chunk_x, chunk_y, chunk_z, vtx_solid.size(), vtx_solid.size() / 4 * 6);
+    TRACE("Chunk: <%d, %d, %d>, Vertices (Trans): %d, Indices: %d", chunk_x, chunk_y, chunk_z, vtx_translucent.size(), vtx_translucent.size() / 4 * 6);
+    TRACE("Chunk: <%d, %d, %d>, Vertices (Overlay): %d, Indices: %d", chunk_x, chunk_y, chunk_z, vtx_overlay.size(), vtx_overlay.size() / 4 * 6);
 
     if (!vtx_solid.size() && !vtx_translucent.size())
     {
-        center->index_type = GL_NONE;
-        center->index_count = 0;
+        center->free_renderer_resources();
         return;
     }
 
-    if (!center->vao)
-    {
-        terrain_vertex_t::create_vao(&center->vao);
-        tetra::gl_obj_label(GL_VERTEX_ARRAY, center->vao, "[Level][Chunk]: <%d, %d, %d>: VAO", center->pos.x, center->pos.y, center->pos.z);
-    }
-    glBindVertexArray(center->vao);
-    if (!center->vbo)
-    {
-        glGenBuffers(1, &center->vbo);
-        tetra::gl_obj_label(GL_BUFFER, center->vbo, "[Level][Chunk]: <%d, %d, %d>: VBO", center->pos.x, center->pos.y, center->pos.z);
-        glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    }
+    mesh_queue_info_t queue_info = {};
 
-    center->index_type = GL_UNSIGNED_INT;
-    center->index_count = vtx_solid.size() / 4 * 6;
-    center->index_count_overlay = vtx_overlay.size() / 4 * 6;
-    center->index_count_translucent = vtx_translucent.size() / 4 * 6;
+    queue_info.index_count = vtx_solid.size() / 4 * 6;
+    queue_info.index_count_overlay = vtx_overlay.size() / 4 * 6;
+    queue_info.index_count_translucent = vtx_translucent.size() / 4 * 6;
 
     /* Combine vectors into one */
-    vtx_solid.reserve(vtx_solid.size() + vtx_overlay.size() + vtx_translucent.size());
-    vtx_solid.insert(vtx_solid.end(), vtx_overlay.begin(), vtx_overlay.end());
-    vtx_solid.insert(vtx_solid.end(), vtx_translucent.begin(), vtx_translucent.end());
+    int vtx_solid_idx = vtx_solid.size();
+    vtx_solid.resize(vtx_solid.size() + vtx_overlay.size() + vtx_translucent.size());
+    memcpy(vtx_solid.Data + vtx_solid_idx, vtx_overlay.Data, vtx_overlay.size_in_bytes());
+    vtx_solid_idx += vtx_overlay.size();
+    memcpy(vtx_solid.Data + vtx_solid_idx, vtx_translucent.Data, vtx_translucent.size_in_bytes());
+    vtx_solid_idx += vtx_translucent.size();
 
-    glBindBuffer(GL_ARRAY_BUFFER, center->vbo);
-    glBufferData(GL_ARRAY_BUFFER, vtx_solid.size() * sizeof(vtx_solid[0]), vtx_solid.data(), GL_STATIC_DRAW);
-    glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, pos));
-    glVertexAttribIPointer(1, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, col));
-    glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, tex));
+    assert(vtx_solid_idx == vtx_solid.size());
+
+    /* Rip data out of vtx vector */
+    queue_info.vertex_data = vtx_solid.Data;
+    queue_info.vertex_data_size = vtx_solid.size_in_bytes();
+    queue_info.vertex_freefunc = [](void* b) { IM_FREE(b); };
+    vtx_solid.Data = nullptr;
+    vtx_solid.Size = vtx_solid.Capacity = 0;
+
+    queue_info.pos = center->pos;
+
+    mesh_queue.push_back(queue_info);
+
+    //     Uint32 buf_size = (vtx_solid.size() + 0x1F) & ~0x1F;
+    //
+    //     SDL_GPUBufferCreateInfo cinfo_buffer = { .usage = SDL_GPU_BUFFERUSAGE_VERTEX, .size = buf_size, .props = SDL_CreateProperties() };
+    //     if(cinfo_buffer.props)
+    //     {
+    //         char name[128];
+    //         stbsp_snprintf(name, IM_ARRAYSIZE(name), "[Level][Chunk]: <%d, %d, %d>: Vertex Buffer", center->pos.x, center->pos.y, center->pos.z);
+    //         SDL_SetStringProperty(cinfo_buffer.props, SDL_PROP_GPU_BUFFER_CREATE_NAME_STRING, name);
+    //     }
+    //
+    //     // SDL_CopyGPUBufferToBuffer();
+    //
+    //     if (!center->vbo)
+    //     {
+    //         glGenBuffers(1, &center->vbo);
+    //         tetra::gl_obj_label(GL_BUFFER, center->vbo, "[Level][Chunk]: <%d, %d, %d>: VBO", center->pos.x, center->pos.y, center->pos.z);
+    //         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    //     }
+    //
+    //     glBindBuffer(GL_ARRAY_BUFFER, center->vbo);
+    //     glBufferData(GL_ARRAY_BUFFER, vtx_solid.size() * sizeof(vtx_solid[0]), vtx_solid.data(), GL_STATIC_DRAW);
 }
 
 #include "shared/cubiomes/biomes.h"

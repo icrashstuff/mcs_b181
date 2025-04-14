@@ -27,12 +27,11 @@
 #include "chunk_cubic.h"
 #include "entity/entity.h"
 #include "lightmap.h"
-#include "shaders/shaders.h"
-#include "shared/ids.h"
 #include "shared/inventory.h"
 #include "sound/sound_world.h"
 #include "texture_terrain.h"
 #include "time_blended_modifer.h"
+#include <deque>
 #include <entt/entt.hpp>
 #include <glm/glm.hpp>
 #include <map>
@@ -40,6 +39,7 @@
 #include <vector>
 
 #include "migration_gl.h"
+#include "state.h"
 
 /**
  * Handles both level data and the rendering of said level data
@@ -150,13 +150,11 @@ struct level_t
      */
     dimension_switch_result dimension_switch(const int dim);
 
-    GLuint ebo = 0;
+    SDL_GPUBuffer*& ebo = state::gpu_square_ebo;
 
     GLuint ent_missing_vao = 0;
     GLuint ent_missing_vbo = 0;
     size_t ent_missing_vert_count = 0;
-
-    shader_t* shader_terrain = NULL;
 
     /**
      * Clears all meshes
@@ -266,12 +264,28 @@ struct level_t
     inline mc_tick_t get_last_tick() { return last_tick; };
 
     /**
+     * Prepare world for rendering
+     *
+     * @param win_size Window size (used for culling)
+     */
+    void render_stage_prepare(const glm::ivec2 win_size);
+
+    /**
+     * Perform data transfers
+     *
+     * @param copy_pass Copy pass to use
+     */
+    void render_stage_copy(SDL_GPUCopyPass* const copy_pass);
+
+    /**
      * Renders the world and entities
      *
      * @param win_size Window size (used for projection matrix)
      * @param delta_time Time since last frame in seconds
+     * @param render_pass Render pass to use
      */
-    void render(const glm::ivec2 win_size, const float delta_time);
+    void render_stage_render(
+        SDL_GPUCommandBuffer* const command_buffer, SDL_GPURenderPass* const render_pass, const glm::ivec2 win_size, const float delta_time);
 
     inline glm::vec3 get_camera_pos() const { return foot_pos + glm::vec3(0, camera_offset_height, 0) + camera_direction * camera_offset_radius; }
 
@@ -327,6 +341,8 @@ struct level_t
     sound_world_t sound_engine;
 
     sound_resources_t* sound_resources = nullptr;
+
+    size_t get_mesh_queue_size() { return mesh_queue.size(); }
 
 private:
     mc_id::gamemode_t gamemode = mc_id::GAMEMODE_SPECTATOR;
@@ -396,6 +412,38 @@ private:
      * Build and or replace the mesh for the corresponding chunk
      */
     void build_mesh(chunk_cubic_t* const chunk);
+
+    struct mesh_queue_info_t
+    {
+        size_t index_count = 0;
+        size_t index_count_overlay = 0;
+        size_t index_count_translucent = 0;
+
+        Uint32 vertex_data_size = 0;
+        void* vertex_data = nullptr;
+        void (*vertex_freefunc)(void*) = nullptr;
+
+        /** To be filled in by the upload pass */
+        SDL_GPUBuffer* vertex_buf = nullptr;
+
+        glm::ivec3 pos = { 0, 0, 0 };
+
+        void release_data();
+    };
+
+    std::deque<mesh_queue_info_t> mesh_queue;
+
+    /**
+     * Process an item from mesh_queue
+     *
+     * @param copy_pass Copy pass to use
+     * @param item Item to process
+     *
+     * @returns true if the item should be popped from the queue and be released, false otherwise
+     */
+    bool mesh_queue_upload_item(SDL_GPUCopyPass* const copy_pass, mesh_queue_info_t& item);
+
+    bool mesh_queue_upload_items(mesh_queue_info_t& item);
 
     /** Items should probably be removed from terrain **/
     texture_terrain_t* terrain;

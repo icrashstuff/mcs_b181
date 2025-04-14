@@ -47,12 +47,14 @@ public:
     /**
      * Updates and uploads light map
      */
-    void update();
+    void update(SDL_GPUCopyPass* const copy_pass);
 
     void imgui_contents();
 
-    GLuint tex_id_linear = 0;
-    GLuint tex_id_nearest = 0;
+    SDL_GPUTexture* tex_id = nullptr;
+
+    SDL_GPUSampler* sampler_linear = nullptr;
+    SDL_GPUSampler* sampler_nearest = nullptr;
 
 private:
     float flicker_strength = 0.25f;

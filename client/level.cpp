@@ -25,10 +25,15 @@
 #include "level.h"
 
 #include <algorithm>
+#include <glm/ext/matrix_clip_space.hpp>
 #include <glm/ext/matrix_transform.hpp>
+#include <glm/glm.hpp>
 
 #include "tetra/util/convar.h"
+#include "tetra/util/stb_sprintf.h"
 #include <SDL3/SDL.h>
+
+#include "state.h"
 
 #define PASS_TIMER_START()             \
     do                                 \
@@ -493,7 +498,7 @@ void level_t::set_terrain(texture_terrain_t* const _terrain)
         }
     }
     glBindVertexArray(ent_missing_vao);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
+    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
     glBindBuffer(GL_ARRAY_BUFFER, ent_missing_vbo);
     glBufferData(GL_ARRAY_BUFFER, missing_verts.size() * sizeof(missing_verts[0]), missing_verts.data(), GL_STATIC_DRAW);
     glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, pos));
@@ -506,12 +511,6 @@ void level_t::set_terrain(texture_terrain_t* const _terrain)
 
 void level_t::render_entities()
 {
-    if (!shader_terrain)
-    {
-        dc_log_error("The terrain shader is required to render entities");
-        return;
-    }
-
     const glm::f64vec3 camera_pos_capture = get_camera_pos();
 
     ecs.sort<entity_transform_t>([&camera_pos_capture](const entity_transform_t& a, const entity_transform_t& b) -> bool {
@@ -520,15 +519,13 @@ void level_t::render_entities()
         return adist < bdist;
     });
 
-    glUseProgram(shader_terrain->id);
-
     glBindVertexArray(ent_missing_vao);
 
     auto view = ecs.view<const entity_id_t, const entity_transform_t>();
     view.use<const entity_transform_t>();
     for (auto [entity, id, pos] : view.each())
     {
-        shader_terrain->set_model(pos.get_mat());
+        // shader_terrain->set_model(pos.get_mat());
         glDrawElements(GL_TRIANGLES, ent_missing_vert_count / 4 * 6, GL_UNSIGNED_INT, 0);
     }
     glBindVertexArray(0);
@@ -552,7 +549,7 @@ static convar_float_t cvr_r_damage_tilt_rate {
     CONVAR_FLAG_SAVE,
 };
 
-void level_t::render(const glm::ivec2 win_size, const float delta_time)
+void level_t::render_stage_prepare(const glm::ivec2 win_size)
 {
     const int render_distance = (render_distance_override > 0) ? render_distance_override : r_render_distance.get();
 
@@ -561,10 +558,108 @@ void level_t::render(const glm::ivec2 win_size, const float delta_time)
     build_dirty_meshes();
 
     tick();
+}
 
-    glUseProgram(shader_terrain->id);
+bool level_t::mesh_queue_upload_item(SDL_GPUCopyPass* const copy_pass, mesh_queue_info_t& item)
+{
+    chunk_cubic_t* c = get_chunk(item.pos);
+
+    /* Mesh is for non-existent chunk, pop it */
+    if (!c)
+        return true;
+
+    struct TBO
+    {
+        SDL_GPUTransferBuffer* tbo = nullptr;
+        void* pointer = nullptr;
+        TBO(Uint32 size)
+        {
+            SDL_GPUTransferBufferCreateInfo cinfo_tbo = { .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, .size = size, .props = 0 };
+            tbo = SDL_CreateGPUTransferBuffer(state::gpu_device, &cinfo_tbo);
+            if (!tbo)
+                return;
+            pointer = SDL_MapGPUTransferBuffer(state::gpu_device, tbo, 0);
+        }
+        ~TBO()
+        {
+            if (pointer)
+                SDL_UnmapGPUTransferBuffer(state::gpu_device, tbo);
+            if (tbo)
+                SDL_ReleaseGPUTransferBuffer(state::gpu_device, tbo);
+        }
+    };
+
+    TBO tbo(item.vertex_data_size);
+    if (!tbo.pointer)
+        return false;
+
+    SDL_GPUBufferCreateInfo cinfo_vbo = {
+        .usage = SDL_GPU_BUFFERUSAGE_VERTEX,
+        .size = item.vertex_data_size,
+        .props = SDL_CreateProperties(),
+    };
+    char name[128];
+    stbsp_snprintf(name, IM_ARRAYSIZE(name), "[Level][Chunk]: <%d, %d, %d>: Vertex Buffer", item.pos.x, item.pos.y, item.pos.z);
+    SDL_SetStringProperty(cinfo_vbo.props, SDL_PROP_GPU_BUFFER_CREATE_NAME_STRING, name);
+    SDL_GPUBuffer* vbo = SDL_CreateGPUBuffer(state::gpu_device, &cinfo_vbo);
+    SDL_DestroyProperties(cinfo_vbo.props);
+
+    if (!vbo)
+        return false;
+
+    memcpy(tbo.pointer, item.vertex_data, item.vertex_data_size);
+
+    SDL_GPUTransferBufferLocation loc_tbo = {
+        .transfer_buffer = tbo.tbo,
+        .offset = 0,
+    };
+    SDL_GPUBufferRegion region_vbo = {
+        .buffer = vbo,
+        .offset = 0,
+        .size = item.vertex_data_size,
+    };
+    SDL_UploadToGPUBuffer(copy_pass, &loc_tbo, &region_vbo, 0);
+
+    SDL_ReleaseGPUBuffer(state::gpu_device, c->vbo);
+    c->vbo = vbo;
+    c->index_count = item.index_count;
+    c->index_count_overlay = item.index_count_overlay;
+    c->index_count_translucent = item.index_count_translucent;
+
+    return true;
+}
+
+void level_t::render_stage_copy(SDL_GPUCopyPass* const copy_pass)
+{
+    lightmap.update(copy_pass);
+
+    for (int i = 0; mesh_queue.size() && i < r_mesh_throttle.get() * 4; i++)
+    {
+        mesh_queue_info_t item = mesh_queue.front();
+        mesh_queue.pop_front();
+
+        if (mesh_queue_upload_item(copy_pass, item))
+            item.release_data();
+        else
+            mesh_queue.push_back(item);
+    }
+}
+
+static convar_int_t cvr_r_wireframe {
+    "r_wireframe",
+    0,
+    0,
+    1,
+    "Render world in wireframe mode",
+    CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_DEV_ONLY,
+};
+
+void level_t::render_stage_render(
+    SDL_GPUCommandBuffer* const command_buffer, SDL_GPURenderPass* const render_pass, const glm::ivec2 win_size, const float delta_time)
+{
+    const int render_distance = (render_distance_override > 0) ? render_distance_override : r_render_distance.get();
+
     glm::mat4 mat_proj = glm::perspective(glm::radians(fov), (float)win_size.x / (float)win_size.y, 0.03125f, render_distance * 32.0f);
-    shader_terrain->set_projection(mat_proj);
 
     glm::mat4 mat_cam = glm::lookAt(get_camera_pos(), get_camera_pos() + camera_direction, camera_up);
     damage_tilt = SDL_clamp(damage_tilt, 0.0f, 1.0f);
@@ -572,17 +667,6 @@ void level_t::render(const glm::ivec2 win_size, const float delta_time)
         damage_tilt = 0.0f;
     mat_cam = glm::rotate(glm::mat4(1.0f), -glm::radians(damage_tilt * cvr_r_damage_tilt_magnitude.get()), glm::vec3(0.f, 0.f, 1.f)) * mat_cam;
     damage_tilt -= delta_time / (cvr_r_damage_tilt_magnitude.get() * cvr_r_damage_tilt_rate.get() / 1000.0f);
-    shader_terrain->set_camera(mat_cam);
-
-    shader_terrain->set_model(glm::mat4(1.0f));
-    shader_terrain->set_uniform("tex_atlas", 0);
-    shader_terrain->set_uniform("tex_lightmap", 1);
-
-    glActiveTexture(GL_TEXTURE0);
-    // glBindTexture(GL_TEXTURE_2D, get_terrain()->tex_id_main);
-    glActiveTexture(GL_TEXTURE1);
-    glBindTexture(GL_TEXTURE_2D, lightmap.tex_id_linear);
-    glActiveTexture(GL_TEXTURE0);
 
     {
         const glm::i64vec3 cpos(glm::round(get_camera_pos() / 16.0f));
@@ -608,86 +692,96 @@ void level_t::render(const glm::ivec2 win_size, const float delta_time)
         }
     }
 
-    shader_terrain->set_uniform("allow_translucency", 0);
+    SDL_GPUTextureSamplerBinding binding_tex[] = {
+        terrain->binding,
+        SDL_GPUTextureSamplerBinding { .texture = lightmap.tex_id, .sampler = lightmap.sampler_linear },
+    };
 
-    struct
+    SDL_GPUBufferBinding binding_idx = { .buffer = state::gpu_square_ebo, .offset = 0 };
+
+    SDL_BindGPUFragmentSamplers(render_pass, 0, binding_tex, SDL_arraysize(binding_tex));
+    SDL_BindGPUIndexBuffer(render_pass, &binding_idx, SDL_GPU_INDEXELEMENTSIZE_32BIT);
+
+    alignas(16) struct ubo_world_t
     {
-        GLboolean blend;
-        GLboolean depth_test;
-        GLboolean depth_mask;
-        GLint depth_func;
+        glm::mat4 camera;
+        glm::mat4 projection;
+    } ubo_world = { .camera = mat_cam, .projection = mat_proj };
 
-        void restore(GLenum pname, GLboolean i)
+    struct ubo_tint_t
+    {
+        glm::vec4 tint;
+    } ubo_tint = { .tint = glm::vec4(1) };
+
+    alignas(16) struct ubo_frag_t
+    {
+        bool use_texture;
+    } ubo_frag = { .use_texture = 1 };
+
+    SDL_PushGPUFragmentUniformData(command_buffer, 0, &ubo_frag, sizeof(ubo_frag));
+    SDL_PushGPUVertexUniformData(command_buffer, 0, &ubo_world, sizeof(ubo_world));
+    SDL_PushGPUVertexUniformData(command_buffer, 1, &ubo_tint, sizeof(ubo_tint));
+
+    if (state::pipeline_shader_terrain_opaque)
+    {
+        SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_opaque);
+        for (auto it = chunks_render_order.rbegin(); it != chunks_render_order.rend(); it = next(it))
         {
-            void (*fun)(GLenum) = i ? glEnable : glDisable;
-            fun(pname);
+            chunk_cubic_t* c = *it;
+            if (!c->vbo || c->index_count == 0 || !c->visible)
+                continue;
+            glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
+            alignas(16) struct ubo_model_t
+            {
+                glm::vec4 model;
+            } ubo_model = { .model = glm::vec4(translate.x, translate.y, translate.z, 0.0f) };
+            SDL_PushGPUVertexUniformData(command_buffer, 2, &ubo_model, sizeof(ubo_model));
+            SDL_GPUBufferBinding binding_vtx = { .buffer = c->vbo, .offset = 0 };
+            SDL_BindGPUVertexBuffers(render_pass, 0, &binding_vtx, 1);
+            SDL_DrawGPUIndexedPrimitives(render_pass, c->index_count, 1, 0, 0, 0);
         }
-    } prev_gl_state;
-
-    glGetBooleanv(GL_BLEND, &prev_gl_state.blend);
-    glGetBooleanv(GL_DEPTH_TEST, &prev_gl_state.depth_test);
-    glGetBooleanv(GL_DEPTH_WRITEMASK, &prev_gl_state.depth_mask);
-    glGetIntegerv(GL_DEPTH_FUNC, &prev_gl_state.depth_func);
-
-    glDisable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
-    glDepthMask(GL_TRUE);
-
-    /* Draw opaque geometry from front to back to reduce unnecessary filling
-     * This can actually make a performance difference (I tested it)
-     */
-    for (auto it = chunks_render_order.rbegin(); it != chunks_render_order.rend(); it = next(it))
-    {
-        chunk_cubic_t* c = *it;
-        if (c->index_type == GL_NONE || c->index_count == 0 || !c->visible || !c->vao)
-            continue;
-        assert(c->index_type == GL_UNSIGNED_INT);
-        glBindVertexArray(c->vao);
-        glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
-        shader_terrain->set_model(glm::translate(glm::mat4(1.0f), translate));
-        glDrawElements(GL_TRIANGLES, c->index_count, c->index_type, 0);
     }
 
-    glDepthFunc(GL_EQUAL);
-    for (auto it = chunks_render_order.rbegin(); it != chunks_render_order.rend(); it = next(it))
+    if (state::pipeline_shader_terrain_overlay)
     {
-        chunk_cubic_t* c = *it;
-        if (c->index_type == GL_NONE || c->index_count_overlay == 0 || !c->visible || !c->vao)
-            continue;
-        assert(c->index_type == GL_UNSIGNED_INT);
-        glBindVertexArray(c->vao);
-        glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
-        shader_terrain->set_model(glm::translate(glm::mat4(1.0f), translate));
-        glDrawElements(GL_TRIANGLES, c->index_count_overlay, c->index_type, (void*)(c->index_count * 4));
+        SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_overlay);
+        for (auto it = chunks_render_order.rbegin(); it != chunks_render_order.rend(); it = next(it))
+        {
+            chunk_cubic_t* c = *it;
+            if (!c->vbo || c->index_count_overlay == 0 || !c->visible)
+                continue;
+            glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
+            alignas(16) struct ubo_model_t
+            {
+                glm::vec4 model;
+            } ubo_model = { .model = glm::vec4(translate.x, translate.y, translate.z, 0.0f) };
+            SDL_PushGPUVertexUniformData(command_buffer, 2, &ubo_model, sizeof(ubo_model));
+            SDL_GPUBufferBinding binding_vtx = { .buffer = c->vbo, .offset = 0 };
+            SDL_BindGPUVertexBuffers(render_pass, 0, &binding_vtx, 1);
+            SDL_DrawGPUIndexedPrimitives(render_pass, c->index_count_overlay, 1, 0, c->index_count * 2 / 3, 0);
+        }
     }
-    glDepthFunc(prev_gl_state.depth_func);
 
     render_entities();
 
-    shader_terrain->set_uniform("allow_translucency", 1);
-    glUseProgram(shader_terrain->id);
-
-    glEnable(GL_BLEND);
-    glEnable(GL_DEPTH_TEST);
-    /* I am not sure why the internet said to disable depth writes for the translucent pass, but my best guess is that
-     * it decreases overhead by stopping translucent stuff from constantly overwriting the buffer
-     */
-    glDepthMask(GL_FALSE);
-
-    for (chunk_cubic_t* c : chunks_render_order)
+    if (state::pipeline_shader_terrain_translucent)
     {
-        if (c->index_type == GL_NONE || c->index_count_translucent == 0 || !c->visible || !c->vao)
-            continue;
-        assert(c->index_type == GL_UNSIGNED_INT);
-        glBindVertexArray(c->vao);
-        glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
-        shader_terrain->set_model(glm::translate(glm::mat4(1.0f), translate));
-        glDrawElements(GL_TRIANGLES, c->index_count_translucent, c->index_type, (void*)((c->index_count + c->index_count_overlay) * 4));
+        SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_translucent);
+        for (chunk_cubic_t* c : chunks_render_order)
+        {
+            if (!c->vbo || c->index_count_translucent == 0 || !c->visible)
+                continue;
+            glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
+            alignas(16) struct ubo_model_t
+            {
+                glm::vec4 model;
+            } ubo_model = { .model = glm::vec4(translate.x, translate.y, translate.z, 0.0f) };
+            SDL_PushGPUVertexUniformData(command_buffer, 2, &ubo_model, sizeof(ubo_model));
+            SDL_GPUBufferBinding binding_vtx = { .buffer = c->vbo, .offset = 0 };
+            SDL_BindGPUVertexBuffers(render_pass, 0, &binding_vtx, 1);
+            SDL_DrawGPUIndexedPrimitives(render_pass, c->index_count_translucent, 1, 0, (c->index_count + c->index_count_overlay) * 2 / 3, 0);
+        }
     }
-
-    prev_gl_state.restore(GL_BLEND, prev_gl_state.blend);
-    prev_gl_state.restore(GL_DEPTH_TEST, prev_gl_state.depth_test);
-    glDepthMask(prev_gl_state.depth_mask);
 }
 
 void level_t::remove_chunk(const glm::ivec3 pos)
@@ -795,27 +889,6 @@ void level_t::add_chunk(chunk_cubic_t* const c)
 
 level_t::level_t(texture_terrain_t* const _terrain)
 {
-    /* Size the buffer for maximum 36 quads for every block, TODO-OPT: Would multiple smaller buffers be better? */
-    size_t quads = SUBCHUNK_SIZE_X * SUBCHUNK_SIZE_Y * SUBCHUNK_SIZE_Z * 6 * 6;
-    std::vector<Uint32> ind;
-    ind.reserve(quads * 6);
-    for (size_t i = 0; i < quads; i++)
-    {
-        ind.push_back(i * 4 + 0);
-        ind.push_back(i * 4 + 1);
-        ind.push_back(i * 4 + 2);
-        ind.push_back(i * 4 + 2);
-        ind.push_back(i * 4 + 1);
-        ind.push_back(i * 4 + 3);
-    }
-
-    glBindVertexArray(0);
-    glGenBuffers(1, &ebo);
-    tetra::gl_obj_label(GL_BUFFER, ebo, "[Level]: EBO (Main)");
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    glBufferData(GL_ELEMENT_ARRAY_BUFFER, ind.size() * sizeof(ind[0]), ind.data(), GL_STATIC_DRAW);
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, 0);
-
     /* Create missing entity mesh OpenGL resources */
     glGenVertexArrays(1, &ent_missing_vao);
     tetra::gl_obj_label(GL_VERTEX_ARRAY, ent_missing_vao, "[Level][Entity]: Missing: VAO");
@@ -827,8 +900,6 @@ level_t::level_t(texture_terrain_t* const _terrain)
     glEnableVertexAttribArray(0);
     glEnableVertexAttribArray(1);
     glEnableVertexAttribArray(2);
-
-    glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
 
     glBindVertexArray(0);
 
@@ -849,10 +920,23 @@ level_t::level_t(texture_terrain_t* const _terrain)
     generator_create();
 }
 
+void level_t::mesh_queue_info_t::release_data()
+{
+    if (vertex_freefunc)
+    {
+        vertex_freefunc(vertex_data);
+        vertex_data = NULL;
+    }
+}
+
 level_t::~level_t()
 {
+    for (auto it : mesh_queue)
+        it.release_data();
+
     glBindVertexArray(0);
-    glDeleteBuffers(1, &ebo);
+    SDL_ReleaseGPUBuffer(state::gpu_device, ebo);
+    ebo = nullptr;
     glDeleteBuffers(1, &ent_missing_vbo);
     glDeleteVertexArrays(1, &ent_missing_vao);
     for (chunk_cubic_t* c : chunks_render_order)

@@ -25,7 +25,6 @@
 
 #include "connection.h"
 #include "level.h"
-#include "shaders/shaders.h"
 #include "sound/sound_resources.h"
 #include "texture_terrain.h"
 
@@ -53,13 +52,7 @@ SDL_GPUFence* game_resources_t::reload()
         SDL_EndGPUCopyPass(copy_pass);
     }
 
-    terrain_shader = new shader_t("/shaders/terrain.vert", "/shaders/terrain.frag");
     sound_resources = new sound_resources_t("/assets/", "/_resources/assets/");
-
-    terrain_shader->build();
-    glUseProgram(terrain_shader->id);
-    terrain_shader->set_uniform("ao_algorithm", ao_algorithm);
-    terrain_shader->set_uniform("use_texture", use_texture);
 
     return SDL_SubmitGPUCommandBufferAndAcquireFence(command_buffer);
 }
@@ -118,7 +111,6 @@ void game_t::reload_resources(const game_resources_t* const _resources, const bo
     if (level)
     {
         level->set_terrain(resources ? resources->terrain_atlas : NULL);
-        level->shader_terrain = resources ? resources->terrain_shader : NULL;
         level->sound_resources = resources ? resources->sound_resources : NULL;
         level->sound_engine.kill_all();
     }

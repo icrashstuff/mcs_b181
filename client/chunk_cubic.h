@@ -134,21 +134,10 @@ struct chunk_cubic_t
         chunk_cubic_t* neg_z = NULL;
     } neighbors;
 
-    GLuint vao = 0;
-    GLuint vbo = 0;
-    GLuint ebo_translucent = 0;
-    /**
-     * One of GL_UNSIGNED_INT, GL_UNSIGNED_SHORT, GL_UNSIGNED_BYTE, or GL_NONE
-     */
-    GLenum index_type = GL_NONE;
-    size_t index_count = 0;
+    SDL_GPUBuffer* vbo = nullptr;
+    SDL_GPUBuffer* ebo_translucent = nullptr;
 
-    /**
-     * One of GL_UNSIGNED_INT, GL_UNSIGNED_SHORT, GL_UNSIGNED_BYTE, or GL_NONE
-     *
-     * (Unused)
-     */
-    GLenum index_type_overlay = GL_NONE;
+    size_t index_count = 0;
     size_t index_count_overlay = 0;
 
     /**

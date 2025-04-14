@@ -37,35 +37,65 @@ static convar_float_t r_light_brightness("r_light_brightness", 0.0, 0.0, 1.0, "L
 
 SDL_FORCE_INLINE float curve(const float base, const float x) { return (glm::pow(base, x) - 1) / (base - 1); }
 
+#include "state.h"
+/* The similarities between this and glTexImage2D are not coincidental */
+static void gpu_upload_to_texture(SDL_GPUCopyPass* const copy_pass, SDL_GPUTexture* const tex, SDL_GPUTextureFormat format, Uint32 level, Uint32 width,
+    Uint32 height, void* const data, bool cycle)
+{
+    if (!copy_pass || !tex || !width || !height || !data || format == SDL_GPU_TEXTUREFORMAT_INVALID)
+        return;
+
+    Uint32 buf_size = SDL_CalculateGPUTextureFormatSize(format, width, height, 1);
+
+    SDL_GPUTransferBufferCreateInfo cinfo_tbo = { .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, .size = buf_size, .props = 0 };
+
+    SDL_GPUTransferBuffer* tbo = SDL_CreateGPUTransferBuffer(state::gpu_device, &cinfo_tbo);
+    {
+        void* tbo_pointer = SDL_MapGPUTransferBuffer(state::gpu_device, tbo, 0);
+        if (!tbo_pointer)
+        {
+            SDL_ReleaseGPUTransferBuffer(state::gpu_device, tbo);
+            return;
+        }
+        memcpy(tbo_pointer, data, buf_size);
+
+        SDL_UnmapGPUTransferBuffer(state::gpu_device, tbo);
+    }
+
+    SDL_GPUTextureTransferInfo loc_tex = {
+        .transfer_buffer = tbo,
+        .offset = 0,
+        .pixels_per_row = width,
+        .rows_per_layer = height,
+    };
+
+    SDL_GPUTextureRegion region_tex = {
+        .texture = tex,
+        .mip_level = level,
+        .layer = 0,
+        .x = 0,
+        .y = 0,
+        .z = 0,
+        .w = width,
+        .h = height,
+        .d = 1,
+    };
+
+    SDL_UploadToGPUTexture(copy_pass, &loc_tex, &region_tex, cycle);
+
+    SDL_ReleaseGPUTransferBuffer(state::gpu_device, tbo);
+}
+
 lightmap_t::lightmap_t(const lightmap_preset_t preset)
 {
     r_state = SDL_rand_bits() | (Uint64(SDL_rand_bits()) << 32);
 
-    glGenTextures(1, &tex_id_linear);
-    glGenTextures(1, &tex_id_nearest);
-
-    tetra::gl_obj_label(GL_TEXTURE, tex_id_linear, "[Lightmap]: Texture Linear");
-    tetra::gl_obj_label(GL_TEXTURE, tex_id_nearest, "[Lightmap]: Texture Nearest");
-
-    glBindTexture(GL_TEXTURE_2D, tex_id_linear);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-    glBindTexture(GL_TEXTURE_2D, tex_id_nearest);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MAG_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_MIN_FILTER, GL_NEAREST);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_S, GL_CLAMP_TO_EDGE);
-    glTexParameteri(GL_TEXTURE_2D, GL_TEXTURE_WRAP_T, GL_CLAMP_TO_EDGE);
-
-    glBindTexture(GL_TEXTURE_2D, GL_NONE);
+    // tetra::gl_obj_label(GL_TEXTURE, tex_id_linear, "[Lightmap]: Texture Linear");
+    // tetra::gl_obj_label(GL_TEXTURE, tex_id_nearest, "[Lightmap]: Texture Nearest");
 
     last_flicker_tick = SDL_GetTicks() - ticks_per_flicker_tick * 2;
 
     set_preset(preset);
-
-    update();
 }
 
 void lightmap_t::set_preset(const lightmap_preset_t preset)
@@ -101,8 +131,9 @@ void lightmap_t::set_preset(const lightmap_preset_t preset)
 
 lightmap_t::~lightmap_t()
 {
-    glDeleteTextures(1, &tex_id_linear);
-    glDeleteTextures(1, &tex_id_nearest);
+    SDL_ReleaseGPUTexture(state::gpu_device, tex_id);
+    SDL_ReleaseGPUSampler(state::gpu_device, sampler_linear);
+    SDL_ReleaseGPUSampler(state::gpu_device, sampler_nearest);
 }
 
 SDL_FORCE_INLINE float mix_for_time_of_day(int time_of_day)
@@ -161,14 +192,27 @@ void lightmap_t::imgui_contents()
 
     float tex_size = ImGui::GetContentRegionAvail().x / 2.2f;
 
-    ImGui::Image(tex_id_nearest, ImVec2(tex_size, tex_size), ImVec2(0, 0), ImVec2(1, 1));
+    SDL_GPUTextureSamplerBinding binding_linear = { .texture = tex_id, .sampler = sampler_linear };
+    SDL_GPUTextureSamplerBinding binding_nearest = { .texture = tex_id, .sampler = sampler_nearest };
+
+    if (!binding_linear.texture)
+        binding_linear.texture = state::gpu_debug_texture;
+    if (!binding_nearest.texture)
+        binding_nearest.texture = state::gpu_debug_texture;
+
+    if (!binding_linear.sampler)
+        binding_linear.sampler = state::gpu_debug_sampler;
+    if (!binding_nearest.sampler)
+        binding_nearest.sampler = state::gpu_debug_sampler;
+
+    ImGui::Image(reinterpret_cast<ImTextureID>(&binding_linear), ImVec2(tex_size, tex_size), ImVec2(0, 0), ImVec2(1, 1));
     ImGui::SameLine();
-    ImGui::Image(tex_id_linear, ImVec2(tex_size, tex_size), ImVec2(0, 0), ImVec2(1, 1));
+    ImGui::Image(reinterpret_cast<ImTextureID>(&binding_nearest), ImVec2(tex_size, tex_size), ImVec2(0, 0), ImVec2(1, 1));
 
     ImGui::EndGroup();
 }
 
-void lightmap_t::update()
+void lightmap_t::update(SDL_GPUCopyPass* const copy_pass)
 {
     Uint64 sdl_cur_tick = SDL_GetTicks();
     if (sdl_cur_tick - last_flicker_tick < ticks_per_flicker_tick)
@@ -232,11 +276,53 @@ void lightmap_t::update()
         }
     }
 
-    glBindTexture(GL_TEXTURE_2D, tex_id_linear);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 16, 16, 0, GL_RGBA, GL_UNSIGNED_BYTE, dat.data());
+    if (!tex_id)
+    {
+        SDL_GPUTextureCreateInfo cinfo_tex = {
+            .type = SDL_GPU_TEXTURETYPE_2D,
+            .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
+            .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER,
+            .width = 16,
+            .height = 16,
+            .layer_count_or_depth = 1,
+            .num_levels = 1,
+            .sample_count = SDL_GPU_SAMPLECOUNT_1,
 
-    glBindTexture(GL_TEXTURE_2D, tex_id_nearest);
-    glTexImage2D(GL_TEXTURE_2D, 0, GL_RGBA, 16, 16, 0, GL_RGBA, GL_UNSIGNED_BYTE, dat.data());
+            .props = SDL_CreateProperties(),
+        };
 
-    glBindTexture(GL_TEXTURE_2D, GL_NONE);
+        SDL_SetStringProperty(cinfo_tex.props, SDL_PROP_GPU_TEXTURE_CREATE_NAME_STRING, "[Level]: Lightmap");
+
+        tex_id = SDL_CreateGPUTexture(state::gpu_device, &cinfo_tex);
+
+        SDL_DestroyProperties(cinfo_tex.props);
+    }
+
+    if (!sampler_linear || !sampler_nearest)
+    {
+        SDL_GPUSamplerCreateInfo cinfo_sampler = {
+            .min_filter = SDL_GPU_FILTER_LINEAR,
+            .mag_filter = SDL_GPU_FILTER_LINEAR,
+            .mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR,
+            .address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE,
+            .address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE,
+            .address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE,
+            .mip_lod_bias = 0.0f,
+            .max_anisotropy = 0.0f,
+            .compare_op = SDL_GPU_COMPAREOP_INVALID,
+            .min_lod = 0,
+            .max_lod = 0,
+            .enable_anisotropy = 0,
+            .enable_compare = 0,
+        };
+
+        cinfo_sampler.mag_filter = SDL_GPU_FILTER_LINEAR;
+        if (!sampler_linear)
+            sampler_linear = SDL_CreateGPUSampler(state::gpu_device, &cinfo_sampler);
+        cinfo_sampler.mag_filter = SDL_GPU_FILTER_NEAREST;
+        if (!sampler_nearest)
+            sampler_nearest = SDL_CreateGPUSampler(state::gpu_device, &cinfo_sampler);
+    }
+
+    gpu_upload_to_texture(copy_pass, tex_id, SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM, 0, 16, 16, dat.data(), 1);
 }

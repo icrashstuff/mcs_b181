@@ -19,25 +19,12 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
- *
- * TODO: Fold/Flatten game_resources_t into this?
  */
-#ifndef MCS_B181__CLIENT__STATE_H_INCLUDED
-#define MCS_B181__CLIENT__STATE_H_INCLUDED
-
-#include <SDL3/SDL.h>
-
+#ifndef MCS_B181__CLIENT__SHADERS__TERRAIN_SHADER
+#define MCS_B181__CLIENT__SHADERS__TERRAIN_SHADER
 namespace state
 {
-extern SDL_Window* window;
-extern SDL_GPUDevice* gpu_device;
-extern SDL_GPUTexture* gpu_debug_texture;
-extern SDL_GPUSampler* gpu_debug_sampler;
-extern SDL_GPUBuffer* gpu_square_ebo;
-extern SDL_GPUTextureFormat gpu_tex_format_best_depth_only;
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_opaque;
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_overlay;
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_translucent;
-}
-
+void init_terrain_pipelines();
+void destroy_terrain_pipelines();
+};
 #endif
