@@ -1754,6 +1754,8 @@ int main(int argc, char* argv[])
 
     tetra::init("icrashstuff", "mcs_b181", "mcs_b181_client", argc, (const char**)argv, false);
 
+    SDL_InitSubSystem(SDL_INIT_AUDIO);
+
     if (!cvr_username.get().length())
     {
         cvr_username.set_default(std::string("Player") + std::to_string(SDL_rand_bits() % 65536));
@@ -2204,6 +2206,8 @@ int main(int argc, char* argv[])
     SDL_ReleaseGPUSampler(state::gpu_device, state::gpu_debug_sampler);
 
     connection_t::cull_dead_sockets(100);
+
+    SDL_QuitSubSystem(SDL_INIT_AUDIO);
 
     SDLNet_Quit();
     tetra::deinit_gui();
