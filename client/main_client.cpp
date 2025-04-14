@@ -2165,9 +2165,8 @@ int main(int argc, char* argv[])
             }
 
             if (game_selected)
-                game_selected->level->sound_engine.update(glm::f64vec3(0, 0, 0), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
-
-            if (sound_engine_main_menu)
+                game_selected->level->sound_engine.update(glm::f64vec3(0, 0, 0), game_selected->level->camera_direction, glm::vec3(0, 1, 0));
+            else
                 sound_engine_main_menu->update(glm::f64vec3(0, 0, 0), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
 
             break;
@@ -2226,4 +2225,5 @@ void play_gui_button_sound()
     sound_info_t sinfo;
     if (game_resources->sound_resources->get_sound("minecraft:gui.button.press", sinfo))
         sound_engine_main_menu->request_source(sinfo, glm::f64vec3(0.0f), true);
+    sound_engine_main_menu->update(glm::f64vec3(0, 0, 0), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
 }
