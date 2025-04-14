@@ -1191,6 +1191,9 @@ static client_menu_return_t do_menu_options(mc_gui::mc_gui_ctx* ctx)
     if (mc_gui::button_big("options.controls"))
         ret.name_to_open = "menu.options.controls";
 
+    if (mc_gui::button_big("options.sounds"))
+        ret.name_to_open = "menu.options.sound";
+
     if (convar_t::dev() && mc_gui::button_big("mcs_b181.reload_resources"))
         reload_resources = 1;
 
@@ -1315,6 +1318,64 @@ static client_menu_return_t do_menu_options_video(mc_gui::mc_gui_ctx* ctx)
     return ret;
 }
 
+static void im_cvr_slider(mc_gui::mc_gui_ctx* ctx, convar_int_t* cvr, const char* translation_id, int width = 0)
+{
+    SDL_assert(cvr);
+    if (!cvr)
+        return;
+    int cvr_val = cvr->get();
+    std::string buf = mc_gui::get_translation(translation_id);
+    buf += ": %d";
+    ImGui::SetNextItemWidth((width == 0) ? ctx->get_width_mid() : width);
+    ImGui::PushID(translation_id);
+    ImGui::PushStyleVarY(ImGuiStyleVar_FramePadding, ImGui::GetStyle().FramePadding.y * 2);
+    if (ImGui::SliderInt("##slider", &cvr_val, cvr->get_min(), cvr->get_max(), buf.c_str(), ImGuiSliderFlags_AlwaysClamp))
+        cvr->set(cvr_val);
+    ImGui::PopStyleVar();
+    ImGui::PopID();
+}
+
+static client_menu_return_t do_menu_options_sound(mc_gui::mc_gui_ctx* ctx)
+{
+    client_menu_return_t ret;
+
+    menu_title(ctx, "options.sounds.title");
+
+    ImGui::SetNextWindowPos(get_viewport_centered_title_bar(), ImGuiCond_Always, ImVec2(0.5, 0.0));
+    ImGui::Begin("menu.options.sound", NULL, ctx->default_win_flags);
+
+    static convar_int_t* cvr_a_volume_master = (convar_int_t*)convar_t::get_convar("a_volume_master");
+    static convar_int_t* cvr_a_volume_music = (convar_int_t*)convar_t::get_convar("a_volume_music");
+    static convar_int_t* cvr_a_volume_weather = (convar_int_t*)convar_t::get_convar("a_volume_weather");
+    static convar_int_t* cvr_a_volume_hostile = (convar_int_t*)convar_t::get_convar("a_volume_hostile");
+    static convar_int_t* cvr_a_volume_player = (convar_int_t*)convar_t::get_convar("a_volume_player");
+    static convar_int_t* cvr_a_volume_record = (convar_int_t*)convar_t::get_convar("a_volume_record");
+    static convar_int_t* cvr_a_volume_blocks = (convar_int_t*)convar_t::get_convar("a_volume_blocks");
+    static convar_int_t* cvr_a_volume_neutral = (convar_int_t*)convar_t::get_convar("a_volume_neutral");
+    static convar_int_t* cvr_a_volume_ambient = (convar_int_t*)convar_t::get_convar("a_volume_ambient");
+
+    im_cvr_slider(ctx, cvr_a_volume_master, "soundCategory.master", -1);
+
+    im_cvr_slider(ctx, cvr_a_volume_music, "soundCategory.music");
+    ImGui::SameLine();
+    im_cvr_slider(ctx, cvr_a_volume_weather, "soundCategory.weather");
+    im_cvr_slider(ctx, cvr_a_volume_hostile, "soundCategory.hostile");
+    ImGui::SameLine();
+    im_cvr_slider(ctx, cvr_a_volume_player, "soundCategory.player");
+    im_cvr_slider(ctx, cvr_a_volume_record, "soundCategory.record");
+    ImGui::SameLine();
+    im_cvr_slider(ctx, cvr_a_volume_blocks, "soundCategory.block");
+    im_cvr_slider(ctx, cvr_a_volume_neutral, "soundCategory.neutral");
+    ImGui::SameLine();
+    im_cvr_slider(ctx, cvr_a_volume_ambient, "soundCategory.ambient");
+
+    ImGui::End();
+
+    menu_done(ctx, ret);
+
+    return ret;
+}
+
 static client_menu_return_t do_menu_options_controls(mc_gui::mc_gui_ctx* ctx)
 {
     client_menu_return_t ret;
@@ -1390,6 +1451,7 @@ static void init()
     client_menu_manager.add_menu("menu.title", do_main_menu);
     client_menu_manager.add_menu("menu.options", do_menu_options);
     client_menu_manager.add_menu("menu.options.video", do_menu_options_video);
+    client_menu_manager.add_menu("menu.options.sound", do_menu_options_sound);
     client_menu_manager.add_menu("menu.options.controls", do_menu_options_controls);
 }
 
