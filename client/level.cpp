@@ -703,18 +703,23 @@ void level_t::render_stage_render(
     SDL_BindGPUFragmentSamplers(render_pass, 0, binding_tex, SDL_arraysize(binding_tex));
     SDL_BindGPUIndexBuffer(render_pass, &binding_idx, SDL_GPU_INDEXELEMENTSIZE_32BIT);
 
-    alignas(16) struct ubo_world_t
+    struct alignas(16) ubo_model_t
+    {
+        glm::vec4 model;
+    };
+
+    struct alignas(16) ubo_world_t
     {
         glm::mat4 camera;
         glm::mat4 projection;
     } ubo_world = { .camera = mat_cam, .projection = mat_proj };
 
-    struct ubo_tint_t
+    struct alignas(16) ubo_tint_t
     {
         glm::vec4 tint;
     } ubo_tint = { .tint = glm::vec4(1) };
 
-    alignas(16) struct ubo_frag_t
+    struct alignas(16) ubo_frag_t
     {
         Uint32 use_texture;
     } ubo_frag = { .use_texture = !!(state::game_resources->use_texture) };
@@ -732,10 +737,7 @@ void level_t::render_stage_render(
             if (!c->vbo || c->index_count == 0 || !c->visible)
                 continue;
             glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
-            alignas(16) struct ubo_model_t
-            {
-                glm::vec4 model;
-            } ubo_model = { .model = glm::vec4(translate.x, translate.y, translate.z, 0.0f) };
+            ubo_model_t ubo_model = { .model = glm::vec4(translate.x, translate.y, translate.z, 0.0f) };
             SDL_PushGPUVertexUniformData(command_buffer, 2, &ubo_model, sizeof(ubo_model));
             SDL_GPUBufferBinding binding_vtx = { .buffer = c->vbo, .offset = 0 };
             SDL_BindGPUVertexBuffers(render_pass, 0, &binding_vtx, 1);
@@ -752,10 +754,7 @@ void level_t::render_stage_render(
             if (!c->vbo || c->index_count_overlay == 0 || !c->visible)
                 continue;
             glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
-            alignas(16) struct ubo_model_t
-            {
-                glm::vec4 model;
-            } ubo_model = { .model = glm::vec4(translate.x, translate.y, translate.z, 0.0f) };
+            ubo_model_t ubo_model = { .model = glm::vec4(translate.x, translate.y, translate.z, 0.0f) };
             SDL_PushGPUVertexUniformData(command_buffer, 2, &ubo_model, sizeof(ubo_model));
             SDL_GPUBufferBinding binding_vtx = { .buffer = c->vbo, .offset = 0 };
             SDL_BindGPUVertexBuffers(render_pass, 0, &binding_vtx, 1);
@@ -765,6 +764,22 @@ void level_t::render_stage_render(
 
     render_entities();
 
+    if (state::pipeline_shader_terrain_translucent_depth)
+    {
+        SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_translucent_depth);
+        for (chunk_cubic_t* c : chunks_render_order)
+        {
+            if (!c->vbo || c->index_count_translucent == 0 || !c->visible)
+                continue;
+            glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
+            ubo_model_t ubo_model = { .model = glm::vec4(translate.x, translate.y, translate.z, 0.0f) };
+            SDL_PushGPUVertexUniformData(command_buffer, 2, &ubo_model, sizeof(ubo_model));
+            SDL_GPUBufferBinding binding_vtx = { .buffer = c->vbo, .offset = 0 };
+            SDL_BindGPUVertexBuffers(render_pass, 0, &binding_vtx, 1);
+            SDL_DrawGPUIndexedPrimitives(render_pass, c->index_count_translucent, 1, 0, (c->index_count + c->index_count_overlay) * 2 / 3, 0);
+        }
+    }
+
     if (state::pipeline_shader_terrain_translucent)
     {
         SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_translucent);
@@ -773,10 +788,7 @@ void level_t::render_stage_render(
             if (!c->vbo || c->index_count_translucent == 0 || !c->visible)
                 continue;
             glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
-            alignas(16) struct ubo_model_t
-            {
-                glm::vec4 model;
-            } ubo_model = { .model = glm::vec4(translate.x, translate.y, translate.z, 0.0f) };
+            ubo_model_t ubo_model = { .model = glm::vec4(translate.x, translate.y, translate.z, 0.0f) };
             SDL_PushGPUVertexUniformData(command_buffer, 2, &ubo_model, sizeof(ubo_model));
             SDL_GPUBufferBinding binding_vtx = { .buffer = c->vbo, .offset = 0 };
             SDL_BindGPUVertexBuffers(render_pass, 0, &binding_vtx, 1);

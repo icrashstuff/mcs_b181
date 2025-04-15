@@ -33,6 +33,7 @@
 SDL_GPUGraphicsPipeline* state::pipeline_shader_terrain_opaque = nullptr;
 SDL_GPUGraphicsPipeline* state::pipeline_shader_terrain_overlay = nullptr;
 SDL_GPUGraphicsPipeline* state::pipeline_shader_terrain_translucent = nullptr;
+SDL_GPUGraphicsPipeline* state::pipeline_shader_terrain_translucent_depth = nullptr;
 
 static SDL_GPUShader* shader_vert = nullptr;
 static SDL_GPUShader* shader_frag = nullptr;
@@ -255,7 +256,16 @@ void state::init_terrain_pipelines()
     cinfo_pipeline.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS;
     cinfo_pipeline.depth_stencil_state.enable_depth_test = 1;
     cinfo_pipeline.depth_stencil_state.enable_depth_write = 1;
+    color_target_descriptions[0].blend_state.enable_blend = 0;
+    color_target_descriptions[0].blend_state.enable_color_write_mask = 1;
+    color_target_descriptions[0].blend_state.color_write_mask = 0;
+    create_pipeline(pipeline_shader_terrain_translucent_depth, cinfo_pipeline, "Terrain pipeline (translucent depth-only)");
+
+    cinfo_pipeline.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_EQUAL;
+    cinfo_pipeline.depth_stencil_state.enable_depth_test = 1;
+    cinfo_pipeline.depth_stencil_state.enable_depth_write = 0;
     color_target_descriptions[0].blend_state.enable_blend = 1;
+    color_target_descriptions[0].blend_state.enable_color_write_mask = 0;
     create_pipeline(pipeline_shader_terrain_translucent, cinfo_pipeline, "Terrain pipeline (translucent)");
 }
 
@@ -264,6 +274,7 @@ void state::destroy_terrain_pipelines()
     release_pipeline(pipeline_shader_terrain_opaque);
     release_pipeline(pipeline_shader_terrain_overlay);
     release_pipeline(pipeline_shader_terrain_translucent);
+    release_pipeline(pipeline_shader_terrain_translucent_depth);
     release_shader(shader_vert);
     release_shader(shader_frag);
 }

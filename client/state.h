@@ -42,6 +42,7 @@ extern SDL_GPUTextureFormat gpu_tex_format_best_depth_only;
 extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_opaque;
 extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_overlay;
 extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_translucent;
+extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_translucent_depth;
 }
 
 #endif
