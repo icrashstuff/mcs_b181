@@ -20,9 +20,10 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#include "migration_gl.h"
+#include "game.h"
 
 #include "level.h"
+#include "migration_gl.h"
 
 #include <algorithm>
 #include <glm/ext/matrix_clip_space.hpp>
@@ -715,8 +716,8 @@ void level_t::render_stage_render(
 
     alignas(16) struct ubo_frag_t
     {
-        bool use_texture;
-    } ubo_frag = { .use_texture = 1 };
+        Uint32 use_texture;
+    } ubo_frag = { .use_texture = !!(state::game_resources->use_texture) };
 
     SDL_PushGPUFragmentUniformData(command_buffer, 0, &ubo_frag, sizeof(ubo_frag));
     SDL_PushGPUVertexUniformData(command_buffer, 0, &ubo_world, sizeof(ubo_world));

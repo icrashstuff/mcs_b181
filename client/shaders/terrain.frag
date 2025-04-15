@@ -51,7 +51,7 @@ const int ao_algorithm = 1;
 
 layout(std140, set = 3, binding = 0) uniform ubo_frag_t
 {
-    bool use_texture;
+    uint use_texture;
 }
 ubo_frag;
 
@@ -59,7 +59,7 @@ void main()
 {
     out_color = frag.color;
 
-    if (ubo_frag.use_texture)
+    if (ubo_frag.use_texture != 1)
         out_color *= texture(tex_atlas, frag.uv, -1.0);
     else
         out_color.a *= texture(tex_atlas, frag.uv, -1.0).a;
