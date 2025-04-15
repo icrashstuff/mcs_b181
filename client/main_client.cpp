@@ -71,6 +71,17 @@ static bool on_ios = 0;
 #define CVR_DIR_ASSETS_DEFAULT ""
 #endif
 
+static convar_int_t cvr_mc_gui_mobile_controls {
+    "mc_gui_mobile_controls",
+    on_ios,
+    0,
+    1,
+    "Use mobile control scheme",
+    CONVAR_FLAG_SAVE | CONVAR_FLAG_INT_IS_BOOL,
+};
+
+static convar_float_t cvr_mouse_sensitivity { "mouse_sensitivity", 0.1f, 0.01f, 1.0f, "Sensitivity of mouse/touch inputs", CONVAR_FLAG_SAVE };
+
 static convar_string_t cvr_username("username", "", "Username (duh)", CONVAR_FLAG_SAVE);
 static convar_string_t cvr_dir_assets("dir_assets", CVR_DIR_ASSETS_DEFAULT, "Path to assets (ex: \"~/.minecraft/assets/\")", CONVAR_FLAG_SAVE);
 static convar_string_t cvr_path_resource_pack("path_base_resources", CVR_PATH_RESOURCE_PACK_DEFAULT,
@@ -98,7 +109,6 @@ static bool take_screenshot = 0;
 static void compile_shaders() { }
 
 static std::vector<game_t*> games;
-static game_t* game_pano = nullptr;
 static game_t* game_selected = nullptr;
 game_resources_t* state::game_resources = nullptr;
 static int game_selected_idx = 0;
@@ -724,6 +734,8 @@ static glm::dvec2 ImVec2_to_dvec2(const ImVec2 x) { return glm::dvec2(x.x, x.y);
 static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture* gpu_target, const ImVec4 clear_color, const glm::ivec2 win_size)
 {
     bool warp_mouse_to_center = 0;
+    if (cvr_mc_gui_mobile_controls.get())
+        mouse_grabbed = 0;
     if (SDL_GetWindowMouseGrab(state::window) != mouse_grabbed)
     {
         warp_mouse_to_center = 1;
@@ -735,6 +747,8 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
         warp_mouse_to_center = 1;
         SDL_SetWindowRelativeMouseMode(state::window, mouse_grabbed);
     }
+    if (cvr_mc_gui_mobile_controls.get())
+        warp_mouse_to_center = 0;
 
     if (warp_mouse_to_center)
     {
@@ -1180,14 +1194,15 @@ static void process_event(SDL_Event& event, bool* done)
 
     game_t* game = game_selected;
 
-    if (!game)
     {
         ImGuiContext* last_ctx = ImGui::GetCurrentContext();
         ImGui::SetCurrentContext(imgui_ctx_main_menu);
         ImGui_ImplSDL3_ProcessEvent(&event);
         ImGui::SetCurrentContext(last_ctx);
-        return;
     }
+
+    if (!game)
+        return;
 
     level_t* level = game->level;
     connection_t* connection = game->connection;
@@ -1207,23 +1222,10 @@ static void process_event(SDL_Event& event, bool* done)
         TRACE("%d %d", client_menu_manager.stack_size(), mouse_grabbed);
     }
 
-    /* The only way for the mouse to be grabbed is in normal_loop() */
-    if (!mouse_grabbed)
-    {
-        ImGuiContext* last_ctx = ImGui::GetCurrentContext();
-        ImGui::SetCurrentContext(imgui_ctx_main_menu);
-        ImGui_ImplSDL3_ProcessEvent(&event);
-        ImGui::SetCurrentContext(last_ctx);
-        return;
-    }
-
     /* Mouse is guaranteed to be grabbed at this point */
 
-    if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
-    {
-        if (mouse_grabbed)
-            world_interaction_mouse(game, event.button.button);
-    }
+    if (mouse_grabbed && event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
+        world_interaction_mouse(game, event.button.button);
 
     if (event.type == SDL_EVENT_MOUSE_WHEEL)
     {
@@ -1240,9 +1242,11 @@ static void process_event(SDL_Event& event, bool* done)
         }
     }
 
-    if (mouse_grabbed && event.type == SDL_EVENT_MOUSE_MOTION)
+    if (mouse_grabbed && event.type == SDL_EVENT_MOUSE_MOTION && (!cvr_mc_gui_mobile_controls.get() || (SDL_GetMouseState(NULL, NULL) & 1)))
     {
-        const float sensitivity = 0.1f;
+        float sensitivity = cvr_mouse_sensitivity.get();
+        if (cvr_mc_gui_mobile_controls.get())
+            sensitivity *= 2.0f;
 
         if (event.motion.yrel != 0.0f)
         {

@@ -62,6 +62,7 @@ struct mc_gui_ctx
     inline int get_width_large(bool scale = true) { return (scale ? menu_scale : 1) * 200; }
     inline int get_width_mid(bool scale = true) { return (scale ? menu_scale : 1) * 149; }
     inline int get_width_small(bool scale = true) { return (scale ? menu_scale : 1) * 98; }
+    inline int get_width_tiny(bool scale = true) { return (scale ? menu_scale : 1) * 49; }
 
     ImGuiWindowFlags default_win_flags = ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoBackground;
 
@@ -84,6 +85,7 @@ struct mc_gui_ctx
 
 enum widget_size_t
 {
+    SIZE_TINY,
     SIZE_SMALL,
     SIZE_MID,
     SIZE_BIG
@@ -105,6 +107,7 @@ IMGUI_API ImGuiButtonFlags button(widget_size_t size, const char* label, ImGuiBu
 IMGUI_API ImGuiButtonFlags button_big(const char* label, ImGuiButtonFlags flags = ImGuiButtonFlags_MouseButtonLeft);
 IMGUI_API ImGuiButtonFlags button_mid(const char* label, ImGuiButtonFlags flags = ImGuiButtonFlags_MouseButtonLeft);
 IMGUI_API ImGuiButtonFlags button_small(const char* label, ImGuiButtonFlags flags = ImGuiButtonFlags_MouseButtonLeft);
+IMGUI_API ImGuiButtonFlags button_tiny(const char* label, ImGuiButtonFlags flags = ImGuiButtonFlags_MouseButtonLeft);
 
 /* TODO: Handle minecraft style coloring */
 IMGUI_API void text_unformatted(const char* const text, const char* text_end = NULL);

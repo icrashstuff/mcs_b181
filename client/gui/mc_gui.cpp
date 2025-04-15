@@ -497,10 +497,17 @@ ImGuiButtonFlags mc_gui::button_small(const char* const label, ImGuiButtonFlags 
     return mc_gui::button(label, ImVec2(global_ctx->get_width_small(false), 20), flags);
 }
 
+ImGuiButtonFlags mc_gui::button_tiny(const char* const label, ImGuiButtonFlags flags)
+{
+    return mc_gui::button(label, ImVec2(global_ctx->get_width_tiny(false), 20), flags);
+}
+
 ImGuiButtonFlags mc_gui::button(widget_size_t size, const char* const label, ImGuiButtonFlags flags)
 {
     switch (size)
     {
+    case SIZE_TINY:
+        return button_tiny(label, flags);
     case SIZE_SMALL:
         return button_small(label, flags);
     case SIZE_MID:

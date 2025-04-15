@@ -1064,6 +1064,27 @@ static client_menu_return_t do_in_game_menu(mc_gui::mc_gui_ctx* ctx, ImDrawList*
     if (game_selected->connection)
         do_in_game_menu__player_list(ctx, game_selected->connection);
 
+    if (!cvr_mc_gui_mobile_controls.get())
+        return ret;
+
+    ImGuiViewport* vprt = ImGui::GetMainViewport();
+
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowPadding, ImVec2(ctx->menu_scale, ctx->menu_scale));
+    ImGui::SetNextWindowPos(vprt->GetCenter() * ImVec2(1, 0), ImGuiCond_Always, ImVec2(0.5, 0));
+    ImGui::Begin("Top Buttons", NULL, ImGuiWindowFlags_NoDecoration | ImGuiWindowFlags_AlwaysAutoResize);
+
+    ImGui::PushStyleVarY(ImGuiStyleVar_ItemSpacing, 0);
+    ImGui::PushStyleVar(ImGuiStyleVar_ItemInnerSpacing, ImVec2(0, 0));
+    if (mc_gui::button_tiny("F3"))
+        cvr_debug_screen.set(!cvr_debug_screen.get());
+    ImGui::SameLine();
+    if (mc_gui::button_tiny("Menu"))
+        ret.name_to_open = "menu.game";
+    ImGui::PopStyleVar(2);
+
+    ImGui::End();
+    ImGui::PopStyleVar(1);
+
     return ret;
 }
 
