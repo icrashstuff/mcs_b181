@@ -128,11 +128,11 @@ void state::init_terrain_pipelines()
     }
     else if (formats & SDL_GPU_SHADERFORMAT_MSL)
     {
-        cinfo_shader_vert.code = (const Uint8*)"main0";
+        cinfo_shader_vert.entrypoint = "main0";
         cinfo_shader_vert.code = terrain_vert_msl;
         cinfo_shader_vert.code_size = terrain_vert_msl_len;
         cinfo_shader_vert.format = SDL_GPU_SHADERFORMAT_MSL;
-        cinfo_shader_frag.code = (const Uint8*)"main0";
+        cinfo_shader_frag.entrypoint = "main0";
         cinfo_shader_frag.code = terrain_frag_msl;
         cinfo_shader_frag.code_size = terrain_frag_msl_len;
         cinfo_shader_frag.format = SDL_GPU_SHADERFORMAT_MSL;
