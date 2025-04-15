@@ -41,6 +41,7 @@ static bool create_shader(SDL_GPUShader*& shader, SDL_GPUShaderCreateInfo& cinfo
 {
     cinfo.props = SDL_CreateProperties();
     SDL_SetStringProperty(cinfo.props, SDL_PROP_GPU_SHADER_CREATE_NAME_STRING, name);
+    SDL_ClearError();
 
     shader = SDL_CreateGPUShader(state::gpu_device, &cinfo);
     if (!shader)
@@ -60,6 +61,7 @@ static bool create_pipeline(SDL_GPUGraphicsPipeline*& pipeline, SDL_GPUGraphicsP
 {
     cinfo.props = SDL_CreateProperties();
     SDL_SetStringProperty(cinfo.props, SDL_PROP_GPU_GRAPHICSPIPELINE_CREATE_NAME_STRING, name);
+    SDL_ClearError();
 
     pipeline = SDL_CreateGPUGraphicsPipeline(state::gpu_device, &cinfo);
     if (!pipeline)
