@@ -59,7 +59,7 @@ void main()
 {
     out_color = frag.color;
 
-    if (ubo_frag.use_texture != 1)
+    if (ubo_frag.use_texture == 1)
         out_color *= texture(tex_atlas, frag.uv, -1.0);
     else
         out_color.a *= texture(tex_atlas, frag.uv, -1.0).a;
