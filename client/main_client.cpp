@@ -100,7 +100,7 @@ static void compile_shaders() { }
 static std::vector<game_t*> games;
 static game_t* game_pano = nullptr;
 static game_t* game_selected = nullptr;
-static game_resources_t* game_resources = nullptr;
+game_resources_t* state::game_resources = nullptr;
 static int game_selected_idx = 0;
 static float music_counter = 0;
 
@@ -152,9 +152,9 @@ static bool initialize_resources()
     std::vector<SDL_GPUFence*> fences;
 
     /* In the future parsing of one of the indexes at /assets/indexes/ will need to happen here (For sound) */
-    game_resources = new game_resources_t();
+    state::game_resources = new game_resources_t();
 
-    fences.push_back(game_resources->reload());
+    fences.push_back(state::game_resources->reload());
     fences.push_back(mc_gui::global_ctx->load_resources());
 
     /* Ideally we would just reload the font here rather than completely restarting the mc_gui/ImGui context.
@@ -170,7 +170,7 @@ static bool initialize_resources()
 
     for (game_t* g : games)
         if (g)
-            g->reload_resources(game_resources);
+            g->reload_resources(state::game_resources);
 
     wait_and_release_fences(state::gpu_device, fences);
 
@@ -180,7 +180,7 @@ static bool initialize_resources()
 static bool deinitialize_resources()
 {
     delete sound_engine_main_menu;
-    delete game_resources;
+    delete state::game_resources;
 
     mc_gui::global_ctx->unload_resources();
 
@@ -193,7 +193,7 @@ static bool deinitialize_resources()
             g->reload_resources(nullptr, true);
 
     sound_engine_main_menu = NULL;
-    game_resources = 0;
+    state::game_resources = 0;
     return true;
 }
 
@@ -341,13 +341,13 @@ void render_world_overlays(level_t* level, ImDrawList* const bg_draw_list)
         /* In the future this should happen by setting fog intensity to high and fog color to red */
         bg_draw_list->AddRectFilled(pos0, pos1, IM_COL32(255, 24, 0, 0.5 * 255));
     }
-    else if (mc_id::is_block(type) && !mc_id::is_transparent(type) && game_resources && game_resources->terrain_atlas)
+    else if (mc_id::is_block(type) && !mc_id::is_transparent(type) && state::game_resources && state::game_resources->terrain_atlas)
     {
-        ImTextureID tex_id(reinterpret_cast<ImTextureID>(&game_resources->terrain_atlas->binding));
-        mc_id::terrain_face_t face = game_resources->terrain_atlas->get_face(mc_id::FACE_STONE);
-#define BLOCK_OVERLAY(ID, FACE_ID)                               \
-    case ID:                                                     \
-        face = game_resources->terrain_atlas->get_face(FACE_ID); \
+        ImTextureID tex_id(reinterpret_cast<ImTextureID>(&state::game_resources->terrain_atlas->binding));
+        mc_id::terrain_face_t face = state::game_resources->terrain_atlas->get_face(mc_id::FACE_STONE);
+#define BLOCK_OVERLAY(ID, FACE_ID)                                      \
+    case ID:                                                            \
+        face = state::game_resources->terrain_atlas->get_face(FACE_ID); \
         break;
         switch (type)
         {
@@ -615,24 +615,24 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
     ImGui::InputScalar("Port", ImGuiDataType_U16, &new_port, &port_step);
 
     if (ImGui::Button("Init Game (Server)"))
-        games.push_back(new game_t(new_addr, new_port, new_username, game_resources));
+        games.push_back(new game_t(new_addr, new_port, new_username, state::game_resources));
     ImGui::SameLine();
     if (ImGui::Button("Init Game (Test World)"))
     {
-        game_t* new_game = new game_t(game_resources);
+        game_t* new_game = new game_t(state::game_resources);
         new_game->create_testworld();
         games.push_back(new_game);
     }
     if (ImGui::Button("Init Game (Light Test Simplex World)"))
     {
-        game_t* new_game = new game_t(game_resources);
+        game_t* new_game = new game_t(state::game_resources);
         new_game->create_light_test_decorated_simplex({ 16, 8, 16 });
         games.push_back(new_game);
     }
     ImGui::SameLine();
     if (ImGui::Button("Init Game (Light Test SDL_rand World)"))
     {
-        game_t* new_game = new game_t(game_resources);
+        game_t* new_game = new game_t(state::game_resources);
         new_game->create_light_test_sdl_rand({ 16, 8, 16 });
         games.push_back(new_game);
     }
@@ -690,9 +690,9 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
 
             sound_info_t sinfo;
 
-            if (sound_engine_main_menu && game_resources && game_resources->sound_resources && !sound_engine_main_menu->is_music_playing())
+            if (sound_engine_main_menu && state::game_resources && state::game_resources->sound_resources && !sound_engine_main_menu->is_music_playing())
             {
-                if (game_resources->sound_resources->get_sound("minecraft:music.menu", sinfo))
+                if (state::game_resources->sound_resources->get_sound("minecraft:music.menu", sinfo))
                     sound_engine_main_menu->request_source(sinfo, glm::f64vec3(0.0), 1);
             }
         }
@@ -931,7 +931,7 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
 
         SDL_PushGPUDebugGroup(gpu_command_buffer, "[Level]: Copy pass");
         game->level->render_stage_copy(copy_pass);
-        game_resources->terrain_atlas->update(copy_pass);
+        state::game_resources->terrain_atlas->update(copy_pass);
         SDL_PopGPUDebugGroup(gpu_command_buffer);
 
         SDL_EndGPUCopyPass(copy_pass);
@@ -1343,14 +1343,14 @@ static void process_event(SDL_Event& event, bool* done)
         }
         case SDL_SCANCODE_C:
         {
-            game_resources->ao_algorithm = (game_resources->ao_algorithm + 1) % (AO_ALGO_MAX + 1);
-            dc_log("Setting ao_algorithm to %d", game_resources->ao_algorithm);
+            state::game_resources->ao_algorithm = (state::game_resources->ao_algorithm + 1) % (AO_ALGO_MAX + 1);
+            dc_log("Setting ao_algorithm to %d", state::game_resources->ao_algorithm);
             break;
         }
         case SDL_SCANCODE_X:
         {
-            game_resources->use_texture = !game_resources->use_texture;
-            dc_log("Setting use_texture to %d", game_resources->use_texture);
+            state::game_resources->use_texture = !state::game_resources->use_texture;
+            dc_log("Setting use_texture to %d", state::game_resources->use_texture);
             break;
         }
         case SDL_SCANCODE_R:
@@ -1573,7 +1573,7 @@ static void screenshot_func(const glm::ivec2 win_size)
 static convar_int_t cvr_profile_light("profile_light", 0, 0, 1, "Profile lighting engine then exit", CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_DEV_ONLY);
 static void profile_light()
 {
-    game_t game(game_resources);
+    game_t game(state::game_resources);
 
     game.level->enable_timer_log_light = 1;
 
@@ -2009,7 +2009,7 @@ int main(int argc, char* argv[])
 
         dc_log("Creating external game, addr: \"%s\", port: %d", argv[1], port);
 
-        game_t* new_game = new game_t(argv[1], port, cvr_username.get(), game_resources);
+        game_t* new_game = new game_t(argv[1], port, cvr_username.get(), state::game_resources);
         games.push_back(new_game);
         game_selected_idx = new_game->game_id;
 
@@ -2216,7 +2216,7 @@ int main(int argc, char* argv[])
                 ImGui::End();
             }
 
-            if (game_resources && (game_selected || sound_engine_main_menu) && game_resources->sound_resources && cvr_gui_sound.get())
+            if (state::game_resources && (game_selected || sound_engine_main_menu) && state::game_resources->sound_resources && cvr_gui_sound.get())
             {
                 ImGui::SetNextWindowPos(viewport->Size * ImVec2(0.0075f, 0.1875f), ImGuiCond_FirstUseEver, ImVec2(0.0, 0.0));
                 ImGui::SetNextWindowSize(viewport->Size * ImVec2(0.425f, 0.8f), ImGuiCond_FirstUseEver);
@@ -2264,7 +2264,7 @@ int main(int argc, char* argv[])
                     sound_info_t sound_to_play;
 
                     ImGui::BeginChild("Sound List", ImGui::GetContentRegionAvail() * ImVec2(0.0f, 1.0f), ImGuiChildFlags_Borders);
-                    game_resources->sound_resources->imgui_contents(play_sound, sound_to_play);
+                    state::game_resources->sound_resources->imgui_contents(play_sound, sound_to_play);
                     ImGui::EndChild();
 
                     if (play_sound && sound_engine)
@@ -2354,11 +2354,11 @@ int main(int argc, char* argv[])
 
 void play_gui_button_sound()
 {
-    if (!(sound_engine_main_menu && game_resources && game_resources->sound_resources))
+    if (!(sound_engine_main_menu && state::game_resources && state::game_resources->sound_resources))
         return;
 
     sound_info_t sinfo;
-    if (game_resources->sound_resources->get_sound("minecraft:gui.button.press", sinfo))
+    if (state::game_resources->sound_resources->get_sound("minecraft:gui.button.press", sinfo))
         sound_engine_main_menu->request_source(sinfo, glm::f64vec3(0.0f), true);
     sound_engine_main_menu->update(glm::f64vec3(0, 0, 0), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
 }

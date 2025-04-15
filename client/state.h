@@ -27,8 +27,12 @@
 
 #include <SDL3/SDL.h>
 
+/* Forward declaration(s) */
+struct game_resources_t;
+
 namespace state
 {
+extern game_resources_t* game_resources;
 extern SDL_Window* window;
 extern SDL_GPUDevice* gpu_device;
 extern SDL_GPUTexture* gpu_debug_texture;

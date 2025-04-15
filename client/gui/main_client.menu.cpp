@@ -225,7 +225,7 @@ static client_menu_return_t do_main_menu(mc_gui::mc_gui_ctx* ctx)
 
     if (mc_gui::button_big("mcs_b181.menu.test_world"))
     {
-        game_t* new_game = new game_t(game_resources);
+        game_t* new_game = new game_t(state::game_resources);
         new_game->create_testworld();
         games.push_back(new_game);
         ret.clear_stack = 1;
@@ -233,7 +233,7 @@ static client_menu_return_t do_main_menu(mc_gui::mc_gui_ctx* ctx)
 
     if (mc_gui::button_big("menu.multiplayer"))
     {
-        games.push_back(new game_t(cvr_autoconnect_addr.get(), cvr_autoconnect_port.get(), cvr_username.get(), game_resources));
+        games.push_back(new game_t(cvr_autoconnect_addr.get(), cvr_autoconnect_port.get(), cvr_username.get(), state::game_resources));
         ret.clear_stack = 1;
     }
 
@@ -404,11 +404,11 @@ static void render_item_stack(ImDrawList* const draw_list, const int menu_scale,
     if (item.id == BLOCK_ID_NONE || item.id == BLOCK_ID_AIR)
         return;
 
-    ImTextureID tex_id(reinterpret_cast<ImTextureID>(&game_resources->terrain_atlas->binding));
+    ImTextureID tex_id(reinterpret_cast<ImTextureID>(&state::game_resources->terrain_atlas->binding));
 
-    mc_id::terrain_face_t face_top = game_resources->terrain_atlas->get_face(mc_id::FACE_STONE);
-    mc_id::terrain_face_t face_left = game_resources->terrain_atlas->get_face(mc_id::FACE_STONE);
-    mc_id::terrain_face_t face_right = game_resources->terrain_atlas->get_face(mc_id::FACE_STONE);
+    mc_id::terrain_face_t face_top = state::game_resources->terrain_atlas->get_face(mc_id::FACE_STONE);
+    mc_id::terrain_face_t face_left = state::game_resources->terrain_atlas->get_face(mc_id::FACE_STONE);
+    mc_id::terrain_face_t face_right = state::game_resources->terrain_atlas->get_face(mc_id::FACE_STONE);
 
     /* TODO: Proper rendering of items/blocks */
     if (!mc_id::is_block(item.id) || !mc_id::block_has_collision(item.id))
