@@ -284,6 +284,152 @@ static convar_int_t cvr_debug_screen("debug_screen", 0, 0, 1, "Enable debug scre
 
 #define GLM_TO_IM(A) ImVec2((A).x, (A).y)
 
+static void world_interaction_mouse(game_t* const game, Uint8 button)
+{
+    level_t* level = game->level;
+    connection_t* connection = game->connection;
+
+    glm::dvec3 cam_dir;
+    cam_dir.x = SDL_cos(glm::radians(level->yaw)) * SDL_cos(glm::radians(level->pitch));
+    cam_dir.y = SDL_sin(glm::radians(level->pitch));
+    cam_dir.z = SDL_sin(glm::radians(level->yaw)) * SDL_cos(glm::radians(level->pitch));
+    cam_dir = glm::normalize(cam_dir);
+
+    glm::dvec3 rotation_point = level->get_camera_pos() /*+ glm::vec3(0.0f, (!crouching) ? 1.625f : 1.275f, 0.0f)*/;
+
+    chunk_cubic_t* cache = NULL;
+    itemstack_t block_at_ray;
+    glm::ivec3 collapsed_ray;
+    glm::dvec3 ray = rotation_point;
+    {
+        bool found = 0;
+        for (int i = 0; !found && i <= 32 * 5; i++, ray += cam_dir / 32.0)
+        {
+            collapsed_ray = glm::floor(ray);
+            if (level->get_block(collapsed_ray, block_at_ray, cache) && block_at_ray.id != BLOCK_ID_AIR && mc_id::is_block(block_at_ray.id))
+                found = 1;
+        }
+
+        if (!found)
+        {
+            dc_log("Point: <%.1f, %.1f, %.1f>, Ray: <%.1f, %.1f, %.1f>", rotation_point.x, rotation_point.y, rotation_point.z, ray.x, ray.y, ray.z);
+            return;
+        }
+    }
+
+    /* TODO: Determine correct block face */
+    if (button == 1)
+    {
+        connection_t::tentative_block_t t;
+        t.timestamp = SDL_GetTicks();
+        t.pos = collapsed_ray;
+        if (level->get_block(t.pos, t.old, cache) && t.old.id != BLOCK_ID_AIR)
+        {
+            level->set_block(t.pos, BLOCK_ID_AIR, 0);
+
+            if (connection)
+                connection->push_tentative_block(t);
+            packet_player_dig_t p;
+            p.x = t.pos.x;
+            p.y = t.pos.y - 1;
+            p.z = t.pos.z;
+            p.face = 1;
+            p.status = PLAYER_DIG_STATUS_START_DIG;
+            if (connection)
+                connection->send_packet(p);
+            p.status = PLAYER_DIG_STATUS_FINISH_DIG;
+            if (connection)
+                connection->send_packet(p);
+        }
+    }
+    else if (button == 2)
+    {
+        packet_inventory_action_creative_t pack_inv_action;
+
+        const bool can_create = level->gamemode_get() == mc_id::GAMEMODE_CREATIVE || !connection;
+
+        int new_slot_id = level->inventory.hotbar_sel;
+
+        /* Try to find existing */
+        for (int i = level->inventory.hotbar_min; level->inventory.items[new_slot_id] != block_at_ray && i <= level->inventory.hotbar_max; i++)
+            if (level->inventory.items[i] == block_at_ray)
+                new_slot_id = i;
+
+        /* Try to find the nearest open slot for block creation */
+        if (can_create && level->inventory.items[new_slot_id] != block_at_ray)
+        {
+            const int num_squares = level->inventory.hotbar_max - level->inventory.hotbar_min + 1;
+            const int cur_square = level->inventory.hotbar_sel - level->inventory.hotbar_min;
+            bool found = 0;
+            for (int i = 0; !found && i < num_squares; i++)
+            {
+                int slot_id = level->inventory.hotbar_min + ((i + cur_square) % num_squares);
+                if (level->inventory.items[slot_id].id == BLOCK_ID_NONE || level->inventory.items[slot_id].id == BLOCK_ID_AIR)
+                    new_slot_id = slot_id, found = 1;
+            }
+        }
+
+        /* Inform the server of any slot selection changes */
+        if (new_slot_id != level->inventory.hotbar_sel)
+        {
+            packet_hold_change_t pack;
+            pack.slot_id = new_slot_id - level->inventory.hotbar_min;
+            if (connection)
+                connection->send_packet(pack);
+        }
+        level->inventory.hotbar_sel = new_slot_id;
+
+        /* All actions past this point require creative permission */
+        if (!can_create)
+            return;
+
+        itemstack_t& hand = level->inventory.items[level->inventory.hotbar_sel];
+
+        if (hand == block_at_ray)
+            return;
+
+        hand = block_at_ray;
+        hand.quantity = 1;
+
+        pack_inv_action.item_id = hand.id;
+        pack_inv_action.damage = hand.damage;
+        pack_inv_action.quantity = hand.quantity;
+        pack_inv_action.slot = level->inventory.hotbar_sel;
+
+        if (connection)
+            connection->send_packet(pack_inv_action);
+    }
+    /* TODO: Determine correct block face */
+    else if (button == 3)
+    {
+        connection_t::tentative_block_t t;
+        t.timestamp = SDL_GetTicks();
+        t.pos = collapsed_ray;
+        itemstack_t hand = level->inventory.items[level->inventory.hotbar_sel];
+
+        if (level->get_block(t.pos, t.old, cache) && t.old != hand)
+        {
+            if (mc_id::is_block(hand.id))
+            {
+                if (connection)
+                    connection->push_tentative_block(t);
+                level->set_block(t.pos, hand);
+            }
+
+            packet_player_place_t p;
+            p.x = collapsed_ray.x;
+            p.y = collapsed_ray.y;
+            p.z = collapsed_ray.z;
+            p.direction = 1;
+            p.block_item_id = hand.id;
+            p.amount = 0;
+            p.damage = hand.damage;
+            if (connection)
+                connection->send_packet(p);
+        }
+    }
+}
+
 /**
  * Draw world overlays
  *
@@ -1076,147 +1222,7 @@ static void process_event(SDL_Event& event, bool* done)
     if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
     {
         if (mouse_grabbed)
-        {
-            glm::dvec3 cam_dir;
-            cam_dir.x = SDL_cos(glm::radians(level->yaw)) * SDL_cos(glm::radians(level->pitch));
-            cam_dir.y = SDL_sin(glm::radians(level->pitch));
-            cam_dir.z = SDL_sin(glm::radians(level->yaw)) * SDL_cos(glm::radians(level->pitch));
-            cam_dir = glm::normalize(cam_dir);
-
-            glm::dvec3 rotation_point = level->get_camera_pos() /*+ glm::vec3(0.0f, (!crouching) ? 1.625f : 1.275f, 0.0f)*/;
-
-            chunk_cubic_t* cache = NULL;
-            itemstack_t block_at_ray;
-            glm::ivec3 collapsed_ray;
-            glm::dvec3 ray = rotation_point;
-            {
-                bool found = 0;
-                for (int i = 0; !found && i <= 32 * 5; i++, ray += cam_dir / 32.0)
-                {
-                    collapsed_ray = glm::floor(ray);
-                    if (level->get_block(collapsed_ray, block_at_ray, cache) && block_at_ray.id != BLOCK_ID_AIR && mc_id::is_block(block_at_ray.id))
-                        found = 1;
-                }
-
-                if (!found)
-                {
-                    dc_log("Point: <%.1f, %.1f, %.1f>, Ray: <%.1f, %.1f, %.1f>", rotation_point.x, rotation_point.y, rotation_point.z, ray.x, ray.y, ray.z);
-                    return;
-                }
-            }
-
-            /* TODO: Determine correct block face */
-            if (event.button.button == 1)
-            {
-                connection_t::tentative_block_t t;
-                t.timestamp = SDL_GetTicks();
-                t.pos = collapsed_ray;
-                if (level->get_block(t.pos, t.old, cache) && t.old.id != BLOCK_ID_AIR)
-                {
-                    level->set_block(t.pos, BLOCK_ID_AIR, 0);
-
-                    if (connection)
-                        connection->push_tentative_block(t);
-                    packet_player_dig_t p;
-                    p.x = t.pos.x;
-                    p.y = t.pos.y - 1;
-                    p.z = t.pos.z;
-                    p.face = 1;
-                    p.status = PLAYER_DIG_STATUS_START_DIG;
-                    if (connection)
-                        connection->send_packet(p);
-                    p.status = PLAYER_DIG_STATUS_FINISH_DIG;
-                    if (connection)
-                        connection->send_packet(p);
-                }
-            }
-            else if (event.button.button == 2)
-            {
-                packet_inventory_action_creative_t pack_inv_action;
-
-                const bool can_create = level->gamemode_get() == mc_id::GAMEMODE_CREATIVE || !connection;
-
-                int new_slot_id = level->inventory.hotbar_sel;
-
-                /* Try to find existing */
-                for (int i = level->inventory.hotbar_min; level->inventory.items[new_slot_id] != block_at_ray && i <= level->inventory.hotbar_max; i++)
-                    if (level->inventory.items[i] == block_at_ray)
-                        new_slot_id = i;
-
-                /* Try to find the nearest open slot for block creation */
-                if (can_create && level->inventory.items[new_slot_id] != block_at_ray)
-                {
-                    const int num_squares = level->inventory.hotbar_max - level->inventory.hotbar_min + 1;
-                    const int cur_square = level->inventory.hotbar_sel - level->inventory.hotbar_min;
-                    bool found = 0;
-                    for (int i = 0; !found && i < num_squares; i++)
-                    {
-                        int slot_id = level->inventory.hotbar_min + ((i + cur_square) % num_squares);
-                        if (level->inventory.items[slot_id].id == BLOCK_ID_NONE || level->inventory.items[slot_id].id == BLOCK_ID_AIR)
-                            new_slot_id = slot_id, found = 1;
-                    }
-                }
-
-                /* Inform the server of any slot selection changes */
-                if (new_slot_id != level->inventory.hotbar_sel)
-                {
-                    packet_hold_change_t pack;
-                    pack.slot_id = new_slot_id - level->inventory.hotbar_min;
-                    if (connection)
-                        connection->send_packet(pack);
-                }
-                level->inventory.hotbar_sel = new_slot_id;
-
-                /* All actions past this point require creative permission */
-                if (!can_create)
-                    return;
-
-                itemstack_t& hand = level->inventory.items[level->inventory.hotbar_sel];
-
-                if (hand == block_at_ray)
-                    return;
-
-                hand = block_at_ray;
-                hand.quantity = 1;
-
-                pack_inv_action.item_id = hand.id;
-                pack_inv_action.damage = hand.damage;
-                pack_inv_action.quantity = hand.quantity;
-                pack_inv_action.slot = level->inventory.hotbar_sel;
-
-                if (connection)
-                    connection->send_packet(pack_inv_action);
-            }
-            /* TODO: Determine correct block face */
-            else if (event.button.button == 3)
-            {
-                connection_t::tentative_block_t t;
-                t.timestamp = SDL_GetTicks();
-                t.pos = collapsed_ray;
-                itemstack_t hand = level->inventory.items[level->inventory.hotbar_sel];
-
-                if (level->get_block(t.pos, t.old, cache) && t.old != hand)
-                {
-                    if (mc_id::is_block(hand.id))
-                    {
-                        if (connection)
-                            connection->push_tentative_block(t);
-                        level->set_block(t.pos, hand);
-                    }
-
-                    packet_player_place_t p;
-                    p.x = collapsed_ray.x;
-                    p.y = collapsed_ray.y;
-                    p.z = collapsed_ray.z;
-                    p.direction = 1;
-                    p.block_item_id = hand.id;
-                    p.amount = 0;
-                    p.damage = hand.damage;
-                    if (connection)
-                        connection->send_packet(p);
-                }
-            }
-        }
+            world_interaction_mouse(game, event.button.button);
     }
 
     if (event.type == SDL_EVENT_MOUSE_WHEEL)
