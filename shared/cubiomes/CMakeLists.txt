@@ -1,4 +1,4 @@
-cmake_minimum_required(VERSION 2.8)
+cmake_minimum_required(VERSION 3.25...4.0)
 project(cubiomes)
 
 # if (NOT CMAKE_BUILD_TYPE)
