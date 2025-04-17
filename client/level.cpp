@@ -948,8 +948,6 @@ level_t::~level_t()
         it.release_data();
 
     glBindVertexArray(0);
-    SDL_ReleaseGPUBuffer(state::gpu_device, ebo);
-    ebo = nullptr;
     glDeleteBuffers(1, &ent_missing_vbo);
     glDeleteVertexArrays(1, &ent_missing_vao);
     for (chunk_cubic_t* c : chunks_render_order)
