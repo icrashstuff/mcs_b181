@@ -465,14 +465,14 @@ texture_terrain_t::texture_terrain_t(const std::string path_textures)
 void texture_terrain_t::update(SDL_GPUCopyPass* copy_pass)
 {
     Uint64 cur_sdl_tick = SDL_GetTicks();
-    if (cur_sdl_tick - time_last_update < 25 || !copy_pass)
+    if (cur_sdl_tick - time_last_update < 45 || !copy_pass)
         return;
     time_last_update = cur_sdl_tick;
 
     /* Update flailing clocks/compasses */
     for (size_t i = 0; i < anim_textures.size(); i++)
     {
-        texture_pre_pack_t t = anim_textures[i];
+        const texture_pre_pack_t& t = anim_textures[i];
 
         if (t.is_item && t.name == "compass.png")
         {
@@ -514,11 +514,11 @@ void texture_terrain_t::update(SDL_GPUCopyPass* copy_pass)
         Uint8* data = raw_mipmaps[mip_lvl];
         for (size_t i = 0; i < anim_textures.size(); i++)
         {
-            texture_pre_pack_t t = anim_textures[i];
-            t.x >>= mip_lvl;
-            t.y >>= mip_lvl;
-            t.w >>= mip_lvl;
-            t.h >>= mip_lvl;
+            const texture_pre_pack_t& t = anim_textures[i];
+            const int t_x = t.x >> mip_lvl;
+            const int t_y = t.y >> mip_lvl;
+            const int t_w = t.w >> mip_lvl;
+            const int t_h = t.h >> mip_lvl;
 
             double frame_cur_f = SDL_fmod(cur_mc_tick / (double)t.frame_time, t.frame_offsets_len);
 
@@ -554,31 +554,31 @@ void texture_terrain_t::update(SDL_GPUCopyPass* copy_pass)
             if (frame_off_cur_n < 0 || (frame_off_cur_n + 1) > t.frame_offsets_len)
                 continue;
 
-            for (int y = 0; y < t.h; y++)
+            for (int y = 0; y < t_h; y++)
             {
                 if (t.data_mipmaped[mip_lvl].size())
                 {
                     if (!t.interpolate)
-                        memcpy(data + ((y + t.y) * atlas_width + t.x) * 4, t.data_mipmaped[mip_lvl].data() + (y + frame_cur_i * t.h) * t.w * 4, t.w * 4);
+                        memcpy(data + ((y + t_y) * atlas_width + t_x) * 4, t.data_mipmaped[mip_lvl].data() + (y + frame_cur_i * t_h) * t_w * 4, t_w * 4);
                     else
                     {
-                        int startx = ((y + t.y) * atlas_width + t.x) * 4;
-                        for (int j = 0; j < t.w * 4; j++)
+                        int startx = ((y + t_y) * atlas_width + t_x) * 4;
+                        for (int j = 0; j < t_w * 4; j++)
                         {
-                            Uint8 col0 = t.data_mipmaped[mip_lvl][(y + frame_cur_i * t.h) * t.w * 4 + j] * (1.0 - frame_blend);
-                            Uint8 col1 = t.data_mipmaped[mip_lvl][(y + frame_cur_n * t.h) * t.w * 4 + j] * frame_blend;
+                            Uint8 col0 = t.data_mipmaped[mip_lvl][(y + frame_cur_i * t_h) * t_w * 4 + j] * (1.0 - frame_blend);
+                            Uint8 col1 = t.data_mipmaped[mip_lvl][(y + frame_cur_n * t_h) * t_w * 4 + j] * frame_blend;
                             data[startx + j] = col0 + col1;
                         }
                     }
                 }
                 else
                 {
-                    for (GLsizei i_w = t.x; i_w < t.w + t.x; i_w++)
+                    for (GLsizei i_w = t_x; i_w < t_w + t_x; i_w++)
                     {
-                        data[((y + t.y) * atlas_width + i_w) * 4 + 0] = 0xFF * (i_w / 8 % 2 == y / 8 % 2);
-                        data[((y + t.y) * atlas_width + i_w) * 4 + 1] = 0;
-                        data[((y + t.y) * atlas_width + i_w) * 4 + 2] = 0xFF * (i_w / 8 % 2 == y / 8 % 2);
-                        data[((y + t.y) * atlas_width + i_w) * 4 + 3] = 0xFF;
+                        data[((y + t_y) * atlas_width + i_w) * 4 + 0] = 0xFF * (i_w / 8 % 2 == y / 8 % 2);
+                        data[((y + t_y) * atlas_width + i_w) * 4 + 1] = 0;
+                        data[((y + t_y) * atlas_width + i_w) * 4 + 2] = 0xFF * (i_w / 8 % 2 == y / 8 % 2);
+                        data[((y + t_y) * atlas_width + i_w) * 4 + 3] = 0xFF;
                     }
                 }
             }
