@@ -2,6 +2,7 @@
 
 ## OSX artifacts
 .DS_Store
+._*
 
 ## Dear ImGui artifacts
 imgui.ini
