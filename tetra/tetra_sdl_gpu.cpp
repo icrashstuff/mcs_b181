@@ -155,7 +155,7 @@ void tetra::configure_swapchain_if_needed()
     SDL_SetGPUSwapchainParameters(gpu_device, window, swapchain_composition, swapchain_present_mode);
 }
 
-SDL_GPUShaderFormat tetra::get_imgui_shader_formats() { return SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL | SDL_GPU_SHADERFORMAT_METALLIB; }
+SDL_GPUShaderFormat tetra::get_imgui_shader_formats() { return SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_DXIL | SDL_GPU_SHADERFORMAT_MSL; }
 
 int tetra::init_gui(const char* const window_title, const SDL_GPUShaderFormat shader_formats_application)
 {
