@@ -322,7 +322,7 @@ sound_world_t::source_id_t sound_world_t::request_source(const sound_info_t& inf
     }
 
     ma_sound_set_pitch(slot.source, slot.info.pitch);
-    ma_sound_set_volume(slot.source, get_category_volume(slot.category));
+    ma_sound_set_volume(slot.source, get_category_volume(slot.category) * slot.info.volume);
 
     MA_CALL(result, ma_sound_start(slot.source));
 
