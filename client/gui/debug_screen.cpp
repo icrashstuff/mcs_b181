@@ -29,6 +29,7 @@
 #include "tetra/util/convar.h"
 
 #include "client/state.h"
+#include "client/sys/device_state.h"
 #include "tetra/tetra_sdl_gpu.h"
 
 static void IM_FMTARGS(5) add_text(mc_gui::mc_gui_ctx* ctx, ImDrawList* const drawlist, bool right_align, ImVec2& cursor, const char* fmt, ...)
@@ -49,7 +50,6 @@ static void IM_FMTARGS(5) add_text(mc_gui::mc_gui_ctx* ctx, ImDrawList* const dr
     mc_gui::add_text(drawlist, upper_left, buf);
 
     cursor.y += text_size.y + ctx->menu_scale;
-    ;
 }
 
 static float get_y_spacing() { return ImGui::GetStyle().ItemSpacing.y; }
@@ -184,6 +184,8 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
     int num_cores = SDL_GetNumLogicalCPUCores();
     add_text(ctx, drawlist, 1, cursor_r, "CPU: %dx, RAM: %.1f GiB", num_cores, SDL_GetSystemRAM() / 1024.f);
     add_text(ctx, drawlist, 1, cursor_r, "OS: %s", SDL_GetPlatform());
+    add_text(ctx, drawlist, 1, cursor_r, "Thermal state: %s%s", device_state::thermal_state_to_string(device_state::get_thermal_state()),
+        (device_state::get_lower_power_mode() ? " (LP)" : ""));
 
     cursor_r.y += get_y_spacing();
 

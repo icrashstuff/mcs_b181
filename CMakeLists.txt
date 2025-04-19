@@ -24,7 +24,11 @@ cmake_minimum_required(VERSION 3.25)
 # Make option() honor normal variables
 cmake_policy(SET CMP0077 NEW)
 
-project(mcs_b181 LANGUAGES CXX C)
+if(APPLE)
+    project(mcs_b181 LANGUAGES CXX C OBJC)
+else()
+    project(mcs_b181 LANGUAGES CXX C)
+endif()
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 
@@ -120,6 +124,8 @@ set(mcs_b181_client_SRC
 
     client/shaders/terrain_shader.cpp
 
+    client/sys/device_state.cpp
+
     shared/ids.cpp
     shared/misc.cpp
     shared/chunk.cpp
@@ -128,6 +134,12 @@ set(mcs_b181_client_SRC
     shared/java_strings.cpp
     shared/simplex_noise/SimplexNoise.cpp
 )
+
+if(APPLE)
+    list(APPEND mcs_b181_client_SRC client/sys/device_state_apple.mm)
+else()
+    list(APPEND mcs_b181_client_SRC client/sys/device_state_fallback.cpp)
+endif()
 
 SET_SOURCE_FILES_PROPERTIES(shared/simplex_noise/SimplexNoise.cpp PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS_RELEASE}")
 
