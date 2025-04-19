@@ -268,6 +268,10 @@ sound_world_t::source_id_t sound_world_t::request_source(const sound_info_t& inf
         break;
     }
 
+    /* Don't play a sound if it will be muted */
+    if (get_category_volume(category) * info.volume <= 0.001f)
+        return 0;
+
     /* TODO: Investigate if playing background music directly through SDL would work on iOS */
     /* Reserve slot0 for either music or ambient sounds */
     const bool force_slot0 = category == sound_info_t::SOUND_CATEGORY_MUSIC;
