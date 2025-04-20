@@ -220,6 +220,18 @@ static client_menu_return_t do_main_menu(mc_gui::mc_gui_ctx* ctx)
 
     ret.allow_pano = 1;
 
+    ImGui::SetNextWindowPos(ImVec2(0.0, 0.0), ImGuiCond_Always, ImVec2(0.0, 0.0));
+    ImGui::Begin("Convar Window", NULL, ctx->default_win_flags);
+    static Uint64 last_convar_button_press = 0;
+    if (ImGui::InvisibleButton("Convar Button", ImGui::GetMainViewport()->Size / 10.0f))
+    {
+        Uint64 cur_tick = SDL_GetTicks();
+        if (cur_tick - last_convar_button_press < 300)
+            ret.name_to_open = "menu.convars";
+        last_convar_button_press = cur_tick;
+    }
+    ImGui::End();
+
     ImGui::SetNextWindowPos(ImGui::GetMainViewport()->GetWorkCenter(), ImGuiCond_Always, ImVec2(0.5, 0.5));
     ImGui::Begin("Main", NULL, ctx->default_win_flags);
 
@@ -1439,6 +1451,60 @@ static client_menu_return_t do_menu_options_controls(mc_gui::mc_gui_ctx* ctx)
     return ret;
 }
 
+static client_menu_return_t do_menu_convars(mc_gui::mc_gui_ctx* ctx)
+{
+    client_menu_return_t ret;
+
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+
+    /* Title */
+    ImGui::SetNextWindowPos(ImVec2(viewport->Size.x / 2.0f, 0), ImGuiCond_Always, ImVec2(0.5, 0.0));
+    ImGui::Begin("menu_title", NULL, ctx->default_win_flags);
+    mc_gui::text_translated("Convars");
+    ImGui::End();
+
+    /* Contents */
+    ImVec2 size_min(0, viewport->Size.y - ctx->menu_scale * 25.0f * 2.5f);
+    ImVec2 size_max(viewport->Size.x * 0.8f, size_min.y);
+    ImGui::SetNextWindowSizeConstraints(size_min, size_max);
+    ImGui::SetNextWindowPos(ImVec2(viewport->GetWorkCenter().x, ctx->menu_scale * 25.0f), ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+    ImGui::SetNextWindowBgAlpha(0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, ctx->menu_scale);
+    ImGui::Begin("menu.options.controls", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar);
+
+    static std::vector<convar_t*> convars;
+    if (!convars.size())
+    {
+        convars.insert(convars.end(), convar_t::get_convar_list()->begin(), convar_t::get_convar_list()->end());
+        std::sort(convars.begin(), convars.end(), [](convar_t* const a, convar_t* const b) { return strcmp(a->get_name(), b->get_name()) <= 0; });
+    }
+
+    for (auto cvr : convars)
+    {
+        ImGui::SetNextItemWidth(viewport->Size.x * 0.45f);
+        cvr->imgui_edit();
+    }
+
+    ImGui::End();
+    ImGui::PopStyleVar();
+
+    /* Done button */
+    ImGui::SetNextWindowPos(ImVec2(viewport->Size.x / 2.0f, viewport->Size.y), ImGuiCond_Always, ImVec2(0.5f, 1.0f));
+    ImGui::Begin("menu.gui.done", NULL, ctx->default_win_flags);
+
+    if (mc_gui::button_big("Save convars"))
+        convar_file_parser::write();
+
+    ImGui::SameLine();
+
+    if (mc_gui::button_big("gui.done"))
+        ret.close = 1;
+
+    ImGui::End();
+
+    return ret;
+}
+
 namespace mc_gui
 {
 /* Mostly copy pasted from imgui_impl_sdlgpu3.cpp */
@@ -1589,6 +1655,7 @@ static void init()
 
     client_menu_manager.add_menu("menu.game", do_game_menu);
     client_menu_manager.add_menu("menu.title", do_main_menu);
+    client_menu_manager.add_menu("menu.convars", do_menu_convars);
     client_menu_manager.add_menu("menu.options", do_menu_options);
     client_menu_manager.add_menu("menu.options.video", do_menu_options_video);
     client_menu_manager.add_menu("menu.options.sound", do_menu_options_sound);
