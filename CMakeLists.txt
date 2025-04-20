@@ -106,6 +106,7 @@ set(mcs_b181_client_SRC
     client/game.cpp
     client/time_blended_modifer.cpp
     client/chunk_cubic.cpp
+    client/touch.cpp
 
     client/sound/stb_vorbis.c
     client/sound/sound_world.cpp

@@ -60,27 +60,60 @@
 #include "shaders/terrain_shader.h"
 
 #include "state.h"
+#include "touch.h"
 
 #ifdef SDL_PLATFORM_IOS
-static bool on_ios = 1;
+const bool state::on_ios = 1;
+#else
+const bool state::on_ios = 0;
+#endif
+
+#ifdef SDL_PLATFORM_ANDROID
+const bool state::on_android = 1;
+#else
+const bool state::on_android = 0;
+#endif
+
+#if defined(SDL_PLATFORM_ANDROID) || defined(SDL_PLATFORM_IOS)
+const bool state::on_mobile = 1;
+#else
+const bool state::on_mobile = 0;
+#endif
+
+#if defined(SDL_PLATFORM_ANDROID) || defined(SDL_PLATFORM_IOS)
 #define CVR_PATH_RESOURCE_PACK_DEFAULT "resources.zip"
 #define CVR_DIR_ASSETS_DEFAULT "assets.zip"
 #else
-static bool on_ios = 0;
 #define CVR_PATH_RESOURCE_PACK_DEFAULT ""
 #define CVR_DIR_ASSETS_DEFAULT ""
 #endif
 
 static convar_int_t cvr_mc_gui_mobile_controls {
     "mc_gui_mobile_controls",
-    on_ios,
+    state::on_mobile,
     0,
     1,
     "Use mobile control scheme",
     CONVAR_FLAG_SAVE | CONVAR_FLAG_INT_IS_BOOL,
 };
 
-static convar_float_t cvr_mouse_sensitivity { "mouse_sensitivity", 0.1f, 0.01f, 1.0f, "Sensitivity of mouse/touch inputs", CONVAR_FLAG_SAVE };
+static convar_int_t cvr_mc_gui_mobile_controls_diag {
+    "mc_gui_mobile_controls_diag",
+    0,
+    0,
+    1,
+    "Draw representation of touch inputs",
+    CONVAR_FLAG_SAVE | CONVAR_FLAG_INT_IS_BOOL,
+};
+
+static convar_float_t cvr_mouse_sensitivity {
+    "mouse_sensitivity",
+    state::on_mobile ? 0.2f : 0.1f,
+    0.01f,
+    1.0f,
+    "Sensitivity of mouse/touch inputs",
+    CONVAR_FLAG_SAVE,
+};
 
 static convar_string_t cvr_username("username", "", "Username (duh)", CONVAR_FLAG_SAVE);
 static convar_string_t cvr_dir_assets("dir_assets", CVR_DIR_ASSETS_DEFAULT, "Path to assets (ex: \"~/.minecraft/assets/\")", CONVAR_FLAG_SAVE);
@@ -113,6 +146,8 @@ static game_t* game_selected = nullptr;
 game_resources_t* state::game_resources = nullptr;
 static int game_selected_idx = 0;
 static float music_counter = 0;
+
+static touch_handler_t touch_handler;
 
 /* This should probably be replaced by a direct to SDL system */
 static SDL_DEPRECATED sound_world_t* sound_engine_main_menu = nullptr;
@@ -282,11 +317,15 @@ static bool held_space = 0;
 static bool held_shift = 0;
 static bool held_ctrl = 0;
 static bool held_tab = 1;
-static bool mouse_grabbed = 0;
+static bool world_has_input = 0;
 static bool window_has_focus = 0;
 static bool wireframe = 0;
 static bool reload_resources = 0;
 #define AO_ALGO_MAX 5
+
+static SDL_Rect touch_region_move;
+static SDL_Rect touch_region_move_exclude;
+static SDL_Rect touch_region_camera;
 
 static convar_int_t cvr_debug_screen("debug_screen", 0, 0, 1, "Enable debug screen (F3 menu)", CONVAR_FLAG_SAVE);
 
@@ -734,21 +773,19 @@ static glm::dvec2 ImVec2_to_dvec2(const ImVec2 x) { return glm::dvec2(x.x, x.y);
 static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture* gpu_target, const ImVec4 clear_color, const glm::ivec2 win_size)
 {
     bool warp_mouse_to_center = 0;
+    bool mouse_wants_grabbed = world_has_input;
     if (cvr_mc_gui_mobile_controls.get())
-        mouse_grabbed = 0;
-    if (SDL_GetWindowMouseGrab(state::window) != mouse_grabbed)
+        mouse_wants_grabbed = 0;
+    if (SDL_GetWindowMouseGrab(state::window) != mouse_wants_grabbed)
     {
         warp_mouse_to_center = 1;
-        SDL_SetWindowMouseGrab(state::window, mouse_grabbed);
+        SDL_SetWindowMouseGrab(state::window, mouse_wants_grabbed);
     }
-
-    if (SDL_GetWindowRelativeMouseMode(state::window) != mouse_grabbed)
+    if (SDL_GetWindowRelativeMouseMode(state::window) != mouse_wants_grabbed)
     {
         warp_mouse_to_center = 1;
-        SDL_SetWindowRelativeMouseMode(state::window, mouse_grabbed);
+        SDL_SetWindowRelativeMouseMode(state::window, mouse_wants_grabbed);
     }
-    if (cvr_mc_gui_mobile_controls.get())
-        warp_mouse_to_center = 0;
 
     if (warp_mouse_to_center)
     {
@@ -859,25 +896,25 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
     }
 
     if (game && !client_menu_manager.stack_size() && (!game->connection || game->connection->get_in_world()))
-        mouse_grabbed = 1;
+        world_has_input = 1;
 
     if (!show_level || !game_selected)
-        mouse_grabbed = 0;
+        world_has_input = 0;
 
     if ((ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard) && tetra::imgui_ctx_main_wants_input())
-        mouse_grabbed = 0;
+        world_has_input = 0;
 
     if (!game || client_menu_manager.stack_size())
-        mouse_grabbed = 0;
+        world_has_input = 0;
 
     if (!window_has_focus)
     {
-        mouse_grabbed = 0;
+        world_has_input = 0;
         if (game && !client_menu_manager.stack_size() && (!game->connection || game->connection->get_in_world()))
             client_menu_manager.stack_push("menu.game");
     }
 
-    if (!mouse_grabbed)
+    if (!world_has_input)
     {
         held_w = 0;
         held_a = 0;
@@ -914,6 +951,19 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
     {
         level_t* level = game->level;
 
+        float sensitivity = cvr_mouse_sensitivity.get();
+
+        level->pitch -= touch_handler.get_dy() * sensitivity;
+        if (level->pitch > 89.95f)
+            level->pitch = 89.95f;
+        if (level->pitch < -89.95f)
+            level->pitch = -89.95f;
+
+        level->yaw = SDL_fmodf(level->yaw + touch_handler.get_dx() * sensitivity, 360.0f);
+
+        if (level->yaw < 0.0f)
+            level->yaw += 360.0f;
+
         if (held_w)
             level->foot_pos += camera_speed * glm::vec3(SDL_cosf(glm::radians(level->yaw)), 0, SDL_sinf(glm::radians(level->yaw)));
         if (held_s)
@@ -933,6 +983,15 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
         level->fov = cvr_r_fov_base.get();
         level->fov *= level->modifier_sprint.get_modifier();
         level->fov *= level->modifier_fly.get_modifier();
+
+        ImVec2 move_factors = touch_handler.get_move_factors(held_ctrl);
+        level->foot_pos += move_factors.y * camera_speed * glm::vec3(SDL_cosf(glm::radians(level->yaw)), 0, SDL_sinf(glm::radians(level->yaw)));
+        level->foot_pos += move_factors.x * camera_speed * glm::vec3(-SDL_sinf(glm::radians(level->yaw)), 0, SDL_cosf(glm::radians(level->yaw)));
+
+        if (touch_handler.get_button_left_hold())
+            world_interaction_mouse(game, 1);
+        if (touch_handler.get_button_right_hold())
+            world_interaction_mouse(game, 3);
     }
 
     ImGuiContext* last_ctx = ImGui::GetCurrentContext();
@@ -1070,6 +1129,9 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
 
     bg_draw_list->ChannelsMerge();
 
+    if (cvr_mc_gui_mobile_controls_diag.get())
+        touch_handler.draw_imgui(ImGui::GetForegroundDrawList(), ImVec2(0, 0), ImGui::GetMainViewport()->Size * 0.25f);
+
     ImGui::Render();
     ImDrawData* draw_data = ImGui::GetDrawData();
     const bool is_minimized = (draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f);
@@ -1162,7 +1224,8 @@ static void process_event(SDL_Event& event, bool* done)
     if (event.type == SDL_EVENT_QUIT)
         *done = true;
 
-    if (event.window.windowID != SDL_GetWindowID(state::window))
+    if (event.window.windowID != SDL_GetWindowID(state::window) && event.type != SDL_EVENT_FINGER_DOWN && event.type != SDL_EVENT_FINGER_CANCELED
+        && event.type != SDL_EVENT_FINGER_MOTION && event.type != SDL_EVENT_FINGER_UP)
         return;
 
     switch (event.window.type)
@@ -1172,7 +1235,7 @@ static void process_event(SDL_Event& event, bool* done)
         break;
     case SDL_EVENT_WINDOW_FOCUS_LOST:
         TRACE("Focus Lost");
-        mouse_grabbed = false;
+        world_has_input = false;
         window_has_focus = 0;
         break;
     case SDL_EVENT_WINDOW_FOCUS_GAINED:
@@ -1217,14 +1280,18 @@ static void process_event(SDL_Event& event, bool* done)
         else
             client_menu_manager.stack_push("menu.game");
 
-        mouse_grabbed = !client_menu_manager.stack_size();
+        world_has_input = !client_menu_manager.stack_size();
 
-        TRACE("%d %d", client_menu_manager.stack_size(), mouse_grabbed);
+        TRACE("%d %d", client_menu_manager.stack_size(), world_has_input);
     }
 
-    /* Mouse is guaranteed to be grabbed at this point */
+    touch_handler.set_world_focus(world_has_input && cvr_mc_gui_mobile_controls.get());
+    if (!world_has_input)
+        return;
+    /* World interaction past this point */
+    touch_handler.feed_event(event);
 
-    if (mouse_grabbed && event.type == SDL_EVENT_MOUSE_BUTTON_DOWN)
+    if (event.type == SDL_EVENT_MOUSE_BUTTON_DOWN && !cvr_mc_gui_mobile_controls.get())
         world_interaction_mouse(game, event.button.button);
 
     if (event.type == SDL_EVENT_MOUSE_WHEEL)
@@ -1242,11 +1309,9 @@ static void process_event(SDL_Event& event, bool* done)
         }
     }
 
-    if (mouse_grabbed && event.type == SDL_EVENT_MOUSE_MOTION && (!cvr_mc_gui_mobile_controls.get() || (SDL_GetMouseState(NULL, NULL) & 1)))
+    if (event.type == SDL_EVENT_MOUSE_MOTION && !cvr_mc_gui_mobile_controls.get())
     {
         float sensitivity = cvr_mouse_sensitivity.get();
-        if (cvr_mc_gui_mobile_controls.get())
-            sensitivity *= 2.0f;
 
         if (event.motion.yrel != 0.0f)
         {
@@ -1370,7 +1435,7 @@ static void process_event(SDL_Event& event, bool* done)
         }
         case SDL_SCANCODE_ESCAPE:
         case SDL_SCANCODE_GRAVE:
-            mouse_grabbed = false;
+            world_has_input = false;
             break;
         default:
             break;
@@ -1922,13 +1987,13 @@ int main(int argc, char* argv[])
         cvr_username.set(cvr_username.get_default());
     }
 
-    if (on_ios && cvr_path_resource_pack.get() == cvr_path_resource_pack.get_default())
+    if (state::on_ios && cvr_path_resource_pack.get() == cvr_path_resource_pack.get_default())
     {
         cvr_path_resource_pack.set(SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS) + cvr_path_resource_pack.get_default());
         cvr_path_resource_pack.set_default(cvr_path_resource_pack.get());
     }
 
-    if (on_ios && cvr_dir_assets.get() == cvr_dir_assets.get_default())
+    if (state::on_ios && cvr_dir_assets.get() == cvr_dir_assets.get_default())
     {
         cvr_dir_assets.set(SDL_GetUserFolder(SDL_FOLDER_DOCUMENTS) + cvr_dir_assets.get_default());
         cvr_dir_assets.set_default(cvr_dir_assets.get());
@@ -2089,7 +2154,7 @@ int main(int argc, char* argv[])
         tetra::show_imgui_ctx_overlay(!game_selected || !cvr_debug_screen.get());
 
         if (tetra::imgui_ctx_main_wants_input())
-            mouse_grabbed = 0;
+            world_has_input = 0;
 
         ImGuiViewport* viewport = ImGui::GetMainViewport();
 

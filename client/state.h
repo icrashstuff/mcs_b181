@@ -43,6 +43,10 @@ extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_opaque;
 extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_overlay;
 extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_translucent;
 extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_translucent_depth;
+
+extern const bool on_ios;
+extern const bool on_android;
+extern const bool on_mobile;
 }
 
 #endif

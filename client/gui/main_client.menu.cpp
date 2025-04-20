@@ -1097,6 +1097,19 @@ static client_menu_return_t do_in_game_menu(mc_gui::mc_gui_ctx* ctx, ImDrawList*
     ImGui::End();
     ImGui::PopStyleVar(1);
 
+    ImVec2 touch0 = vprt->Size * touch_handler.corner_camera_move0;
+    ImVec2 touch1 = vprt->Size * touch_handler.corner_camera_move1;
+    ImVec2 touch_size = touch1 - touch0;
+    ImVec2 touch_center = touch0 + touch_size * 0.5f;
+    ImVec2 cursor_size = touch_size * 0.2f;
+    draw_list->AddRectFilled(touch_center - cursor_size / 2.f, touch_center + cursor_size / 2.f, IM_COL32(72, 72, 72, 40), ctx->menu_scale * 10.0f);
+    draw_list->AddRectFilled(touch0, touch1, IM_COL32(72, 72, 72, 128), ctx->menu_scale * 10.0f);
+
+    bool a;
+    ImVec2 cursor_pos = touch_center + touch_size * ImVec2(0.5f, -0.5f) * touch_handler.get_move_factors(a);
+    Uint32 cursor_col = IM_COL32(72, held_ctrl ? 128 : 72, 72, held_ctrl ? 160 : 128);
+    draw_list->AddRectFilled(cursor_pos - cursor_size / 2.f, cursor_pos + cursor_size / 2.f, cursor_col, ctx->menu_scale * 10.0f);
+
     return ret;
 }
 
@@ -1196,7 +1209,7 @@ static client_menu_return_t do_game_menu(mc_gui::mc_gui_ctx* ctx)
     if (mc_gui::button_big("menu.returnToGame"))
     {
         ret.clear_stack = 1;
-        mouse_grabbed = 1;
+        world_has_input = 1;
     }
 
     ImGui::SetCursorPosY(ImGui::GetCursorPosY() + float(40 * ctx->menu_scale) + ImGui::GetStyle().ItemSpacing.y * 2.0f);
