@@ -60,11 +60,9 @@ SDL_GPUFence* game_resources_t::reload()
 void game_resources_t::destroy()
 {
     delete terrain_atlas;
-    delete terrain_shader;
     delete sound_resources;
 
     terrain_atlas = NULL;
-    terrain_shader = NULL;
     sound_resources = NULL;
 }
 

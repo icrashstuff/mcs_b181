@@ -32,12 +32,10 @@
 class texture_terrain_t;
 struct level_t;
 struct connection_t;
-struct shader_t;
 struct sound_resources_t;
 
 struct game_resources_t
 {
-    shader_t* terrain_shader = nullptr;
     texture_terrain_t* terrain_atlas = nullptr;
 
     sound_resources_t* sound_resources = nullptr;
