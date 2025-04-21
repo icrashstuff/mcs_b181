@@ -149,8 +149,7 @@ static float music_counter = 0;
 
 static touch_handler_t touch_handler;
 
-/* This should probably be replaced by a direct to SDL system */
-static SDL_DEPRECATED sound_world_t* sound_engine_main_menu = nullptr;
+static sound_world_t* sound_engine_main_menu = nullptr;
 
 static ImGuiContext* imgui_ctx_main_menu = NULL;
 static SDL_GPUGraphicsPipeline* pipeline_imgui_regular = nullptr;
@@ -211,7 +210,7 @@ static bool initialize_resources()
 
     compile_shaders();
 
-    sound_engine_main_menu = new sound_world_t();
+    sound_engine_main_menu = new sound_world_t(4);
 
     for (game_t* g : games)
         if (g)
@@ -224,8 +223,8 @@ static bool initialize_resources()
 
 static bool deinitialize_resources()
 {
-    delete sound_engine_main_menu;
     delete state::game_resources;
+    state::game_resources = 0;
 
     mc_gui::global_ctx->unload_resources();
 
@@ -237,8 +236,8 @@ static bool deinitialize_resources()
         if (g)
             g->reload_resources(nullptr, true);
 
+    delete sound_engine_main_menu;
     sound_engine_main_menu = NULL;
-    state::game_resources = 0;
     return true;
 }
 

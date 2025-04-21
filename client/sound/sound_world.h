@@ -54,7 +54,14 @@ public:
      */
     typedef Uint64 source_id_t;
 
-    sound_world_t();
+    /**
+     * Create sound world
+     *
+     * Number of sources possible is driven by the equation SDL_min(cvr_a_sources_max.get(), max_sources)
+     *
+     * @param max_sources Maximum number of sources before considering the convar: a_sources_max
+     */
+    sound_world_t(const Uint16 max_sources = 0xFFFF);
 
     ~sound_world_t();
 

@@ -143,7 +143,7 @@ static void audio_data_callback(void* userdata, SDL_AudioStream* stream, int add
     free(buffer);
 }
 
-sound_world_t::sound_world_t()
+sound_world_t::sound_world_t(const Uint16 max_sources)
 {
     dc_log("Initializing sound engine");
     Uint64 sdl_tick_start_ns = SDL_GetTicksNS();
@@ -151,7 +151,7 @@ sound_world_t::sound_world_t()
     engine = new ma_engine;
     ma_result result;
 
-    slots.resize(cvr_a_sources_max.get());
+    slots.resize(SDL_min(cvr_a_sources_max.get(), max_sources));
     for (auto& slot : slots)
         slot.init();
 
