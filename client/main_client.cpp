@@ -985,6 +985,7 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
         level->fov *= level->modifier_fly.get_modifier();
 
         ImVec2 move_factors = touch_handler.get_move_factors(held_ctrl);
+        level->foot_pos.y += camera_speed * touch_handler.get_vertical_factor();
         level->foot_pos += move_factors.y * camera_speed * glm::vec3(SDL_cosf(glm::radians(level->yaw)), 0, SDL_sinf(glm::radians(level->yaw)));
         level->foot_pos += move_factors.x * camera_speed * glm::vec3(-SDL_sinf(glm::radians(level->yaw)), 0, SDL_cosf(glm::radians(level->yaw)));
 

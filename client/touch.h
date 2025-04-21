@@ -38,6 +38,9 @@ struct touch_handler_t
      * @param held_ctrl [out] If touch_handler has focus, then this will be set to whether the player should sprint or not
      */
     ImVec2 get_move_factors(bool& held_ctrl) const;
+
+    float get_vertical_factor() const;
+
     float get_dx()
     {
         float ret = camera_dx;
@@ -79,8 +82,8 @@ struct touch_handler_t
     ImVec2 corner_camera_exclude1 = { 0.25f, 1.0f };
     ImVec2 corner_camera_move0 = { 0.025f, 0.55f };
     ImVec2 corner_camera_move1 = { 0.225f, 0.95f };
-    ImVec2 corner_camera_vert0 = { 0.775f, 0.55f };
-    ImVec2 corner_camera_vert1 = { 0.975f, 0.95f };
+    ImVec2 corner_camera_vert0 = { 0.85f, 0.55f };
+    ImVec2 corner_camera_vert1 = { 0.95f, 0.95f };
 
 private:
     struct touch_finger_data_t
@@ -94,6 +97,7 @@ private:
         float max_delta_y = 0;
 
         bool area_move;
+        bool area_vert;
         bool area_camera;
         bool within_deadzone;
         bool within_deadzone_prior_to_threshold;

@@ -191,12 +191,36 @@ ImVec2 touch_handler_t::get_move_factors(bool& held_ctrl) const
     return ImVec2(0, 0);
 }
 
+float touch_handler_t::get_vertical_factor() const
+{
+    if (!world_has_focus)
+        return 0;
+
+    for (auto& it : fingers)
+    {
+        if (!it.second.area_vert)
+            continue;
+        ImVec2 vert_size = corner_camera_vert1 - corner_camera_vert0;
+        ImVec2 displace = corner_camera_vert0 + vert_size * 0.5f;
+        ImVec2 values(it.second.x - displace.x, -(it.second.y - displace.y));
+        values /= vert_size * 0.5f;
+        if (fabsf(values.x) > 1.0f)
+            values.x = copysignf(1.0f, values.x);
+        if (fabsf(values.y) > 1.0f)
+            values.y = copysignf(1.0f, values.y);
+        return values.y;
+    }
+
+    return 0;
+}
+
 void touch_handler_t::draw_imgui(ImDrawList* const drawlist, const ImVec2 pos0, const ImVec2 pos1) const
 {
     const ImVec2 size = pos1 - pos0;
     drawlist->AddRectFilled(pos0, pos0 + size, IM_COL32(72, 72, 72, 255));
     drawlist->AddRectFilled(pos0 + size * corner_camera_exclude0, pos0 + size * corner_camera_exclude1, IM_COL32(255, 72, 72, 255));
     drawlist->AddRectFilled(pos0 + size * corner_camera_move0, pos0 + size * corner_camera_move1, IM_COL32(72, 255, 72, 255));
+    drawlist->AddRectFilled(pos0 + size * corner_camera_vert0, pos0 + size * corner_camera_vert1, IM_COL32(72, 255, 72, 255));
     for (auto& it : fingers)
     {
         ImVec2 p_start = pos0 + size * ImVec2(it.second.initial_x, it.second.initial_y);
@@ -206,6 +230,8 @@ void touch_handler_t::draw_imgui(ImDrawList* const drawlist, const ImVec2 pos0, 
         drawlist->AddLine(p_start, p_final, IM_COL32(0, 0, 255, 255), 4);
         if (it.second.area_move)
             drawlist->AddText(p_final += ImVec2(0, ImGui::GetTextLineHeight()), IM_COL32(255, 255, 255, 255), "area_move");
+        if (it.second.area_vert)
+            drawlist->AddText(p_final += ImVec2(0, ImGui::GetTextLineHeight()), IM_COL32(255, 255, 255, 255), "area_vert");
         if (it.second.area_camera)
             drawlist->AddText(p_final += ImVec2(0, ImGui::GetTextLineHeight()), IM_COL32(255, 255, 255, 255), "area_camera");
         if (it.second.within_deadzone)
@@ -220,6 +246,7 @@ void touch_handler_t::draw_imgui(ImDrawList* const drawlist, const ImVec2 pos0, 
     drawlist->AddText(tpos += ImVec2(0, ImGui::GetTextLineHeight()), IM_COL32(255, 255, 255, 255), std::to_string(fingers.size()).c_str());
     drawlist->AddText(tpos += ImVec2(0, ImGui::GetTextLineHeight()), IM_COL32(255, 255, 255, 255), std::to_string(move_factors.y).c_str());
     drawlist->AddText(tpos += ImVec2(0, ImGui::GetTextLineHeight()), IM_COL32(255, 255, 255, 255), std::to_string(move_factors.x).c_str());
+    drawlist->AddText(tpos += ImVec2(0, ImGui::GetTextLineHeight()), IM_COL32(255, 255, 255, 255), std::to_string(get_vertical_factor()).c_str());
 }
 
 void touch_handler_t::set_world_focus(const bool world_has_input)
@@ -254,6 +281,7 @@ void touch_handler_t::feed_event(const SDL_Event& event_src)
             .max_delta_x = 0.0f,
             .max_delta_y = 0.0f,
             .area_move = 0,
+            .area_vert = 0,
             .area_camera = 0,
             .within_deadzone = 1,
             .within_deadzone_prior_to_threshold = 1,
@@ -264,6 +292,8 @@ void touch_handler_t::feed_event(const SDL_Event& event_src)
             if (dat.x > corner_camera_move0.x && dat.y < corner_camera_move1.y)
                 dat.area_move = 1;
         }
+        else if (dat.x < corner_camera_vert1.x && dat.y < corner_camera_vert1.y && dat.x > corner_camera_vert0.x && dat.y > corner_camera_vert0.y)
+            dat.area_vert = 1;
         else
             dat.area_camera = 1;
 

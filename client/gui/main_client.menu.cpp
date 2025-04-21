@@ -1078,6 +1078,7 @@ static client_menu_return_t do_in_game_menu(mc_gui::mc_gui_ctx* ctx, ImDrawList*
 
     if (!cvr_mc_gui_mobile_controls.get())
         return ret;
+    /* Mobile controls only past this point */
 
     ImGuiViewport* vprt = ImGui::GetMainViewport();
 
@@ -1097,18 +1098,39 @@ static client_menu_return_t do_in_game_menu(mc_gui::mc_gui_ctx* ctx, ImDrawList*
     ImGui::End();
     ImGui::PopStyleVar(1);
 
-    ImVec2 touch0 = vprt->Size * touch_handler.corner_camera_move0;
-    ImVec2 touch1 = vprt->Size * touch_handler.corner_camera_move1;
-    ImVec2 touch_size = touch1 - touch0;
-    ImVec2 touch_center = touch0 + touch_size * 0.5f;
-    ImVec2 cursor_size = touch_size * 0.2f;
-    draw_list->AddRectFilled(touch_center - cursor_size / 2.f, touch_center + cursor_size / 2.f, IM_COL32(72, 72, 72, 40), ctx->menu_scale * 10.0f);
-    draw_list->AddRectFilled(touch0, touch1, IM_COL32(72, 72, 72, 128), ctx->menu_scale * 10.0f);
+    /* Horizontal joystick */
+    {
+        ImVec2 touch0 = vprt->Size * touch_handler.corner_camera_move0;
+        ImVec2 touch1 = vprt->Size * touch_handler.corner_camera_move1;
+        ImVec2 touch_size = touch1 - touch0;
+        ImVec2 touch_center = touch0 + touch_size * 0.5f;
+        ImVec2 cursor_size = touch_size * 0.2f;
+        draw_list->AddRectFilled(touch_center - cursor_size / 2.f, touch_center + cursor_size / 2.f, IM_COL32(72, 72, 72, 40), ctx->menu_scale * 10.0f);
+        draw_list->AddRect(touch0, touch1, IM_COL32(72, 72, 72, 128), ctx->menu_scale * 10.0f, 0, ctx->menu_scale);
+        draw_list->AddRectFilled(touch0, touch1, IM_COL32(72, 72, 72, 128), ctx->menu_scale * 10.0f);
 
-    bool a;
-    ImVec2 cursor_pos = touch_center + touch_size * ImVec2(0.5f, -0.5f) * touch_handler.get_move_factors(a);
-    Uint32 cursor_col = IM_COL32(72, held_ctrl ? 128 : 72, 72, held_ctrl ? 160 : 128);
-    draw_list->AddRectFilled(cursor_pos - cursor_size / 2.f, cursor_pos + cursor_size / 2.f, cursor_col, ctx->menu_scale * 10.0f);
+        bool a;
+        ImVec2 cursor_pos = touch_center + touch_size * ImVec2(0.5f, -0.5f) * touch_handler.get_move_factors(a);
+        Uint32 cursor_col = IM_COL32(72, held_ctrl ? 128 : 72, 72, held_ctrl ? 160 : 128);
+        draw_list->AddRectFilled(cursor_pos - cursor_size / 2.f, cursor_pos + cursor_size / 2.f, cursor_col, ctx->menu_scale * 10.0f);
+    }
+
+    /* Raise/lower slider */
+    {
+        ImVec2 touch0 = vprt->Size * touch_handler.corner_camera_vert0;
+        ImVec2 touch1 = vprt->Size * touch_handler.corner_camera_vert1;
+        ImVec2 touch_size = touch1 - touch0;
+        ImVec2 touch_center = touch0 + touch_size * 0.5f;
+        ImVec2 cursor_size = touch_size * 0.2f;
+        cursor_size.x = SDL_min(touch_size.x, SDL_max(cursor_size.x, cursor_size.y));
+        draw_list->AddRect(touch0, touch1, IM_COL32(72, 72, 72, 128), ctx->menu_scale * 10.0f, 0, ctx->menu_scale);
+        draw_list->AddRectFilled(touch_center - cursor_size / 2.f, touch_center + cursor_size / 2.f, IM_COL32(72, 72, 72, 40), ctx->menu_scale * 10.0f);
+        draw_list->AddRectFilled(touch0, touch1, IM_COL32(72, 72, 72, 128), ctx->menu_scale * 10.0f);
+
+        ImVec2 cursor_pos = touch_center + touch_size * ImVec2(0, -0.5f * touch_handler.get_vertical_factor());
+        Uint32 cursor_col = IM_COL32(72, 72, 72, 128);
+        draw_list->AddRectFilled(cursor_pos - cursor_size / 2.f, cursor_pos + cursor_size / 2.f, cursor_col, ctx->menu_scale * 10.0f);
+    }
 
     return ret;
 }
