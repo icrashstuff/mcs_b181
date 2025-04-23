@@ -47,7 +47,7 @@ set(PHYSFS_ARCHIVE_VDF FALSE)
 set(PHYSFS_ARCHIVE_LECARCHIVES FALSE)
 set(PHYSFS_BUILD_DOCS FALSE)
 set(PHYSFS_BUILD_TEST FALSE)
-add_subdirectory(util/physfs/physfs-74c3054/)
+add_subdirectory(util/physfs/physfs/)
 
 set(CMAKE_INCLUDE_CURRENT_DIR ON)
 set(CMAKE_CXX_STANDARD 11)
@@ -86,7 +86,7 @@ set(tetra_core_SRC
     ${TETRA_DIR}util/stb/stb_sprintf.c
     ${TETRA_DIR}util/stb/stb_rect_pack.c
 
-    ${TETRA_DIR}util/physfs/physfs-74c3054/extras/physfssdl3.c
+    ${TETRA_DIR}util/physfs/physfs/extras/physfssdl3.c
 
     ${TETRA_DIR}tetra_core.cpp
 
