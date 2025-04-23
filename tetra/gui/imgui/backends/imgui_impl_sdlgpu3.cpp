@@ -210,6 +210,14 @@ void ImGui_ImplSDLGPU3_RenderDrawData(ImDrawData* draw_data, SDL_GPUCommandBuffe
             {
                 ImGui_ImplSDLGPU3_SetupRenderState(draw_data, pipeline, command_buffer, render_pass, fd, fb_width, fb_height);
             }
+            // [tetra]: Add ImDrawCallback_ChangePipeline
+            else if(pcmd->UserCallback == ImDrawCallback_ChangePipeline)
+            {
+                if(pcmd->UserCallbackData == nullptr)
+                    SDL_BindGPUGraphicsPipeline(render_pass, pipeline);
+                else
+                    SDL_BindGPUGraphicsPipeline(render_pass, (SDL_GPUGraphicsPipeline*)pcmd->UserCallbackData);
+            }
             else if (pcmd->UserCallback != nullptr)
             {
                 pcmd->UserCallback(draw_list, pcmd);

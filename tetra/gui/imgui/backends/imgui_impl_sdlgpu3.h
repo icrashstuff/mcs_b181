@@ -36,6 +36,9 @@ struct ImGui_ImplSDLGPU3_InitInfo
 
 // SDL_GPU Data [tetra]: Make these data structures public
 
+// [tetra]: Special Draw callback value to request renderer backend to bind the pipeline stored in ImDrawCmd::UserCallbackData
+#define ImDrawCallback_ChangePipeline (ImDrawCallback)(-16)
+
 // Reusable buffers used for rendering 1 current in-flight frame, for ImGui_ImplSDLGPU3_RenderDrawData()
 struct ImGui_ImplSDLGPU3_FrameData
 {
