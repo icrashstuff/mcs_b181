@@ -205,7 +205,12 @@ void ImGui_ImplSDLGPU3_RenderDrawData(ImDrawData* draw_data, SDL_GPUCommandBuffe
         for (int cmd_i = 0; cmd_i < draw_list->CmdBuffer.Size; cmd_i++)
         {
             const ImDrawCmd* pcmd = &draw_list->CmdBuffer[cmd_i];
-            if (pcmd->UserCallback != nullptr)
+            // [tetra]: Handle ImDrawCallback_ResetRenderState
+            if(pcmd->UserCallback == ImDrawCallback_ResetRenderState)
+            {
+                ImGui_ImplSDLGPU3_SetupRenderState(draw_data, pipeline, command_buffer, render_pass, fd, fb_width, fb_height);
+            }
+            else if (pcmd->UserCallback != nullptr)
             {
                 pcmd->UserCallback(draw_list, pcmd);
             }
