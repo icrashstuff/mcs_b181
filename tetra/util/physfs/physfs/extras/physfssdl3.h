@@ -26,7 +26,7 @@
 #ifndef _INCLUDE_PHYSFSSDL3_H_
 #define _INCLUDE_PHYSFSSDL3_H_
 
-#include "../../physfs.h"
+#include "physfs.h"
 #include <SDL3/SDL.h>
 
 #ifdef __cplusplus

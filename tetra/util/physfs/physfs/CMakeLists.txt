@@ -13,9 +13,6 @@ set(PHYSFS_VERSION 3.3.0)
 
 cmake_minimum_required(VERSION 3.5)
 
-# Make option() honor normal variables
-cmake_policy(SET CMP0077 NEW)
-
 project(PhysicsFS VERSION ${PHYSFS_VERSION} LANGUAGES C )
 
 include(GNUInstallDirs)
@@ -87,6 +84,7 @@ set(PHYSFS_SRCS
     src/physfs_platform_os2.c
     src/physfs_platform_qnx.c
     src/physfs_platform_android.c
+    src/physfs_platform_libretro.c
     src/physfs_platform_playdate.c
     src/physfs_archiver_dir.c
     src/physfs_archiver_unpacked.c
