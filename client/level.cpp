@@ -730,6 +730,7 @@ void level_t::render_stage_render(
 
     if (state::pipeline_shader_terrain_opaque)
     {
+        SDL_PushGPUDebugGroup(command_buffer, "Opaque");
         SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_opaque);
         for (auto it = chunks_render_order.rbegin(); it != chunks_render_order.rend(); it = next(it))
         {
@@ -743,10 +744,12 @@ void level_t::render_stage_render(
             SDL_BindGPUVertexBuffers(render_pass, 0, &binding_vtx, 1);
             SDL_DrawGPUIndexedPrimitives(render_pass, c->index_count, 1, 0, 0, 0);
         }
+        SDL_PopGPUDebugGroup(command_buffer);
     }
 
     if (state::pipeline_shader_terrain_overlay)
     {
+        SDL_PushGPUDebugGroup(command_buffer, "Overlay");
         SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_overlay);
         for (auto it = chunks_render_order.rbegin(); it != chunks_render_order.rend(); it = next(it))
         {
@@ -760,12 +763,14 @@ void level_t::render_stage_render(
             SDL_BindGPUVertexBuffers(render_pass, 0, &binding_vtx, 1);
             SDL_DrawGPUIndexedPrimitives(render_pass, c->index_count_overlay, 1, 0, c->index_count * 2 / 3, 0);
         }
+        SDL_PopGPUDebugGroup(command_buffer);
     }
 
     render_entities();
 
     if (state::pipeline_shader_terrain_translucent_depth)
     {
+        SDL_PushGPUDebugGroup(command_buffer, "Translucent Depth");
         SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_translucent_depth);
         for (chunk_cubic_t* c : chunks_render_order)
         {
@@ -778,10 +783,12 @@ void level_t::render_stage_render(
             SDL_BindGPUVertexBuffers(render_pass, 0, &binding_vtx, 1);
             SDL_DrawGPUIndexedPrimitives(render_pass, c->index_count_translucent, 1, 0, (c->index_count + c->index_count_overlay) * 2 / 3, 0);
         }
+        SDL_PopGPUDebugGroup(command_buffer);
     }
 
     if (state::pipeline_shader_terrain_translucent)
     {
+        SDL_PushGPUDebugGroup(command_buffer, "Translucent Color");
         SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_translucent);
         for (chunk_cubic_t* c : chunks_render_order)
         {
@@ -794,6 +801,7 @@ void level_t::render_stage_render(
             SDL_BindGPUVertexBuffers(render_pass, 0, &binding_vtx, 1);
             SDL_DrawGPUIndexedPrimitives(render_pass, c->index_count_translucent, 1, 0, (c->index_count + c->index_count_overlay) * 2 / 3, 0);
         }
+        SDL_PopGPUDebugGroup(command_buffer);
     }
 }
 
