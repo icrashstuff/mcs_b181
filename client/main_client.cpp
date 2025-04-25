@@ -769,34 +769,11 @@ void do_debug_crosshair(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawl
 static ImVec2 dvec2_to_ImVec2(const glm::dvec2 x) { return ImVec2(x.x, x.y); }
 static glm::dvec2 ImVec2_to_dvec2(const ImVec2 x) { return glm::dvec2(x.x, x.y); }
 
-static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture* gpu_target, const ImVec4 clear_color, const glm::ivec2 win_size)
+static void gui_game_manager()
 {
-    bool warp_mouse_to_center = 0;
-    bool mouse_wants_grabbed = world_has_input;
-    if (cvr_mc_gui_mobile_controls.get())
-        mouse_wants_grabbed = 0;
-    if (SDL_GetWindowMouseGrab(state::window) != mouse_wants_grabbed)
-    {
-        warp_mouse_to_center = 1;
-        SDL_SetWindowMouseGrab(state::window, mouse_wants_grabbed);
-    }
-    if (SDL_GetWindowRelativeMouseMode(state::window) != mouse_wants_grabbed)
-    {
-        warp_mouse_to_center = 1;
-        SDL_SetWindowRelativeMouseMode(state::window, mouse_wants_grabbed);
-    }
-
-    if (warp_mouse_to_center)
-    {
-        ImVec2 center = ImGui::GetMainViewport()->GetWorkCenter();
-        SDL_WarpMouseInWindow(state::window, center.x, center.y);
-    }
-
     ImGui::SetNextWindowSize(ImVec2(580, 480), ImGuiCond_FirstUseEver);
     ImGui::SetNextWindowPos(ImVec2(20.0f, ImGui::GetMainViewport()->GetWorkCenter().y), ImGuiCond_FirstUseEver, ImVec2(0.0, 0.5));
-    ImGui::Begin("Render Selector");
-    static bool show_level = true;
-    ImGui::Checkbox("Forcibly Show Level", &show_level);
+    ImGui::Begin("Game manager");
 
     if (ImGui::Button("Rebuild resources"))
         reload_resources = 1;
@@ -850,6 +827,11 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
         ImGui::PopID();
     }
 
+    ImGui::End();
+}
+
+static void loop_stage_ensure_game_selected()
+{
     game_selected = nullptr;
 
     for (game_t* g : games)
@@ -868,48 +850,47 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
         game_selected = games[0];
         game_selected_idx = game_selected->game_id;
     }
+}
 
-    ImGui::End();
-
-    game_t* game = game_selected;
-
-    music_counter -= delta_time;
-
-    /* Decide main menu music stuff immediately */
+static void loop_stage_process_queued_input()
+{
+    bool warp_mouse_to_center = 0;
+    bool mouse_wants_grabbed = world_has_input;
+    if (cvr_mc_gui_mobile_controls.get())
+        mouse_wants_grabbed = 0;
+    if (SDL_GetWindowMouseGrab(state::window) != mouse_wants_grabbed)
     {
-        if (game)
-            sound_engine_main_menu->kill_music();
-        else if (music_counter < 0)
-        {
-            /* Try to spawn music again in 0.5min-1.5min */
-            music_counter = 30.0f + SDL_randf() * 60.0f;
-
-            sound_info_t sinfo;
-
-            if (sound_engine_main_menu && state::game_resources && state::game_resources->sound_resources && !sound_engine_main_menu->is_music_playing())
-            {
-                if (state::game_resources->sound_resources->get_sound("minecraft:music.menu", sinfo))
-                    sound_engine_main_menu->request_source(sinfo, glm::f64vec3(0.0), 1);
-            }
-        }
+        warp_mouse_to_center = 1;
+        SDL_SetWindowMouseGrab(state::window, mouse_wants_grabbed);
+    }
+    if (SDL_GetWindowRelativeMouseMode(state::window) != mouse_wants_grabbed)
+    {
+        warp_mouse_to_center = 1;
+        SDL_SetWindowRelativeMouseMode(state::window, mouse_wants_grabbed);
     }
 
-    if (game && !client_menu_manager.stack_size() && (!game->connection || game->connection->get_in_world()))
+    if (warp_mouse_to_center)
+    {
+        ImVec2 center = ImGui::GetMainViewport()->GetWorkCenter();
+        SDL_WarpMouseInWindow(state::window, center.x, center.y);
+    }
+
+    if (game_selected && !client_menu_manager.stack_size() && (!game_selected->connection || game_selected->connection->get_in_world()))
         world_has_input = 1;
 
-    if (!show_level || !game_selected)
+    if (!game_selected)
         world_has_input = 0;
 
     if ((ImGui::GetIO().WantCaptureMouse || ImGui::GetIO().WantCaptureKeyboard) && tetra::imgui_ctx_main_wants_input())
         world_has_input = 0;
 
-    if (!game || client_menu_manager.stack_size())
+    if (!game_selected || client_menu_manager.stack_size())
         world_has_input = 0;
 
     if (!window_has_focus)
     {
         world_has_input = 0;
-        if (game && !client_menu_manager.stack_size() && (!game->connection || game->connection->get_in_world()))
+        if (game_selected && !client_menu_manager.stack_size() && (!game_selected->connection || game_selected->connection->get_in_world()))
             client_menu_manager.stack_push("menu.game");
     }
 
@@ -929,7 +910,8 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
         if (g->connection && g->level)
             g->connection->run(g->level);
 
-    bool in_flight = (game && game->level->gamemode_get() != mc_id::GAMEMODE_SURVIVAL && game->level->gamemode_get() != mc_id::GAMEMODE_ADVENTURE);
+    bool in_flight = (game_selected && game_selected->level->gamemode_get() != mc_id::GAMEMODE_SURVIVAL
+        && game_selected->level->gamemode_get() != mc_id::GAMEMODE_ADVENTURE);
 
     /* Base player speed is ~4.317 m/s, Source: https://minecraft.wiki/w/Sprinting */
     float camera_speed = 4.3175f * delta_time;
@@ -943,12 +925,12 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
         camera_speed *= 2.5f;
 
     /* Until spectator speed is changeable by some method, this will do */
-    if (game && game->level->gamemode_get() == mc_id::GAMEMODE_SPECTATOR)
+    if (game_selected && game_selected->level->gamemode_get() == mc_id::GAMEMODE_SPECTATOR)
         camera_speed *= 1.5f;
 
-    if (game)
+    if (game_selected)
     {
-        level_t* level = game->level;
+        level_t* level = game_selected->level;
 
         float sensitivity = cvr_mouse_sensitivity.get();
 
@@ -989,9 +971,35 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
         level->foot_pos += move_factors.x * camera_speed * glm::vec3(-SDL_sinf(glm::radians(level->yaw)), 0, SDL_cosf(glm::radians(level->yaw)));
 
         if (touch_handler.get_button_left_hold())
-            world_interaction_mouse(game, 1);
+            world_interaction_mouse(game_selected, 1);
         if (touch_handler.get_button_right_hold())
-            world_interaction_mouse(game, 3);
+            world_interaction_mouse(game_selected, 3);
+    }
+}
+
+static void loop_stage_prerender(glm::ivec2 win_size, bool& render_world)
+{
+    render_world = 0;
+
+    music_counter -= delta_time;
+
+    /* Decide main menu music stuff immediately */
+    {
+        if (game_selected)
+            sound_engine_main_menu->kill_music();
+        else if (music_counter < 0)
+        {
+            /* Try to spawn music again in 0.5min-1.5min */
+            music_counter = 30.0f + SDL_randf() * 60.0f;
+
+            sound_info_t sinfo;
+
+            if (sound_engine_main_menu && state::game_resources && state::game_resources->sound_resources && !sound_engine_main_menu->is_music_playing())
+            {
+                if (state::game_resources->sound_resources->get_sound("minecraft:music.menu", sinfo))
+                    sound_engine_main_menu->request_source(sinfo, glm::f64vec3(0.0), 1);
+            }
+        }
     }
 
     ImGuiContext* last_ctx = ImGui::GetCurrentContext();
@@ -1030,11 +1038,11 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
         ImGui::ShowStyleEditor();
     }
 
-    if (!game) /* No game */
+    if (!game_selected) /* No game */
         client_menu_manager.set_default("menu.title");
-    else if (game->connection) /* External world */
+    else if (game_selected->connection) /* External world */
     {
-        if (game->connection->get_in_world())
+        if (game_selected->connection->get_in_world())
             client_menu_manager.set_default("in_game");
         else
             client_menu_manager.set_default("loading");
@@ -1053,36 +1061,25 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
     bg_draw_list->ChannelsSetCurrent(0);
 
     /* client_menu_manager.run_last_in_stack() may delete the game */
-    game = game_selected;
-    bool in_world = game;
-    if (in_world && game->connection)
-        in_world = game->connection->get_in_world();
+    bool in_world = !!(game_selected);
+    if (in_world && game_selected->connection)
+        in_world = game_selected->connection->get_in_world();
 
-    bool render_world = menu_ret.allow_world && in_world;
+    render_world = menu_ret.allow_world && in_world;
 
-    /* Define this early to pass to ImGui callbacks */
-    SDL_GPURenderPass* render_pass = nullptr;
     if (render_world)
     {
-
-        render_world_overlays(game->level, bg_draw_list);
+        render_world_overlays(game_selected->level, bg_draw_list);
 
         render_hotbar(mc_gui::global_ctx, bg_draw_list);
 
         if (cvr_debug_screen.get())
         {
-            do_debug_crosshair(mc_gui::global_ctx, game, bg_draw_list);
-            do_debug_screen(mc_gui::global_ctx, game, bg_draw_list);
+            do_debug_crosshair(mc_gui::global_ctx, game_selected, bg_draw_list);
+            do_debug_screen(mc_gui::global_ctx, game_selected, bg_draw_list);
         }
         else
         {
-            /* This blendfunc causes properly made cursors to contrast with the environment better */
-            bg_draw_list->AddCallback(
-                [](const ImDrawList*, const ImDrawCmd* draw_cmd) {
-                    SDL_BindGPUGraphicsPipeline(*static_cast<SDL_GPURenderPass**>(draw_cmd->UserCallbackData), pipeline_imgui_crosshair);
-                },
-                &render_pass);
-
             /* Render crosshair
              * NOTE: If a function called by client_menu_manager.run_last_in_stack() adds to
              * the background draw list then the crosshair will be drawn on top!
@@ -1093,15 +1090,12 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
             const ImVec2 pos1(center + ImVec2(8.0f, 8.0f) * scale);
             const ImVec2 uv0(240.0f / 256.0f, 0.0f);
             const ImVec2 uv1(1.0f, 16.0f / 256.0f);
+            bg_draw_list->AddCallback(ImDrawCallback_ChangePipeline, pipeline_imgui_crosshair);
             if (cvr_r_crosshair_widgets.get())
                 bg_draw_list->AddImage(mc_gui::global_ctx->tex_id_widgets, pos0, pos1, uv0, uv1);
             else
                 bg_draw_list->AddImage(mc_gui::global_ctx->tex_id_crosshair, pos0, pos1);
-            bg_draw_list->AddCallback(
-                [](const ImDrawList*, const ImDrawCmd* draw_cmd) {
-                    SDL_BindGPUGraphicsPipeline(*static_cast<SDL_GPURenderPass**>(draw_cmd->UserCallbackData), pipeline_imgui_regular);
-                },
-                &render_pass);
+            bg_draw_list->AddCallback(ImDrawCallback_ChangePipeline, nullptr);
         }
 
         /* Draw world dim */
@@ -1133,34 +1127,44 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
         touch_handler.draw_imgui(ImGui::GetForegroundDrawList(), ImVec2(0, 0), ImGui::GetMainViewport()->Size * 0.25f);
 
     ImGui::Render();
+    ImGui::SetCurrentContext(last_ctx);
+
+    if (game_selected)
+        game_selected->level->render_stage_prepare(win_size);
+}
+
+static void loop_stage_render(
+    SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture* gpu_target, const ImVec4 clear_color, const glm::ivec2 win_size, bool render_world)
+{
+    if (!game_selected)
+        render_world = 0;
+
+    ImGuiContext* last_ctx = ImGui::GetCurrentContext();
+
+    ImGui::SetCurrentContext(imgui_ctx_main_menu);
     ImDrawData* draw_data = ImGui::GetDrawData();
+    ImGui::SetCurrentContext(last_ctx);
     const bool is_minimized = (draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f);
     if (gpu_target == nullptr || is_minimized || gpu_command_buffer == nullptr)
-    {
-        ImGui::SetCurrentContext(last_ctx);
         return;
-    }
 
+    ImGui::SetCurrentContext(imgui_ctx_main_menu);
     SDL_PushGPUDebugGroup(gpu_command_buffer, "[mc_gui]: Copy pass");
     Imgui_ImplSDLGPU3_PrepareDrawData(draw_data, gpu_command_buffer);
     SDL_PopGPUDebugGroup(gpu_command_buffer);
+    ImGui::SetCurrentContext(last_ctx);
 
     if (render_world)
     {
-        ImGui::SetCurrentContext(last_ctx);
-        game->level->render_stage_prepare(win_size);
         SDL_GPUCopyPass* copy_pass = SDL_BeginGPUCopyPass(gpu_command_buffer);
 
         SDL_PushGPUDebugGroup(gpu_command_buffer, "[Level]: Copy pass");
-        game->level->render_stage_copy(copy_pass);
+        game_selected->level->render_stage_copy(copy_pass);
         state::game_resources->terrain_atlas->update(copy_pass);
         SDL_PopGPUDebugGroup(gpu_command_buffer);
 
         SDL_EndGPUCopyPass(copy_pass);
-        ImGui::SetCurrentContext(imgui_ctx_main_menu);
     }
-
-    // TODO: Split render and copy pass into separate functions
 
     SDL_GPUColorTargetInfo tinfo_color = {};
     tinfo_color.texture = gpu_target;
@@ -1193,27 +1197,25 @@ static void normal_loop(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture
         .padding1 = 0,
         .padding2 = 0,
     };
-    render_pass = SDL_BeginGPURenderPass(gpu_command_buffer, &tinfo_color, 1, &tinfo_depth);
+    SDL_GPURenderPass* render_pass = SDL_BeginGPURenderPass(gpu_command_buffer, &tinfo_color, 1, &tinfo_depth);
     SDL_ReleaseGPUTexture(state::gpu_device, tinfo_depth.texture);
 
     if (render_world)
     {
         ImGui::SetCurrentContext(last_ctx);
-
         SDL_PushGPUDebugGroup(gpu_command_buffer, "[Level]: Render pass");
-        game->level->render_stage_render(gpu_command_buffer, render_pass, win_size, delta_time);
+        game_selected->level->render_stage_render(gpu_command_buffer, render_pass, win_size, delta_time);
         SDL_PopGPUDebugGroup(gpu_command_buffer);
-
         ImGui::SetCurrentContext(imgui_ctx_main_menu);
     }
 
+    ImGui::SetCurrentContext(imgui_ctx_main_menu);
     SDL_PushGPUDebugGroup(gpu_command_buffer, "[mc_gui]: Render pass");
     ImGui_ImplSDLGPU3_RenderDrawData(draw_data, gpu_command_buffer, render_pass, pipeline_imgui_regular);
     SDL_PopGPUDebugGroup(gpu_command_buffer);
+    ImGui::SetCurrentContext(last_ctx);
 
     SDL_EndGPURenderPass(render_pass);
-
-    ImGui::SetCurrentContext(last_ctx);
 }
 
 static void process_event(SDL_Event& event, bool* done)
@@ -1929,7 +1931,7 @@ void setup_static_gpu_state()
         util::die("Failed to acquire copy pass to upload debug texture, SDL_BeginGPUCopyPass: %s", SDL_GetError());
 
     upload_debug_texture(copy_pass);
-    upload_square_ebo(copy_pass, "[Level]: EBO: 16bit");
+    upload_square_ebo(copy_pass, "[Level]: EBO");
 
     SDL_EndGPUCopyPass(copy_pass);
 
@@ -2237,7 +2239,14 @@ int main(int argc, char* argv[])
                 break;
             }
 
-            normal_loop(command_buffer, swapchain_texture, clear_color, win_size);
+            gui_game_manager();
+            loop_stage_ensure_game_selected();
+
+            loop_stage_process_queued_input();
+
+            bool render_world = 0;
+            loop_stage_prerender(win_size, render_world);
+            loop_stage_render(command_buffer, swapchain_texture, clear_color, win_size, render_world);
 
             if (game_selected && game_selected->level && cvr_gui_renderer.get())
             {
