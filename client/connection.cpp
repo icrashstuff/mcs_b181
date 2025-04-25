@@ -67,7 +67,7 @@ static void decompress_chunk_packet(level_t* const level, const packet_chunk_t* 
     const int real_volume = (real_size_x * real_size_y * real_size_z);
 
     /* Oversize the buffer a small amount in case weirdness occurs  */
-    size_t uncompressed_size = real_size_x * real_size_y * real_size_z * 41 / 16;
+    long unsigned int uncompressed_size = real_size_x * real_size_y * real_size_z * 41 / 16;
     if (uncompressed_size > buffer.size())
     {
         dc_log("Resizing decompression buffer to %zu", uncompressed_size);
