@@ -1624,7 +1624,8 @@ static void init_mc_gui_shaders()
 
     pipeline_imgui_regular = SDL_CreateGPUGraphicsPipeline(state::gpu_device, &pipeline_info);
 
-    color_target_desc[0].blend_state.color_blend_op = SDL_GPU_BLENDOP_REVERSE_SUBTRACT;
+    color_target_desc[0].blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_DST_COLOR;
+    color_target_desc[0].blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_COLOR;
 
     pipeline_imgui_crosshair = SDL_CreateGPUGraphicsPipeline(state::gpu_device, &pipeline_info);
 }
