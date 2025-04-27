@@ -155,8 +155,6 @@ public:
     /**
      * Update and upload the terrain texture
      *
-     * Must be called inside the same OpenGL context as the constructor
-     *
      * NOTE: It would probably be wise to call this on a background thread
      * NOTE: The time values used for determining animations (except the clock & compass) are to tied SDL_GetTicks()
      */

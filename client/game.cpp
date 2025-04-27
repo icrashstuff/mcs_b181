@@ -129,12 +129,12 @@ static convar_int_t cvr_world_y_off_neg("dev_world_y_off_neg", 6, 0, 32, "Negati
 void game_t::create_testworld()
 {
     level->clear();
-    level->foot_pos = { -38, -12.7, -52 };
+    level->foot_pos = { -36.0f, -23.5f, -95.0f };
     level->camera_direction = { 1, 0, 0 };
     level->camera_right = { 1, 0, 0 };
     level->camera_up = { 0, 1, 0 };
-    level->yaw = 119.0f;
-    level->pitch = -45.0f;
+    level->yaw = 170.0f;
+    level->pitch = -13.0f;
     level->fov = -1.0f;
     level->mc_seed = 1;
 

@@ -149,9 +149,6 @@ SET_SOURCE_FILES_PROPERTIES(client/chunk_cubic.cpp PROPERTIES COMPILE_FLAGS "${C
 
 # SET_SOURCE_FILES_PROPERTIES(client/chunk_cubic.cpp PROPERTIES COMPILE_OPTIONS "-fopt-info-vec-all")
 
-configure_file(client/shaders/terrain.frag shaders/terrain.frag COPYONLY)
-configure_file(client/shaders/terrain.vert shaders/terrain.vert COPYONLY)
-
 set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(sdl_net/)
 

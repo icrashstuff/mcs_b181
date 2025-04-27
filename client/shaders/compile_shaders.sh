@@ -1,6 +1,5 @@
 #!/bin/sh
 # This script requires xxd, glslc, spirv-opt, and SDL_shadercross
-# TODO-OPT: Metallib shaders
 
 set -e
 
