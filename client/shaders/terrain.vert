@@ -22,28 +22,37 @@
  * DEALINGS IN THE SOFTWARE.
  */
 /* ================ BEGIN Vertex inputs ================ */
-/**
- * X:  [0....9]
- * Y:  [10..19]
- * Z:  [20..29]
- * AO: [30..31]
- */
-layout(location = 0) in uint vtx_pos_ao;
-/**
- * R: [0....7]
- * G: [8...15]
- * B: [16..23]
- * Light Block: [24..27]
- * Light Sky:   [28..31]
- */
-layout(location = 1) in uint vtx_coloring;
-/**
- * Max atlas size of 32767^2
- *
- * U: [0...15] / (2^15 + 1)
- * V: [16..31] / (2^15 + 1)
- */
-layout(location = 2) in uint vtx_texturing;
+struct vertex_t
+{
+    /**
+     * X:  [0....9]
+     * Y:  [10..19]
+     * Z:  [20..29]
+     * AO: [30..31]
+     */
+    uint pos_ao;
+    /**
+     * R: [0....7]
+     * G: [8...15]
+     * B: [16..23]
+     * Light Block: [24..27]
+     * Light Sky:   [28..31]
+     */
+    uint coloring;
+    /**
+     * Max atlas size of 32767^2
+     *
+     * U: [0...15] / (2^15 + 1)
+     * V: [16..31] / (2^15 + 1)
+     */
+    uint texturing;
+};
+
+layout(std430, set = 0, binding = 0) readonly buffer vertex_data_t
+{
+    /* ivec3 pos; */
+    vertex_t data[];
+} vtx_data;
 /* ================ END Vertex inputs ================ */
 
 /* ================ BEGIN Vertex outputs ================ */
@@ -86,23 +95,25 @@ ubo_model;
 
 void main()
 {
+    vertex_t vtx = vtx_data.data[gl_InstanceIndex * 4 + gl_VertexIndex];
+
     vec3 pos;
-    pos.x = float(int((vtx_pos_ao      ) & 1023u) - 256) / 32.0;
-    pos.y = float(int((vtx_pos_ao >> 10) & 1023u) - 256) / 32.0;
-    pos.z = float(int((vtx_pos_ao >> 20) & 1023u) - 256) / 32.0;
+    pos.x = float(int((vtx.pos_ao      ) & 1023u) - 256) / 32.0;
+    pos.y = float(int((vtx.pos_ao >> 10) & 1023u) - 256) / 32.0;
+    pos.z = float(int((vtx.pos_ao >> 20) & 1023u) - 256) / 32.0;
     gl_Position = ubo_world.projection * ubo_world.camera * (vec4(pos, 1.0) + ubo_model.model);
 
-    frag.ao = float((vtx_pos_ao >> 30) & 3u) / 3.0;
+    frag.ao = float((vtx.pos_ao >> 30) & 3u) / 3.0;
 
-    frag.color.r = ubo_tint.tint.r * float((vtx_coloring      ) & 255u) / 255.0;
-    frag.color.g = ubo_tint.tint.g * float((vtx_coloring >>  8) & 255u) / 255.0;
-    frag.color.b = ubo_tint.tint.b * float((vtx_coloring >> 16) & 255u) / 255.0;
+    frag.color.r = ubo_tint.tint.r * float((vtx.coloring      ) & 255u) / 255.0;
+    frag.color.g = ubo_tint.tint.g * float((vtx.coloring >>  8) & 255u) / 255.0;
+    frag.color.b = ubo_tint.tint.b * float((vtx.coloring >> 16) & 255u) / 255.0;
     frag.color.a = ubo_tint.tint.a;
 
-    frag.light_block = float((vtx_coloring >> 24) & 15u) / 15.0;
-    frag.light_sky   = float((vtx_coloring >> 28) & 15u) / 15.0;
+    frag.light_block = float((vtx.coloring >> 24) & 15u) / 15.0;
+    frag.light_sky   = float((vtx.coloring >> 28) & 15u) / 15.0;
 
-    float u = float((vtx_texturing      ) & 65535u) / 32768.0;
-    float v = float((vtx_texturing >> 16) & 65535u) / 32768.0;
+    float u = float((vtx.texturing      ) & 65535u) / 32768.0;
+    float v = float((vtx.texturing >> 16) & 65535u) / 32768.0;
     frag.uv = vec2(u, v);
 }

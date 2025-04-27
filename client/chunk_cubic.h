@@ -137,16 +137,9 @@ struct chunk_cubic_t
     SDL_GPUBuffer* vbo = nullptr;
     SDL_GPUBuffer* ebo_translucent = nullptr;
 
-    size_t index_count = 0;
-    size_t index_count_overlay = 0;
-
-    /**
-     * One of GL_UNSIGNED_INT, GL_UNSIGNED_SHORT, GL_UNSIGNED_BYTE, or GL_NONE
-     *
-     * (Unused)
-     */
-    GLenum index_type_translucent = GL_NONE;
-    size_t index_count_translucent = 0;
+    size_t quad_count = 0;
+    size_t quad_count_overlay = 0;
+    size_t quad_count_translucent = 0;
 
     const Uint64 time_creation = SDL_GetTicks();
 

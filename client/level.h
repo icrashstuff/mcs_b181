@@ -415,9 +415,9 @@ private:
 
     struct mesh_queue_info_t
     {
-        size_t index_count = 0;
-        size_t index_count_overlay = 0;
-        size_t index_count_translucent = 0;
+        size_t quad_count = 0;
+        size_t quad_count_overlay = 0;
+        size_t quad_count_translucent = 0;
 
         Uint32 vertex_data_size = 0;
         void* vertex_data = nullptr;

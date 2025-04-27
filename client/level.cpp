@@ -595,7 +595,7 @@ bool level_t::mesh_queue_upload_item(SDL_GPUCopyPass* const copy_pass, mesh_queu
         return false;
 
     SDL_GPUBufferCreateInfo cinfo_vbo = {
-        .usage = SDL_GPU_BUFFERUSAGE_VERTEX,
+        .usage = SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ,
         .size = item.vertex_data_size,
         .props = SDL_CreateProperties(),
     };
@@ -623,9 +623,9 @@ bool level_t::mesh_queue_upload_item(SDL_GPUCopyPass* const copy_pass, mesh_queu
 
     SDL_ReleaseGPUBuffer(state::gpu_device, c->vbo);
     c->vbo = vbo;
-    c->index_count = item.index_count;
-    c->index_count_overlay = item.index_count_overlay;
-    c->index_count_translucent = item.index_count_translucent;
+    c->quad_count = item.quad_count;
+    c->quad_count_overlay = item.quad_count_overlay;
+    c->quad_count_translucent = item.quad_count_translucent;
 
     return true;
 }
@@ -735,14 +735,13 @@ void level_t::render_stage_render(
         for (auto it = chunks_render_order.rbegin(); it != chunks_render_order.rend(); it = next(it))
         {
             chunk_cubic_t* c = *it;
-            if (!c->vbo || c->index_count == 0 || !c->visible)
+            if (!c->vbo || c->quad_count == 0 || !c->visible)
                 continue;
             glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
             ubo_model_t ubo_model = { .model = glm::vec4(translate.x, translate.y, translate.z, 0.0f) };
             SDL_PushGPUVertexUniformData(command_buffer, 2, &ubo_model, sizeof(ubo_model));
-            SDL_GPUBufferBinding binding_vtx = { .buffer = c->vbo, .offset = 0 };
-            SDL_BindGPUVertexBuffers(render_pass, 0, &binding_vtx, 1);
-            SDL_DrawGPUIndexedPrimitives(render_pass, c->index_count, 1, 0, 0, 0);
+            SDL_BindGPUVertexStorageBuffers(render_pass, 0, &c->vbo, 1);
+            SDL_DrawGPUPrimitives(render_pass, 4, c->quad_count, 0, 0);
         }
         SDL_PopGPUDebugGroup(command_buffer);
     }
@@ -754,14 +753,13 @@ void level_t::render_stage_render(
         for (auto it = chunks_render_order.rbegin(); it != chunks_render_order.rend(); it = next(it))
         {
             chunk_cubic_t* c = *it;
-            if (!c->vbo || c->index_count_overlay == 0 || !c->visible)
+            if (!c->vbo || c->quad_count_overlay == 0 || !c->visible)
                 continue;
             glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
             ubo_model_t ubo_model = { .model = glm::vec4(translate.x, translate.y, translate.z, 0.0f) };
             SDL_PushGPUVertexUniformData(command_buffer, 2, &ubo_model, sizeof(ubo_model));
-            SDL_GPUBufferBinding binding_vtx = { .buffer = c->vbo, .offset = 0 };
-            SDL_BindGPUVertexBuffers(render_pass, 0, &binding_vtx, 1);
-            SDL_DrawGPUIndexedPrimitives(render_pass, c->index_count_overlay, 1, 0, c->index_count * 2 / 3, 0);
+            SDL_BindGPUVertexStorageBuffers(render_pass, 0, &c->vbo, 1);
+            SDL_DrawGPUPrimitives(render_pass, 4, c->quad_count_overlay, 0, c->quad_count);
         }
         SDL_PopGPUDebugGroup(command_buffer);
     }
@@ -774,14 +772,13 @@ void level_t::render_stage_render(
         SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_translucent_depth);
         for (chunk_cubic_t* c : chunks_render_order)
         {
-            if (!c->vbo || c->index_count_translucent == 0 || !c->visible)
+            if (!c->vbo || c->quad_count_translucent == 0 || !c->visible)
                 continue;
             glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
             ubo_model_t ubo_model = { .model = glm::vec4(translate.x, translate.y, translate.z, 0.0f) };
             SDL_PushGPUVertexUniformData(command_buffer, 2, &ubo_model, sizeof(ubo_model));
-            SDL_GPUBufferBinding binding_vtx = { .buffer = c->vbo, .offset = 0 };
-            SDL_BindGPUVertexBuffers(render_pass, 0, &binding_vtx, 1);
-            SDL_DrawGPUIndexedPrimitives(render_pass, c->index_count_translucent, 1, 0, (c->index_count + c->index_count_overlay) * 2 / 3, 0);
+            SDL_BindGPUVertexStorageBuffers(render_pass, 0, &c->vbo, 1);
+            SDL_DrawGPUPrimitives(render_pass, 4, c->quad_count_translucent, 0, c->quad_count + c->quad_count_overlay);
         }
         SDL_PopGPUDebugGroup(command_buffer);
     }
@@ -792,14 +789,13 @@ void level_t::render_stage_render(
         SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_translucent);
         for (chunk_cubic_t* c : chunks_render_order)
         {
-            if (!c->vbo || c->index_count_translucent == 0 || !c->visible)
+            if (!c->vbo || c->quad_count_translucent == 0 || !c->visible)
                 continue;
             glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
             ubo_model_t ubo_model = { .model = glm::vec4(translate.x, translate.y, translate.z, 0.0f) };
             SDL_PushGPUVertexUniformData(command_buffer, 2, &ubo_model, sizeof(ubo_model));
-            SDL_GPUBufferBinding binding_vtx = { .buffer = c->vbo, .offset = 0 };
-            SDL_BindGPUVertexBuffers(render_pass, 0, &binding_vtx, 1);
-            SDL_DrawGPUIndexedPrimitives(render_pass, c->index_count_translucent, 1, 0, (c->index_count + c->index_count_overlay) * 2 / 3, 0);
+            SDL_BindGPUVertexStorageBuffers(render_pass, 0, &c->vbo, 1);
+            SDL_DrawGPUPrimitives(render_pass, 4, c->quad_count_translucent, 0, c->quad_count + c->quad_count_overlay);
         }
         SDL_PopGPUDebugGroup(command_buffer);
     }

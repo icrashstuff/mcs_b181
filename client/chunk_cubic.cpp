@@ -35,11 +35,9 @@ void chunk_cubic_t::free_renderer_resources()
     vbo = nullptr;
     ebo_translucent = nullptr;
 
-    index_count = 0;
-    index_count_overlay = 0;
-    index_count_translucent = 0;
-
-    index_type_translucent = GL_NONE;
+    quad_count = 0;
+    quad_count_overlay = 0;
+    quad_count_translucent = 0;
 
     dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
 }

@@ -102,7 +102,7 @@ void state::init_terrain_pipelines()
         .stage = SDL_GPU_SHADERSTAGE_VERTEX,
         .num_samplers = 0,
         .num_storage_textures = 0,
-        .num_storage_buffers = 0,
+        .num_storage_buffers = 1,
         .num_uniform_buffers = 3,
         .props = 0,
     };
@@ -147,93 +147,60 @@ void state::init_terrain_pipelines()
     if (!create_shader(shader_frag, cinfo_shader_frag, "Terrain shader (frag)"))
         return;
 
-    SDL_GPUVertexAttribute vertex_attributes[] = {
-        SDL_GPUVertexAttribute {
-            .location = 0,
-            .buffer_slot = 0,
-            .format = SDL_GPU_VERTEXELEMENTFORMAT_UINT,
-            .offset = 0,
-        },
-        SDL_GPUVertexAttribute {
-            .location = 1,
-            .buffer_slot = 0,
-            .format = SDL_GPU_VERTEXELEMENTFORMAT_UINT,
-            .offset = 4,
-        },
-        SDL_GPUVertexAttribute {
-            .location = 2,
-            .buffer_slot = 0,
-            .format = SDL_GPU_VERTEXELEMENTFORMAT_UINT,
-            .offset = 8,
-        },
-    };
+    SDL_GPUVertexAttribute vertex_attributes[] = {};
 
-    SDL_GPUVertexBufferDescription vertex_buffer_descriptions[] = {
-        SDL_GPUVertexBufferDescription {
-            .slot = 0,
-            .pitch = 12,
-            .input_rate = SDL_GPU_VERTEXINPUTRATE_VERTEX,
-            .instance_step_rate = 0,
-        },
-    };
+    SDL_GPUVertexBufferDescription vertex_buffer_descriptions[] = {};
 
-    SDL_GPUVertexInputState vertex_input_state = {
-        .vertex_buffer_descriptions = vertex_buffer_descriptions,
-        .num_vertex_buffers = SDL_arraysize(vertex_buffer_descriptions),
-        .vertex_attributes = vertex_attributes,
-        .num_vertex_attributes = SDL_arraysize(vertex_attributes),
-    };
-    SDL_GPURasterizerState rasterizer_state = {
-        .fill_mode = SDL_GPU_FILLMODE_FILL,
-        .cull_mode = SDL_GPU_CULLMODE_BACK,
-        .front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE,
-        .depth_bias_constant_factor = 0,
-        .depth_bias_clamp = 0,
-        .depth_bias_slope_factor = 0,
-        .enable_depth_bias = 0,
-        .enable_depth_clip = 0,
-    };
-    SDL_GPUMultisampleState multisample_state = {
-        .sample_count = SDL_GPU_SAMPLECOUNT_1,
-        .sample_mask = 0,
-        .enable_mask = 0,
-    };
+    SDL_GPUVertexInputState vertex_input_state = {};
+    vertex_input_state.vertex_buffer_descriptions = vertex_buffer_descriptions;
+    vertex_input_state.num_vertex_buffers = SDL_arraysize(vertex_buffer_descriptions);
+    vertex_input_state.vertex_attributes = vertex_attributes;
+    vertex_input_state.num_vertex_attributes = SDL_arraysize(vertex_attributes);
+
+    SDL_GPURasterizerState rasterizer_state = {};
+    rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
+    rasterizer_state.cull_mode = SDL_GPU_CULLMODE_BACK;
+    rasterizer_state.front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
+    rasterizer_state.depth_bias_constant_factor = 0;
+    rasterizer_state.depth_bias_clamp = 0;
+    rasterizer_state.depth_bias_slope_factor = 0;
+    rasterizer_state.enable_depth_bias = 0;
+    rasterizer_state.enable_depth_clip = 0;
+
+    SDL_GPUMultisampleState multisample_state = {};
+    multisample_state.sample_count = SDL_GPU_SAMPLECOUNT_1;
+    multisample_state.sample_mask = 0;
+    multisample_state.enable_mask = 0;
+
     SDL_GPUDepthStencilState depth_stencil_state = {};
     depth_stencil_state.enable_depth_test = 1;
     depth_stencil_state.enable_depth_write = 1;
     depth_stencil_state.enable_stencil_test = 0;
 
-    SDL_GPUColorTargetDescription color_target_descriptions[] = {
-        SDL_GPUColorTargetDescription {
-            SDL_GetGPUSwapchainTextureFormat(state::gpu_device, state::window),
-            SDL_GPUColorTargetBlendState {
-                .src_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA,
-                .dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
-                .color_blend_op = SDL_GPU_BLENDOP_ADD,
-                .src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE,
-                .dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA,
-                .alpha_blend_op = SDL_GPU_BLENDOP_ADD,
-                .color_write_mask = SDL_GPU_COLORCOMPONENT_R | SDL_GPU_COLORCOMPONENT_G | SDL_GPU_COLORCOMPONENT_B | SDL_GPU_COLORCOMPONENT_A,
-                .enable_blend = 0,
-                .enable_color_write_mask = 0,
-                .padding1 = 0,
-                .padding2 = 0,
-            },
-        },
-    };
+    SDL_GPUColorTargetDescription color_target_desc[1] = {};
+    color_target_desc[0].format = SDL_GetGPUSwapchainTextureFormat(state::gpu_device, state::window);
+    color_target_desc[0].blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
+    color_target_desc[0].blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+    color_target_desc[0].blend_state.color_blend_op = SDL_GPU_BLENDOP_ADD;
+    color_target_desc[0].blend_state.src_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE;
+    color_target_desc[0].blend_state.dst_alpha_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
+    color_target_desc[0].blend_state.alpha_blend_op = SDL_GPU_BLENDOP_ADD;
+    color_target_desc[0].blend_state.color_write_mask
+        = SDL_GPU_COLORCOMPONENT_R | SDL_GPU_COLORCOMPONENT_G | SDL_GPU_COLORCOMPONENT_B | SDL_GPU_COLORCOMPONENT_A;
+    color_target_desc[0].blend_state.enable_blend = 0;
+    color_target_desc[0].blend_state.enable_color_write_mask = 0;
 
-    SDL_GPUGraphicsPipelineTargetInfo target_info = {
-        .color_target_descriptions = color_target_descriptions,
-        .num_color_targets = SDL_arraysize(color_target_descriptions),
-        .depth_stencil_format = state::gpu_tex_format_best_depth_only,
-        .has_depth_stencil_target = 1,
-    };
+    SDL_GPUGraphicsPipelineTargetInfo target_info = {};
+    target_info.color_target_descriptions = color_target_desc;
+    target_info.num_color_targets = SDL_arraysize(color_target_desc);
+    target_info.depth_stencil_format = state::gpu_tex_format_best_depth_only;
+    target_info.has_depth_stencil_target = 1;
 
     SDL_GPUGraphicsPipelineCreateInfo cinfo_pipeline = {
         .vertex_shader = shader_vert,
         .fragment_shader = shader_frag,
         .vertex_input_state = vertex_input_state,
-        .primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLELIST,
+        .primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLESTRIP,
         .rasterizer_state = rasterizer_state,
         .multisample_state = multisample_state,
         .depth_stencil_state = depth_stencil_state,
@@ -244,28 +211,28 @@ void state::init_terrain_pipelines()
     cinfo_pipeline.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS;
     cinfo_pipeline.depth_stencil_state.enable_depth_test = 1;
     cinfo_pipeline.depth_stencil_state.enable_depth_write = 1;
-    color_target_descriptions[0].blend_state.enable_blend = 0;
+    color_target_desc[0].blend_state.enable_blend = 0;
     create_pipeline(pipeline_shader_terrain_opaque, cinfo_pipeline, "Terrain pipeline (opaque)");
 
     cinfo_pipeline.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_EQUAL;
     cinfo_pipeline.depth_stencil_state.enable_depth_test = 1;
     cinfo_pipeline.depth_stencil_state.enable_depth_write = 0;
-    color_target_descriptions[0].blend_state.enable_blend = 0;
+    color_target_desc[0].blend_state.enable_blend = 0;
     create_pipeline(pipeline_shader_terrain_overlay, cinfo_pipeline, "Terrain pipeline (overlay)");
 
     cinfo_pipeline.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS;
     cinfo_pipeline.depth_stencil_state.enable_depth_test = 1;
     cinfo_pipeline.depth_stencil_state.enable_depth_write = 1;
-    color_target_descriptions[0].blend_state.enable_blend = 0;
-    color_target_descriptions[0].blend_state.enable_color_write_mask = 1;
-    color_target_descriptions[0].blend_state.color_write_mask = 0;
+    color_target_desc[0].blend_state.enable_blend = 0;
+    color_target_desc[0].blend_state.enable_color_write_mask = 1;
+    color_target_desc[0].blend_state.color_write_mask = 0;
     create_pipeline(pipeline_shader_terrain_translucent_depth, cinfo_pipeline, "Terrain pipeline (translucent depth-only)");
 
     cinfo_pipeline.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_EQUAL;
     cinfo_pipeline.depth_stencil_state.enable_depth_test = 1;
     cinfo_pipeline.depth_stencil_state.enable_depth_write = 0;
-    color_target_descriptions[0].blend_state.enable_blend = 1;
-    color_target_descriptions[0].blend_state.enable_color_write_mask = 0;
+    color_target_desc[0].blend_state.enable_blend = 1;
+    color_target_desc[0].blend_state.enable_color_write_mask = 0;
     create_pipeline(pipeline_shader_terrain_translucent, cinfo_pipeline, "Terrain pipeline (translucent)");
 }
 

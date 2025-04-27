@@ -2443,9 +2443,9 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
     mesh_queue_info_t queue_info = {};
 
-    queue_info.index_count = vtx_solid.size() / 4 * 6;
-    queue_info.index_count_overlay = vtx_overlay.size() / 4 * 6;
-    queue_info.index_count_translucent = vtx_translucent.size() / 4 * 6;
+    queue_info.quad_count = vtx_solid.size() / 4;
+    queue_info.quad_count_overlay = vtx_overlay.size() / 4;
+    queue_info.quad_count_translucent = vtx_translucent.size() / 4;
 
     /* Combine vectors into one */
     int vtx_solid_idx = vtx_solid.size();

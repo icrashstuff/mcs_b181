@@ -4,12 +4,22 @@
 set -e
 
 # This snippet was copied from build-shaders.sh from SDL3
-make_header() {
+make_header_binary() {
     echo "// clang-format off" > "$1.h"
     xxd -i "$1" | sed \
         -e 's/^unsigned /const unsigned /g' \
         -e 's,^const,static const,' \
         >> "$1.h"
+    rm -f "$1"
+}
+make_header_text() {
+    ARRAY_NAME="$(echo "$1" | sed -e 's/\./_/g')"
+
+    echo "// clang-format off" > "$1.h"
+    echo "static const unsigned char ${ARRAY_NAME}[] = R\"(" >> "$1.h"
+    cat  "$1"  >> "$1.h"
+    echo ")\";"  >> "$1.h"
+    echo "static const unsigned int ${ARRAY_NAME}_len = sizeof(${ARRAY_NAME});" >> "$1.h"
     rm -f "$1"
 }
 
@@ -35,8 +45,8 @@ compile_shader()
     # echo "==> $STAGE: ${FILE_OUT_SPIRV} -> ${FILE_OUT_DXIL}"
     # shadercross "${FILE_OUT_SPIRV}" --source SPIRV --dest DXIL --stage "${STAGE}" --output "${FILE_OUT_DXIL}"
 
-    make_header "${FILE_OUT_SPIRV}"
-    make_header "${FILE_OUT_METAL}"
+    make_header_binary "${FILE_OUT_SPIRV}"
+    make_header_text "${FILE_OUT_METAL}"
 }
 
 compile_shader "vertex" "terrain.vert"

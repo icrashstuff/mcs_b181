@@ -81,7 +81,7 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
             num_dirty_visible += it->visible ? (it->dirty_level != chunk_cubic_t::DIRTY_LEVEL_NONE) : 0;
 
             mem_chunk_guess += sizeof(chunk_cubic_t);
-            mem_chunk_mesh_guess += sizeof(terrain_vertex_t) * (it->index_count + it->index_count_overlay + it->index_count_translucent) / 6 * 4;
+            mem_chunk_mesh_guess += sizeof(terrain_vertex_t) * (it->quad_count + it->quad_count_overlay + it->quad_count_translucent) * 4;
         }
         mem_chunk_guess += cvec.capacity() * sizeof(cvec[0]);
 
