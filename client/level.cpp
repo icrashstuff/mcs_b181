@@ -499,7 +499,6 @@ void level_t::set_terrain(texture_terrain_t* const _terrain)
         }
     }
     glBindVertexArray(ent_missing_vao);
-    // glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
     glBindBuffer(GL_ARRAY_BUFFER, ent_missing_vbo);
     glBufferData(GL_ARRAY_BUFFER, missing_verts.size() * sizeof(missing_verts[0]), missing_verts.data(), GL_STATIC_DRAW);
     glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, pos));
@@ -698,10 +697,7 @@ void level_t::render_stage_render(
         SDL_GPUTextureSamplerBinding { .texture = lightmap.tex_id, .sampler = lightmap.sampler_linear },
     };
 
-    SDL_GPUBufferBinding binding_idx = { .buffer = state::gpu_square_ebo, .offset = 0 };
-
     SDL_BindGPUFragmentSamplers(render_pass, 0, binding_tex, SDL_arraysize(binding_tex));
-    SDL_BindGPUIndexBuffer(render_pass, &binding_idx, SDL_GPU_INDEXELEMENTSIZE_32BIT);
 
     struct alignas(16) ubo_model_t
     {

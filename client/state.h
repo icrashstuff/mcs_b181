@@ -37,7 +37,6 @@ extern SDL_Window* window;
 extern SDL_GPUDevice* gpu_device;
 extern SDL_GPUTexture* gpu_debug_texture;
 extern SDL_GPUSampler* gpu_debug_sampler;
-extern SDL_GPUBuffer* gpu_square_ebo;
 extern SDL_GPUTextureFormat gpu_tex_format_best_depth_only;
 extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_opaque;
 extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_overlay;

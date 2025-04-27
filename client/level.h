@@ -150,8 +150,6 @@ struct level_t
      */
     dimension_switch_result dimension_switch(const int dim);
 
-    SDL_GPUBuffer*& ebo = state::gpu_square_ebo;
-
     GLuint ent_missing_vao = 0;
     GLuint ent_missing_vbo = 0;
     size_t ent_missing_vert_count = 0;

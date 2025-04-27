@@ -1775,7 +1775,6 @@ SDL_Window* state::window = nullptr;
 SDL_GPUDevice* state::gpu_device = nullptr;
 SDL_GPUTexture* state::gpu_debug_texture = nullptr;
 SDL_GPUSampler* state::gpu_debug_sampler = nullptr;
-SDL_GPUBuffer* state::gpu_square_ebo = nullptr;
 SDL_GPUTextureFormat state::gpu_tex_format_best_depth_only = SDL_GPU_TEXTUREFORMAT_D16_UNORM;
 
 static void upload_debug_texture(SDL_GPUCopyPass* const copy_pass)
@@ -1858,65 +1857,6 @@ static void upload_debug_texture(SDL_GPUCopyPass* const copy_pass)
     SDL_ReleaseGPUTransferBuffer(state::gpu_device, tbo);
 }
 
-static void upload_square_ebo(SDL_GPUCopyPass* const copy_pass, const char* name)
-{
-    Uint32 num_quads = CHUNK_SIZE_X * CHUNK_SIZE_Y * CHUNK_SIZE_Z * 6;
-    Uint32 num_idx = num_quads * 6;
-    Uint32 buf_size = num_idx * sizeof(Uint32);
-
-    SDL_GPUBufferCreateInfo cinfo_buf = {
-        .usage = SDL_GPU_BUFFERUSAGE_INDEX,
-        .size = buf_size,
-        .props = SDL_CreateProperties(),
-    };
-
-    SDL_SetStringProperty(cinfo_buf.props, SDL_PROP_GPU_BUFFER_CREATE_NAME_STRING, name);
-
-    if ((state::gpu_square_ebo = SDL_CreateGPUBuffer(state::gpu_device, &cinfo_buf)) == nullptr)
-        util::die("Unable to create debug texture, SDL_CreateGPUBuffer: %s", SDL_GetError());
-
-    SDL_GPUTransferBufferCreateInfo cinfo_tbo = {
-        .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
-        .size = buf_size,
-        .props = 0,
-    };
-
-    SDL_GPUTransferBuffer* tbo = SDL_CreateGPUTransferBuffer(state::gpu_device, &cinfo_tbo);
-    if (tbo == nullptr)
-        util::die("Failed to acquire TBO to upload debug texture");
-
-    Uint32* tbo_pointer = (Uint32*)SDL_MapGPUTransferBuffer(state::gpu_device, tbo, false);
-    if (tbo_pointer == nullptr)
-        util::die("Failed to map TBO to upload debug texture, SDL_MapGPUTransferBuffer: %s", SDL_GetError());
-
-    Uint32 j = 0;
-    for (Uint32 i = 0; i < num_quads; i++)
-    {
-        tbo_pointer[j++] = i * 4 + 0;
-        tbo_pointer[j++] = i * 4 + 1;
-        tbo_pointer[j++] = i * 4 + 2;
-        tbo_pointer[j++] = i * 4 + 2;
-        tbo_pointer[j++] = i * 4 + 1;
-        tbo_pointer[j++] = i * 4 + 3;
-    }
-    assert(j == num_idx);
-
-    SDL_UnmapGPUTransferBuffer(state::gpu_device, tbo);
-
-    SDL_GPUTransferBufferLocation region_tbo = {
-        .transfer_buffer = tbo,
-        .offset = 0,
-    };
-    SDL_GPUBufferRegion region_buf = {
-        .buffer = state::gpu_square_ebo,
-        .offset = 0,
-        .size = buf_size,
-    };
-
-    SDL_UploadToGPUBuffer(copy_pass, &region_tbo, &region_buf, false);
-    SDL_ReleaseGPUTransferBuffer(state::gpu_device, tbo);
-}
-
 void setup_static_gpu_state()
 {
     state::window = tetra::window;
@@ -1931,7 +1871,6 @@ void setup_static_gpu_state()
         util::die("Failed to acquire copy pass to upload debug texture, SDL_BeginGPUCopyPass: %s", SDL_GetError());
 
     upload_debug_texture(copy_pass);
-    upload_square_ebo(copy_pass, "[Level]: EBO");
 
     SDL_EndGPUCopyPass(copy_pass);
 
@@ -2421,7 +2360,6 @@ int main(int argc, char* argv[])
 
     SDL_ReleaseGPUTexture(state::gpu_device, state::gpu_debug_texture);
     SDL_ReleaseGPUSampler(state::gpu_device, state::gpu_debug_sampler);
-    SDL_ReleaseGPUBuffer(state::gpu_device, state::gpu_square_ebo);
 
     connection_t::cull_dead_sockets(100);
 
