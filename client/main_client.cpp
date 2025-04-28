@@ -1586,19 +1586,166 @@ static bool engine_state_menu()
 
 static gui_register_menu register_engine_state_menu(engine_state_menu);
 
-static void stbi_physfs_write_func(void* context, void* data, int size) { PHYSFS_writeBytes((PHYSFS_File*)context, data, size); }
-static void screenshot_func(const glm::ivec2 win_size)
+#define BAIL_IF(EXPR, RET, CLEANUP)                 \
+    do                                              \
+    {                                               \
+        if (EXPR)                                   \
+        {                                           \
+            dc_log("`%s' failed, bailing!", #EXPR); \
+            CLEANUP;                                \
+            return RET;                             \
+        }                                           \
+    } while (0)
+
+static SDL_GPUTransferBuffer* screenshot_func_prepare(
+    const glm::ivec2 tex_size, SDL_GPUCommandBuffer* const command_buffer, SDL_GPUTexture* const swapchain_texture)
 {
-    if (!take_screenshot)
+    if (!take_screenshot || !command_buffer || !swapchain_texture || tex_size.x < 1 || tex_size.y < 1)
+        return nullptr;
+
+    /* Create intermediate textures */
+    SDL_GPUTextureCreateInfo cinfo_tex = {};
+    cinfo_tex.type = SDL_GPU_TEXTURETYPE_2D;
+    cinfo_tex.width = tex_size.x;
+    cinfo_tex.height = tex_size.y;
+    cinfo_tex.layer_count_or_depth = 1;
+    cinfo_tex.num_levels = 1;
+    cinfo_tex.sample_count = SDL_GPU_SAMPLECOUNT_1;
+    cinfo_tex.props = SDL_CreateProperties();
+
+    SDL_SetStringProperty(cinfo_tex.props, SDL_PROP_GPU_TEXTURE_CREATE_NAME_STRING, "Intermediate screenshot texture (Swapchain format)");
+    cinfo_tex.format = SDL_GetGPUSwapchainTextureFormat(state::gpu_device, state::window);
+    cinfo_tex.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+    SDL_GPUTexture* tex_swapchain_fmt = SDL_CreateGPUTexture(state::gpu_device, &cinfo_tex);
+
+    SDL_SetStringProperty(cinfo_tex.props, SDL_PROP_GPU_TEXTURE_CREATE_NAME_STRING, "Intermediate screenshot texture (R8B8G8A8 format)");
+    cinfo_tex.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+    cinfo_tex.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;
+    SDL_GPUTexture* tex_screenshot_fmt = SDL_CreateGPUTexture(state::gpu_device, &cinfo_tex);
+
+    SDL_DestroyProperties(cinfo_tex.props);
+    BAIL_IF(!tex_swapchain_fmt || !tex_screenshot_fmt, nullptr, SDL_ReleaseGPUTexture(state::gpu_device, tex_swapchain_fmt);
+        SDL_ReleaseGPUTexture(state::gpu_device, tex_screenshot_fmt));
+
+    /* Create transfer buffer */
+    SDL_GPUTransferBufferCreateInfo cinfo_tbo = {};
+    cinfo_tbo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;
+    cinfo_tbo.size = SDL_CalculateGPUTextureFormatSize(SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM, tex_size.x, tex_size.y, 1);
+
+    SDL_GPUTransferBuffer* tbo = SDL_CreateGPUTransferBuffer(state::gpu_device, &cinfo_tbo);
+    BAIL_IF(!tbo, nullptr, SDL_ReleaseGPUTexture(state::gpu_device, tex_swapchain_fmt); SDL_ReleaseGPUTexture(state::gpu_device, tex_screenshot_fmt));
+
+    /* Copy swapchain */
+    {
+        SDL_GPUCopyPass* copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+        SDL_GPUTextureLocation loc_tex_swapchain = {};
+        SDL_GPUTextureLocation loc_tex_swapchain_fmt = {};
+
+        loc_tex_swapchain.texture = swapchain_texture;
+        loc_tex_swapchain_fmt.texture = tex_swapchain_fmt;
+
+        SDL_CopyGPUTextureToTexture(copy_pass, &loc_tex_swapchain, &loc_tex_swapchain_fmt, tex_size.x, tex_size.y, 1, false);
+        SDL_EndGPUCopyPass(copy_pass);
+    }
+
+    /* Convert texture format */
+    {
+        SDL_GPUBlitInfo blit_info = {};
+        blit_info.source.texture = tex_swapchain_fmt;
+        blit_info.source.w = tex_size.x;
+        blit_info.source.h = tex_size.y;
+        blit_info.destination.texture = tex_screenshot_fmt;
+        blit_info.destination.w = tex_size.x;
+        blit_info.destination.h = tex_size.y;
+        blit_info.load_op = SDL_GPU_LOADOP_DONT_CARE;
+        SDL_BlitGPUTexture(command_buffer, &blit_info);
+    }
+
+    /* Download texture */
+    {
+        SDL_GPUCopyPass* copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+        SDL_GPUTextureRegion rinfo_tex_screenshot_fmt = {};
+        rinfo_tex_screenshot_fmt.texture = tex_screenshot_fmt;
+        rinfo_tex_screenshot_fmt.w = tex_size.x;
+        rinfo_tex_screenshot_fmt.h = tex_size.y;
+        rinfo_tex_screenshot_fmt.d = 1;
+        SDL_GPUTextureTransferInfo tinfo_tbo = {};
+        tinfo_tbo.transfer_buffer = tbo;
+        SDL_DownloadFromGPUTexture(copy_pass, &rinfo_tex_screenshot_fmt, &tinfo_tbo);
+        SDL_EndGPUCopyPass(copy_pass);
+    }
+
+    SDL_ReleaseGPUTexture(state::gpu_device, tex_swapchain_fmt);
+    SDL_ReleaseGPUTexture(state::gpu_device, tex_screenshot_fmt);
+
+    return tbo;
+}
+
+static void stbi_physfs_write_func(void* context, void* data, int size) { PHYSFS_writeBytes((PHYSFS_File*)context, data, size); }
+struct screenshot_async_data_t
+{
+    PHYSFS_File* fd;
+    Uint8* buf;
+    glm::ivec2 tex_size;
+    std::string path;
+
+    screenshot_async_data_t(PHYSFS_File* const _fd, Uint8* const _buf, const glm::ivec2 _tex_size, const std::string& _path)
+    {
+        fd = _fd, buf = _buf, tex_size = _tex_size, path = _path;
+    }
+
+    void run()
+    {
+        int result = stbi_write_png_to_func(stbi_physfs_write_func, fd, tex_size.x, tex_size.y, 3, buf, tex_size.x * 3);
+
+        if (result)
+            dc_log("Saved screenshot to %s", path.c_str());
+        else
+            dc_log("Error saving screenshot: stbi_write_png_to_func() returned %d", result);
+    }
+
+    void destroy()
+    {
+        PHYSFS_close(fd);
+        free(buf);
+    }
+};
+
+static int SDLCALL screenshot_func_async_compress(void* userdata)
+{
+    static_cast<screenshot_async_data_t*>(userdata)->run();
+    static_cast<screenshot_async_data_t*>(userdata)->destroy();
+    delete static_cast<screenshot_async_data_t*>(userdata);
+    return 0;
+}
+
+/**
+ * @param tex_size Size of swapchain texture (Must be the same value give to screenshot_func_prepare())
+ * @param fence Fence guarding transfer buffer (Must be released by caller)
+ * @param tbo Transfer buffer containing SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM data (Must be released by caller)
+ */
+static void screenshot_func_save(const glm::ivec2 tex_size, SDL_GPUFence* const fence, SDL_GPUTransferBuffer* const tbo)
+{
+    if (!take_screenshot || !fence || !tbo || tex_size.x < 1 || tex_size.y < 1)
         return;
     take_screenshot = 0;
 
-    dc_log_error("Screenshot functionality has not yet been updated for SDL_GPU");
-    return;
+    SDL_WaitForGPUFences(state::gpu_device, 1, &fence, 1);
 
-    glPixelStorei(GL_PACK_ALIGNMENT, 1);
-    Uint8* buf = (Uint8*)malloc(win_size.x * win_size.y * 3);
-    glReadPixels(0, 0, win_size.x, win_size.y, GL_RGB, GL_UNSIGNED_BYTE, buf);
+    Uint8* tbo_pointer = (Uint8*)SDL_MapGPUTransferBuffer(state::gpu_device, tbo, 0);
+    BAIL_IF(!tbo_pointer, , );
+
+    Uint8* buf = (Uint8*)malloc(tex_size.x * tex_size.y * 3);
+    BAIL_IF(!buf, , );
+
+    Uint32 num_pixels = SDL_CalculateGPUTextureFormatSize(SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM, tex_size.x, tex_size.y, 1) / 4;
+    for (Uint32 i = 0; i < num_pixels; i++)
+    {
+        buf[i * 3 + 0] = tbo_pointer[i * 4 + 0];
+        buf[i * 3 + 1] = tbo_pointer[i * 4 + 1];
+        buf[i * 3 + 2] = tbo_pointer[i * 4 + 2];
+    }
+    SDL_UnmapGPUTransferBuffer(state::gpu_device, tbo);
 
     SDL_Time cur_time;
     SDL_GetCurrentTime(&cur_time);
@@ -1610,7 +1757,7 @@ static void screenshot_func(const glm::ivec2 win_size)
     snprintf(buf_path, SDL_arraysize(buf_path), "screenshots/Screenshot_%04d-%02d-%02d_%02d.%02d.%02d.%02d.png", dt.year, dt.month, dt.day, dt.hour, dt.minute,
         dt.second, dt.nanosecond / 10000000);
 
-    stbi_flip_vertically_on_write(true);
+    stbi_flip_vertically_on_write(false);
 
     if (!PHYSFS_mkdir("screenshots"))
     {
@@ -1636,15 +1783,8 @@ static void screenshot_func(const glm::ivec2 win_size)
         return;
     }
 
-    /* TODO: Move this part to a separate thread */
-    int result = stbi_write_png_to_func(stbi_physfs_write_func, fd, win_size.x, win_size.y, 3, buf, win_size.x * 3);
-
-    if (result)
-        dc_log("Saved screenshot to %s", buf_path);
-    else
-        dc_log("Error saving screenshot: stbi_write_png_to_func() returned %d", result);
-
-    free(buf);
+    SDL_Thread* thread = SDL_CreateThread(screenshot_func_async_compress, "Screenshot Compressor", new screenshot_async_data_t(fd, buf, tex_size, buf_path));
+    SDL_DetachThread(thread);
 }
 
 static convar_int_t cvr_profile_light("profile_light", 0, 0, 1, "Profile lighting engine then exit", CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_DEV_ONLY);
@@ -2056,11 +2196,31 @@ int main(int argc, char* argv[])
         SDL_GPUTexture* swapchain_texture = nullptr;
         if (!SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer, state::window, &swapchain_texture, &win_size.x, &win_size.y))
             swapchain_texture = nullptr;
+        SDL_GPUTexture* window_target = swapchain_texture;
 
-        if (!swapchain_texture)
+        if (!swapchain_texture || win_size.x == 0 || win_size.y == 0)
         {
+            SDL_CancelGPUCommandBuffer(command_buffer);
             tetra::limit_framerate();
             continue;
+        }
+
+        if (take_screenshot)
+        {
+            SDL_GPUTextureCreateInfo cinfo_tex = {};
+            cinfo_tex.format = SDL_GetGPUSwapchainTextureFormat(state::gpu_device, state::window);
+            cinfo_tex.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;
+            cinfo_tex.type = SDL_GPU_TEXTURETYPE_2D;
+            cinfo_tex.width = win_size.x;
+            cinfo_tex.height = win_size.y;
+            cinfo_tex.layer_count_or_depth = 1;
+            cinfo_tex.num_levels = 1;
+            cinfo_tex.sample_count = SDL_GPU_SAMPLECOUNT_1;
+            cinfo_tex.props = SDL_CreateProperties();
+
+            SDL_SetStringProperty(cinfo_tex.props, SDL_PROP_GPU_TEXTURE_CREATE_NAME_STRING, "Intermediate screenshot target");
+            window_target = SDL_CreateGPUTexture(state::gpu_device, &cinfo_tex);
+            SDL_DestroyProperties(cinfo_tex.props);
         }
 
         tetra::start_frame(false);
@@ -2185,7 +2345,7 @@ int main(int argc, char* argv[])
 
             bool render_world = 0;
             loop_stage_prerender(win_size, render_world);
-            loop_stage_render(command_buffer, swapchain_texture, clear_color, win_size, render_world);
+            loop_stage_render(command_buffer, window_target, clear_color, win_size, render_world);
 
             if (game_selected && game_selected->level && cvr_gui_renderer.get())
             {
@@ -2348,9 +2508,27 @@ int main(int argc, char* argv[])
 
         connection_t::cull_dead_sockets(0);
 
-        tetra::end_frame(command_buffer, swapchain_texture, engine_state_current != ENGINE_STATE_RUNNING);
-        SDL_SubmitGPUCommandBuffer(command_buffer);
-        screenshot_func(win_size);
+        tetra::end_frame(command_buffer, window_target, engine_state_current != ENGINE_STATE_RUNNING);
+        SDL_GPUTransferBuffer* screenshot_tbo = screenshot_func_prepare(win_size, command_buffer, window_target);
+
+        if (window_target != swapchain_texture)
+        {
+            SDL_GPUBlitInfo blit_info = {};
+            blit_info.source.texture = window_target;
+            blit_info.source.w = win_size.x;
+            blit_info.source.h = win_size.y;
+            blit_info.destination.texture = swapchain_texture;
+            blit_info.destination.w = win_size.x;
+            blit_info.destination.h = win_size.y;
+            blit_info.load_op = SDL_GPU_LOADOP_DONT_CARE;
+            SDL_BlitGPUTexture(command_buffer, &blit_info);
+            SDL_ReleaseGPUTexture(state::gpu_device, window_target);
+        }
+
+        SDL_GPUFence* fence = SDL_SubmitGPUCommandBufferAndAcquireFence(command_buffer);
+        screenshot_func_save(win_size, fence, screenshot_tbo);
+        SDL_ReleaseGPUTransferBuffer(state::gpu_device, screenshot_tbo);
+        SDL_ReleaseGPUFence(state::gpu_device, fence);
         tetra::limit_framerate();
         last_loop_time = SDL_GetTicksNS() - loop_start_time;
     }
