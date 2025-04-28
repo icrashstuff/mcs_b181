@@ -13,6 +13,9 @@ set(PHYSFS_VERSION 3.3.0)
 
 cmake_minimum_required(VERSION 3.5)
 
+# Make option() honor normal variables
+cmake_policy(SET CMP0077 NEW)
+
 project(PhysicsFS VERSION ${PHYSFS_VERSION} LANGUAGES C )
 
 include(GNUInstallDirs)
