@@ -1,5 +1,5 @@
 // clang-format off
-static const unsigned char terrain_frag_msl[] = R"(
+static const unsigned char terrain_frag_alpha_test_msl[] = R"(
 #include <metal_stdlib>
 #include <simd/simd.h>
 
@@ -70,4 +70,4 @@ fragment main0_out main0(main0_in in [[stage_in]], constant ubo_frag_t& ubo_frag
 }
 
 )";
-static const unsigned int terrain_frag_msl_len = sizeof(terrain_frag_msl);
+static const unsigned int terrain_frag_alpha_test_msl_len = sizeof(terrain_frag_alpha_test_msl);

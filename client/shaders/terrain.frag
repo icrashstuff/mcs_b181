@@ -64,9 +64,10 @@ void main()
     else
         out_color.a *= texture(tex_atlas, frag.uv, -1.0).a;
 
-    /* TODO-OPT: Remove this? */
+#if (USE_ALPHA_TEST)
     if (out_color.a < 0.0625)
         discard;
+#endif
 
     switch (ao_algorithm)
     {
