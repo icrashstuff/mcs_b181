@@ -99,22 +99,6 @@ struct terrain_vertex_t
             dat |= (Uint16(uv.g * 32768)) << 16;
         }
     } tex;
-
-    /**
-     * Sets up an appropriate VAO for handling terrain_vertex_t vertices
-     */
-    static void create_vao(GLuint* const vao);
-
-    static void create_vbo(GLuint* const vbo, GLuint* const ebo, const std::vector<terrain_vertex_t>& vtx, const std::vector<Uint8>& ind);
-    static void create_vbo(GLuint* const vbo, GLuint* const ebo, const std::vector<terrain_vertex_t>& vtx, const std::vector<Uint16>& ind);
-    static void create_vbo(GLuint* const vbo, GLuint* const ebo, const std::vector<terrain_vertex_t>& vtx, const std::vector<Uint32>& ind);
-
-    /**
-     * Creates a vbo and ebo for a mesh
-     *
-     * @return The type used for the indicies or GL_NONE if an empty mesh was provided
-     */
-    static GLenum create_vbo(GLuint* const vbo, GLuint* const ebo, const std::vector<terrain_vertex_t>& vtx);
 };
 
 /**
