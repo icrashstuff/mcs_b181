@@ -29,16 +29,16 @@ std::string format_memory(const size_t size, const bool rate)
 {
     char buf[128];
 
-    if (size < 1000u)
+    if (size < 1024u)
         snprintf(buf, ARR_SIZE(buf), "%zu bytes%s", size, rate ? "/s" : "");
-    else if (size < (1000u * 1000u))
-        snprintf(buf, ARR_SIZE(buf), "%.1f KB%s", (float)size / 1000.0f, rate ? "/s" : "");
-    else if (size < (1000u * 1000u * 1000u))
-        snprintf(buf, ARR_SIZE(buf), "%.2f MB%s", (float)(size / 1000u) / 1000.0f, rate ? "/s" : "");
-    else if (size < (1000u * 1000u * 1000u * 1000u))
-        snprintf(buf, ARR_SIZE(buf), "%.2f GB%s", (float)(size / (1000u * 1000u)) / 1000.0f, rate ? "/s" : "");
+    else if (size < (1024u * 1024u))
+        snprintf(buf, ARR_SIZE(buf), "%.1f KiB%s", (float)size / 1024.0f, rate ? "/s" : "");
+    else if (size < (1024u * 1024u * 1024u))
+        snprintf(buf, ARR_SIZE(buf), "%.2f MiB%s", (float)(size / 1024u) / 1024.0f, rate ? "/s" : "");
+    else if (size < (1024u * 1024u * 1024u * 1024u))
+        snprintf(buf, ARR_SIZE(buf), "%.2f GiB%s", (float)(size / (1024u * 1024u)) / 1024.0f, rate ? "/s" : "");
     else
-        snprintf(buf, ARR_SIZE(buf), "%.2f TB%s", (float)(size / (1000u * 1000u * 1000u)) / 1000.0f, rate ? "/s" : "");
+        snprintf(buf, ARR_SIZE(buf), "%.2f TiB%s", (float)(size / (1024u * 1024u * 1024u)) / 1024.0f, rate ? "/s" : "");
 
     return buf;
 }
