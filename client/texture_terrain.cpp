@@ -120,7 +120,7 @@ texture_terrain_t::texture_terrain_t(const std::string path_textures)
                 t.frame_offsets_len = 1;
             }
 
-            PHYSFS_file* fd = NULL;
+            PHYSFS_File* fd = NULL;
             if (t.animated)
                 fd = PHYSFS_openRead((tpath + ".mcmeta").c_str());
             if (fd)
