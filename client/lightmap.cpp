@@ -20,12 +20,15 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#include "migration_gl.h"
+#include "lightmap.h"
+
 #include <SDL3/SDL.h>
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "lightmap.h"
+#include "gpu/texture.h"
+#include "migration_gl.h"
+#include "state.h"
 
 #define BASE_R 1.0
 #define BASE_G 0.8
@@ -37,61 +40,9 @@ static convar_float_t r_light_brightness("r_light_brightness", 0.0, 0.0, 1.0, "L
 
 SDL_FORCE_INLINE float curve(const float base, const float x) { return (glm::pow(base, x) - 1) / (base - 1); }
 
-#include "state.h"
-/* The similarities between this and glTexImage2D are not coincidental */
-static void gpu_upload_to_texture(SDL_GPUCopyPass* const copy_pass, SDL_GPUTexture* const tex, SDL_GPUTextureFormat format, Uint32 level, Uint32 width,
-    Uint32 height, void* const data, bool cycle)
-{
-    if (!copy_pass || !tex || !width || !height || !data || format == SDL_GPU_TEXTUREFORMAT_INVALID)
-        return;
-
-    Uint32 buf_size = SDL_CalculateGPUTextureFormatSize(format, width, height, 1);
-
-    SDL_GPUTransferBufferCreateInfo cinfo_tbo = { .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, .size = buf_size, .props = 0 };
-
-    SDL_GPUTransferBuffer* tbo = SDL_CreateGPUTransferBuffer(state::gpu_device, &cinfo_tbo);
-    {
-        void* tbo_pointer = SDL_MapGPUTransferBuffer(state::gpu_device, tbo, 0);
-        if (!tbo_pointer)
-        {
-            SDL_ReleaseGPUTransferBuffer(state::gpu_device, tbo);
-            return;
-        }
-        memcpy(tbo_pointer, data, buf_size);
-
-        SDL_UnmapGPUTransferBuffer(state::gpu_device, tbo);
-    }
-
-    SDL_GPUTextureTransferInfo loc_tex = {
-        .transfer_buffer = tbo,
-        .offset = 0,
-        .pixels_per_row = width,
-        .rows_per_layer = height,
-    };
-
-    SDL_GPUTextureRegion region_tex = {
-        .texture = tex,
-        .mip_level = level,
-        .layer = 0,
-        .x = 0,
-        .y = 0,
-        .z = 0,
-        .w = width,
-        .h = height,
-        .d = 1,
-    };
-
-    SDL_UploadToGPUTexture(copy_pass, &loc_tex, &region_tex, cycle);
-
-    SDL_ReleaseGPUTransferBuffer(state::gpu_device, tbo);
-}
-
 lightmap_t::lightmap_t(const lightmap_preset_t preset)
 {
     r_state = SDL_rand_bits() | (Uint64(SDL_rand_bits()) << 32);
-
-    // tetra::gl_obj_label(GL_TEXTURE, tex_id_linear, "[Lightmap]: Texture Linear");
-    // tetra::gl_obj_label(GL_TEXTURE, tex_id_nearest, "[Lightmap]: Texture Nearest");
 
     last_flicker_tick = SDL_GetTicks() - ticks_per_flicker_tick * 2;
 
@@ -324,5 +275,5 @@ void lightmap_t::update(SDL_GPUCopyPass* const copy_pass)
             sampler_nearest = SDL_CreateGPUSampler(state::gpu_device, &cinfo_sampler);
     }
 
-    gpu_upload_to_texture(copy_pass, tex_id, SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM, 0, 16, 16, dat.data(), 1);
+    gpu::upload_to_texture2d(copy_pass, tex_id, SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM, 0, 0, width, height, dat.data(), 1);
 }
