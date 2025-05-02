@@ -41,7 +41,7 @@ void convar_file_parser::set_config_prefix(const char* prefix)
 
 bool convar_file_parser::write()
 {
-    PHYSFS_file* fd = PHYSFS_openWrite(user_config_path.get().c_str());
+    PHYSFS_File* fd = PHYSFS_openWrite(user_config_path.get().c_str());
     if (!fd)
     {
         dc_log_warn("Unable to write user config to: \"%s\"", user_config_path.get().c_str());

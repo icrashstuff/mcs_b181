@@ -27,15 +27,15 @@
 
 #ifdef STB_IMAGE_IMPLEMENTATION
 
-static int stbi_io_callback_physfs_read(void* user, char* data, int size) { return PHYSFS_readBytes((PHYSFS_file*)user, data, size); }
+static int stbi_io_callback_physfs_read(void* user, char* data, int size) { return PHYSFS_readBytes((PHYSFS_File*)user, data, size); }
 
 static void stbi_io_callback_physfs_skip(void* user, int n)
 {
-    PHYSFS_file* fd = (PHYSFS_file*)user;
+    PHYSFS_File* fd = (PHYSFS_File*)user;
     PHYSFS_seek(fd, PHYSFS_tell(fd) + n);
 }
 
-static int stbi_io_callback_physfs_eof(void* user) { return PHYSFS_eof((PHYSFS_file*)user); }
+static int stbi_io_callback_physfs_eof(void* user) { return PHYSFS_eof((PHYSFS_File*)user); }
 
 static const stbi_io_callbacks stbi_io_callbacks_physfs = {
     .read = stbi_io_callback_physfs_read,
