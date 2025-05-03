@@ -40,7 +40,7 @@ compile_shader()
     rm -f "${FILE_OUT_SPIRV}" "${FILE_OUT_METAL}" "${FILE_OUT_DXIL}"
 
     echo "==> $STAGE: ${FILE_IN} -> ${FILE_OUT_SPIRV}"
-    glslc "$@" -fshader-stage="${STAGE}" -c "${FILE_IN}" -o - | spirv-opt -Os  - -o "${FILE_OUT_SPIRV}"
+    glslc "$@" -fshader-stage="${STAGE}" -c "$PWD/${FILE_IN}" -o - | spirv-opt -Os  - -o "${FILE_OUT_SPIRV}"
 
     echo "==> $STAGE: ${FILE_OUT_SPIRV} -> ${FILE_OUT_METAL}"
     shadercross "${FILE_OUT_SPIRV}" --source SPIRV --dest MSL --entrypoint main --stage "${STAGE}" --output "${FILE_OUT_METAL}"
