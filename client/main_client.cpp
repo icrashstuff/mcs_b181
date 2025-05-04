@@ -2198,14 +2198,7 @@ int main(int argc, char* argv[])
             swapchain_texture = nullptr;
         SDL_GPUTexture* window_target = swapchain_texture;
 
-        if (!swapchain_texture || win_size.x == 0 || win_size.y == 0)
-        {
-            SDL_CancelGPUCommandBuffer(command_buffer);
-            tetra::limit_framerate();
-            continue;
-        }
-
-        if (take_screenshot)
+        if (take_screenshot && swapchain_texture && win_size.x != 0 && win_size.y != 0)
         {
             SDL_GPUTextureCreateInfo cinfo_tex = {};
             cinfo_tex.format = SDL_GetGPUSwapchainTextureFormat(state::gpu_device, state::window);
@@ -2221,6 +2214,13 @@ int main(int argc, char* argv[])
             SDL_SetStringProperty(cinfo_tex.props, SDL_PROP_GPU_TEXTURE_CREATE_NAME_STRING, "Intermediate screenshot target");
             window_target = SDL_CreateGPUTexture(state::gpu_device, &cinfo_tex);
             SDL_DestroyProperties(cinfo_tex.props);
+        }
+
+        if (!window_target || win_size.x == 0 || win_size.y == 0)
+        {
+            SDL_CancelGPUCommandBuffer(command_buffer);
+            tetra::limit_framerate();
+            continue;
         }
 
         tetra::start_frame(false);
