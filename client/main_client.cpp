@@ -2230,7 +2230,7 @@ int main(int argc, char* argv[])
         ImVec4 clear_color(0.1f, 0.1f, 0.1f, 1.0f);
         if (game_selected)
         {
-            glm::vec3 col(0.0f);
+            glm::vec3 col_day(0.0f);
             const glm::vec3 pos = game_selected->level->get_camera_pos();
             const float kernel[] = { 0.1f, 0.125f, 0.175f, 0.20f, 0.175f, 0.125f, 0.1f };
             const int offsets[IM_ARRAYSIZE(kernel)] = { -2, -1, 0, 1, 2 };
@@ -2243,10 +2243,18 @@ int main(int argc, char* argv[])
                 const glm::vec3 offset(offsets[i], offsets[j], offsets[k]);
                 const float blur = kernel[i] * kernel[j] * kernel[k];
 
-                col += mc_id::get_biome_color_sky(game_selected->level->get_biome_at(glm::round(pos + offset))) * blur;
+                col_day += mc_id::get_biome_color_sky(game_selected->level->get_biome_at(glm::round(pos + offset))) * blur;
+            }
+            if (game_selected->level->dimension_get() == mc_id::DIMENSION_OVERWORLD)
+            {
+                glm::vec3 col_night = game_selected->level->lightmap.color_night;
+                col_night += game_selected->level->lightmap.color_minimum;
+                col_night /= 3.0f;
+
+                col_day = glm::mix(col_night, col_day, game_selected->level->lightmap.get_mix_for_time(game_selected->level->mc_time));
             }
 
-            clear_color = ImVec4(col.r, col.g, col.b, 1.0f);
+            clear_color = ImVec4(col_day.r, col_day.g, col_day.b, 1.0f);
         }
 
         engine_state_step();
@@ -2364,6 +2372,13 @@ int main(int argc, char* argv[])
                 ImGui::InputFloat("Foot X", &level->foot_pos.x, 1.0f);
                 ImGui::InputFloat("Foot Y", &level->foot_pos.y, 1.0f);
                 ImGui::InputFloat("Foot Z", &level->foot_pos.z, 1.0f);
+
+                auto InputSint64 = [](const char* label, Sint64* v, Sint64 step = 1, Sint64 step_fast = 100, ImGuiInputTextFlags flags = 0) -> bool {
+                    const char* format = (flags & ImGuiInputTextFlags_CharsHexadecimal) ? "%08X" : "%d";
+                    return ImGui::InputScalar(
+                        label, ImGuiDataType_S64, (void*)v, (void*)(step > 0 ? &step : NULL), (void*)(step_fast > 0 ? &step_fast : NULL), format, flags);
+                };
+                InputSint64("MC Time", &level->mc_time);
 
                 static bool cause_damage_tilt = 0;
                 ImGui::Checkbox("Force damage tilt", &cause_damage_tilt);

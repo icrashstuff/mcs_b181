@@ -27,7 +27,6 @@
 #include <glm/gtc/type_ptr.hpp>
 
 #include "gpu/texture.h"
-#include "migration_gl.h"
 #include "state.h"
 
 #define BASE_R 1.0
@@ -102,6 +101,8 @@ SDL_FORCE_INLINE float mix_for_time_of_day(int time_of_day)
 
     return mix;
 }
+
+float lightmap_t::get_mix_for_time(const Sint64 mc_time) { return mix_for_time_of_day(mc_time % 24000); }
 
 void lightmap_t::imgui_contents()
 {

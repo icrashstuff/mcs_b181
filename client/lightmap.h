@@ -45,7 +45,7 @@ public:
     void set_preset(const lightmap_preset_t preset);
 
     /**
-     * Updates and uploads light map
+     * Updates light map
      */
     void update(SDL_GPUCopyPass* const copy_pass);
 
@@ -55,6 +55,20 @@ public:
 
     SDL_GPUSampler* sampler_linear = nullptr;
     SDL_GPUSampler* sampler_nearest = nullptr;
+
+    /**
+     * Get mix between daytime and nighttime based on current time
+     *
+     * @param mc_time Current time in mc_ticks
+     *
+     * @returns A float in the range [0,1]
+     */
+    static float get_mix_for_time(const Sint64 mc_time);
+
+    glm::vec3 color_block = { 0.0f, 0.0f, 0.0f };
+    glm::vec3 color_night = { 0.0f, 0.0f, 0.0f };
+    glm::vec3 color_day = { 0.0f, 0.0f, 0.0f };
+    glm::vec3 color_minimum = { 0.0f, 0.0f, 0.0f };
 
 private:
     float flicker_strength = 0.25f;
@@ -74,11 +88,6 @@ private:
 
     int width = 16;
     int height = 16;
-
-    glm::vec3 color_block = { 0.0f, 0.0f, 0.0f };
-    glm::vec3 color_night = { 0.0f, 0.0f, 0.0f };
-    glm::vec3 color_day = { 0.0f, 0.0f, 0.0f };
-    glm::vec3 color_minimum = { 0.0f, 0.0f, 0.0f };
 
     std::vector<Uint8> dat;
 
