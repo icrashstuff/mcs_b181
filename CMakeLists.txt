@@ -108,6 +108,7 @@ set(mcs_b181_client_SRC
     client/chunk_cubic.cpp
     client/touch.cpp
 
+    client/gpu/buffer.cpp
     client/gpu/texture.cpp
 
     client/sound/stb_vorbis.c
