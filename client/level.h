@@ -150,9 +150,8 @@ struct level_t
      */
     dimension_switch_result dimension_switch(const int dim);
 
-    GLuint ent_missing_vao = 0;
-    GLuint ent_missing_vbo = 0;
-    size_t ent_missing_vert_count = 0;
+    SDL_GPUBuffer* missing_ent_ssbo = nullptr;
+    Uint32 missing_ent_num_instances = 0;
 
     /**
      * Clears all meshes
@@ -362,7 +361,7 @@ private:
      *
      * This should be placed in-between the solid and translucent rendering passes
      */
-    void render_entities();
+    void render_entities(SDL_GPUCommandBuffer* const command_buffer, SDL_GPURenderPass* const render_pass);
 
     /** For quick retrieval of chunks */
     std::map<glm::ivec3, chunk_cubic_t*, ivec3_comparator_t> cmap;
@@ -445,6 +444,8 @@ private:
 
     /** Items should probably be removed from terrain **/
     texture_terrain_t* terrain;
+
+    void upload_missing_ent_mesh(SDL_GPUCopyPass* const copy_pass);
 
     /** Cubiomes generator */
     void* generator = NULL;

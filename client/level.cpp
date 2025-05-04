@@ -34,6 +34,8 @@
 #include "tetra/util/stb_sprintf.h"
 #include <SDL3/SDL.h>
 
+#include "gpu/buffer.h"
+
 #include "state.h"
 
 #define PASS_TIMER_START()             \
@@ -420,8 +422,19 @@ void level_t::set_terrain(texture_terrain_t* const _terrain)
     terrain = _terrain;
     clear_mesh(false);
 
+    SDL_ReleaseGPUBuffer(state::gpu_device, missing_ent_ssbo);
+    missing_ent_ssbo = nullptr;
+    missing_ent_num_instances = 0;
+
     if (!terrain)
         return;
+}
+
+void level_t::upload_missing_ent_mesh(SDL_GPUCopyPass* const copy_pass)
+{
+    SDL_ReleaseGPUBuffer(state::gpu_device, missing_ent_ssbo);
+    missing_ent_ssbo = nullptr;
+    missing_ent_num_instances = 0;
 
     /* Create missing entity mesh */
     std::vector<terrain_vertex_t> missing_verts;
@@ -441,8 +454,8 @@ void level_t::set_terrain(texture_terrain_t* const _terrain)
         faces[3] = faces[0], faces[4] = faces[1], faces[5] = faces[2];
 
         Uint8 scale = 1;
-        short coord_min = -127;
-        short coord_max = 128;
+        short coord_min = -8;
+        short coord_max = -coord_min - 1;
 
         /* Positive Y */
         {
@@ -498,18 +511,18 @@ void level_t::set_terrain(texture_terrain_t* const _terrain)
             missing_verts.push_back({ { scale, coord_max, coord_max, coord_min, ao }, { c, c, c, light_block, light_sky }, faces[5].corners[0] });
         }
     }
-    glBindVertexArray(ent_missing_vao);
-    glBindBuffer(GL_ARRAY_BUFFER, ent_missing_vbo);
-    glBufferData(GL_ARRAY_BUFFER, missing_verts.size() * sizeof(missing_verts[0]), missing_verts.data(), GL_STATIC_DRAW);
-    glVertexAttribIPointer(0, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, pos));
-    glVertexAttribIPointer(1, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, col));
-    glVertexAttribIPointer(2, 1, GL_UNSIGNED_INT, sizeof(terrain_vertex_t), (void*)offsetof(terrain_vertex_t, tex));
-    glBindVertexArray(0);
 
-    ent_missing_vert_count = missing_verts.size();
+    SDL_GPUBufferCreateInfo cinfo_ssbo = {};
+    cinfo_ssbo.usage = SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ;
+    cinfo_ssbo.size = missing_verts.size() * sizeof(terrain_vertex_t);
+
+    missing_ent_ssbo = gpu::create_buffer(cinfo_ssbo, "Missing Ent SSBO");
+
+    if (gpu::upload_to_buffer(copy_pass, missing_ent_ssbo, 0, cinfo_ssbo.size, missing_verts.data(), false))
+        missing_ent_num_instances = missing_verts.size() / 4;
 }
 
-void level_t::render_entities()
+void level_t::render_entities(SDL_GPUCommandBuffer* const command_buffer, SDL_GPURenderPass* const render_pass)
 {
     const glm::f64vec3 camera_pos_capture = get_camera_pos();
 
@@ -519,16 +532,27 @@ void level_t::render_entities()
         return adist < bdist;
     });
 
-    glBindVertexArray(ent_missing_vao);
-
     auto view = ecs.view<const entity_id_t, const entity_transform_t>();
     view.use<const entity_transform_t>();
-    for (auto [entity, id, pos] : view.each())
+
+    struct alignas(16) ubo_model_t
     {
-        // shader_terrain->set_model(pos.get_mat());
-        glDrawElements(GL_TRIANGLES, ent_missing_vert_count / 4 * 6, GL_UNSIGNED_INT, 0);
+        glm::vec4 model;
+    };
+
+    if (state::pipeline_shader_terrain_opaque)
+    {
+        SDL_PushGPUDebugGroup(command_buffer, "Entities");
+        SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_opaque);
+        SDL_BindGPUVertexStorageBuffers(render_pass, 0, &missing_ent_ssbo, 1);
+        for (auto [entity, id, pos] : view.each())
+        {
+            ubo_model_t ubo_model = { glm::vec4(pos.pos.x, pos.pos.y, pos.pos.z, 0.0f) };
+            SDL_PushGPUVertexUniformData(command_buffer, 2, &ubo_model, sizeof(ubo_model));
+            SDL_DrawGPUPrimitives(render_pass, 4, missing_ent_num_instances, 0, 0);
+        }
+        SDL_PopGPUDebugGroup(command_buffer);
     }
-    glBindVertexArray(0);
 }
 
 static convar_float_t cvr_r_damage_tilt_magnitude {
@@ -632,6 +656,9 @@ bool level_t::mesh_queue_upload_item(SDL_GPUCopyPass* const copy_pass, mesh_queu
 void level_t::render_stage_copy(SDL_GPUCopyPass* const copy_pass)
 {
     lightmap.update(copy_pass);
+
+    if (!missing_ent_ssbo || !missing_ent_num_instances)
+        upload_missing_ent_mesh(copy_pass);
 
     for (int i = 0; mesh_queue.size() && i < r_mesh_throttle.get() * 4; i++)
     {
@@ -760,7 +787,7 @@ void level_t::render_stage_render(
         SDL_PopGPUDebugGroup(command_buffer);
     }
 
-    render_entities();
+    render_entities(command_buffer, render_pass);
 
     if (state::pipeline_shader_terrain_translucent_depth)
     {
@@ -902,20 +929,6 @@ void level_t::add_chunk(chunk_cubic_t* const c)
 
 level_t::level_t(texture_terrain_t* const _terrain)
 {
-    /* Create missing entity mesh OpenGL resources */
-    glGenVertexArrays(1, &ent_missing_vao);
-    tetra::gl_obj_label(GL_VERTEX_ARRAY, ent_missing_vao, "[Level][Entity]: Missing: VAO");
-    glBindVertexArray(ent_missing_vao);
-
-    glGenBuffers(1, &ent_missing_vbo);
-    tetra::gl_obj_label(GL_BUFFER, ent_missing_vbo, "[Level][Entity]: Missing: VBO");
-    glBindBuffer(GL_ARRAY_BUFFER, ent_missing_vbo);
-    glEnableVertexAttribArray(0);
-    glEnableVertexAttribArray(1);
-    glEnableVertexAttribArray(2);
-
-    glBindVertexArray(0);
-
     set_terrain(_terrain);
 
     last_tick = SDL_GetTicks() / 50;
@@ -947,9 +960,8 @@ level_t::~level_t()
     for (auto it : mesh_queue)
         it.release_data();
 
-    glBindVertexArray(0);
-    glDeleteBuffers(1, &ent_missing_vbo);
-    glDeleteVertexArrays(1, &ent_missing_vao);
+    SDL_ReleaseGPUBuffer(state::gpu_device, missing_ent_ssbo);
+
     for (chunk_cubic_t* c : chunks_render_order)
         delete c;
 
