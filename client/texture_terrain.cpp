@@ -437,7 +437,7 @@ texture_terrain_t::texture_terrain_t(const std::string path_textures)
     };
     SDL_GPUSamplerCreateInfo cinfo_sampler;
     SDL_zero(cinfo_sampler);
-    cinfo_sampler.min_filter = SDL_GPU_FILTER_LINEAR;
+    cinfo_sampler.min_filter = SDL_GPU_FILTER_NEAREST;
     cinfo_sampler.mag_filter = SDL_GPU_FILTER_NEAREST;
     cinfo_sampler.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
     cinfo_sampler.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
