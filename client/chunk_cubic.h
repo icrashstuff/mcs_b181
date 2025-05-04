@@ -23,7 +23,6 @@
 #ifndef MCS_B181_CLIENT_CHUNK_CUBIC_H
 #define MCS_B181_CLIENT_CHUNK_CUBIC_H
 
-#include "migration_gl.h"
 #include <SDL3/SDL.h>
 #include <glm/glm.hpp>
 

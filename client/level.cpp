@@ -23,7 +23,6 @@
 #include "game.h"
 
 #include "level.h"
-#include "migration_gl.h"
 
 #include <algorithm>
 #include <glm/ext/matrix_clip_space.hpp>
@@ -55,11 +54,11 @@
 static convar_int_t r_mesh_throttle("r_mesh_throttle", 1, 1, 64, "Maximum number of chunks that can be meshed per frame", CONVAR_FLAG_SAVE);
 static convar_int_t r_render_distance("r_render_distance", 8, 1, 64, "Maximum chunk distance that can be viewed at once", CONVAR_FLAG_SAVE);
 
-void level_t::clear_mesh(const bool free_gl)
+void level_t::clear_mesh(const bool free_gpu)
 {
     for (chunk_cubic_t* c : chunks_render_order)
     {
-        if (free_gl)
+        if (free_gpu)
             c->free_renderer_resources();
         if (c->dirty_level < chunk_cubic_t::DIRTY_LEVEL_MESH)
             c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
@@ -671,15 +670,6 @@ void level_t::render_stage_copy(SDL_GPUCopyPass* const copy_pass)
             mesh_queue.push_back(item);
     }
 }
-
-static convar_int_t cvr_r_wireframe {
-    "r_wireframe",
-    0,
-    0,
-    1,
-    "Render world in wireframe mode",
-    CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_DEV_ONLY,
-};
 
 void level_t::render_stage_render(
     SDL_GPUCommandBuffer* const command_buffer, SDL_GPURenderPass* const render_pass, const glm::ivec2 win_size, const float delta_time)

@@ -1364,7 +1364,6 @@ static void process_event(SDL_Event& event, bool* done)
         case SDL_SCANCODE_B:
         {
             wireframe = !wireframe;
-            glPolygonMode(GL_FRONT_AND_BACK, wireframe ? GL_LINE : GL_FILL);
             break;
         }
         case SDL_SCANCODE_P:
@@ -2106,10 +2105,6 @@ int main(int argc, char* argv[])
 
     if (cvr_profile_light.get())
         SDL_HideWindow(state::window);
-
-    glEnable(GL_DEPTH_TEST);
-    glEnable(GL_CULL_FACE);
-    glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
 
     dev_console::add_command("chat", [=](int argc, const char** argv) -> int {
         if (!game_selected)

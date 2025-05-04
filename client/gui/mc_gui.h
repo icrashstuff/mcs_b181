@@ -24,8 +24,6 @@
 #ifndef MCS_B181_CLIENT_MC_GUI_H_INCLUDED
 #define MCS_B181_CLIENT_MC_GUI_H_INCLUDED
 
-#include "../migration_gl.h"
-
 #include "tetra/gui/imgui.h"
 
 #include "client/lang/lang.h"

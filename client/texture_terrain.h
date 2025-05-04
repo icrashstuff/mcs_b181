@@ -23,8 +23,6 @@
 #ifndef MCS_B181_CLIENT_TEXTURE_TERRAIN_H
 #define MCS_B181_CLIENT_TEXTURE_TERRAIN_H
 
-#include "migration_gl.h"
-
 #include <SDL3/SDL.h>
 #include <string>
 #include <vector>
@@ -111,10 +109,7 @@ public:
     /**
      * Load and stitch the block/item atlas
      *
-     * Must be called inside an active OpenGL context
-     *
      * @param path_textures PHYSFS path containing either the subdirectories: blocks/items or block/item (probably: "/_resources/assets/minecraft/textures/")
-     * @param fence Fence associated with the initial upload texture upload
      */
     texture_terrain_t(const std::string path_textures);
 

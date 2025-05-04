@@ -191,9 +191,9 @@ texture_terrain_t::texture_terrain_t(const std::string path_textures)
             textures[i].w = 16;
             textures[i].h = 16;
             textures[i].data_mipmaped[0].resize(16 * 16 * 4);
-            for (GLsizei i_w = 0; i_w < 16; i_w++)
+            for (int i_w = 0; i_w < 16; i_w++)
             {
-                for (GLsizei i_h = 0; i_h < 16; i_h++)
+                for (int i_h = 0; i_h < 16; i_h++)
                 {
                     textures[i].data_mipmaped[0][(i_w + i_h * 16) * 4 + 0] = 0xFF * (i_w / 8 % 2 == i_h / 8 % 2);
                     textures[i].data_mipmaped[0][(i_w + i_h * 16) * 4 + 1] = 0;
@@ -208,9 +208,9 @@ texture_terrain_t::texture_terrain_t(const std::string path_textures)
 
             const int scale = 16 / textures[i].w;
 
-            for (GLsizei i_w = 0; i_w < 16; i_w++)
+            for (int i_w = 0; i_w < 16; i_w++)
             {
-                for (GLsizei i_h = 0; i_h < 16 * textures[i].frame_num_individual; i_h++)
+                for (int i_h = 0; i_h < 16 * textures[i].frame_num_individual; i_h++)
                 {
                     textures[i].data_mipmaped[0][(i_w + i_h * 16) * 4 + 0] = textures[i].data_stbi[((i_w / scale) + (i_h / scale) * textures[i].w) * 4 + 0];
                     textures[i].data_mipmaped[0][(i_w + i_h * 16) * 4 + 1] = textures[i].data_stbi[((i_w / scale) + (i_h / scale) * textures[i].w) * 4 + 1];
@@ -243,9 +243,9 @@ texture_terrain_t::texture_terrain_t(const std::string path_textures)
             Uint8* result = textures[i].data_mipmaped[mip_lvl].data();
             Uint8* source = textures[i].data_mipmaped[mip_lvl - 1].data();
 
-            for (GLsizei i_w = 0; i_w < new_w; i_w++)
+            for (int i_w = 0; i_w < new_w; i_w++)
             {
-                for (GLsizei i_h = 0; i_h < new_h * textures[i].frame_num_individual; i_h++)
+                for (int i_h = 0; i_h < new_h * textures[i].frame_num_individual; i_h++)
                 {
                     Uint32 r = 0, g = 0, b = 0, a = 0, at = 0;
                     at = source[((i_w * 2 + 0) + (i_h * 2 + 0) * new_w * 2) * 4 + 3];
@@ -395,7 +395,7 @@ texture_terrain_t::texture_terrain_t(const std::string path_textures)
                     memcpy(data + ((y + t.y) * atlas_width + t.x) * 4, t.data_mipmaped[mip_lvl].data() + y * t.w * 4, t.w * 4);
                 else
                 {
-                    for (GLsizei i_w = t.x; i_w < t.w + t.x; i_w++)
+                    for (int i_w = t.x; i_w < t.w + t.x; i_w++)
                     {
                         data[((y + t.y) * atlas_width + i_w) * 4 + 0] = 0xFF * (i_w / 8 % 2 == y / 8 % 2);
                         data[((y + t.y) * atlas_width + i_w) * 4 + 1] = 0x7F * (i_w / 8 % 2 == y / 8 % 2);
@@ -573,7 +573,7 @@ void texture_terrain_t::update(SDL_GPUCopyPass* copy_pass)
                 }
                 else
                 {
-                    for (GLsizei i_w = t_x; i_w < t_w + t_x; i_w++)
+                    for (int i_w = t_x; i_w < t_w + t_x; i_w++)
                     {
                         data[((y + t_y) * atlas_width + i_w) * 4 + 0] = 0xFF * (i_w / 8 % 2 == y / 8 % 2);
                         data[((y + t_y) * atlas_width + i_w) * 4 + 1] = 0;

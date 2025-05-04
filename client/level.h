@@ -38,7 +38,6 @@
 #include <memory>
 #include <vector>
 
-#include "migration_gl.h"
 #include "state.h"
 
 /**
@@ -156,9 +155,9 @@ struct level_t
     /**
      * Clears all meshes
      *
-     * @param free_gl Optionally free all OpenGL resources
+     * @param free_gpu Optionally free all GPU resources
      */
-    void clear_mesh(const bool free_gl);
+    void clear_mesh(const bool free_gpu);
 
     /**
      * Switchs terrain texture for level
