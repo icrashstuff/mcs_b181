@@ -35,7 +35,7 @@ public:
     /**
      * Load a translation map from a PHYSFS path
      */
-    translation_map_t(const std::string path);
+    translation_map_t(const std::string& path);
 
     inline const char* get_translation(const char* translation_id)
     {
@@ -62,7 +62,7 @@ public:
      * @param string Value of key
      * @param overwrite Overwrite pre-existing key
      */
-    void add_key(const std::string id, const std::string string, const bool overwrite = true);
+    void add_key(const std::string& id, const std::string& string, const bool overwrite = true);
 
     std::map<std::string, std::string> _map;
 };

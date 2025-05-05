@@ -34,7 +34,7 @@
 
 #define check_for_iec559(T) static_assert(std::numeric_limits<T>::is_iec559)
 
-void assemble_string16(std::vector<Uint8>& dat, const std::string str)
+void assemble_string16(std::vector<Uint8>& dat, const std::string& str)
 {
     /* TODO: Find somewhere else to test the utf8 <-> ucs2 code */
     std::u16string str_ucs2 = UTF8_to_UCS2(UCS2_to_UTF8(UTF8_to_UCS2(str.c_str()).c_str()).c_str());

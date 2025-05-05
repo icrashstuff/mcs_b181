@@ -43,7 +43,7 @@ std::string format_memory(const size_t size, const bool rate)
     return buf;
 }
 
-bool argv_from_str(std::vector<std::string>& argv, const std::string cmdline, const bool parse_quotes, const size_t max_argc)
+bool argv_from_str(std::vector<std::string>& argv, const std::string& cmdline, const bool parse_quotes, const size_t max_argc)
 {
     size_t pos = 0;
 
@@ -81,7 +81,7 @@ bool argv_from_str(std::vector<std::string>& argv, const std::string cmdline, co
     return in_quote == 0;
 }
 
-bool long_from_str(const std::string str, long& out)
+bool long_from_str(const std::string& str, long& out)
 {
     const char* s = str.c_str();
     errno = 0;
@@ -94,7 +94,7 @@ bool long_from_str(const std::string str, long& out)
     return 1;
 }
 
-bool int_from_str(const std::string str, int& out)
+bool int_from_str(const std::string& str, int& out)
 {
     long o;
     int r = long_from_str(str, o);

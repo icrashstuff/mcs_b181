@@ -70,7 +70,7 @@ game_resources_t::~game_resources_t() { destroy(); }
 
 static SDL_AtomicInt game_counter = { 0 };
 
-game_t::game_t(const std::string addr, const Uint16 port, const std::string username, const game_resources_t* const _resources)
+game_t::game_t(const std::string& addr, const Uint16 port, const std::string& username, const game_resources_t* const _resources)
     : game_id(SDL_AddAtomicInt(&game_counter, 1))
 {
     level = new level_t(_resources->terrain_atlas);

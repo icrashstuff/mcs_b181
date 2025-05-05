@@ -111,7 +111,7 @@ public:
      *
      * @param path_textures PHYSFS path containing either the subdirectories: blocks/items or block/item (probably: "/_resources/assets/minecraft/textures/")
      */
-    texture_terrain_t(const std::string path_textures);
+    texture_terrain_t(const std::string& path_textures);
 
     ~texture_terrain_t();
 

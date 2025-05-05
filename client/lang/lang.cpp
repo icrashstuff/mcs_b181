@@ -73,7 +73,7 @@ static bool read_entry(PHYSFS_File* const fd, std::string& id, std::string& stri
 
 translation_map_t::translation_map_t() { }
 
-translation_map_t::translation_map_t(const std::string path)
+translation_map_t::translation_map_t(const std::string& path)
 {
     PHYSFS_File* fd = PHYSFS_openRead(path.c_str());
     if (!fd)
@@ -99,7 +99,7 @@ void translation_map_t::import_keys(const translation_map_t& m, const bool overw
             _map[it.first] = it.second;
 }
 
-void translation_map_t::add_key(const std::string id, const std::string string, const bool overwrite)
+void translation_map_t::add_key(const std::string& id, const std::string& string, const bool overwrite)
 {
     auto it = _map.find(id);
 

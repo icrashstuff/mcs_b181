@@ -65,7 +65,7 @@ static bool path_ends_width(const char* const s, const char* const end)
     return 1;
 }
 
-texture_terrain_t::texture_terrain_t(const std::string path_textures)
+texture_terrain_t::texture_terrain_t(const std::string& path_textures)
 {
     const Uint64 start_tick = SDL_GetTicksNS();
 

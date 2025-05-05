@@ -115,7 +115,7 @@ struct connection_t
      * @param username Username to use for the connection
      * @returns True on success, False on failure
      */
-    bool init(const std::string address, const Uint16 port, const std::string username);
+    bool init(const std::string& address, const Uint16 port, const std::string& username);
 
     /**
      * Runs the connection
@@ -169,7 +169,7 @@ struct connection_t
     loading_button_t loading_button = LOADING_BUTTON_CANCEL;
 
 private:
-    void set_status_msg(const std::string translation_id, const std::string _sub_status = "");
+    void set_status_msg(const std::string& translation_id, const std::string& _sub_status = "");
 
     connection_status_t status = CONNECTION_UNINITIALIZED;
 

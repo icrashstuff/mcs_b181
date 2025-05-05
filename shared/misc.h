@@ -145,10 +145,10 @@ std::string format_memory(const size_t size, const bool rate = false);
 /**
  * Take a cmd and split it into separate string components
  */
-bool argv_from_str(std::vector<std::string>& argv, const std::string cmdline, const bool parse_quotes = false, const size_t max_argc = -1);
+bool argv_from_str(std::vector<std::string>& argv, const std::string& cmdline, const bool parse_quotes = false, const size_t max_argc = -1);
 
-bool long_from_str(const std::string str, long& out);
-bool int_from_str(const std::string str, int& out);
+bool long_from_str(const std::string& str, long& out);
+bool int_from_str(const std::string& str, int& out);
 
 #define ROTATE_UINT64(x, amount) (((((Uint64)(x)) << (64 - ((amount) % 64))) | (((Uint64)(x)) >> ((amount) % 64))) & 0xFFFFFFFFFFFFFFFF)
 

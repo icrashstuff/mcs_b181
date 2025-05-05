@@ -1070,13 +1070,13 @@ void connection_t::run(level_t* const level)
         loading_button = LOADING_BUTTON_BACK_TO_MENU;
 }
 
-void connection_t::set_status_msg(const std::string _status, const std::string _sub_status)
+void connection_t::set_status_msg(const std::string& _status, const std::string& _sub_status)
 {
     status_msg = _status;
     status_msg_sub = _sub_status;
 }
 
-bool connection_t::init(const std::string _addr, const Uint16 _port, const std::string _username)
+bool connection_t::init(const std::string& _addr, const Uint16 _port, const std::string& _username)
 {
     if (status != CONNECTION_UNINITIALIZED)
     {

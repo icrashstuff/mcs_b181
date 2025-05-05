@@ -76,7 +76,7 @@ struct game_t
      * @param username Username to use
      * @param resources Resources to use for game
      */
-    game_t(const std::string addr, const Uint16 port, const std::string username, const game_resources_t* const resources);
+    game_t(const std::string& addr, const Uint16 port, const std::string& username, const game_resources_t* const resources);
 
     /**
      * Creates a internal game (No connection)

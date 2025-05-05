@@ -93,7 +93,7 @@ struct sound_resources_t
      * @param path_assets_obfuscated Physfs path to the obfuscated assets (What is stored in .minecraft/assets/) (Must end with /)
      * @param path_assets_normal Physfs path to assets with un-obfuscated names (Must end with /)
      */
-    sound_resources_t(const std::string path_assets_obfuscated, const std::string path_assets_normal);
+    sound_resources_t(const std::string& path_assets_obfuscated, const std::string& path_assets_normal);
 
     ~sound_resources_t();
 
@@ -105,7 +105,7 @@ struct sound_resources_t
      *
      * @returns true if a sound was found, false otherwise
      */
-    bool get_sound(const std::string sound_id, sound_info_t& out) const;
+    bool get_sound(const std::string& sound_id, sound_info_t& out) const;
 
     /**
      * Display imgui widgets for viewing the data structure
@@ -128,7 +128,7 @@ private:
      * @param domain Resource identifier domain
      * @param path Full physfs path to the json
      */
-    void parse_sound_json(const std::string domain, const std::string path);
+    void parse_sound_json(const std::string& domain, const std::string& path);
 
     std::map<std::string, sound_event_t> sounds;
 

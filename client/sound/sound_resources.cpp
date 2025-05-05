@@ -33,7 +33,7 @@
 
 #include "shared/misc.h"
 
-static bool load_json(const std::string path, Jzon::Node& out)
+static bool load_json(const std::string& path, Jzon::Node& out)
 {
     out = Jzon::Node();
     PHYSFS_File* fd = PHYSFS_openRead(path.c_str());
@@ -65,7 +65,7 @@ static bool load_json(const std::string path, Jzon::Node& out)
     return out;
 }
 
-static bool load_index(const std::string path_assets_obfuscated, Jzon::Node& out)
+static bool load_index(const std::string& path_assets_obfuscated, Jzon::Node& out)
 {
     /* TODO: Check for any other compatible index files */
     const char* names[] = {
@@ -83,7 +83,7 @@ static bool load_index(const std::string path_assets_obfuscated, Jzon::Node& out
     return 0;
 }
 
-void sound_resources_t::parse_sound_json(const std::string domain, const std::string path)
+void sound_resources_t::parse_sound_json(const std::string& domain, const std::string& path)
 {
     Jzon::Node base_node;
 
@@ -196,7 +196,7 @@ void sound_resources_t::parse_sound_json(const std::string domain, const std::st
 }
 sound_resources_t::~sound_resources_t() { delete text_filter; }
 
-sound_resources_t::sound_resources_t(const std::string path_assets_obfuscated, const std::string path_assets_normal)
+sound_resources_t::sound_resources_t(const std::string& path_assets_obfuscated, const std::string& path_assets_normal)
 {
     text_filter = new ImGuiTextFilter();
 
@@ -258,7 +258,7 @@ sound_resources_t::sound_resources_t(const std::string path_assets_obfuscated, c
     }
 }
 
-bool sound_resources_t::get_sound(const std::string sound_id, sound_info_t& out) const
+bool sound_resources_t::get_sound(const std::string& sound_id, sound_info_t& out) const
 {
     auto it_v = sounds.find(sound_id);
 

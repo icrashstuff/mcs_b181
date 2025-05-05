@@ -34,7 +34,7 @@
 #include "misc.h"
 #include "tetra/gui/imgui.h"
 
-void assemble_string16(std::vector<Uint8>& dat, const std::string str);
+void assemble_string16(std::vector<Uint8>& dat, const std::string& str);
 
 void assemble_bool(std::vector<Uint8>& dat, const bool in);
 
@@ -219,7 +219,7 @@ struct packet_t
         ImGui::EndTable();
     }
 
-    virtual ~packet_t() {};
+    virtual ~packet_t() { };
 
     virtual std::vector<Uint8> assemble()
     {
