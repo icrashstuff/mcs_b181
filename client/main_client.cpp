@@ -318,15 +318,33 @@ static bool held_ctrl = 0;
 static bool held_tab = 1;
 static bool world_has_input = 0;
 static bool window_has_focus = 0;
-static bool wireframe = 0;
 static bool reload_resources = 0;
 #define AO_ALGO_MAX 5
 
-static SDL_Rect touch_region_move;
-static SDL_Rect touch_region_move_exclude;
-static SDL_Rect touch_region_camera;
-
-static convar_int_t cvr_debug_screen("debug_screen", 0, 0, 1, "Enable debug screen (F3 menu)", CONVAR_FLAG_SAVE);
+static convar_int_t cvr_r_wireframe {
+    "r_wireframe",
+    0,
+    0,
+    1,
+    "Render world in wireframe mode",
+    CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_DEV_ONLY,
+};
+static convar_int_t cvr_mc_gui_show_ui {
+    "mc_gui_show_ui",
+    1,
+    0,
+    1,
+    "Show HUD/F3 while in world",
+    CONVAR_FLAG_INT_IS_BOOL,
+};
+static convar_int_t cvr_debug_screen {
+    "debug_screen",
+    0,
+    0,
+    1,
+    "Enable debug screen (F3 menu)",
+    CONVAR_FLAG_SAVE | CONVAR_FLAG_INT_IS_BOOL,
+};
 
 #include "gui/main_client.menu.cpp"
 
@@ -1067,7 +1085,7 @@ static void loop_stage_prerender(glm::ivec2 win_size, bool& render_world)
 
     render_world = menu_ret.allow_world && in_world;
 
-    if (render_world)
+    if (render_world && cvr_mc_gui_show_ui.get())
     {
         render_world_overlays(game_selected->level, bg_draw_list);
 
@@ -1097,11 +1115,11 @@ static void loop_stage_prerender(glm::ivec2 win_size, bool& render_world)
                 bg_draw_list->AddImage(mc_gui::global_ctx->tex_id_crosshair, pos0, pos1);
             bg_draw_list->AddCallback(ImDrawCallback_ChangePipeline, nullptr);
         }
-
-        /* Draw world dim */
-        if (client_menu_manager.stack_size())
-            bg_draw_list->AddRectFilled(ImVec2(-32, -32), ImGui::GetMainViewport()->Size + ImVec2(32, 32), IM_COL32(32, 32, 32, 255 * 0.5f));
     }
+
+    /* Draw world dim */
+    if (render_world && client_menu_manager.stack_size())
+        bg_draw_list->AddRectFilled(ImVec2(-32, -32), ImGui::GetMainViewport()->Size + ImVec2(32, 32), IM_COL32(32, 32, 32, 255 * 0.5f));
 
     bool display_pano = (menu_ret.allow_pano && !in_world);
     bool display_dirt = (menu_ret.allow_dirt && ((!menu_ret.allow_pano && !in_world) || (in_world && !menu_ret.allow_world)));
@@ -1248,6 +1266,9 @@ static void process_event(SDL_Event& event, bool* done)
         break;
     }
 
+    if (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_F1 && !event.key.repeat)
+        cvr_mc_gui_show_ui.set(!cvr_mc_gui_show_ui.get());
+
     if (event.type == SDL_EVENT_KEY_DOWN && event.key.scancode == SDL_SCANCODE_F2 && !event.key.repeat)
         take_screenshot = 1;
 
@@ -1363,7 +1384,7 @@ static void process_event(SDL_Event& event, bool* done)
             break;
         case SDL_SCANCODE_B:
         {
-            wireframe = !wireframe;
+            cvr_r_wireframe.set(!cvr_r_wireframe.get());
             break;
         }
         case SDL_SCANCODE_P:
