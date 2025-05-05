@@ -237,3 +237,31 @@ if(IOS)
     ios_resource("${MCS_B181_BUNDLED_ASSETS}")
     ios_resource("${MCS_B181_BUNDLED_RESOURCES}")
 endif()
+
+option(MCS_B181_BUILD_SHADERS "Automatically run compile_shaders.sh (Only use if writing shaders)" OFF)
+message(STATUS "MCS_B181_BUILD_SHADERS: ${MCS_B181_BUILD_SHADERS}")
+if(MCS_B181_BUILD_SHADERS)
+    set(mcs_b181_client_SHADERS
+        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/terrain.frag
+        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/terrain.vert
+        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/compile_shaders.sh
+    )
+
+    set(mcs_b181_client_SHADER_HEADERS
+        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/terrain.frag.no_alpha_test.msl.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/terrain.frag.no_alpha_test.spv.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/terrain.frag.alpha_test.msl.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/terrain.frag.alpha_test.spv.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/terrain.vert.spv.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/terrain.vert.msl.h
+    )
+
+    add_custom_command(OUTPUT ${mcs_b181_client_SHADER_HEADERS}
+        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/
+        COMMAND           ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/compile_shaders.sh
+        DEPENDS           ${mcs_b181_client_SHADERS}
+        COMMENT           "Compiling shaders"
+        )
+    add_custom_target(shaders ALL DEPENDS ${mcs_b181_client_SHADER_HEADERS})
+    add_dependencies(mcs_b181_client shaders)
+endif()
