@@ -59,6 +59,8 @@
 
 #include "shaders/terrain_shader.h"
 
+#include "gpu/command_buffer.h"
+
 #include "state.h"
 #include "touch.h"
 
@@ -1744,13 +1746,13 @@ static int SDLCALL screenshot_func_async_compress(void* userdata)
  * @param fence Fence guarding transfer buffer (Must be released by caller)
  * @param tbo Transfer buffer containing SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM data (Must be released by caller)
  */
-static void screenshot_func_save(const glm::ivec2 tex_size, SDL_GPUFence* const fence, SDL_GPUTransferBuffer* const tbo)
+static void screenshot_func_save(const glm::ivec2 tex_size, gpu::fence_t* const fence, SDL_GPUTransferBuffer* const tbo)
 {
     if (!take_screenshot || !fence || !tbo || tex_size.x < 1 || tex_size.y < 1)
         return;
     take_screenshot = 0;
 
-    SDL_WaitForGPUFences(state::gpu_device, 1, &fence, 1);
+    gpu::wait_for_fence(fence);
 
     Uint8* tbo_pointer = (Uint8*)SDL_MapGPUTransferBuffer(state::gpu_device, tbo, 0);
     BAIL_IF(!tbo_pointer, , );
@@ -2022,9 +2024,9 @@ void setup_static_gpu_state()
     state::window = tetra::window;
     state::gpu_device = tetra::gpu_device;
 
-    SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(state::gpu_device);
+    SDL_GPUCommandBuffer* command_buffer = gpu::acquire_command_buffer();
     if (command_buffer == nullptr)
-        util::die("Failed to acquire command buffer to upload debug texture, SDL_AcquireGPUCommandBuffer: %s", SDL_GetError());
+        util::die("Failed to acquire command buffer to upload debug texture, acquire_command_buffer: %s", SDL_GetError());
 
     SDL_GPUCopyPass* copy_pass = SDL_BeginGPUCopyPass(command_buffer);
     if (command_buffer == nullptr)
@@ -2034,7 +2036,7 @@ void setup_static_gpu_state()
 
     SDL_EndGPUCopyPass(copy_pass);
 
-    SDL_GPUFence* fence = SDL_SubmitGPUCommandBufferAndAcquireFence(command_buffer);
+    gpu::fence_t* fence = gpu::submit_command_buffer_and_acquire_fence(command_buffer);
 
     SDL_GPUTextureFormat best_depth_formats[] = {
         SDL_GPU_TEXTUREFORMAT_D32_FLOAT,
@@ -2052,8 +2054,8 @@ void setup_static_gpu_state()
         break;
     }
 
-    SDL_WaitForGPUFences(state::gpu_device, true, &fence, 1);
-    SDL_ReleaseGPUFence(state::gpu_device, fence);
+    gpu::wait_for_fence(fence);
+    gpu::release_fence(fence);
 }
 
 #include <SDL3/SDL_main.h>
@@ -2079,6 +2081,7 @@ int main(int argc, char* argv[])
     SDL_SetHint(SDL_HINT_IOS_HIDE_HOME_INDICATOR, "2");
 
     tetra::init("icrashstuff", "mcs_b181", "mcs_b181_client", argc, (const char**)argv, false);
+    gpu::init();
 
     SDL_InitSubSystem(SDL_INIT_AUDIO);
 
@@ -2208,7 +2211,7 @@ int main(int argc, char* argv[])
         }
 
         tetra::configure_swapchain_if_needed();
-        SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(state::gpu_device);
+        SDL_GPUCommandBuffer* command_buffer = gpu::acquire_command_buffer();
         SDL_GPUTexture* swapchain_texture = nullptr;
         if (!SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer, state::window, &swapchain_texture, &win_size.x, &win_size.y))
             swapchain_texture = nullptr;
@@ -2230,11 +2233,14 @@ int main(int argc, char* argv[])
             SDL_SetStringProperty(cinfo_tex.props, SDL_PROP_GPU_TEXTURE_CREATE_NAME_STRING, "Intermediate screenshot target");
             window_target = SDL_CreateGPUTexture(state::gpu_device, &cinfo_tex);
             SDL_DestroyProperties(cinfo_tex.props);
+
+            if (!window_target)
+                window_target = swapchain_texture;
         }
 
         if (!window_target || win_size.x == 0 || win_size.y == 0)
         {
-            SDL_CancelGPUCommandBuffer(command_buffer);
+            gpu::cancel_command_buffer(command_buffer);
             tetra::limit_framerate();
             continue;
         }
@@ -2540,10 +2546,10 @@ int main(int argc, char* argv[])
         connection_t::cull_dead_sockets(0);
 
         tetra::end_frame(command_buffer, window_target, engine_state_current != ENGINE_STATE_RUNNING);
-        SDL_GPUTransferBuffer* screenshot_tbo = screenshot_func_prepare(win_size, command_buffer, window_target);
-
         if (window_target != swapchain_texture)
         {
+            SDL_GPUTransferBuffer* screenshot_tbo = screenshot_func_prepare(win_size, command_buffer, window_target);
+
             SDL_GPUBlitInfo blit_info = {};
             blit_info.source.texture = window_target;
             blit_info.source.w = win_size.x;
@@ -2554,12 +2560,14 @@ int main(int argc, char* argv[])
             blit_info.load_op = SDL_GPU_LOADOP_DONT_CARE;
             SDL_BlitGPUTexture(command_buffer, &blit_info);
             SDL_ReleaseGPUTexture(state::gpu_device, window_target);
-        }
 
-        SDL_GPUFence* fence = SDL_SubmitGPUCommandBufferAndAcquireFence(command_buffer);
-        screenshot_func_save(win_size, fence, screenshot_tbo);
-        SDL_ReleaseGPUTransferBuffer(state::gpu_device, screenshot_tbo);
-        SDL_ReleaseGPUFence(state::gpu_device, fence);
+            gpu::fence_t* fence = gpu::submit_command_buffer_and_acquire_fence(command_buffer);
+            screenshot_func_save(win_size, fence, screenshot_tbo);
+            SDL_ReleaseGPUTransferBuffer(state::gpu_device, screenshot_tbo);
+            gpu::release_fence(fence);
+        }
+        else
+            gpu::submit_command_buffer(command_buffer);
         tetra::limit_framerate();
         last_loop_time = SDL_GetTicksNS() - loop_start_time;
     }
@@ -2575,6 +2583,7 @@ int main(int argc, char* argv[])
     SDL_QuitSubSystem(SDL_INIT_AUDIO);
 
     SDLNet_Quit();
+    gpu::quit();
     tetra::deinit_gui();
     state::window = tetra::window;
     state::gpu_device = tetra::gpu_device;
