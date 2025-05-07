@@ -23,16 +23,26 @@
 #include "buffer.h"
 
 #include "../state.h"
+#include "tetra/util/stb_sprintf.h"
 
-SDL_GPUBuffer* gpu::create_buffer(const SDL_GPUBufferCreateInfo& cinfo, const char* name)
+SDL_GPUBuffer* gpu::create_buffer(const SDL_GPUBufferCreateInfo& cinfo, const char* fmt, ...)
 {
     SDL_GPUBufferCreateInfo cinfo_named = cinfo;
     cinfo_named.props = SDL_CreateProperties();
     if (cinfo.props)
         SDL_CopyProperties(cinfo.props, cinfo_named.props);
 
-    if (name)
+    if (fmt)
+    {
+        char name[1024] = "";
+
+        va_list args;
+        va_start(args, fmt);
+        stbsp_vsnprintf(name, SDL_arraysize(name), fmt, args);
+        va_end(args);
+
         SDL_SetStringProperty(cinfo_named.props, SDL_PROP_GPU_BUFFER_CREATE_NAME_STRING, name);
+    }
 
     SDL_GPUBuffer* ret = SDL_CreateGPUBuffer(state::gpu_device, &cinfo_named);
 

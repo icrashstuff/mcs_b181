@@ -31,9 +31,11 @@ namespace gpu
  * Create named GPU buffer
  *
  * @param cinfo Creation info
- * @param name Buffer name
+ * @param fmt Buffer name format string (Uses stb_sprintf) (NULL for no name)
+ *
+ * @returns a buffer handle, or NULL on error
  */
-SDL_GPUBuffer* create_buffer(const SDL_GPUBufferCreateInfo& cinfo, const char* name);
+SDL_GPUBuffer* create_buffer(const SDL_GPUBufferCreateInfo& cinfo, SDL_PRINTF_FORMAT_STRING const char* fmt, ...) SDL_PRINTF_VARARG_FUNC(2);
 
 /**
  * Upload data to a GPU Buffer
