@@ -99,3 +99,10 @@ bool gpu::upload_to_buffer(
         },
         cycle);
 }
+
+void gpu::release_buffer(SDL_GPUBuffer*& buffer, const bool set_buffer_to_null)
+{
+    SDL_ReleaseGPUBuffer(state::gpu_device, buffer);
+    if (set_buffer_to_null)
+        buffer = nullptr;
+}

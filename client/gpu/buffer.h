@@ -66,4 +66,14 @@ bool upload_to_buffer(SDL_GPUCopyPass* const copy_pass, SDL_GPUBuffer* const buf
  */
 bool upload_to_buffer(
     SDL_GPUCopyPass* const copy_pass, SDL_GPUBuffer* const buffer, const Uint32 offset, const Uint32 size, const void* const data, const bool cycle);
+
+/**
+ * Release a GPU buffer
+ *
+ * You must not reference the buffer after calling this function.
+ *
+ * @param buffer Buffer to release
+ * @param set_buffer_to_null Set buffer parameter to null after releasing
+ */
+void release_buffer(SDL_GPUBuffer*& buffer, const bool set_buffer_to_null = true);
 }
