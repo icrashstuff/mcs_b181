@@ -98,22 +98,22 @@ void main()
     vertex_t vtx = vtx_data.data[gl_InstanceIndex * 4 + gl_VertexIndex];
 
     vec3 pos;
-    pos.x = float(int((vtx.pos_ao      ) & 1023u) - 256) / 32.0;
-    pos.y = float(int((vtx.pos_ao >> 10) & 1023u) - 256) / 32.0;
-    pos.z = float(int((vtx.pos_ao >> 20) & 1023u) - 256) / 32.0;
+    pos.x = float(int(bitfieldExtract(vtx.pos_ao,  0, 10)) - 256) / 32.0;
+    pos.y = float(int(bitfieldExtract(vtx.pos_ao, 10, 10)) - 256) / 32.0;
+    pos.z = float(int(bitfieldExtract(vtx.pos_ao, 20, 10)) - 256) / 32.0;
     gl_Position = ubo_world.projection * ubo_world.camera * (vec4(pos, 1.0) + ubo_model.model);
 
-    frag.ao = float((vtx.pos_ao >> 30) & 3u) / 3.0;
+    frag.ao = float(bitfieldExtract(vtx.pos_ao, 30, 2)) / 3.0;
 
-    frag.color.r = ubo_tint.tint.r * float((vtx.coloring      ) & 255u) / 255.0;
-    frag.color.g = ubo_tint.tint.g * float((vtx.coloring >>  8) & 255u) / 255.0;
-    frag.color.b = ubo_tint.tint.b * float((vtx.coloring >> 16) & 255u) / 255.0;
+    frag.color.r = ubo_tint.tint.r * float(bitfieldExtract(vtx.coloring, 0,  8)) / 255.0;
+    frag.color.g = ubo_tint.tint.g * float(bitfieldExtract(vtx.coloring, 8,  8)) / 255.0;
+    frag.color.b = ubo_tint.tint.b * float(bitfieldExtract(vtx.coloring, 16, 8)) / 255.0;
     frag.color.a = ubo_tint.tint.a;
 
-    frag.light_block = float((vtx.coloring >> 24) & 15u) / 15.0;
-    frag.light_sky   = float((vtx.coloring >> 28) & 15u) / 15.0;
+    frag.light_block = float(bitfieldExtract(vtx.coloring, 24, 4)) / 15.0;
+    frag.light_sky   = float(bitfieldExtract(vtx.coloring, 28, 4)) / 15.0;
 
-    float u = float((vtx.texturing      ) & 65535u) / 32768.0;
-    float v = float((vtx.texturing >> 16) & 65535u) / 32768.0;
+    float u = float(bitfieldExtract(vtx.texturing,  0, 16)) / 32768.0;
+    float v = float(bitfieldExtract(vtx.texturing, 16, 16)) / 32768.0;
     frag.uv = vec2(u, v);
 }
