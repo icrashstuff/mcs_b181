@@ -23,6 +23,33 @@
 #include "texture.h"
 
 #include "../state.h"
+#include "tetra/util/stb_sprintf.h"
+
+SDL_GPUTexture* gpu::create_texture(const SDL_GPUTextureCreateInfo& cinfo, const char* fmt, ...)
+{
+    SDL_GPUTextureCreateInfo cinfo_named = cinfo;
+    cinfo_named.props = SDL_CreateProperties();
+    if (cinfo.props)
+        SDL_CopyProperties(cinfo.props, cinfo_named.props);
+
+    if (fmt)
+    {
+        char name[1024] = "";
+
+        va_list args;
+        va_start(args, fmt);
+        stbsp_vsnprintf(name, SDL_arraysize(name), fmt, args);
+        va_end(args);
+
+        SDL_SetStringProperty(cinfo_named.props, SDL_PROP_GPU_TEXTURE_CREATE_NAME_STRING, name);
+    }
+
+    SDL_GPUTexture* ret = SDL_CreateGPUTexture(state::gpu_device, &cinfo_named);
+
+    SDL_DestroyProperties(cinfo_named.props);
+
+    return ret;
+}
 
 bool gpu::upload_to_texture2d(SDL_GPUCopyPass* const copy_pass, SDL_GPUTexture* const tex, const SDL_GPUTextureFormat format, const Uint32 layer,
     const Uint32 miplevel, const Uint32 width, const Uint32 height, std::function<void(void* tbo_pointer, Uint32 tbo_size)> copy_callback, const bool cycle)
@@ -79,4 +106,11 @@ bool gpu::upload_to_texture2d(SDL_GPUCopyPass* const copy_pass, SDL_GPUTexture* 
             memcpy(tbo_data, data, SDL_min(buf_size, tbo_size));
         },
         cycle);
+}
+
+void gpu::release_texture(SDL_GPUTexture*& texture, const bool set_texture_to_null)
+{
+    SDL_ReleaseGPUTexture(state::gpu_device, texture);
+    if (set_texture_to_null)
+        texture = nullptr;
 }

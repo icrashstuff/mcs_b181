@@ -28,6 +28,16 @@
 namespace gpu
 {
 /**
+ * Create named GPU Texture
+ *
+ * @param cinfo Creation info
+ * @param fmt Texture name format string (Uses stb_sprintf) (NULL for no name)
+ *
+ * @returns a texture handle, or NULL on error
+ */
+SDL_GPUTexture* create_texture(const SDL_GPUTextureCreateInfo& cinfo, SDL_PRINTF_FORMAT_STRING const char* fmt, ...) SDL_PRINTF_VARARG_FUNC(2);
+
+/**
  * Upload data to a GPU texture layer
  *
  * @param copy_pass Copy pass to upload texture on
@@ -62,4 +72,14 @@ bool upload_to_texture2d(SDL_GPUCopyPass* const copy_pass, SDL_GPUTexture* const
  */
 bool upload_to_texture2d(SDL_GPUCopyPass* const copy_pass, SDL_GPUTexture* const tex, const SDL_GPUTextureFormat format, const Uint32 layer,
     const Uint32 miplevel, const Uint32 width, const Uint32 height, const void* const data, const bool cycle);
+
+/**
+ * Release a GPU texture
+ *
+ * You must not reference the texture after calling this function.
+ *
+ * @param texture Texture to release
+ * @param set_texture_to_null Set texture parameter to null after releasing
+ */
+void release_texture(SDL_GPUTexture*& texture, const bool set_texture_to_null = true);
 }
