@@ -110,6 +110,7 @@ set(mcs_b181_client_SRC
 
     client/gpu/buffer.cpp
     client/gpu/texture.cpp
+    client/gpu/command_buffer.cpp
 
     client/sound/stb_vorbis.c
     client/sound/sound_world.cpp
