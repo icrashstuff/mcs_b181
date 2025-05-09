@@ -185,42 +185,13 @@ void level_t::build_dirty_meshes()
     }
     PASS_TIMER_STOP(0, "Propagated dirty level for %zu chunks in %.2f ms (%.2f ms per)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
 
-    /* Clear Light Pass */
-    PASS_TIMER_START();
-    for (auto it = chunks_light_order.begin(); it != chunks_light_order.end(); it++)
-    {
-        chunk_cubic_t* c = *it;
-        if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL)
-            continue;
-        c->clear_light_block(0);
-        c->light_pass_block_setup();
-        c->clear_light_sky(0);
-        built++;
-    }
-    PASS_TIMER_STOP(enable_timer_log_light, "Cleared %zu chunks in %.2f ms (%.2f ms per) (Pass 1)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
+    ImVector<chunk_cubic_t*> chunks_needing_light;
 
-    /* First Light Pass */
+    /* Clear Light Pass and Fast-forward cull pass */
     PASS_TIMER_START();
-    for (auto it = chunks_light_order.begin(); it != chunks_light_order.end(); it++)
+    for (chunk_cubic_t* c : chunks_light_order)
     {
-        chunk_cubic_t* c = *it;
-        if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL)
-            continue;
-        c->light_pass_block_grab_from_neighbors();
-        c->light_pass_block_propagate_internals();
-        c->light_pass_sky_grab_from_neighbors();
-        c->light_pass_sky_propagate_internals();
-        c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0;
-        built++;
-    }
-    PASS_TIMER_STOP(enable_timer_log_light, "Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 1)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
-    last_perf_light_pass1.duration = elapsed;
-    last_perf_light_pass1.built = built;
-
-    /* Fast-forward cull pass */
-    for (auto it = chunks_light_order.begin(); it != chunks_light_order.end(); it++)
-    {
-        chunk_cubic_t* c = *it;
+        /* Fast-forward cull pass */
         if (BETWEEN_INCL(c->dirty_level, chunk_cubic_t::DIRTY_LEVEL_MESH, chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0))
         {
             bool light_can_leave = c->can_light_leave();
@@ -237,13 +208,41 @@ void level_t::build_dirty_meshes()
                 }
             }
         }
+
+        if (c->dirty_level > chunk_cubic_t::DIRTY_LEVEL_MESH)
+            chunks_needing_light.push_back(c);
+
+        /* Clear Light Pass */
+        if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL)
+            continue;
+        c->clear_light_block(0);
+        c->light_pass_block_setup();
+        c->clear_light_sky(0);
+        built++;
     }
+    PASS_TIMER_STOP(enable_timer_log_light, "Cleared %zu chunks in %.2f ms (%.2f ms per) (Pass 1)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
+
+    /* First Light Pass */
+    PASS_TIMER_START();
+    for (chunk_cubic_t* c : chunks_needing_light)
+    {
+        if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL)
+            continue;
+        c->light_pass_block_grab_from_neighbors();
+        c->light_pass_block_propagate_internals();
+        c->light_pass_sky_grab_from_neighbors();
+        c->light_pass_sky_propagate_internals();
+        c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0;
+        built++;
+    }
+    PASS_TIMER_STOP(enable_timer_log_light, "Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 1)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
+    last_perf_light_pass1.duration = elapsed;
+    last_perf_light_pass1.built = built;
 
     /* Second Light Pass */
     PASS_TIMER_START();
-    for (auto it = chunks_light_order.begin(); it != chunks_light_order.end(); it++)
+    for (chunk_cubic_t* c : chunks_needing_light)
     {
-        chunk_cubic_t* c = *it;
         if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_0)
             continue;
         c->light_pass_block_grab_from_neighbors();
@@ -259,9 +258,8 @@ void level_t::build_dirty_meshes()
 
     /* Third Light Pass */
     PASS_TIMER_START();
-    for (auto it = chunks_light_order.begin(); it != chunks_light_order.end(); it++)
+    for (chunk_cubic_t* c : chunks_needing_light)
     {
-        chunk_cubic_t* c = *it;
         if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_EXT_1)
             continue;
         c->light_pass_block_grab_from_neighbors();
@@ -282,9 +280,8 @@ void level_t::build_dirty_meshes()
     PASS_TIMER_START();
     int throttle = r_mesh_throttle.get();
     glm::ivec3 pos_cam(glm::ivec3(glm::round(get_camera_pos())) >> 4);
-    for (auto it = chunks_render_order.begin(); it != chunks_render_order.end(); it++)
+    for (chunk_cubic_t* c : chunks_render_order)
     {
-        chunk_cubic_t* c = *it;
         if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_MESH || !c->visible)
             continue;
         /* Bypass mesh throttle for nearby chunks (To stop holes from being punched in the world) */
