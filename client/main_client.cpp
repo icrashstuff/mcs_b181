@@ -59,7 +59,7 @@
 
 #include "shaders/terrain_shader.h"
 
-#include "gpu/command_buffer.h"
+#include "gpu/gpu.h"
 
 #include "state.h"
 #include "touch.h"
@@ -1941,82 +1941,42 @@ SDL_GPUTextureFormat state::gpu_tex_format_best_depth_only = SDL_GPU_TEXTUREFORM
 
 static void upload_debug_texture(SDL_GPUCopyPass* const copy_pass)
 {
-    SDL_GPUTextureCreateInfo tex_info = {
-        .type = SDL_GPU_TEXTURETYPE_2D,
-        .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
-        .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER,
-        .width = 32,
-        .height = 32,
-        .layer_count_or_depth = 1,
-        .num_levels = 1,
-        .sample_count = SDL_GPU_SAMPLECOUNT_1,
-        .props = SDL_CreateProperties(),
-    };
-    SDL_SetStringProperty(tex_info.props, SDL_PROP_GPU_TEXTURE_CREATE_NAME_STRING, "Missing texture (Texture)");
+    SDL_GPUTextureCreateInfo tex_info = {};
+    tex_info.type = SDL_GPU_TEXTURETYPE_2D;
+    tex_info.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+    tex_info.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+    tex_info.width = 32;
+    tex_info.height = 32;
+    tex_info.layer_count_or_depth = 1;
+    tex_info.num_levels = 1;
 
-    SDL_GPUSamplerCreateInfo sampler_info;
-    SDL_zero(sampler_info);
+    SDL_GPUSamplerCreateInfo sampler_info = {};
     sampler_info.min_filter = SDL_GPU_FILTER_LINEAR;
     sampler_info.mag_filter = SDL_GPU_FILTER_NEAREST;
     sampler_info.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
     sampler_info.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
     sampler_info.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
-    sampler_info.props = SDL_CreateProperties();
-    SDL_SetStringProperty(sampler_info.props, SDL_PROP_GPU_SAMPLER_CREATE_NAME_STRING, "Missing texture (Sampler)");
 
-    if (!(state::gpu_debug_texture = SDL_CreateGPUTexture(state::gpu_device, &tex_info)))
+    if (!(state::gpu_debug_texture = gpu::create_texture(tex_info, "Missing texture (Texture)")))
         util::die("Unable to create debug texture, SDL_CreateGPUTexture: %s", SDL_GetError());
 
-    if (!(state::gpu_debug_sampler = SDL_CreateGPUSampler(state::gpu_device, &sampler_info)))
+    if (!(state::gpu_debug_sampler = gpu::create_sampler(sampler_info, "Missing texture (Sampler)")))
         util::die("Unable to create debug texture, SDL_CreateGPUSampler: %s", SDL_GetError());
 
-    SDL_GPUTransferBufferCreateInfo tbo_info = {
-        .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
-        .size = tex_info.height * tex_info.width * 4,
-        .props = 0,
+    auto upload_func = [&](void* tbo_pointer, Uint32) {
+        Uint64 r_state = 0x881abfd3ab1e0024;
+        for (Uint32 y = 0; y < tex_info.height; y++)
+            for (Uint32 x = 0; x < tex_info.width; x++)
+            {
+                ((Uint8*)tbo_pointer)[(y * tex_info.width + x) * 4 + 0] = SDL_rand_r(&r_state, 0x0F + 1) + ((x % 2 == y % 2) ? 0 : 0xF0);
+                ((Uint8*)tbo_pointer)[(y * tex_info.width + x) * 4 + 1] = SDL_rand_r(&r_state, 0x0F + 1);
+                ((Uint8*)tbo_pointer)[(y * tex_info.width + x) * 4 + 2] = SDL_rand_r(&r_state, 0x0F + 1) + ((x % 2 == y % 2) ? 0 : 0xF0);
+                ((Uint8*)tbo_pointer)[(y * tex_info.width + x) * 4 + 3] = 0xFF;
+            }
     };
 
-    SDL_GPUTransferBuffer* tbo = SDL_CreateGPUTransferBuffer(state::gpu_device, &tbo_info);
-    if (tbo == nullptr)
-        util::die("Failed to acquire TBO to upload debug texture");
-
-    Uint8* tbo_pointer = (Uint8*)SDL_MapGPUTransferBuffer(state::gpu_device, tbo, false);
-    if (tbo_pointer == nullptr)
-        util::die("Failed to map TBO to upload debug texture, SDL_MapGPUTransferBuffer: %s", SDL_GetError());
-
-    Uint64 r_state = 0x881abfd3ab1e0024;
-    for (Uint32 y = 0; y < tex_info.height; y++)
-        for (Uint32 x = 0; x < tex_info.width; x++)
-        {
-            tbo_pointer[(y * tex_info.width + x) * 4 + 0] = SDL_rand_r(&r_state, 0x0F + 1) + ((x % 2 == y % 2) ? 0 : 0xF0);
-            tbo_pointer[(y * tex_info.width + x) * 4 + 1] = SDL_rand_r(&r_state, 0x0F + 1);
-            tbo_pointer[(y * tex_info.width + x) * 4 + 2] = SDL_rand_r(&r_state, 0x0F + 1) + ((x % 2 == y % 2) ? 0 : 0xF0);
-            tbo_pointer[(y * tex_info.width + x) * 4 + 3] = 0xFF;
-        }
-
-    SDL_UnmapGPUTransferBuffer(state::gpu_device, tbo);
-
-    SDL_GPUTextureTransferInfo region_tbo = {
-        .transfer_buffer = tbo,
-        .offset = 0,
-        .pixels_per_row = tex_info.width,
-        .rows_per_layer = tex_info.height,
-    };
-
-    SDL_GPUTextureRegion region_tex = {
-        .texture = state::gpu_debug_texture,
-        .mip_level = 0,
-        .layer = 0,
-        .x = 0,
-        .y = 0,
-        .z = 0,
-        .w = tex_info.width,
-        .h = tex_info.height,
-        .d = 1,
-    };
-
-    SDL_UploadToGPUTexture(copy_pass, &region_tbo, &region_tex, false);
-    SDL_ReleaseGPUTransferBuffer(state::gpu_device, tbo);
+    if (gpu::upload_to_texture2d(copy_pass, state::gpu_debug_texture, tex_info.format, 0, 0, 32, 32, upload_func, false))
+        util::die("Failed to to upload debug texture");
 }
 
 void setup_static_gpu_state()
