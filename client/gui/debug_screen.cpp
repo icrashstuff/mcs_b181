@@ -62,8 +62,7 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
 
     add_text(ctx, drawlist, 0, cursor_l, "mcs_b181_client (%s) (%.0f FPS)", build_info::ver_string::client().c_str(), ImGui::GetIO().Framerate);
 
-    size_t mem_chunk_guess = 0;
-    size_t mem_chunk_mesh_guess = 0;
+    size_t mem_chunk = 0;
 
     /* Chunk stats */
     {
@@ -76,14 +75,11 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
         for (auto it : cvec)
         {
             num_visible += it->visible;
-            num_meshed += it->vbo != 0;
+            num_meshed += (it->quad_count || it->quad_count_overlay || it->quad_count_translucent);
             num_dirty += it->dirty_level != chunk_cubic_t::DIRTY_LEVEL_NONE;
             num_dirty_visible += it->visible ? (it->dirty_level != chunk_cubic_t::DIRTY_LEVEL_NONE) : 0;
-
-            mem_chunk_guess += sizeof(chunk_cubic_t);
-            mem_chunk_mesh_guess += sizeof(terrain_vertex_t) * (it->quad_count + it->quad_count_overlay + it->quad_count_translucent) * 4;
         }
-        mem_chunk_guess += cvec.capacity() * sizeof(cvec[0]);
+        mem_chunk = num_total * sizeof(chunk_cubic_t);
 
         add_text(ctx, drawlist, 0, cursor_l, "C: %zu/%zu, M: %zu, D: %zu/%zu, Q: %zu", num_visible, num_total, num_meshed, num_dirty_visible, num_dirty,
             game->level->get_mesh_queue_size());
@@ -142,8 +138,9 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
 
     /* ======================== RIGHT SIDE ======================== */
 
-    add_text(ctx, drawlist, 1, cursor_r, "Chunk mesh memory: %.1lf MB", double(mem_chunk_mesh_guess >> 10) / 1024.0);
-    add_text(ctx, drawlist, 1, cursor_r, "Chunk data memory: %zu MB", mem_chunk_guess >> 20);
+    add_text(ctx, drawlist, 1, cursor_r, "Chunk mesh memory: %.1lf/%.1lf MiB", double(lvl->mesh_buffer_offset >> 10) / 1024.0,
+        double(lvl->mesh_buffer_size >> 10) / 1024.0);
+    add_text(ctx, drawlist, 1, cursor_r, "Chunk data memory: %zu MiB", mem_chunk >> 20);
 
     /* Memory usage */
 #ifdef SDL_PLATFORM_LINUX

@@ -28,6 +28,9 @@
 
 SDL_GPUBuffer* gpu::create_buffer(const SDL_GPUBufferCreateInfo& cinfo, const char* fmt, ...)
 {
+    if (cinfo.size == 0)
+        return nullptr;
+
     SDL_GPUBufferCreateInfo cinfo_named = cinfo;
     cinfo_named.props = SDL_CreateProperties();
     if (cinfo.props)

@@ -29,12 +29,6 @@
 
 void chunk_cubic_t::free_renderer_resources()
 {
-    SDL_ReleaseGPUBuffer(state::gpu_device, vbo);
-    SDL_ReleaseGPUBuffer(state::gpu_device, ebo_translucent);
-
-    vbo = nullptr;
-    ebo_translucent = nullptr;
-
     quad_count = 0;
     quad_count_overlay = 0;
     quad_count_translucent = 0;

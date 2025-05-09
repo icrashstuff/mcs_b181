@@ -340,6 +340,10 @@ struct level_t
 
     size_t get_mesh_queue_size() { return mesh_queue.size(); }
 
+    SDL_GPUBuffer* mesh_buffer = nullptr;
+    Uint32 mesh_buffer_size = 0;
+    Uint32 mesh_buffer_offset = 0;
+
 private:
     mc_id::gamemode_t gamemode = mc_id::GAMEMODE_SPECTATOR;
 
@@ -365,7 +369,7 @@ private:
     /** For quick retrieval of chunks */
     std::map<glm::ivec3, chunk_cubic_t*, ivec3_comparator_t> cmap;
 
-    /* Render order chunks (sorted by distance to camera) */
+    /* Render order chunks (sorted by distance to camera) (Closer first) */
     std::vector<chunk_cubic_t*> chunks_render_order;
 
     /**
@@ -411,9 +415,9 @@ private:
 
     struct mesh_queue_info_t
     {
-        size_t quad_count = 0;
-        size_t quad_count_overlay = 0;
-        size_t quad_count_translucent = 0;
+        Uint32 quad_count = 0;
+        Uint32 quad_count_overlay = 0;
+        Uint32 quad_count_translucent = 0;
 
         Uint32 vertex_data_size = 0;
         void* vertex_data = nullptr;
@@ -428,6 +432,28 @@ private:
     };
 
     std::deque<mesh_queue_info_t> mesh_queue;
+
+    struct transient_indirect_buffers_t
+    {
+        SDL_GPUBuffer* pos = nullptr;
+        SDL_GPUBuffer* cmd_solid = nullptr;
+        SDL_GPUBuffer* cmd_overlay = nullptr;
+        SDL_GPUBuffer* cmd_translucent = nullptr;
+
+        Uint32 cmd_solid_len = 0;
+        Uint32 cmd_overlay_len = 0;
+        Uint32 cmd_translucent_len = 0;
+
+        /**
+         * Release buffers, and reset fields
+         */
+        void release();
+        ~transient_indirect_buffers_t();
+    }
+    /**
+     * Transient data for indirect rendering
+     */
+    indirect_buffers;
 
     /**
      * Process an item from mesh_queue

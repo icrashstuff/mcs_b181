@@ -1,4 +1,4 @@
-#version 450 core
+#version 460 core
 /* SPDX-License-Identifier: MIT
  *
  * SPDX-FileCopyrightText: Copyright (c) 2025 Ian Hangartner <icrashstuff at outlook dot com>
@@ -48,11 +48,11 @@ struct vertex_t
     uint texturing;
 };
 
-layout(std430, set = 0, binding = 0) readonly buffer vertex_data_t
-{
-    /* ivec3 pos; */
-    vertex_t data[];
-} vtx_data;
+layout(std430, set = 0, binding = 0) readonly buffer vertex_data_t { vertex_t data[]; }
+vtx_data;
+
+layout(std430, set = 0, binding = 1) readonly buffer draw_pos_t { ivec4 pos[]; }
+draw_pos;
 /* ================ END Vertex inputs ================ */
 
 /* ================ BEGIN Vertex outputs ================ */
@@ -81,27 +81,21 @@ layout(std140, set = 1, binding = 0) uniform ubo_world_t
 }
 ubo_world;
 
-layout(std140, set = 1, binding = 1) uniform ubo_tint_t
-{
-    vec4 tint;
-}
+layout(std140, set = 1, binding = 1) uniform ubo_tint_t { vec4 tint; }
 ubo_tint;
-
-layout(std140, set = 1, binding = 2) uniform ubo_model_t
-{
-    vec4 model;
-}
-ubo_model;
 
 void main()
 {
-    vertex_t vtx = vtx_data.data[gl_InstanceIndex * 4 + gl_VertexIndex];
+    uint idx_vtx = gl_VertexIndex & 3;
+    uint idx_draw = gl_VertexIndex >> 2;
+
+    vertex_t vtx = vtx_data.data[gl_InstanceIndex * 4 + idx_vtx];
 
     vec3 pos;
-    pos.x = float(int(bitfieldExtract(vtx.pos_ao,  0, 10)) - 256) / 32.0;
-    pos.y = float(int(bitfieldExtract(vtx.pos_ao, 10, 10)) - 256) / 32.0;
-    pos.z = float(int(bitfieldExtract(vtx.pos_ao, 20, 10)) - 256) / 32.0;
-    gl_Position = ubo_world.projection * ubo_world.camera * (vec4(pos, 1.0) + ubo_model.model);
+    pos.x = float(int(bitfieldExtract(vtx.pos_ao,  0, 10)) - 256 + draw_pos.pos[idx_draw].x * 512) / 32.0;
+    pos.y = float(int(bitfieldExtract(vtx.pos_ao, 10, 10)) - 256 + draw_pos.pos[idx_draw].y * 512) / 32.0;
+    pos.z = float(int(bitfieldExtract(vtx.pos_ao, 20, 10)) - 256 + draw_pos.pos[idx_draw].z * 512) / 32.0;
+    gl_Position = ubo_world.projection * ubo_world.camera * (vec4(pos, 1.0));
 
     frag.ao = float(bitfieldExtract(vtx.pos_ao, 30, 2)) / 3.0;
 

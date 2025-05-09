@@ -133,12 +133,13 @@ struct chunk_cubic_t
         chunk_cubic_t* neg_z = NULL;
     } neighbors;
 
-    SDL_GPUBuffer* vbo = nullptr;
-    SDL_GPUBuffer* ebo_translucent = nullptr;
+    Uint32 mesh_buffer_offset_quads = 0;
 
-    size_t quad_count = 0;
-    size_t quad_count_overlay = 0;
-    size_t quad_count_translucent = 0;
+    Uint64 last_mesh_update_time = 0;
+
+    Uint32 quad_count = 0;
+    Uint32 quad_count_overlay = 0;
+    Uint32 quad_count_translucent = 0;
 
     const Uint64 time_creation = SDL_GetTicks();
 

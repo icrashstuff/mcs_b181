@@ -282,7 +282,7 @@ void level_t::build_dirty_meshes()
     PASS_TIMER_START();
     int throttle = r_mesh_throttle.get();
     glm::ivec3 pos_cam(glm::ivec3(glm::round(get_camera_pos())) >> 4);
-    for (auto it = chunks_render_order.rbegin(); it != chunks_render_order.rend(); it++)
+    for (auto it = chunks_render_order.begin(); it != chunks_render_order.end(); it++)
     {
         chunk_cubic_t* c = *it;
         if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_MESH || !c->visible)
@@ -539,6 +539,8 @@ void level_t::render_entities(SDL_GPUCommandBuffer* const command_buffer, SDL_GP
         glm::vec4 model;
     };
 
+    return;
+
     if (state::pipeline_shader_terrain_opaque)
     {
         SDL_PushGPUDebugGroup(command_buffer, "Entities");
@@ -591,60 +593,70 @@ bool level_t::mesh_queue_upload_item(SDL_GPUCopyPass* const copy_pass, mesh_queu
     if (!c)
         return true;
 
-    struct TBO
+    glm::ivec4 chunk_pos(c->pos.x, c->pos.y, c->pos.z, 0);
+
+    const Uint32 old_offset = mesh_buffer_offset;
+    const Uint32 new_offset = item.vertex_data_size + old_offset;
+
+    if (new_offset > mesh_buffer_size)
     {
-        SDL_GPUTransferBuffer* tbo = nullptr;
-        void* pointer = nullptr;
-        TBO(Uint32 size)
-        {
-            SDL_GPUTransferBufferCreateInfo cinfo_tbo = { .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, .size = size, .props = 0 };
-            tbo = SDL_CreateGPUTransferBuffer(state::gpu_device, &cinfo_tbo);
-            if (!tbo)
-                return;
-            pointer = SDL_MapGPUTransferBuffer(state::gpu_device, tbo, 0);
-        }
-        ~TBO()
-        {
-            if (pointer)
-                SDL_UnmapGPUTransferBuffer(state::gpu_device, tbo);
-            if (tbo)
-                SDL_ReleaseGPUTransferBuffer(state::gpu_device, tbo);
-        }
-    };
+        Uint32 new_size = new_offset;
 
-    TBO tbo(item.vertex_data_size);
-    if (!tbo.pointer)
+        /* 1iMB minimum size */
+        new_size = SDL_max(1 << 20, new_size);
+
+        /* I'm not entirely certain what this is rounding to, but it isn't the nearest power of two */
+        Uint32 round_mask = (new_size >> 3) - 1;
+        for (Uint32 i = 0; i < 32; i++)
+            round_mask |= round_mask >> i;
+        round_mask |= (1024 * 1024 * 1 - 1);
+        round_mask &= (1024 * 1024 * 16 - 1);
+        new_size = (new_size + round_mask) & ~round_mask;
+
+        SDL_GPUBufferCreateInfo cinfo_vbo = {};
+        cinfo_vbo.usage = SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ;
+        cinfo_vbo.size = new_size;
+        SDL_GPUBuffer* new_mesh_buffer = gpu::create_buffer(cinfo_vbo, "[Level]: Mesh buffer");
+
+        if (!new_mesh_buffer)
+            return false;
+
+        if (mesh_buffer)
+        {
+            SDL_GPUBufferLocation buf_loc_src = {};
+            SDL_GPUBufferLocation buf_loc_dst = {};
+
+            buf_loc_src.buffer = mesh_buffer;
+            buf_loc_dst.buffer = new_mesh_buffer;
+
+            SDL_CopyGPUBufferToBuffer(copy_pass, &buf_loc_src, &buf_loc_dst, mesh_buffer_size, false);
+            gpu::release_buffer(mesh_buffer);
+        }
+
+        mesh_buffer = new_mesh_buffer;
+        mesh_buffer_size = new_size;
+    }
+
+    if (!mesh_buffer)
         return false;
 
-    SDL_GPUBufferCreateInfo cinfo_vbo = {
-        .usage = SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ,
-        .size = item.vertex_data_size,
-        .props = SDL_CreateProperties(),
-    };
-    char name[128];
-    stbsp_snprintf(name, IM_ARRAYSIZE(name), "[Level][Chunk]: <%d, %d, %d>: Vertex Buffer", item.pos.x, item.pos.y, item.pos.z);
-    SDL_SetStringProperty(cinfo_vbo.props, SDL_PROP_GPU_BUFFER_CREATE_NAME_STRING, name);
-    SDL_GPUBuffer* vbo = SDL_CreateGPUBuffer(state::gpu_device, &cinfo_vbo);
-    SDL_DestroyProperties(cinfo_vbo.props);
-
-    if (!vbo)
+    if (!gpu::upload_to_buffer(
+            copy_pass, mesh_buffer, old_offset, item.vertex_data_size,
+            [&](void* tbo_pointer, Uint32 tbo_size) {
+                assert(item.vertex_data_size == tbo_size);
+                memcpy(tbo_pointer, item.vertex_data, item.vertex_data_size);
+            },
+            false))
+    {
         return false;
+    }
 
-    memcpy(tbo.pointer, item.vertex_data, item.vertex_data_size);
+    mesh_buffer_offset = new_offset;
 
-    SDL_GPUTransferBufferLocation loc_tbo = {
-        .transfer_buffer = tbo.tbo,
-        .offset = 0,
-    };
-    SDL_GPUBufferRegion region_vbo = {
-        .buffer = vbo,
-        .offset = 0,
-        .size = item.vertex_data_size,
-    };
-    SDL_UploadToGPUBuffer(copy_pass, &loc_tbo, &region_vbo, 0);
-
-    SDL_ReleaseGPUBuffer(state::gpu_device, c->vbo);
-    c->vbo = vbo;
+    /* TODO: Invalidate old regions */
+    /* TODO: Only set this after data is for sure uploaded */
+    c->last_mesh_update_time = SDL_GetTicksNS();
+    c->mesh_buffer_offset_quads = old_offset / (sizeof(terrain_vertex_t) * 4);
     c->quad_count = item.quad_count;
     c->quad_count_overlay = item.quad_count_overlay;
     c->quad_count_translucent = item.quad_count_translucent;
@@ -669,6 +681,72 @@ void level_t::render_stage_copy(SDL_GPUCopyPass* const copy_pass)
         else
             mesh_queue.push_back(item);
     }
+
+    ImVector<glm::ivec4> pos_data;
+    ImVector<SDL_GPUIndirectDrawCommand> solid_commands;
+    ImVector<SDL_GPUIndirectDrawCommand> overlay_commands;
+    ImVector<SDL_GPUIndirectDrawCommand> translucent_commands;
+
+    for (Uint32 i = 0; i < Uint32(chunks_render_order.size()); i++)
+    {
+        chunk_cubic_t* const c = chunks_render_order[i];
+        if (!c || !c->visible)
+            continue;
+        SDL_GPUIndirectDrawCommand base_cmd;
+        base_cmd.first_vertex = pos_data.size() * 4;
+        base_cmd.num_vertices = 4;
+        base_cmd.first_instance = c->mesh_buffer_offset_quads;
+        base_cmd.num_instances = 0;
+        pos_data.push_back(glm::ivec4(c->pos, 0));
+        if (c->quad_count)
+        {
+            base_cmd.num_instances = c->quad_count;
+            solid_commands.push_back(base_cmd);
+            base_cmd.first_instance += c->quad_count;
+        }
+        if (c->quad_count_overlay)
+        {
+            base_cmd.num_instances = c->quad_count_overlay;
+            overlay_commands.push_back(base_cmd);
+            base_cmd.first_instance += c->quad_count_overlay;
+        }
+        if (c->quad_count_translucent)
+        {
+            base_cmd.num_instances = c->quad_count_translucent;
+            translucent_commands.push_back(base_cmd);
+            base_cmd.first_instance += c->quad_count_translucent;
+        }
+    }
+
+    indirect_buffers.release();
+
+    SDL_GPUBufferCreateInfo cinfo_chunk_pos = {};
+    cinfo_chunk_pos.usage = SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ;
+    cinfo_chunk_pos.size = pos_data.size_in_bytes();
+    indirect_buffers.pos = gpu::create_buffer(cinfo_chunk_pos, "[Level]: chunk position");
+    if (!gpu::upload_to_buffer(copy_pass, indirect_buffers.pos, 0, pos_data.size_in_bytes(), pos_data.Data, false))
+        indirect_buffers.release();
+
+    SDL_GPUBufferCreateInfo cinfo_indirect = {};
+    cinfo_indirect.usage = SDL_GPU_BUFFERUSAGE_INDIRECT;
+
+    cinfo_indirect.size = solid_commands.size_in_bytes();
+    indirect_buffers.cmd_solid = gpu::create_buffer(cinfo_indirect, "[Level]: solid indirect commands");
+
+    cinfo_indirect.size = overlay_commands.size_in_bytes();
+    indirect_buffers.cmd_overlay = gpu::create_buffer(cinfo_indirect, "[Level]: overlay indirect commands");
+
+    cinfo_indirect.size = translucent_commands.size_in_bytes();
+    indirect_buffers.cmd_translucent = gpu::create_buffer(cinfo_indirect, "[Level]: translucent indirect commands");
+
+    if (gpu::upload_to_buffer(copy_pass, indirect_buffers.cmd_solid, 0, solid_commands.size_in_bytes(), solid_commands.Data, false))
+        indirect_buffers.cmd_solid_len = solid_commands.size();
+
+    if (gpu::upload_to_buffer(copy_pass, indirect_buffers.cmd_overlay, 0, overlay_commands.size_in_bytes(), overlay_commands.Data, false))
+        indirect_buffers.cmd_overlay_len = overlay_commands.size();
+
+    if (gpu::upload_to_buffer(copy_pass, indirect_buffers.cmd_translucent, 0, translucent_commands.size_in_bytes(), translucent_commands.Data, false))
+        indirect_buffers.cmd_translucent_len = translucent_commands.size();
 }
 
 void level_t::render_stage_render(
@@ -701,7 +779,7 @@ void level_t::render_stage_render(
             std::sort(chunks_render_order.begin(), chunks_render_order.end(), [&float_cpos](const chunk_cubic_t* const a, const chunk_cubic_t* const b) {
                 const float adist = glm::distance(glm::f64vec3(a->pos), float_cpos);
                 const float bdist = glm::distance(glm::f64vec3(b->pos), float_cpos);
-                return adist > bdist;
+                return adist < bdist;
             });
             last_render_order_sort_time = SDL_GetTicks();
             request_render_order_sort = 0;
@@ -711,105 +789,71 @@ void level_t::render_stage_render(
 
     SDL_GPUTextureSamplerBinding binding_tex[] = {
         terrain->binding,
-        SDL_GPUTextureSamplerBinding { .texture = lightmap.tex_id, .sampler = lightmap.sampler_linear },
+        SDL_GPUTextureSamplerBinding { lightmap.tex_id, lightmap.sampler_linear },
     };
 
     SDL_BindGPUFragmentSamplers(render_pass, 0, binding_tex, SDL_arraysize(binding_tex));
-
-    struct alignas(16) ubo_model_t
-    {
-        glm::vec4 model;
-    };
 
     struct alignas(16) ubo_world_t
     {
         glm::mat4 camera;
         glm::mat4 projection;
-    } ubo_world = { .camera = mat_cam, .projection = mat_proj };
+    } ubo_world = { mat_cam, mat_proj };
 
     struct alignas(16) ubo_tint_t
     {
         glm::vec4 tint;
-    } ubo_tint = { .tint = glm::vec4(1) };
+    } ubo_tint = { glm::vec4(1) };
 
     struct alignas(16) ubo_frag_t
     {
         Uint32 use_texture;
-    } ubo_frag = { .use_texture = !!(state::game_resources->use_texture) };
+    } ubo_frag = { !!(state::game_resources->use_texture) };
 
+    bool render_resources_valid = 0;
+    if (mesh_buffer && indirect_buffers.pos)
+        render_resources_valid = 1;
+
+    SDL_GPUBuffer* storage_buffers[] = { mesh_buffer, indirect_buffers.pos };
     SDL_PushGPUFragmentUniformData(command_buffer, 0, &ubo_frag, sizeof(ubo_frag));
     SDL_PushGPUVertexUniformData(command_buffer, 0, &ubo_world, sizeof(ubo_world));
     SDL_PushGPUVertexUniformData(command_buffer, 1, &ubo_tint, sizeof(ubo_tint));
 
-    if (state::pipeline_shader_terrain_opaque)
+    if (state::pipeline_shader_terrain_opaque && render_resources_valid && indirect_buffers.cmd_solid)
     {
         SDL_PushGPUDebugGroup(command_buffer, "Opaque");
+        SDL_BindGPUVertexStorageBuffers(render_pass, 0, storage_buffers, 2);
         SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_opaque);
-        for (auto it = chunks_render_order.rbegin(); it != chunks_render_order.rend(); it = next(it))
-        {
-            chunk_cubic_t* c = *it;
-            if (!c->vbo || c->quad_count == 0 || !c->visible)
-                continue;
-            glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
-            ubo_model_t ubo_model = { .model = glm::vec4(translate.x, translate.y, translate.z, 0.0f) };
-            SDL_PushGPUVertexUniformData(command_buffer, 2, &ubo_model, sizeof(ubo_model));
-            SDL_BindGPUVertexStorageBuffers(render_pass, 0, &c->vbo, 1);
-            SDL_DrawGPUPrimitives(render_pass, 4, c->quad_count, 0, 0);
-        }
+        SDL_DrawGPUPrimitivesIndirect(render_pass, indirect_buffers.cmd_solid, 0, indirect_buffers.cmd_solid_len);
         SDL_PopGPUDebugGroup(command_buffer);
     }
 
-    if (state::pipeline_shader_terrain_overlay)
+    if (state::pipeline_shader_terrain_overlay && render_resources_valid && indirect_buffers.cmd_overlay_len)
     {
         SDL_PushGPUDebugGroup(command_buffer, "Overlay");
+        SDL_BindGPUVertexStorageBuffers(render_pass, 0, storage_buffers, 2);
         SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_overlay);
-        for (auto it = chunks_render_order.rbegin(); it != chunks_render_order.rend(); it = next(it))
-        {
-            chunk_cubic_t* c = *it;
-            if (!c->vbo || c->quad_count_overlay == 0 || !c->visible)
-                continue;
-            glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
-            ubo_model_t ubo_model = { .model = glm::vec4(translate.x, translate.y, translate.z, 0.0f) };
-            SDL_PushGPUVertexUniformData(command_buffer, 2, &ubo_model, sizeof(ubo_model));
-            SDL_BindGPUVertexStorageBuffers(render_pass, 0, &c->vbo, 1);
-            SDL_DrawGPUPrimitives(render_pass, 4, c->quad_count_overlay, 0, c->quad_count);
-        }
+        SDL_DrawGPUPrimitivesIndirect(render_pass, indirect_buffers.cmd_overlay, 0, indirect_buffers.cmd_overlay_len);
         SDL_PopGPUDebugGroup(command_buffer);
     }
 
     render_entities(command_buffer, render_pass);
 
-    if (state::pipeline_shader_terrain_translucent_depth)
+    if (state::pipeline_shader_terrain_translucent_depth && render_resources_valid && indirect_buffers.cmd_translucent_len)
     {
         SDL_PushGPUDebugGroup(command_buffer, "Translucent Depth");
+        SDL_BindGPUVertexStorageBuffers(render_pass, 0, storage_buffers, 2);
         SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_translucent_depth);
-        for (chunk_cubic_t* c : chunks_render_order)
-        {
-            if (!c->vbo || c->quad_count_translucent == 0 || !c->visible)
-                continue;
-            glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
-            ubo_model_t ubo_model = { .model = glm::vec4(translate.x, translate.y, translate.z, 0.0f) };
-            SDL_PushGPUVertexUniformData(command_buffer, 2, &ubo_model, sizeof(ubo_model));
-            SDL_BindGPUVertexStorageBuffers(render_pass, 0, &c->vbo, 1);
-            SDL_DrawGPUPrimitives(render_pass, 4, c->quad_count_translucent, 0, c->quad_count + c->quad_count_overlay);
-        }
+        SDL_DrawGPUPrimitivesIndirect(render_pass, indirect_buffers.cmd_translucent, 0, indirect_buffers.cmd_translucent_len);
         SDL_PopGPUDebugGroup(command_buffer);
     }
 
-    if (state::pipeline_shader_terrain_translucent)
+    if (state::pipeline_shader_terrain_translucent && render_resources_valid && indirect_buffers.cmd_translucent_len)
     {
         SDL_PushGPUDebugGroup(command_buffer, "Translucent Color");
+        SDL_BindGPUVertexStorageBuffers(render_pass, 0, storage_buffers, 2);
         SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_translucent);
-        for (chunk_cubic_t* c : chunks_render_order)
-        {
-            if (!c->vbo || c->quad_count_translucent == 0 || !c->visible)
-                continue;
-            glm::vec3 translate(c->pos * glm::ivec3(SUBCHUNK_SIZE_X, SUBCHUNK_SIZE_Y, SUBCHUNK_SIZE_Z));
-            ubo_model_t ubo_model = { .model = glm::vec4(translate.x, translate.y, translate.z, 0.0f) };
-            SDL_PushGPUVertexUniformData(command_buffer, 2, &ubo_model, sizeof(ubo_model));
-            SDL_BindGPUVertexStorageBuffers(render_pass, 0, &c->vbo, 1);
-            SDL_DrawGPUPrimitives(render_pass, 4, c->quad_count_translucent, 0, c->quad_count + c->quad_count_overlay);
-        }
+        SDL_DrawGPUPrimitivesIndirect(render_pass, indirect_buffers.cmd_translucent, 0, indirect_buffers.cmd_translucent_len);
         SDL_PopGPUDebugGroup(command_buffer);
     }
 }
@@ -945,13 +989,32 @@ void level_t::mesh_queue_info_t::release_data()
     }
 }
 
+void level_t::transient_indirect_buffers_t::release()
+{
+    SDL_ReleaseGPUBuffer(state::gpu_device, pos);
+    SDL_ReleaseGPUBuffer(state::gpu_device, cmd_solid);
+    SDL_ReleaseGPUBuffer(state::gpu_device, cmd_overlay);
+    SDL_ReleaseGPUBuffer(state::gpu_device, cmd_translucent);
+
+    pos = nullptr;
+    cmd_solid = nullptr;
+    cmd_overlay = nullptr;
+    cmd_translucent = nullptr;
+
+    cmd_solid_len = 0;
+    cmd_overlay_len = 0;
+    cmd_translucent_len = 0;
+}
+
+level_t::transient_indirect_buffers_t::~transient_indirect_buffers_t() { release(); }
+
 level_t::~level_t()
 {
     for (auto it : mesh_queue)
         it.release_data();
 
     SDL_ReleaseGPUBuffer(state::gpu_device, missing_ent_ssbo);
-
+    SDL_ReleaseGPUBuffer(state::gpu_device, mesh_buffer);
     for (chunk_cubic_t* c : chunks_render_order)
         delete c;
 
