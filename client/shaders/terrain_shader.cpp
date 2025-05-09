@@ -153,7 +153,7 @@ void state::init_terrain_pipelines()
         cinfo_shader_frag_no_alpha_test.entrypoint = "main0";
         cinfo_shader_frag_no_alpha_test.code = terrain_frag_no_alpha_test_msl;
         cinfo_shader_frag_no_alpha_test.code_size = terrain_frag_no_alpha_test_msl_len;
-        cinfo_shader_frag_alpha_test.format = SDL_GPU_SHADERFORMAT_MSL;
+        cinfo_shader_frag_no_alpha_test.format = SDL_GPU_SHADERFORMAT_MSL;
     }
 
     if (!create_shader(shader_vert, cinfo_shader_vert, "Terrain shader (vert)"))
