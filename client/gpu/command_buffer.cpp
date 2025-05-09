@@ -22,6 +22,8 @@
  */
 #include "command_buffer.h"
 
+#include "gpu.h"
+
 #include "../state.h"
 #include "tetra/log.h"
 #include <map>

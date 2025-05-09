@@ -27,10 +27,6 @@
 namespace gpu
 {
 typedef struct fence_t fence_t;
-
-void init();
-
-void quit();
 }
 
 /* Command buffer operations */
