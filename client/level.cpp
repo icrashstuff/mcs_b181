@@ -676,7 +676,7 @@ void level_t::render_stage_render(
 {
     const int render_distance = (render_distance_override > 0) ? render_distance_override : r_render_distance.get();
 
-    glm::mat4 mat_proj = glm::perspective(glm::radians(fov), (float)win_size.x / (float)win_size.y, 0.03125f, render_distance * 32.0f);
+    glm::mat4 mat_proj = glm::perspective(glm::radians(fov), (float)win_size.x / (float)win_size.y, 1.f / 16.f, render_distance * 32.0f);
 
     glm::mat4 mat_cam = glm::lookAt(get_camera_pos(), get_camera_pos() + camera_direction, camera_up);
     damage_tilt = SDL_clamp(damage_tilt, 0.0f, 1.0f);
