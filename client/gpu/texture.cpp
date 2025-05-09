@@ -59,7 +59,9 @@ bool gpu::upload_to_texture2d(SDL_GPUCopyPass* const copy_pass, SDL_GPUTexture* 
 
     Uint32 buf_size = SDL_CalculateGPUTextureFormatSize(format, width, height, 1) >> (miplevel * 2);
 
-    SDL_GPUTransferBufferCreateInfo cinfo_tbo = { .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, .size = buf_size, .props = 0 };
+    SDL_GPUTransferBufferCreateInfo cinfo_tbo = {};
+    cinfo_tbo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    cinfo_tbo.size = buf_size;
 
     SDL_GPUTransferBuffer* tbo = SDL_CreateGPUTransferBuffer(state::gpu_device, &cinfo_tbo);
     {

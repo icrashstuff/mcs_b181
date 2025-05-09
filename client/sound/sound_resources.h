@@ -58,7 +58,7 @@ struct sound_info_t
 
         /** Used internally when selecting a sound */
         bool is_event : 1;
-    } flags = { .stream = 0, .is_event = 0 };
+    } flags = {};
 
     /** Sound category (Used for volume sliders) */
     sound_category_t category = sound_category_t::SOUND_CATEGORY_MASTER;

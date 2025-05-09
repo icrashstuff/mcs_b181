@@ -97,30 +97,17 @@ static void release_shader(SDL_GPUShader*& shader)
 void state::init_terrain_pipelines()
 {
     destroy_terrain_pipelines();
-    SDL_GPUShaderCreateInfo cinfo_shader_vert = {
-        .code_size = 0,
-        .code = NULL,
-        .entrypoint = "main",
-        .format = SDL_GPU_SHADERFORMAT_INVALID,
-        .stage = SDL_GPU_SHADERSTAGE_VERTEX,
-        .num_samplers = 0,
-        .num_storage_textures = 0,
-        .num_storage_buffers = 1,
-        .num_uniform_buffers = 3,
-        .props = 0,
-    };
-    SDL_GPUShaderCreateInfo cinfo_shader_frag_alpha_test = {
-        .code_size = 0,
-        .code = NULL,
-        .entrypoint = "main",
-        .format = SDL_GPU_SHADERFORMAT_INVALID,
-        .stage = SDL_GPU_SHADERSTAGE_FRAGMENT,
-        .num_samplers = 2,
-        .num_storage_textures = 0,
-        .num_storage_buffers = 0,
-        .num_uniform_buffers = 1,
-        .props = 0,
-    };
+    SDL_GPUShaderCreateInfo cinfo_shader_vert = {};
+    cinfo_shader_vert.entrypoint = "main";
+    cinfo_shader_vert.stage = SDL_GPU_SHADERSTAGE_VERTEX;
+    cinfo_shader_vert.num_storage_buffers = 2;
+    cinfo_shader_vert.num_uniform_buffers = 2;
+
+    SDL_GPUShaderCreateInfo cinfo_shader_frag_alpha_test = {};
+    cinfo_shader_frag_alpha_test.entrypoint = "main";
+    cinfo_shader_frag_alpha_test.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
+    cinfo_shader_frag_alpha_test.num_samplers = 2;
+    cinfo_shader_frag_alpha_test.num_uniform_buffers = 1;
     SDL_GPUShaderCreateInfo cinfo_shader_frag_no_alpha_test = cinfo_shader_frag_alpha_test;
 
     SDL_GPUShaderFormat formats = SDL_GetGPUShaderFormats(state::gpu_device);
@@ -165,15 +152,15 @@ void state::init_terrain_pipelines()
     if (!create_shader(shader_frag_alpha_test, cinfo_shader_frag_alpha_test, "Terrain shader (frag) (Alpha test)"))
         return;
 
-    SDL_GPUVertexAttribute vertex_attributes[] = {};
+    SDL_GPUVertexAttribute vertex_attributes = {};
 
-    SDL_GPUVertexBufferDescription vertex_buffer_descriptions[] = {};
+    SDL_GPUVertexBufferDescription vertex_buffer_descriptions = {};
 
     SDL_GPUVertexInputState vertex_input_state = {};
-    vertex_input_state.vertex_buffer_descriptions = vertex_buffer_descriptions;
-    vertex_input_state.num_vertex_buffers = SDL_arraysize(vertex_buffer_descriptions);
-    vertex_input_state.vertex_attributes = vertex_attributes;
-    vertex_input_state.num_vertex_attributes = SDL_arraysize(vertex_attributes);
+    vertex_input_state.vertex_buffer_descriptions = &vertex_buffer_descriptions;
+    vertex_input_state.num_vertex_buffers = 0;
+    vertex_input_state.vertex_attributes = &vertex_attributes;
+    vertex_input_state.num_vertex_attributes = 0;
 
     SDL_GPURasterizerState rasterizer_state = {};
     rasterizer_state.fill_mode = SDL_GPU_FILLMODE_FILL;
@@ -214,17 +201,15 @@ void state::init_terrain_pipelines()
     target_info.depth_stencil_format = state::gpu_tex_format_best_depth_only;
     target_info.has_depth_stencil_target = 1;
 
-    SDL_GPUGraphicsPipelineCreateInfo cinfo_pipeline = {
-        .vertex_shader = shader_vert,
-        .fragment_shader = shader_frag_alpha_test,
-        .vertex_input_state = vertex_input_state,
-        .primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLESTRIP,
-        .rasterizer_state = rasterizer_state,
-        .multisample_state = multisample_state,
-        .depth_stencil_state = depth_stencil_state,
-        .target_info = target_info,
-        .props = 0,
-    };
+    SDL_GPUGraphicsPipelineCreateInfo cinfo_pipeline = {};
+    cinfo_pipeline.vertex_shader = shader_vert;
+    cinfo_pipeline.fragment_shader = shader_frag_alpha_test;
+    cinfo_pipeline.vertex_input_state = vertex_input_state;
+    cinfo_pipeline.primitive_type = SDL_GPU_PRIMITIVETYPE_TRIANGLESTRIP;
+    cinfo_pipeline.rasterizer_state = rasterizer_state;
+    cinfo_pipeline.multisample_state = multisample_state;
+    cinfo_pipeline.depth_stencil_state = depth_stencil_state;
+    cinfo_pipeline.target_info = target_info;
 
     cinfo_pipeline.fragment_shader = shader_frag_alpha_test;
     cinfo_pipeline.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS;

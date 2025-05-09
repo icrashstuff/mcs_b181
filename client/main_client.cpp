@@ -1194,29 +1194,25 @@ static void loop_stage_render(
     tinfo_color.mip_level = 0;
     tinfo_color.layer_or_depth_plane = 0;
     tinfo_color.cycle = false;
-    SDL_GPUTextureCreateInfo cinfo_depth_tex = {
-        .type = SDL_GPU_TEXTURETYPE_2D,
-        .format = state::gpu_tex_format_best_depth_only,
-        .usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET,
-        .width = Uint32(win_size.x),
-        .height = Uint32(win_size.y),
-        .layer_count_or_depth = 1,
-        .num_levels = 1,
-        .sample_count = SDL_GPU_SAMPLECOUNT_1,
-        .props = 0,
-    };
-    SDL_GPUDepthStencilTargetInfo tinfo_depth = {
-        .texture = SDL_CreateGPUTexture(state::gpu_device, &cinfo_depth_tex),
-        .clear_depth = 1.0,
-        .load_op = SDL_GPU_LOADOP_CLEAR,
-        .store_op = SDL_GPU_STOREOP_DONT_CARE,
-        .stencil_load_op = SDL_GPU_LOADOP_DONT_CARE,
-        .stencil_store_op = SDL_GPU_STOREOP_DONT_CARE,
-        .cycle = 0,
-        .clear_stencil = 0,
-        .padding1 = 0,
-        .padding2 = 0,
-    };
+
+    SDL_GPUTextureCreateInfo cinfo_depth_tex = {};
+    cinfo_depth_tex.type = SDL_GPU_TEXTURETYPE_2D;
+    cinfo_depth_tex.format = state::gpu_tex_format_best_depth_only;
+    cinfo_depth_tex.usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET;
+    cinfo_depth_tex.width = Uint32(win_size.x);
+    cinfo_depth_tex.height = Uint32(win_size.y);
+    cinfo_depth_tex.layer_count_or_depth = 1;
+    cinfo_depth_tex.num_levels = 1;
+
+    SDL_GPUDepthStencilTargetInfo tinfo_depth = {};
+    tinfo_depth.texture = SDL_CreateGPUTexture(state::gpu_device, &cinfo_depth_tex);
+    tinfo_depth.clear_depth = 1.0;
+    tinfo_depth.load_op = SDL_GPU_LOADOP_CLEAR;
+    tinfo_depth.store_op = SDL_GPU_STOREOP_DONT_CARE;
+    tinfo_depth.stencil_load_op = SDL_GPU_LOADOP_DONT_CARE;
+    tinfo_depth.stencil_store_op = SDL_GPU_STOREOP_DONT_CARE;
+    tinfo_depth.clear_stencil = 0;
+
     SDL_GPURenderPass* render_pass = SDL_BeginGPURenderPass(gpu_command_buffer, &tinfo_color, 1, &tinfo_depth);
     SDL_ReleaseGPUTexture(state::gpu_device, tinfo_depth.texture);
 

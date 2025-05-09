@@ -57,7 +57,9 @@ bool gpu::upload_to_buffer(SDL_GPUCopyPass* const copy_pass, SDL_GPUBuffer* cons
     if (!copy_pass || !buffer || !size || !copy_callback)
         return false;
 
-    SDL_GPUTransferBufferCreateInfo cinfo_tbo = { .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD, .size = size, .props = 0 };
+    SDL_GPUTransferBufferCreateInfo cinfo_tbo = {};
+    cinfo_tbo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
+    cinfo_tbo.size = size;
 
     SDL_GPUTransferBuffer* tbo = SDL_CreateGPUTransferBuffer(state::gpu_device, &cinfo_tbo);
     {

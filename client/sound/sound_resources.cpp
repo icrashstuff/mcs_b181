@@ -128,7 +128,7 @@ void sound_resources_t::parse_sound_json(const std::string& domain, const std::s
         /* Find or emplace a new event object */
         auto it_map = sounds.find(info_event.id_sound);
         if (it_map == sounds.end())
-            it_map = sounds.insert(it_map, std::pair(info_event.id_sound, sound_event_t { .total_weight = 0, .entries = std::vector<sound_info_t>() }));
+            it_map = sounds.insert(it_map, std::pair(info_event.id_sound, sound_event_t {}));
 
         /* Clear event object if requested */
         if (node_event.get("replace").toBool(0))
