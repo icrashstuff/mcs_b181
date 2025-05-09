@@ -1511,7 +1511,7 @@ static client_menu_return_t do_menu_convars(mc_gui::mc_gui_ctx* ctx)
     if (!convars.size())
     {
         convars.insert(convars.end(), convar_t::get_convar_list()->begin(), convar_t::get_convar_list()->end());
-        std::sort(convars.begin(), convars.end(), [](convar_t* const a, convar_t* const b) { return strcmp(a->get_name(), b->get_name()) <= 0; });
+        std::sort(convars.begin(), convars.end(), [](convar_t* const a, convar_t* const b) -> bool { return strcmp(a->get_name(), b->get_name()) < 0; });
     }
 
     for (auto cvr : convars)
