@@ -1971,7 +1971,7 @@ static void upload_debug_texture(SDL_GPUCopyPass* const copy_pass)
             }
     };
 
-    if (gpu::upload_to_texture2d(copy_pass, state::gpu_debug_texture, tex_info.format, 0, 0, 32, 32, upload_func, false))
+    if (!gpu::upload_to_texture2d(copy_pass, state::gpu_debug_texture, tex_info.format, 0, 0, 32, 32, upload_func, false))
         util::die("Failed to to upload debug texture");
 }
 
