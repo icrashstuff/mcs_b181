@@ -324,7 +324,7 @@ struct level_t
     inventory_player_t inventory;
 
     Sint64 mc_seed = 0;
-    long mc_time = 0;
+    Sint64 mc_time = 0;
 
     /** Used for the ambience sounds (https://minecraft.wiki/w/Ambience#Mood_algorithm) */
     float mood = 0;
