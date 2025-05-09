@@ -29,107 +29,50 @@
 #include "tetra/log.h"
 #include "tetra/util/stbi.h"
 
+#include "../gpu/gpu.h"
+
 #include "tetra/gui/imgui_internal.h"
 
 #include <vector>
 
 static ImTextureID load_texture(SDL_GPUCopyPass* copy_pass, const void* data, const Uint32 x, const Uint32 y, std::string label, SDL_GPUSamplerAddressMode edge)
 {
+    SDL_GPUTextureSamplerBinding* sampler_binding = new SDL_GPUTextureSamplerBinding {};
+    sampler_binding->texture = state::gpu_debug_texture;
+    sampler_binding->sampler = state::gpu_debug_sampler;
     if (!data || x == 0 || y == 0 || !copy_pass)
-        return reinterpret_cast<ImTextureID>(new SDL_GPUTextureSamplerBinding {
-            .texture = state::gpu_debug_texture,
-            .sampler = state::gpu_debug_sampler,
-        });
+        return reinterpret_cast<ImTextureID>(sampler_binding);
 
-    SDL_GPUTextureCreateInfo tex_info = {
-        .type = SDL_GPU_TEXTURETYPE_2D,
-        .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
-        .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER,
-        .width = x,
-        .height = y,
-        .layer_count_or_depth = 1,
-        .num_levels = 1,
-        .sample_count = SDL_GPU_SAMPLECOUNT_1,
-        .props = SDL_CreateProperties(),
-    };
+    SDL_GPUTextureCreateInfo tex_info = {};
+    tex_info.type = SDL_GPU_TEXTURETYPE_2D;
+    tex_info.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+    tex_info.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+    tex_info.width = x;
+    tex_info.height = y;
+    tex_info.layer_count_or_depth = 1;
+    tex_info.num_levels = 1;
 
-    SDL_GPUSamplerCreateInfo sampler_info;
-    SDL_zero(sampler_info);
+    SDL_GPUSamplerCreateInfo sampler_info = {};
     sampler_info.min_filter = SDL_GPU_FILTER_LINEAR;
     sampler_info.mag_filter = SDL_GPU_FILTER_NEAREST;
     sampler_info.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
-    sampler_info.address_mode_u = edge;
-    sampler_info.address_mode_v = edge;
+    sampler_info.address_mode_u = sampler_info.address_mode_v = edge;
     sampler_info.props = SDL_CreateProperties();
 
     SDL_SetStringProperty(tex_info.props, SDL_PROP_GPU_TEXTURE_CREATE_NAME_STRING, (label + " (Texture)").c_str());
     SDL_SetStringProperty(sampler_info.props, SDL_PROP_GPU_SAMPLER_CREATE_NAME_STRING, (label + " (Sampler)").c_str());
 
-    SDL_GPUTransferBuffer* tbo = nullptr;
-    SDL_GPUTextureSamplerBinding* sampler_binding = new SDL_GPUTextureSamplerBinding();
-    if ((sampler_binding->texture = SDL_CreateGPUTexture(state::gpu_device, &tex_info)) == nullptr)
-    {
-        dc_log_error("Failed to acquire texture! SDL_CreateGPUTexture: %s", SDL_GetError());
+    if (!(sampler_binding->texture = gpu::create_texture(tex_info, "%s (Texture)", label.c_str())))
         sampler_binding->texture = state::gpu_debug_texture;
-    }
-    else /* Texture created: Acquire transfer buffer */
-    {
-        SDL_GPUTransferBufferCreateInfo tbo_info {
-            .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
-            .size = x * y * 4,
-            .props = SDL_CreateProperties(),
-        };
-        SDL_SetStringProperty(tbo_info.props, SDL_PROP_GPU_TRANSFERBUFFER_CREATE_NAME_STRING, (label + " (TBO)").c_str());
-        tbo = SDL_CreateGPUTransferBuffer(state::gpu_device, &tbo_info);
-        if (!tbo)
-            dc_log_error("Failed to acquire transfer buffer, SDL_CreateGPUTransferBuffer: %s", SDL_GetError());
-    }
 
-    if ((sampler_binding->sampler = SDL_CreateGPUSampler(state::gpu_device, &sampler_info)) == nullptr)
-    {
-        dc_log_error("Failed to acquire sampler! SDL_CreateGPUSampler: %s", SDL_GetError());
+    if (!(sampler_binding->sampler = gpu::create_sampler(sampler_info, "%s (Sampler)", label.c_str())))
         sampler_binding->sampler = state::gpu_debug_sampler;
-    }
 
-    void* tbo_pointer = nullptr;
-    if (tbo) /* Map transfer buffer */
+    if (sampler_binding->texture && sampler_binding->texture != state::gpu_debug_texture)
     {
-        tbo_pointer = SDL_MapGPUTransferBuffer(state::gpu_device, tbo, false);
-        if (!tbo_pointer)
-            dc_log_error("Failed to map transfer buffer, SDL_MapGPUTransferBuffer: %s", SDL_GetError());
+        if (!gpu::upload_to_texture2d(copy_pass, sampler_binding->texture, tex_info.format, 0, 0, x, y, data, false))
+            dc_log_error("Failed to upload texture!");
     }
-
-    if (tbo_pointer) /* Copy data to transfer buffer */
-    {
-        memcpy(tbo_pointer, data, x * y * 4);
-
-        SDL_UnmapGPUTransferBuffer(state::gpu_device, tbo);
-        tbo_pointer = nullptr;
-
-        SDL_GPUTextureTransferInfo region_tbo = {
-            .transfer_buffer = tbo,
-            .offset = 0,
-            .pixels_per_row = tex_info.width,
-            .rows_per_layer = tex_info.height,
-        };
-
-        SDL_GPUTextureRegion region_tex = {
-            .texture = sampler_binding->texture,
-            .mip_level = 0,
-            .layer = 0,
-            .x = 0,
-            .y = 0,
-            .z = 0,
-            .w = tex_info.width,
-            .h = tex_info.height,
-            .d = 1,
-        };
-
-        SDL_UploadToGPUTexture(copy_pass, &region_tbo, &region_tex, false);
-    }
-
-    if (tbo)
-        SDL_ReleaseGPUTransferBuffer(state::gpu_device, tbo);
 
     return reinterpret_cast<ImTextureID>(sampler_binding);
 }
