@@ -23,6 +23,7 @@
 #include "buffer.h"
 
 #include "../state.h"
+#include "tetra/log.h"
 #include "tetra/util/stb_sprintf.h"
 
 SDL_GPUBuffer* gpu::create_buffer(const SDL_GPUBufferCreateInfo& cinfo, const char* fmt, ...)
@@ -46,6 +47,9 @@ SDL_GPUBuffer* gpu::create_buffer(const SDL_GPUBufferCreateInfo& cinfo, const ch
 
     SDL_GPUBuffer* ret = SDL_CreateGPUBuffer(state::gpu_device, &cinfo_named);
 
+    if (!ret)
+        dc_log_error("Failed to acquire buffer! SDL_CreateGPUBuffer: %s", SDL_GetError());
+
     SDL_DestroyProperties(cinfo_named.props);
 
     return ret;
@@ -62,10 +66,16 @@ bool gpu::upload_to_buffer(SDL_GPUCopyPass* const copy_pass, SDL_GPUBuffer* cons
     cinfo_tbo.size = size;
 
     SDL_GPUTransferBuffer* tbo = SDL_CreateGPUTransferBuffer(state::gpu_device, &cinfo_tbo);
+    if (!tbo)
+    {
+        dc_log_error("Failed to create transfer buffer! SDL_CreateGPUTransferBuffer: %s", SDL_GetError());
+        return false;
+    }
     {
         void* tbo_pointer = SDL_MapGPUTransferBuffer(state::gpu_device, tbo, 0);
         if (!tbo_pointer)
         {
+            dc_log_error("Failed to map transfer buffer! SDL_MapGPUTransferBuffer: %s", SDL_GetError());
             SDL_ReleaseGPUTransferBuffer(state::gpu_device, tbo);
             return false;
         }

@@ -23,6 +23,7 @@
 #include "texture.h"
 
 #include "../state.h"
+#include "tetra/log.h"
 #include "tetra/util/stb_sprintf.h"
 
 SDL_GPUTexture* gpu::create_texture(const SDL_GPUTextureCreateInfo& cinfo, const char* fmt, ...)
@@ -46,6 +47,9 @@ SDL_GPUTexture* gpu::create_texture(const SDL_GPUTextureCreateInfo& cinfo, const
 
     SDL_GPUTexture* ret = SDL_CreateGPUTexture(state::gpu_device, &cinfo_named);
 
+    if (!ret)
+        dc_log_error("Failed to acquire texture! SDL_CreateGPUTexture: %s", SDL_GetError());
+
     SDL_DestroyProperties(cinfo_named.props);
 
     return ret;
@@ -64,10 +68,16 @@ bool gpu::upload_to_texture2d(SDL_GPUCopyPass* const copy_pass, SDL_GPUTexture* 
     cinfo_tbo.size = buf_size;
 
     SDL_GPUTransferBuffer* tbo = SDL_CreateGPUTransferBuffer(state::gpu_device, &cinfo_tbo);
+    if (!tbo)
+    {
+        dc_log_error("Failed to create transfer buffer! SDL_CreateGPUTransferBuffer: %s", SDL_GetError());
+        return false;
+    }
     {
         void* tbo_pointer = SDL_MapGPUTransferBuffer(state::gpu_device, tbo, 0);
         if (!tbo_pointer)
         {
+            dc_log_error("Failed to map transfer buffer! SDL_MapGPUTransferBuffer: %s", SDL_GetError());
             SDL_ReleaseGPUTransferBuffer(state::gpu_device, tbo);
             return false;
         }
