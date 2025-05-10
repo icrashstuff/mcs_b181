@@ -185,7 +185,7 @@ public:
      * @param func Callback function
      * @param call Whether to call the callback after setting it
      */
-    void set_post_callback(std::function<void()>, bool call = false);
+    void set_post_callback(std::function<void()> func, bool call = false);
 
     void log_help();
 
@@ -253,7 +253,7 @@ public:
      * @param func Callback function
      * @param call Whether to call the callback after setting it
      */
-    void set_post_callback(std::function<void()>, bool call = false);
+    void set_post_callback(std::function<void()> func, bool call = false);
 
     void log_help();
 
@@ -314,7 +314,7 @@ public:
      * @param func Callback function
      * @param call Whether to call the callback after setting it
      */
-    void set_post_callback(std::function<void()>, bool call = false);
+    void set_post_callback(std::function<void()> func, bool call = false);
 
     void log_help();
 
