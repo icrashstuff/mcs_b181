@@ -36,8 +36,16 @@
 #include "tetra/util/convar.h"
 
 static convar_float_t r_light_brightness("r_light_brightness", 0.0, 0.0, 1.0, "Lightmap base brightness", CONVAR_FLAG_SAVE);
-
-SDL_FORCE_INLINE float curve(const float base, const float x) { return (glm::pow(base, x) - 1) / (base - 1); }
+static convar_float_t r_lightmap_gamma {
+    "r_light_gamma",
+    2.2,
+    0.1,
+    10.0,
+    "Lightmap gamma (y) value\n"
+    "If confused, read: https://learnopengl.com/Advanced-Lighting/Gamma-Correction\n"
+    "And/or read: https://blog.johnnovak.net/2016/09/21/what-every-coder-should-know-about-gamma/",
+    CONVAR_FLAG_SAVE,
+};
 
 lightmap_t::lightmap_t(const lightmap_preset_t preset)
 {
@@ -118,6 +126,7 @@ void lightmap_t::imgui_contents()
     ImGui::PlotLines("mix_for_time_of_day", mixes, SDL_arraysize(mixes), 0, NULL, 0.0f, 1.0f, ImVec2(0, 64));
 
     r_light_brightness.imgui_edit();
+    r_lightmap_gamma.imgui_edit();
 
     ImGui::SliderFloat("Flicker Strength", &flicker_strength, 0.0f, 1.0f);
     ImGui::SliderFloat("Flicker Midpoint", &flicker_midpoint, 0.0f, 1.0f);
@@ -191,35 +200,33 @@ void lightmap_t::update(SDL_GPUCopyPass* const copy_pass)
     if (time_of_day_override > -1)
         time_of_day = time_of_day_override;
 
-    float mix = mix_for_time_of_day(time_of_day);
-
     float flick = flicker_value * SDL_fabsf(flicker_value) * flicker_strength * 0.5f + flicker_midpoint;
 
-    float gamma = r_light_brightness.get();
+    float gamma = r_lightmap_gamma.get();
+
+    glm::vec3 sky_mix = glm::mix(color_night, color_day, mix_for_time_of_day(time_of_day));
 
     for (int y = 0; y < height; y++)
     {
+        const float v = y / float(height - 1);
+        const float v_gamma = glm::pow(v, gamma);
         for (int x = 0; x < width; x++)
         {
             const float u = x / float(width - 1);
-            const float v = y / float(height - 1);
+            const float u_gamma = glm::pow(u, gamma);
 
             /* Block Light */
-            float r = curve(8.0f, u * 1.2f) * color_block.r * flick;
-            float g = curve(8.0f, u * 1.2f) * color_block.g * flick;
-            float b = curve(8.0f, u * 1.2f) * color_block.b * flick;
+            float r = u_gamma * color_block.r * flick;
+            float g = u_gamma * color_block.g * flick;
+            float b = u_gamma * color_block.b * flick;
 
-            r += curve(32, v) * glm::mix(color_night.r, color_day.r, mix);
-            g += curve(32, v) * glm::mix(color_night.g, color_day.g, mix);
-            b += curve(32, v) * glm::mix(color_night.b, color_day.b, mix);
+            r += v_gamma * sky_mix.r;
+            g += v_gamma * sky_mix.g;
+            b += v_gamma * sky_mix.b;
 
             r = (r + color_minimum.r) / (1.0f + color_minimum.r);
             g = (g + color_minimum.g) / (1.0f + color_minimum.g);
             b = (b + color_minimum.b) / (1.0f + color_minimum.b);
-
-            r = (r + gamma) / (1.0f + gamma);
-            g = (g + gamma) / (1.0f + gamma);
-            b = (b + gamma) / (1.0f + gamma);
 
             dat[(y * width + x) * 4 + 0] = SDL_clamp(r, 0.0f, 1.0f) * 255;
             dat[(y * width + x) * 4 + 1] = SDL_clamp(g, 0.0f, 1.0f) * 255;
@@ -252,21 +259,10 @@ void lightmap_t::update(SDL_GPUCopyPass* const copy_pass)
 
     if (!sampler_linear || !sampler_nearest)
     {
-        SDL_GPUSamplerCreateInfo cinfo_sampler = {
-            .min_filter = SDL_GPU_FILTER_LINEAR,
-            .mag_filter = SDL_GPU_FILTER_LINEAR,
-            .mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR,
-            .address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE,
-            .address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE,
-            .address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE,
-            .mip_lod_bias = 0.0f,
-            .max_anisotropy = 0.0f,
-            .compare_op = SDL_GPU_COMPAREOP_INVALID,
-            .min_lod = 0,
-            .max_lod = 0,
-            .enable_anisotropy = 0,
-            .enable_compare = 0,
-        };
+        SDL_GPUSamplerCreateInfo cinfo_sampler = {};
+        cinfo_sampler.min_filter = SDL_GPU_FILTER_LINEAR;
+        cinfo_sampler.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
+        cinfo_sampler.address_mode_u = cinfo_sampler.address_mode_v = cinfo_sampler.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
 
         cinfo_sampler.mag_filter = SDL_GPU_FILTER_LINEAR;
         if (!sampler_linear)
