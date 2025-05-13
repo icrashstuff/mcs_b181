@@ -28,6 +28,13 @@
 namespace gpu
 {
 /**
+ * Get GPU shader formats
+ *
+ * @returns a bit-flag of the shader formats supported by the current GPU device
+ */
+SDL_GPUShaderFormat get_shader_formats();
+
+/**
  * Create a named GPU Shader
  *
  * @param cinfo Creation info

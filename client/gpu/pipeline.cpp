@@ -30,3 +30,5 @@ CREATE_FUNC_DEF(create, ComputePipeline, SDL_PROP_GPU_COMPUTEPIPELINE_CREATE_NAM
 RELEASE_FUNC_DEF(release, Shader);
 RELEASE_FUNC_DEF(release, GraphicsPipeline);
 RELEASE_FUNC_DEF(release, ComputePipeline);
+
+SDL_GPUShaderFormat gpu::get_shader_formats() { return SDL_GetGPUShaderFormats(state::gpu_device); }
