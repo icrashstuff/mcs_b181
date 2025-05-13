@@ -212,7 +212,7 @@ void state::init_terrain_pipelines()
     cinfo_pipeline.target_info = target_info;
 
     cinfo_pipeline.fragment_shader = shader_frag_alpha_test;
-    cinfo_pipeline.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS;
+    cinfo_pipeline.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_GREATER;
     cinfo_pipeline.depth_stencil_state.enable_depth_test = 1;
     cinfo_pipeline.depth_stencil_state.enable_depth_write = 1;
     color_target_desc[0].blend_state.enable_blend = 0;
@@ -226,7 +226,7 @@ void state::init_terrain_pipelines()
     create_pipeline(pipeline_shader_terrain_overlay, cinfo_pipeline, "Terrain pipeline (overlay)");
 
     cinfo_pipeline.fragment_shader = shader_frag_no_alpha_test;
-    cinfo_pipeline.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_LESS;
+    cinfo_pipeline.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_GREATER;
     cinfo_pipeline.depth_stencil_state.enable_depth_test = 1;
     cinfo_pipeline.depth_stencil_state.enable_depth_write = 1;
     color_target_desc[0].blend_state.enable_blend = 0;

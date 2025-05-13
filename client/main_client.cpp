@@ -1206,7 +1206,7 @@ static void loop_stage_render(
 
     SDL_GPUDepthStencilTargetInfo tinfo_depth = {};
     tinfo_depth.texture = SDL_CreateGPUTexture(state::gpu_device, &cinfo_depth_tex);
-    tinfo_depth.clear_depth = 1.0;
+    tinfo_depth.clear_depth = 0.0f;
     tinfo_depth.load_op = SDL_GPU_LOADOP_CLEAR;
     tinfo_depth.store_op = SDL_GPU_STOREOP_DONT_CARE;
     tinfo_depth.stencil_load_op = SDL_GPU_LOADOP_DONT_CARE;
