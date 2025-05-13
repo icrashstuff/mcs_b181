@@ -22,12 +22,14 @@
  */
 #include "buffer.h"
 
-#include "../state.h"
-#include "tetra/log.h"
-#include "tetra/util/stb_sprintf.h"
+#include "internal.h"
 
+RELEASE_FUNC_DEF(release_buffer, Buffer);
+
+// CREATE_FUNC_DEF(create_buffer, Buffer, SDL_PROP_GPU_BUFFER_CREATE_NAME_STRING);
 SDL_GPUBuffer* gpu::create_buffer(const SDL_GPUBufferCreateInfo& cinfo, const char* fmt, ...)
 {
+    /* This check is the reason CREATE_FUNC_DEF() is not used */
     if (cinfo.size == 0)
         return nullptr;
 
@@ -113,11 +115,4 @@ bool gpu::upload_to_buffer(
             memcpy(tbo_data, data, SDL_min(size, tbo_size));
         },
         cycle);
-}
-
-void gpu::release_buffer(SDL_GPUBuffer*& buffer, const bool set_buffer_to_null)
-{
-    SDL_ReleaseGPUBuffer(state::gpu_device, buffer);
-    if (set_buffer_to_null)
-        buffer = nullptr;
 }

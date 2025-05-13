@@ -27,7 +27,8 @@
 #include "terrain.vert.msl.h"
 #include "terrain.vert.spv.h"
 
-#include "../state.h"
+#include "client/gpu/pipeline.h"
+#include "client/state.h"
 #include "terrain_shader.h"
 #include "tetra/log.h"
 #include <SDL3/SDL.h>
@@ -40,58 +41,6 @@ SDL_GPUGraphicsPipeline* state::pipeline_shader_terrain_translucent_depth = null
 static SDL_GPUShader* shader_vert = nullptr;
 static SDL_GPUShader* shader_frag_alpha_test = nullptr;
 static SDL_GPUShader* shader_frag_no_alpha_test = nullptr;
-
-static bool create_shader(SDL_GPUShader*& shader, SDL_GPUShaderCreateInfo& cinfo, const char* name)
-{
-    cinfo.props = SDL_CreateProperties();
-    SDL_SetStringProperty(cinfo.props, SDL_PROP_GPU_SHADER_CREATE_NAME_STRING, name);
-    SDL_ClearError();
-
-    shader = SDL_CreateGPUShader(state::gpu_device, &cinfo);
-    if (!shader)
-        dc_log_error("Error creating shader \"%s\": %s", name, SDL_GetError());
-
-    SDL_DestroyProperties(cinfo.props);
-
-    cinfo.props = 0;
-
-    if (!shader)
-        return false;
-    else
-        return true;
-}
-
-static bool create_pipeline(SDL_GPUGraphicsPipeline*& pipeline, SDL_GPUGraphicsPipelineCreateInfo& cinfo, const char* name)
-{
-    cinfo.props = SDL_CreateProperties();
-    SDL_SetStringProperty(cinfo.props, SDL_PROP_GPU_GRAPHICSPIPELINE_CREATE_NAME_STRING, name);
-    SDL_ClearError();
-
-    pipeline = SDL_CreateGPUGraphicsPipeline(state::gpu_device, &cinfo);
-    if (!pipeline)
-        dc_log_error("Error creating shader \"%s\": %s", name, SDL_GetError());
-
-    SDL_DestroyProperties(cinfo.props);
-
-    cinfo.props = 0;
-
-    if (!pipeline)
-        return false;
-    else
-        return true;
-}
-
-static void release_pipeline(SDL_GPUGraphicsPipeline*& pipeline)
-{
-    SDL_ReleaseGPUGraphicsPipeline(state::gpu_device, pipeline);
-    pipeline = nullptr;
-}
-
-static void release_shader(SDL_GPUShader*& shader)
-{
-    SDL_ReleaseGPUShader(state::gpu_device, shader);
-    shader = nullptr;
-}
 
 #include <stdio.h>
 void state::init_terrain_pipelines()
@@ -143,13 +92,13 @@ void state::init_terrain_pipelines()
         cinfo_shader_frag_no_alpha_test.format = SDL_GPU_SHADERFORMAT_MSL;
     }
 
-    if (!create_shader(shader_vert, cinfo_shader_vert, "Terrain shader (vert)"))
+    if (!(shader_vert = gpu::create(cinfo_shader_vert, "Terrain shader (vert)")))
         return;
 
-    if (!create_shader(shader_frag_no_alpha_test, cinfo_shader_frag_no_alpha_test, "Terrain shader (frag) (No alpha test)"))
+    if (!(shader_frag_no_alpha_test = gpu::create(cinfo_shader_frag_no_alpha_test, "Terrain shader (frag) (No alpha test)")))
         return;
 
-    if (!create_shader(shader_frag_alpha_test, cinfo_shader_frag_alpha_test, "Terrain shader (frag) (Alpha test)"))
+    if (!(shader_frag_alpha_test = gpu::create(cinfo_shader_frag_alpha_test, "Terrain shader (frag) (Alpha test)")))
         return;
 
     SDL_GPUVertexAttribute vertex_attributes = {};
@@ -216,14 +165,14 @@ void state::init_terrain_pipelines()
     cinfo_pipeline.depth_stencil_state.enable_depth_test = 1;
     cinfo_pipeline.depth_stencil_state.enable_depth_write = 1;
     color_target_desc[0].blend_state.enable_blend = 0;
-    create_pipeline(pipeline_shader_terrain_opaque, cinfo_pipeline, "Terrain pipeline (opaque)");
+    pipeline_shader_terrain_opaque = gpu::create(cinfo_pipeline, "Terrain pipeline (opaque)");
 
     cinfo_pipeline.fragment_shader = shader_frag_alpha_test;
     cinfo_pipeline.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_EQUAL;
     cinfo_pipeline.depth_stencil_state.enable_depth_test = 1;
     cinfo_pipeline.depth_stencil_state.enable_depth_write = 0;
     color_target_desc[0].blend_state.enable_blend = 0;
-    create_pipeline(pipeline_shader_terrain_overlay, cinfo_pipeline, "Terrain pipeline (overlay)");
+    pipeline_shader_terrain_overlay = gpu::create(cinfo_pipeline, "Terrain pipeline (overlay)");
 
     cinfo_pipeline.fragment_shader = shader_frag_no_alpha_test;
     cinfo_pipeline.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_GREATER;
@@ -232,7 +181,7 @@ void state::init_terrain_pipelines()
     color_target_desc[0].blend_state.enable_blend = 0;
     color_target_desc[0].blend_state.enable_color_write_mask = 1;
     color_target_desc[0].blend_state.color_write_mask = 0;
-    create_pipeline(pipeline_shader_terrain_translucent_depth, cinfo_pipeline, "Terrain pipeline (translucent depth-only)");
+    pipeline_shader_terrain_translucent_depth = gpu::create(cinfo_pipeline, "Terrain pipeline (translucent depth-only)");
 
     cinfo_pipeline.fragment_shader = shader_frag_no_alpha_test;
     cinfo_pipeline.depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_EQUAL;
@@ -240,16 +189,16 @@ void state::init_terrain_pipelines()
     cinfo_pipeline.depth_stencil_state.enable_depth_write = 0;
     color_target_desc[0].blend_state.enable_blend = 1;
     color_target_desc[0].blend_state.enable_color_write_mask = 0;
-    create_pipeline(pipeline_shader_terrain_translucent, cinfo_pipeline, "Terrain pipeline (translucent)");
+    pipeline_shader_terrain_translucent = gpu::create(cinfo_pipeline, "Terrain pipeline (translucent)");
 }
 
 void state::destroy_terrain_pipelines()
 {
-    release_pipeline(pipeline_shader_terrain_opaque);
-    release_pipeline(pipeline_shader_terrain_overlay);
-    release_pipeline(pipeline_shader_terrain_translucent);
-    release_pipeline(pipeline_shader_terrain_translucent_depth);
-    release_shader(shader_vert);
-    release_shader(shader_frag_alpha_test);
-    release_shader(shader_frag_no_alpha_test);
+    gpu::release(pipeline_shader_terrain_opaque);
+    gpu::release(pipeline_shader_terrain_overlay);
+    gpu::release(pipeline_shader_terrain_translucent);
+    gpu::release(pipeline_shader_terrain_translucent_depth);
+    gpu::release(shader_vert);
+    gpu::release(shader_frag_alpha_test);
+    gpu::release(shader_frag_no_alpha_test);
 }

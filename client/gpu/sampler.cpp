@@ -22,38 +22,7 @@
  */
 #include "sampler.h"
 
-#include "../state.h"
-#include "tetra/util/stb_sprintf.h"
+#include "internal.h"
 
-SDL_GPUSampler* gpu::create_sampler(const SDL_GPUSamplerCreateInfo& cinfo, const char* fmt, ...)
-{
-    SDL_GPUSamplerCreateInfo cinfo_named = cinfo;
-    cinfo_named.props = SDL_CreateProperties();
-    if (cinfo.props)
-        SDL_CopyProperties(cinfo.props, cinfo_named.props);
-
-    if (fmt)
-    {
-        char name[1024] = "";
-
-        va_list args;
-        va_start(args, fmt);
-        stbsp_vsnprintf(name, SDL_arraysize(name), fmt, args);
-        va_end(args);
-
-        SDL_SetStringProperty(cinfo_named.props, SDL_PROP_GPU_SAMPLER_CREATE_NAME_STRING, name);
-    }
-
-    SDL_GPUSampler* ret = SDL_CreateGPUSampler(state::gpu_device, &cinfo_named);
-
-    SDL_DestroyProperties(cinfo_named.props);
-
-    return ret;
-}
-
-void gpu::release_sampler(SDL_GPUSampler*& sampler, const bool set_sampler_to_null)
-{
-    SDL_ReleaseGPUSampler(state::gpu_device, sampler);
-    if (set_sampler_to_null)
-        sampler = nullptr;
-}
+CREATE_FUNC_DEF(create_sampler, Sampler, SDL_PROP_GPU_SAMPLER_CREATE_NAME_STRING);
+RELEASE_FUNC_DEF(release_sampler, Sampler);

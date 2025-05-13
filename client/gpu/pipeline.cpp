@@ -20,15 +20,13 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#ifndef MCS_B181__CLIENT__SHADERS__TERRAIN_SHADER
-#define MCS_B181__CLIENT__SHADERS__TERRAIN_SHADER
-namespace state
-{
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_opaque;
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_overlay;
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_translucent;
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_translucent_depth;
-void init_terrain_pipelines();
-void destroy_terrain_pipelines();
-};
-#endif
+#include "pipeline.h"
+
+#include "internal.h"
+
+CREATE_FUNC_DEF(create, Shader, SDL_PROP_GPU_SHADER_CREATE_NAME_STRING);
+CREATE_FUNC_DEF(create, GraphicsPipeline, SDL_PROP_GPU_GRAPHICSPIPELINE_CREATE_NAME_STRING);
+CREATE_FUNC_DEF(create, ComputePipeline, SDL_PROP_GPU_COMPUTEPIPELINE_CREATE_NAME_STRING);
+RELEASE_FUNC_DEF(release, Shader);
+RELEASE_FUNC_DEF(release, GraphicsPipeline);
+RELEASE_FUNC_DEF(release, ComputePipeline);

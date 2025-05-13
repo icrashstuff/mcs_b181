@@ -27,6 +27,8 @@
 
 #include <SDL3/SDL.h>
 
+#include "shaders/terrain_shader.h"
+
 /* Forward declaration(s) */
 struct game_resources_t;
 
@@ -38,10 +40,6 @@ extern SDL_GPUDevice* gpu_device;
 extern SDL_GPUTexture* gpu_debug_texture;
 extern SDL_GPUSampler* gpu_debug_sampler;
 extern SDL_GPUTextureFormat gpu_tex_format_best_depth_only;
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_opaque;
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_overlay;
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_translucent;
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_translucent_depth;
 
 extern const bool on_ios;
 extern const bool on_android;
