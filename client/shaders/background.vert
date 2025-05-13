@@ -1,3 +1,4 @@
+#version 460 core
 /* SPDX-License-Identifier: MIT
  *
  * SPDX-FileCopyrightText: Copyright (c) 2025 Ian Hangartner <icrashstuff at outlook dot com>
@@ -19,32 +20,14 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
- *
- * TODO: Fold/Flatten game_resources_t into this?
  */
-#ifndef MCS_B181__CLIENT__STATE_H_INCLUDED
-#define MCS_B181__CLIENT__STATE_H_INCLUDED
+/* ================ BEGIN Vertex outputs ================ */
+layout(location = 0) out vec2 fragcoords;
+/* ================ END Vertex outputs ================ */
 
-#include <SDL3/SDL.h>
-
-#include "shaders/background_shader.h"
-#include "shaders/terrain_shader.h"
-
-/* Forward declaration(s) */
-struct game_resources_t;
-
-namespace state
+void main()
 {
-extern game_resources_t* game_resources;
-extern SDL_Window* window;
-extern SDL_GPUDevice* gpu_device;
-extern SDL_GPUTexture* gpu_debug_texture;
-extern SDL_GPUSampler* gpu_debug_sampler;
-extern SDL_GPUTextureFormat gpu_tex_format_best_depth_only;
+    fragcoords = vec2(gl_VertexIndex & 1, (gl_VertexIndex >> 1) & 1);
 
-extern const bool on_ios;
-extern const bool on_android;
-extern const bool on_mobile;
+    gl_Position = vec4(fragcoords * 2.0 - 1.0, 0, 1);
 }
-
-#endif

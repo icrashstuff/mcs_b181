@@ -51,6 +51,7 @@ struct mc_gui_ctx
     ImTextureID tex_id_crafting_table = 0;
 
     ImTextureID tex_id_bg = 0;
+    ImTextureID tex_id_bg_normal = 0;
     ImTextureID tex_id_water = 0;
     ImTextureID tex_id_selectors_resource = 0;
     ImTextureID tex_id_selectors_server = 0;

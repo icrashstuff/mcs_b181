@@ -27,9 +27,9 @@ compile_shader()
 {
     STAGE="$1"
     FILE_IN="$2"
-    FILE_OUT_SPIRV="$3.spv"
-    FILE_OUT_METAL="$3.msl"
-    FILE_OUT_DXIL="$3.dxil"
+    FILE_OUT_SPIRV="$2$3.spv"
+    FILE_OUT_METAL="$2$3.msl"
+    FILE_OUT_DXIL="$2$3.dxil"
 
     # Discard first three parameters
     shift 3
@@ -53,6 +53,10 @@ compile_shader()
     make_header_text "${FILE_OUT_METAL}"
 }
 
-compile_shader "vertex"   "terrain.vert" "terrain.vert"
-compile_shader "fragment" "terrain.frag" "terrain.frag.alpha_test"    -DUSE_ALPHA_TEST=1
-compile_shader "fragment" "terrain.frag" "terrain.frag.no_alpha_test" -DUSE_ALPHA_TEST=0
+compile_shader "vertex"   "terrain.vert" ""
+compile_shader "fragment" "terrain.frag" ".alpha_test"    -DUSE_ALPHA_TEST=1
+compile_shader "fragment" "terrain.frag" ".no_alpha_test" -DUSE_ALPHA_TEST=0
+
+
+compile_shader "vertex"   "background.vert" ""
+compile_shader "fragment" "background.frag" ""

@@ -130,6 +130,7 @@ set(mcs_b181_client_SRC
     client/entity/entity_physics.cpp
 
     client/shaders/terrain_shader.cpp
+    client/shaders/background_shader.cpp
 
     client/sys/device_state.cpp
 
@@ -247,6 +248,8 @@ if(MCS_B181_BUILD_SHADERS)
     set(mcs_b181_client_SHADERS
         ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/terrain.frag
         ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/terrain.vert
+        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/background.frag
+        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/background.vert
         ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/compile_shaders.sh
     )
 
@@ -257,6 +260,10 @@ if(MCS_B181_BUILD_SHADERS)
         ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/terrain.frag.alpha_test.spv.h
         ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/terrain.vert.spv.h
         ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/terrain.vert.msl.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/background.frag.spv.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/background.frag.msl.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/background.vert.spv.h
+        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/background.vert.msl.h
     )
 
     add_custom_command(OUTPUT ${mcs_b181_client_SHADER_HEADERS}

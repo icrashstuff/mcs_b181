@@ -57,10 +57,6 @@ static ImTextureID load_texture(SDL_GPUCopyPass* copy_pass, const void* data, co
     sampler_info.mag_filter = SDL_GPU_FILTER_NEAREST;
     sampler_info.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
     sampler_info.address_mode_u = sampler_info.address_mode_v = edge;
-    sampler_info.props = SDL_CreateProperties();
-
-    SDL_SetStringProperty(tex_info.props, SDL_PROP_GPU_TEXTURE_CREATE_NAME_STRING, (label + " (Texture)").c_str());
-    SDL_SetStringProperty(sampler_info.props, SDL_PROP_GPU_SAMPLER_CREATE_NAME_STRING, (label + " (Sampler)").c_str());
 
     if (!(sampler_binding->texture = gpu::create_texture(tex_info, "%s (Texture)", label.c_str())))
         sampler_binding->texture = state::gpu_debug_texture;
@@ -197,6 +193,55 @@ void mc_gui::mc_gui_ctx::load_font_ascii(ImFontAtlas* font_atlas)
 
     stbi_image_free(tex_data);
 }
+
+static float get_pixel_brightness(const Uint8* const in)
+{
+    float r = in[0] / (255.f * 2.f);
+    float g = in[0] / (255.f * 2.f);
+    float b = in[0] / (255.f * 2.f);
+
+    float min = SDL_min(r, SDL_min(g, b));
+    float max = SDL_max(r, SDL_max(g, b));
+
+    return min + max;
+}
+
+static int get_pixel_offset(const int w, const int h, int x, int y)
+{
+    if (x < 0)
+        x += w;
+    if (y < 0)
+        y += h;
+
+    x %= w;
+    y %= h;
+
+    return (y * w + x) * 4;
+}
+
+/* Algorithm pulled from https://developer.valvesoftware.com/wiki/Bump_map#Implementation */
+static void create_tiling_normal_map(const Uint8* const in, Uint8* const out, const int w, const int h)
+{
+    if (!in || !out || w < 1 || h < 1)
+        return;
+
+    for (int y = 0; y < h; y++)
+    {
+        for (int x = 0; x < w; x++)
+        {
+            float sample_l = get_pixel_brightness(in + get_pixel_offset(w, h, x - 1, y - 0));
+            float sample_r = get_pixel_brightness(in + get_pixel_offset(w, h, x + 1, y + 0));
+            float sample_u = get_pixel_brightness(in + get_pixel_offset(w, h, x - 0, y - 1));
+            float sample_d = get_pixel_brightness(in + get_pixel_offset(w, h, x + 0, y + 1));
+
+            out[(w * y + x) * 4 + 0] = (((sample_l - sample_r) + 1) * .5f) * 255;
+            out[(w * y + x) * 4 + 1] = (((sample_u - sample_d) + 1) * .5f) * 255;
+            out[(w * y + x) * 4 + 2] = 255;
+            out[(w * y + x) * 4 + 3] = 255;
+        }
+    }
+}
+
 SDL_GPUFence* mc_gui::mc_gui_ctx::load_resources()
 {
     unload_resources();
@@ -216,27 +261,42 @@ SDL_GPUFence* mc_gui::mc_gui_ctx::load_resources()
     tex_id_furnace = load_gui_texture(copy_pass, "container/furnace.png");
     tex_id_crafting_table = load_gui_texture(copy_pass, "container/crafting_table.png");
 
-    tex_id_bg = load_gui_texture(copy_pass, "options_background.png", SDL_GPU_SAMPLERADDRESSMODE_REPEAT);
     tex_id_water = load_gui_texture(copy_pass, "misc/underwater.png", SDL_GPU_SAMPLERADDRESSMODE_REPEAT, "/_resources/assets/minecraft/textures/");
     tex_id_selectors_resource = load_gui_texture(copy_pass, "resource_packs.png");
     tex_id_selectors_server = load_gui_texture(copy_pass, "server_selection.png");
 
-    Uint8 data_crosshair[16 * 16 * 4] = { 0 };
-    for (int i = 3; i < 12; i++)
+    /* Background texture */
     {
-        data_crosshair[(i + 7 * 16) * 4 + 0] = 0xFF;
-        data_crosshair[(7 + i * 16) * 4 + 0] = 0xFF;
+        int width = 0;
+        int height = 0;
+        Uint8* background = stbi_physfs_load("/_resources/assets/minecraft/textures/gui/options_background.png", &width, &height, NULL, 4);
+        ;
+        std::vector<Uint8> normal;
+        normal.resize(width * height * 4 * sizeof(*background));
+        create_tiling_normal_map(background, normal.data(), width, height);
 
-        data_crosshair[(i + 7 * 16) * 4 + 1] = 0xFF;
-        data_crosshair[(7 + i * 16) * 4 + 1] = 0xFF;
-
-        data_crosshair[(i + 7 * 16) * 4 + 2] = 0xFF;
-        data_crosshair[(7 + i * 16) * 4 + 2] = 0xFF;
-
-        data_crosshair[(i + 7 * 16) * 4 + 3] = 0xFF;
-        data_crosshair[(7 + i * 16) * 4 + 3] = 0xFF;
+        tex_id_bg = load_texture(copy_pass, background, width, height, "[Menu]: Texture: Background", SDL_GPU_SAMPLERADDRESSMODE_REPEAT);
+        tex_id_bg_normal = load_texture(copy_pass, normal.data(), width, height, "[Menu]: Normal map: Background", SDL_GPU_SAMPLERADDRESSMODE_REPEAT);
     }
-    tex_id_crosshair = load_texture(copy_pass, data_crosshair, 16, 16, "[Menu]: Texture: Crosshair", SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE);
+    /* Crosshair */
+    {
+        Uint8 data_crosshair[16 * 16 * 4] = { 0 };
+        for (int i = 3; i < 12; i++)
+        {
+            data_crosshair[(i + 7 * 16) * 4 + 0] = 0xFF;
+            data_crosshair[(7 + i * 16) * 4 + 0] = 0xFF;
+
+            data_crosshair[(i + 7 * 16) * 4 + 1] = 0xFF;
+            data_crosshair[(7 + i * 16) * 4 + 1] = 0xFF;
+
+            data_crosshair[(i + 7 * 16) * 4 + 2] = 0xFF;
+            data_crosshair[(7 + i * 16) * 4 + 2] = 0xFF;
+
+            data_crosshair[(i + 7 * 16) * 4 + 3] = 0xFF;
+            data_crosshair[(7 + i * 16) * 4 + 3] = 0xFF;
+        }
+        tex_id_crosshair = load_texture(copy_pass, data_crosshair, 16, 16, "[Menu]: Texture: Crosshair", SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE);
+    }
 
     if (copy_pass)
         SDL_EndGPUCopyPass(copy_pass);
@@ -291,6 +351,7 @@ void mc_gui::mc_gui_ctx::unload_resources()
     DEL_TEX(tex_id_crafting_table);
 
     DEL_TEX(tex_id_bg);
+    DEL_TEX(tex_id_bg_normal);
     DEL_TEX(tex_id_water);
     DEL_TEX(tex_id_selectors_resource);
     DEL_TEX(tex_id_selectors_server);

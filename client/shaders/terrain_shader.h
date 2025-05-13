@@ -22,6 +22,9 @@
  */
 #ifndef MCS_B181__CLIENT__SHADERS__TERRAIN_SHADER
 #define MCS_B181__CLIENT__SHADERS__TERRAIN_SHADER
+
+#include <SDL3/SDL_gpu.h>
+
 namespace state
 {
 extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_opaque;

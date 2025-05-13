@@ -141,7 +141,11 @@ static convar_int_t cvr_mc_gui_style_editor(
 
 static bool take_screenshot = 0;
 
-static void compile_shaders() { }
+static void compile_shaders()
+{
+    state::init_background_pipelines();
+    state::init_terrain_pipelines();
+}
 
 static std::vector<game_t*> games;
 static game_t* game_selected = nullptr;
@@ -208,8 +212,6 @@ static bool initialize_resources()
      * (Hours wasted: 2) (This applied specifically to OpenGL) */
     mc_gui::init();
 
-    state::init_terrain_pipelines();
-
     compile_shaders();
 
     sound_engine_main_menu = new sound_world_t(4);
@@ -232,6 +234,7 @@ static bool deinitialize_resources()
 
     mc_gui::deinit();
 
+    state::destroy_background_pipelines();
     state::destroy_terrain_pipelines();
 
     for (game_t* g : games)
@@ -997,9 +1000,10 @@ static void loop_stage_process_queued_input()
     }
 }
 
-static void loop_stage_prerender(glm::ivec2 win_size, bool& render_world)
+static void loop_stage_prerender(glm::ivec2 win_size, bool& render_world, bool& display_dirt)
 {
     render_world = 0;
+    display_dirt = 0;
 
     music_counter -= delta_time;
 
@@ -1124,22 +1128,10 @@ static void loop_stage_prerender(glm::ivec2 win_size, bool& render_world)
         bg_draw_list->AddRectFilled(ImVec2(-32, -32), ImGui::GetMainViewport()->Size + ImVec2(32, 32), IM_COL32(32, 32, 32, 255 * 0.5f));
 
     bool display_pano = (menu_ret.allow_pano && !in_world);
-    bool display_dirt = (menu_ret.allow_dirt && ((!menu_ret.allow_pano && !in_world) || (in_world && !menu_ret.allow_world)));
+    display_dirt = (menu_ret.allow_dirt && ((!menu_ret.allow_pano && !in_world) || (in_world && !menu_ret.allow_world)));
 
-    if (display_pano || display_dirt)
-    {
-        ImTextureID tex_id = mc_gui::global_ctx->tex_id_bg;
-
-        double side_len = 32.0 * double(SDL_max(1, mc_gui::global_ctx->menu_scale));
-
-        glm::dvec2 pos0 = glm::dvec2(0);
-        glm::dvec2 pos1 = ImVec2_to_dvec2(ImGui::GetMainViewport()->Size) + glm::dvec2(side_len);
-
-        glm::dvec2 uv0(0.0);
-        glm::dvec2 uv1 = pos1 / side_len;
-
-        bg_draw_list->AddImage(tex_id, dvec2_to_ImVec2(pos0), dvec2_to_ImVec2(pos1), dvec2_to_ImVec2(uv0), dvec2_to_ImVec2(uv1), IM_COL32(64, 64, 64, 255));
-    }
+    if (display_pano)
+        display_dirt = 1;
 
     bg_draw_list->ChannelsMerge();
 
@@ -1153,11 +1145,14 @@ static void loop_stage_prerender(glm::ivec2 win_size, bool& render_world)
         game_selected->level->render_stage_prepare(win_size);
 }
 
-static void loop_stage_render(
-    SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture* gpu_target, const ImVec4 clear_color, const glm::ivec2 win_size, bool render_world)
+static void loop_stage_render(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture* gpu_target, const ImVec4 clear_color, const glm::ivec2 win_size,
+    bool render_world, bool display_dirt)
 {
     if (!game_selected)
         render_world = 0;
+
+    if (!state::pipeline_background)
+        display_dirt = 0;
 
     ImGuiContext* last_ctx = ImGui::GetCurrentContext();
 
@@ -1191,9 +1186,9 @@ static void loop_stage_render(
     tinfo_color.clear_color = SDL_FColor { clear_color.x, clear_color.y, clear_color.z, clear_color.w };
     tinfo_color.load_op = SDL_GPU_LOADOP_CLEAR;
     tinfo_color.store_op = SDL_GPU_STOREOP_STORE;
-    tinfo_color.mip_level = 0;
-    tinfo_color.layer_or_depth_plane = 0;
-    tinfo_color.cycle = false;
+
+    if (display_dirt)
+        tinfo_color.load_op = SDL_GPU_LOADOP_DONT_CARE;
 
     SDL_GPUTextureCreateInfo cinfo_depth_tex = {};
     cinfo_depth_tex.type = SDL_GPU_TEXTURETYPE_2D;
@@ -1215,6 +1210,31 @@ static void loop_stage_render(
 
     SDL_GPURenderPass* render_pass = SDL_BeginGPURenderPass(gpu_command_buffer, &tinfo_color, 1, &tinfo_depth);
     SDL_ReleaseGPUTexture(state::gpu_device, tinfo_depth.texture);
+
+    if (display_dirt)
+    {
+        double side_len = 32.0 * double(SDL_max(1, mc_gui::global_ctx->menu_scale));
+
+        alignas(16) struct ubo_lighting_t
+        {
+            glm::vec4 light_color;
+            glm::vec2 uv_size;
+            glm::vec2 cursor_pos;
+            float ambient_brightness;
+        } ubo_lighting;
+        ubo_lighting.light_color = glm::vec4(1.0f, 0.875f, 0.7f, 1.0f) * 0.25f;
+        ubo_lighting.uv_size = ImVec2_to_dvec2(ImGui::GetMainViewport()->Size) / side_len;
+        ubo_lighting.cursor_pos = ImVec2_to_dvec2(ImGui::GetMousePos()) / ImVec2_to_dvec2(ImGui::GetMainViewport()->Size);
+        ubo_lighting.ambient_brightness = 32.f / 255.f;
+
+        SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_background);
+
+        SDL_PushGPUFragmentUniformData(gpu_command_buffer, 0, &ubo_lighting, sizeof(ubo_lighting));
+        SDL_BindGPUFragmentSamplers(render_pass, 0, reinterpret_cast<SDL_GPUTextureSamplerBinding*>(mc_gui_global_ctx.tex_id_bg), 1);
+        SDL_BindGPUFragmentSamplers(render_pass, 1, reinterpret_cast<SDL_GPUTextureSamplerBinding*>(mc_gui_global_ctx.tex_id_bg_normal), 1);
+
+        SDL_DrawGPUPrimitives(render_pass, 4, 1, 0, 0);
+    }
 
     if (render_world)
     {
@@ -2330,8 +2350,9 @@ int main(int argc, char* argv[])
             loop_stage_process_queued_input();
 
             bool render_world = 0;
-            loop_stage_prerender(win_size, render_world);
-            loop_stage_render(command_buffer, window_target, clear_color, win_size, render_world);
+            bool display_dirt = 0;
+            loop_stage_prerender(win_size, render_world, display_dirt);
+            loop_stage_render(command_buffer, window_target, clear_color, win_size, render_world, display_dirt);
 
             if (game_selected && game_selected->level && cvr_gui_renderer.get())
             {
