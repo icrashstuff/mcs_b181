@@ -39,9 +39,9 @@ struct gpu::fence_t
     /** When submitted == true this is valid */
     SDL_GPUFence* fence = nullptr;
 
-    void release()
+    void release(int count)
     {
-        if (!SDL_AtomicDecRef(&ref_counter))
+        if (!(SDL_AddAtomicInt(&ref_counter, -count) == 1))
             return;
         SDL_ReleaseGPUFence(state::gpu_device, fence);
         delete this;
@@ -157,10 +157,16 @@ gpu::fence_t* gpu::get_command_buffer_fence(const SDL_GPUCommandBuffer* const co
     return fence;
 }
 
-void gpu::release_fence(fence_t* const fence)
+void gpu::ref_fence(fence_t* const fence, const Uint32 count)
 {
-    if (fence)
-        fence->release();
+    if (fence && count)
+        SDL_AddAtomicInt(&fence->ref_counter, count);
+}
+
+void gpu::release_fence(fence_t* const fence, Uint32 count)
+{
+    if (fence && count)
+        fence->release(count);
 }
 bool gpu::is_fence_cancelled(fence_t* const fence) { return fence->is_cancelled(); }
 bool gpu::is_fence_done(fence_t* const fence) { return fence->is_done(); }

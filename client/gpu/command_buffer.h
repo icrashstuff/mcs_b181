@@ -100,13 +100,22 @@ namespace gpu
 [[nodiscard]] bool is_fence_cancelled(fence_t* const fence);
 
 /**
+ * Increment fence reference counter
+ *
+ * @param fence Fence to modify (NULL is a safe no-op)
+ * @param count Amount to increment reference counter by
+ */
+void ref_fence(fence_t* const fence, const Uint32 count = 1);
+
+/**
  * Release a fence handle acquired by either gpu::submit_command_buffer_and_acquire_fence() or gpu::get_command_buffer_fence()
  *
  * You must not reference the fence after calling this function.
  *
  * @param fence Fence to release (NULL is a safe no-op)
+ * @param count Amount to decrement reference counter by
  */
-void release_fence(fence_t* const fence);
+void release_fence(fence_t* const fence, const Uint32 count = 1);
 
 /**
  * Wait on a single fence
