@@ -56,6 +56,9 @@ public:
     SDL_GPUSampler* sampler_linear = nullptr;
     SDL_GPUSampler* sampler_nearest = nullptr;
 
+    SDL_GPUTextureSamplerBinding binding_linear = {};
+    SDL_GPUTextureSamplerBinding binding_nearest = {};
+
     /**
      * Get mix between daytime and nighttime based on current time
      *

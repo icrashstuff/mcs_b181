@@ -26,7 +26,7 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "gpu/texture.h"
+#include "gpu/gpu.h"
 #include "state.h"
 
 #define BASE_R 1.0
@@ -153,8 +153,8 @@ void lightmap_t::imgui_contents()
 
     float tex_size = ImGui::GetContentRegionAvail().x / 2.2f;
 
-    SDL_GPUTextureSamplerBinding binding_linear = { .texture = tex_id, .sampler = sampler_linear };
-    SDL_GPUTextureSamplerBinding binding_nearest = { .texture = tex_id, .sampler = sampler_nearest };
+    binding_linear = { tex_id, sampler_linear };
+    binding_nearest = { tex_id, sampler_nearest };
 
     if (!binding_linear.texture)
         binding_linear.texture = state::gpu_debug_texture;
@@ -220,10 +220,12 @@ void lightmap_t::update(SDL_GPUCopyPass* const copy_pass)
             float g = u_gamma * color_block.g * flick;
             float b = u_gamma * color_block.b * flick;
 
+            /* Sky light */
             r += v_gamma * sky_mix.r;
             g += v_gamma * sky_mix.g;
             b += v_gamma * sky_mix.b;
 
+            /* Minimum light */
             r = (r + color_minimum.r) / (1.0f + color_minimum.r);
             g = (g + color_minimum.g) / (1.0f + color_minimum.g);
             b = (b + color_minimum.b) / (1.0f + color_minimum.b);
@@ -237,24 +239,16 @@ void lightmap_t::update(SDL_GPUCopyPass* const copy_pass)
 
     if (!tex_id)
     {
-        SDL_GPUTextureCreateInfo cinfo_tex = {
-            .type = SDL_GPU_TEXTURETYPE_2D,
-            .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
-            .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER,
-            .width = 16,
-            .height = 16,
-            .layer_count_or_depth = 1,
-            .num_levels = 1,
-            .sample_count = SDL_GPU_SAMPLECOUNT_1,
+        SDL_GPUTextureCreateInfo cinfo_tex = {};
+        cinfo_tex.type = SDL_GPU_TEXTURETYPE_2D;
+        cinfo_tex.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+        cinfo_tex.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+        cinfo_tex.width = Uint32(width);
+        cinfo_tex.height = Uint32(height);
+        cinfo_tex.layer_count_or_depth = 1;
+        cinfo_tex.num_levels = 1;
 
-            .props = SDL_CreateProperties(),
-        };
-
-        SDL_SetStringProperty(cinfo_tex.props, SDL_PROP_GPU_TEXTURE_CREATE_NAME_STRING, "[Level]: Lightmap");
-
-        tex_id = SDL_CreateGPUTexture(state::gpu_device, &cinfo_tex);
-
-        SDL_DestroyProperties(cinfo_tex.props);
+        tex_id = gpu::create_texture(cinfo_tex, "Lightmap");
     }
 
     if (!sampler_linear || !sampler_nearest)
@@ -266,10 +260,10 @@ void lightmap_t::update(SDL_GPUCopyPass* const copy_pass)
 
         cinfo_sampler.mag_filter = SDL_GPU_FILTER_LINEAR;
         if (!sampler_linear)
-            sampler_linear = SDL_CreateGPUSampler(state::gpu_device, &cinfo_sampler);
+            sampler_linear = gpu::create_sampler(cinfo_sampler, "Linear lightmap sampler");
         cinfo_sampler.mag_filter = SDL_GPU_FILTER_NEAREST;
         if (!sampler_nearest)
-            sampler_nearest = SDL_CreateGPUSampler(state::gpu_device, &cinfo_sampler);
+            sampler_nearest = gpu::create_sampler(cinfo_sampler, "Nearest lightmap sampler");
     }
 
     gpu::upload_to_texture2d(copy_pass, tex_id, SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM, 0, 0, width, height, dat.data(), 1);
