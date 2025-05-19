@@ -29,6 +29,14 @@
 #include <map>
 #include <vector>
 
+#define DEBUG_USE_AFTER_FREE 0
+#if DEBUG_USE_AFTER_FREE
+#warning "DEBUG_USE_AFTER_FREE enabled!"
+#endif
+#if defined(NDEBUG) && DEBUG_USE_AFTER_FREE
+#error "DEBUG_USE_AFTER_FREE shouldn't be used on release builds!"
+#endif
+
 struct gpu::fence_t
 {
     SDL_AtomicInt ref_counter = { 1 };
@@ -41,10 +49,19 @@ struct gpu::fence_t
 
     void release(int count)
     {
+        if (DEBUG_USE_AFTER_FREE)
+            SDL_assert_always(SDL_GetAtomicInt(&ref_counter) > 0);
+
         if (!(SDL_AddAtomicInt(&ref_counter, -count) == 1))
             return;
-        SDL_ReleaseGPUFence(state::gpu_device, fence);
-        delete this;
+
+        if (DEBUG_USE_AFTER_FREE)
+            dc_log_warn("Leaking fence!");
+        else
+        {
+            SDL_ReleaseGPUFence(state::gpu_device, fence);
+            delete this;
+        }
     }
 
     bool is_done() { return SDL_GetAtomicInt(&submitted) && fence != nullptr && SDL_QueryGPUFence(state::gpu_device, fence); }
@@ -152,7 +169,10 @@ gpu::fence_t* gpu::get_command_buffer_fence(const SDL_GPUCommandBuffer* const co
     auto it = fence_map.find(command_buffer);
     if (it != fence_map.end())
         fence = it->second;
+    SDL_assert(fence);
     SDL_UnlockRWLock(fence_map_lock);
+
+    gpu::ref_fence(fence);
 
     return fence;
 }
