@@ -247,39 +247,39 @@ texture_terrain_t::texture_terrain_t(const std::string& path_textures)
             {
                 for (int i_h = 0; i_h < new_h * textures[i].frame_num_individual; i_h++)
                 {
-                    Uint32 r = 0, g = 0, b = 0, a = 0, at = 0;
-                    at = source[((i_w * 2 + 0) + (i_h * 2 + 0) * new_w * 2) * 4 + 3];
-                    r += source[((i_w * 2 + 0) + (i_h * 2 + 0) * new_w * 2) * 4 + 0] * at;
-                    g += source[((i_w * 2 + 0) + (i_h * 2 + 0) * new_w * 2) * 4 + 1] * at;
-                    b += source[((i_w * 2 + 0) + (i_h * 2 + 0) * new_w * 2) * 4 + 2] * at;
+                    float r = 0, g = 0, b = 0, a = 0, at = 0;
+                    at = source[((i_w * 2 + 0) + (i_h * 2 + 0) * new_w * 2) * 4 + 3] / 255.f;
+                    r += source[((i_w * 2 + 0) + (i_h * 2 + 0) * new_w * 2) * 4 + 0] / 255.f * at;
+                    g += source[((i_w * 2 + 0) + (i_h * 2 + 0) * new_w * 2) * 4 + 1] / 255.f * at;
+                    b += source[((i_w * 2 + 0) + (i_h * 2 + 0) * new_w * 2) * 4 + 2] / 255.f * at;
                     a += at;
 
-                    at = source[((i_w * 2 + 1) + (i_h * 2 + 0) * new_w * 2) * 4 + 3];
-                    r += source[((i_w * 2 + 1) + (i_h * 2 + 0) * new_w * 2) * 4 + 0] * at;
-                    g += source[((i_w * 2 + 1) + (i_h * 2 + 0) * new_w * 2) * 4 + 1] * at;
-                    b += source[((i_w * 2 + 1) + (i_h * 2 + 0) * new_w * 2) * 4 + 2] * at;
+                    at = source[((i_w * 2 + 1) + (i_h * 2 + 0) * new_w * 2) * 4 + 3] / 255.f;
+                    r += source[((i_w * 2 + 1) + (i_h * 2 + 0) * new_w * 2) * 4 + 0] / 255.f * at;
+                    g += source[((i_w * 2 + 1) + (i_h * 2 + 0) * new_w * 2) * 4 + 1] / 255.f * at;
+                    b += source[((i_w * 2 + 1) + (i_h * 2 + 0) * new_w * 2) * 4 + 2] / 255.f * at;
                     a += at;
 
-                    at = source[((i_w * 2 + 0) + (i_h * 2 + 1) * new_w * 2) * 4 + 3];
-                    r += source[((i_w * 2 + 0) + (i_h * 2 + 1) * new_w * 2) * 4 + 0] * at;
-                    g += source[((i_w * 2 + 0) + (i_h * 2 + 1) * new_w * 2) * 4 + 1] * at;
-                    b += source[((i_w * 2 + 0) + (i_h * 2 + 1) * new_w * 2) * 4 + 2] * at;
+                    at = source[((i_w * 2 + 0) + (i_h * 2 + 1) * new_w * 2) * 4 + 3] / 255.f;
+                    r += source[((i_w * 2 + 0) + (i_h * 2 + 1) * new_w * 2) * 4 + 0] / 255.f * at;
+                    g += source[((i_w * 2 + 0) + (i_h * 2 + 1) * new_w * 2) * 4 + 1] / 255.f * at;
+                    b += source[((i_w * 2 + 0) + (i_h * 2 + 1) * new_w * 2) * 4 + 2] / 255.f * at;
                     a += at;
 
-                    at = source[((i_w * 2 + 1) + (i_h * 2 + 1) * new_w * 2) * 4 + 3];
-                    r += source[((i_w * 2 + 1) + (i_h * 2 + 1) * new_w * 2) * 4 + 0] * at;
-                    g += source[((i_w * 2 + 1) + (i_h * 2 + 1) * new_w * 2) * 4 + 1] * at;
-                    b += source[((i_w * 2 + 1) + (i_h * 2 + 1) * new_w * 2) * 4 + 2] * at;
+                    at = source[((i_w * 2 + 1) + (i_h * 2 + 1) * new_w * 2) * 4 + 3] / 255.f;
+                    r += source[((i_w * 2 + 1) + (i_h * 2 + 1) * new_w * 2) * 4 + 0] / 255.f * at;
+                    g += source[((i_w * 2 + 1) + (i_h * 2 + 1) * new_w * 2) * 4 + 1] / 255.f * at;
+                    b += source[((i_w * 2 + 1) + (i_h * 2 + 1) * new_w * 2) * 4 + 2] / 255.f * at;
                     a += at;
 
-                    if (a == 0)
+                    if (a <= 0.001f)
                         ((Uint32*)result)[i_w + i_h * new_w] = 0;
                     else
                     {
-                        result[(i_w + i_h * new_w) * 4 + 0] = SDL_clamp(r / a, 0, 0xFF);
-                        result[(i_w + i_h * new_w) * 4 + 1] = SDL_clamp(g / a, 0, 0xFF);
-                        result[(i_w + i_h * new_w) * 4 + 2] = SDL_clamp(b / a, 0, 0xFF);
-                        result[(i_w + i_h * new_w) * 4 + 3] = SDL_clamp(a / 4, 0, 0xFF);
+                        result[(i_w + i_h * new_w) * 4 + 0] = SDL_clamp(r * 255.f / a, 0, 0xFF);
+                        result[(i_w + i_h * new_w) * 4 + 1] = SDL_clamp(g * 255.f / a, 0, 0xFF);
+                        result[(i_w + i_h * new_w) * 4 + 2] = SDL_clamp(b * 255.f / a, 0, 0xFF);
+                        result[(i_w + i_h * new_w) * 4 + 3] = SDL_clamp(a * 255.f / 4.f, 0, 0xFF);
                     }
                 }
             }
