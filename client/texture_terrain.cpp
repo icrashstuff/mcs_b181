@@ -37,7 +37,7 @@
 
 #include "jzon/Jzon.h"
 
-#include "state.h"
+#include "gpu/gpu.h"
 
 static convar_int_t r_dump_mipmaps_terrain("r_dump_mipmaps_terrain", 1, 0, 1, "Dump terrain atlas mipmaps to screenshots folder on atlas rebuild",
     CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_SAVE | CONVAR_FLAG_INT_IS_BOOL);
@@ -424,37 +424,22 @@ texture_terrain_t::texture_terrain_t(const std::string& path_textures)
         }
     }
 
-    SDL_GPUTextureCreateInfo cinfo_texture = {
-        .type = SDL_GPU_TEXTURETYPE_2D,
-        .format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM,
-        .usage = SDL_GPU_TEXTUREUSAGE_SAMPLER,
-        .width = Uint32(tex_base_width),
-        .height = Uint32(tex_base_height),
-        .layer_count_or_depth = 1,
-        .num_levels = Uint32(raw_mipmaps.size()),
-        .sample_count = SDL_GPU_SAMPLECOUNT_1,
-        .props = SDL_CreateProperties(),
-    };
-    SDL_GPUSamplerCreateInfo cinfo_sampler;
-    SDL_zero(cinfo_sampler);
-    cinfo_sampler.min_filter = SDL_GPU_FILTER_NEAREST;
-    cinfo_sampler.mag_filter = SDL_GPU_FILTER_NEAREST;
+    SDL_GPUTextureCreateInfo cinfo_texture = {};
+    cinfo_texture.type = SDL_GPU_TEXTURETYPE_2D;
+    cinfo_texture.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
+    cinfo_texture.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
+    cinfo_texture.width = Uint32(tex_base_width);
+    cinfo_texture.height = Uint32(tex_base_height);
+    cinfo_texture.layer_count_or_depth = 1;
+    cinfo_texture.num_levels = Uint32(raw_mipmaps.size());
+    SDL_GPUSamplerCreateInfo cinfo_sampler = {};
+    cinfo_sampler.min_filter = cinfo_sampler.mag_filter = SDL_GPU_FILTER_NEAREST;
     cinfo_sampler.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
-    cinfo_sampler.address_mode_u = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
-    cinfo_sampler.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
-    cinfo_sampler.min_lod = 0.0;
+    cinfo_sampler.address_mode_u = cinfo_sampler.address_mode_v = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
     cinfo_sampler.max_lod = raw_mipmaps.size() - 1;
-    cinfo_sampler.enable_anisotropy = 0;
-    cinfo_sampler.props = SDL_CreateProperties();
 
-    SDL_SetStringProperty(cinfo_texture.props, SDL_PROP_GPU_TEXTURE_CREATE_NAME_STRING, "[Level][Terrain]: Main Texture");
-    SDL_SetStringProperty(cinfo_sampler.props, SDL_PROP_GPU_SAMPLER_CREATE_NAME_STRING, "[Level][Terrain]: Main Sampler");
-
-    binding.texture = SDL_CreateGPUTexture(state::gpu_device, &cinfo_texture);
-    binding.sampler = SDL_CreateGPUSampler(state::gpu_device, &cinfo_sampler);
-
-    SDL_DestroyProperties(cinfo_texture.props);
-    SDL_DestroyProperties(cinfo_sampler.props);
+    binding.texture = gpu::create_texture(cinfo_texture, "Terrain texture");
+    binding.sampler = gpu::create_sampler(cinfo_sampler, "Terrain sampler");
 
     dc_log("Built terrain atlas in %.1f ms", (double)(SDL_GetTicksNS() - start_tick) / 1000000.0);
 
@@ -585,73 +570,9 @@ void texture_terrain_t::update(SDL_GPUCopyPass* copy_pass)
         }
     }
 
-    SDL_GPUTransferBufferCreateInfo cinfo_tbo = {
-        .usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD,
-        .size = 0,
-        .props = SDL_CreateProperties(),
-    };
-
-    SDL_SetStringProperty(cinfo_tbo.props, SDL_PROP_GPU_TRANSFERBUFFER_CREATE_NAME_STRING, "[Level][Terrain]: TBO");
-
-    Uint32* offsets = SDL_stack_alloc(Uint32, raw_mipmaps.size());
-    Uint32* sizes = SDL_stack_alloc(Uint32, raw_mipmaps.size());
-
     for (size_t i = 0; i < raw_mipmaps.size(); i++)
-    {
-        offsets[i] = cinfo_tbo.size;
-        sizes[i] = (tex_base_width >> i) * (tex_base_height >> i) * 4;
-        cinfo_tbo.size += sizes[i];
-    }
-
-    SDL_GPUTransferBuffer* tbo = SDL_CreateGPUTransferBuffer(state::gpu_device, &cinfo_tbo);
-    Uint8* tbo_pointer = nullptr;
-
-    if (!tbo)
-        dc_log_error("Unable to upload texture, SDL_CreateGPUTransferBuffer: %s", SDL_GetError());
-    else
-        tbo_pointer = static_cast<Uint8*>(SDL_MapGPUTransferBuffer(state::gpu_device, tbo, 0));
-
-    if (!tbo_pointer)
-        dc_log_error("Unable to upload texture, SDL_MapGPUTransferBuffer: %s", SDL_GetError());
-    else
-    {
-        for (size_t i = 0; i < raw_mipmaps.size(); i++)
-        {
-            assert(sizes[i] + offsets[i] <= cinfo_tbo.size);
-            memcpy(tbo_pointer + offsets[i], raw_mipmaps[i], sizes[i]);
-        }
-
-        SDL_UnmapGPUTransferBuffer(state::gpu_device, tbo);
-
-        for (size_t i = 0; i < raw_mipmaps.size(); i++)
-        {
-            SDL_GPUTextureTransferInfo region_tbo = {
-                .transfer_buffer = tbo,
-                .offset = offsets[i],
-                .pixels_per_row = Uint32(tex_base_width >> i),
-                .rows_per_layer = Uint32(tex_base_height >> i),
-            };
-
-            SDL_GPUTextureRegion region_tex = {
-                .texture = binding.texture,
-                .mip_level = Uint32(i),
-                .layer = 0,
-                .x = 0,
-                .y = 0,
-                .z = 0,
-                .w = Uint32(tex_base_width >> i),
-                .h = Uint32(tex_base_height >> i),
-                .d = 1,
-            };
-
-            SDL_UploadToGPUTexture(copy_pass, &region_tbo, &region_tex, 0); /* TODO: I feel like this should use cycling, but it doesn't seem to work */
-        }
-    }
-
-    SDL_ReleaseGPUTransferBuffer(state::gpu_device, tbo);
-
-    SDL_stack_free(sizes);
-    SDL_stack_free(offsets);
+        gpu::upload_to_texture2d(
+            copy_pass, binding.texture, SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM, 0, i, tex_base_width >> i, tex_base_height >> i, raw_mipmaps[i], false);
 }
 
 void texture_terrain_t::dump_mipmaps()
@@ -770,8 +691,8 @@ bool texture_terrain_t::imgui_view(const char* title)
 
 texture_terrain_t::~texture_terrain_t()
 {
-    SDL_ReleaseGPUTexture(state::gpu_device, binding.texture);
-    SDL_ReleaseGPUSampler(state::gpu_device, binding.sampler);
+    gpu::release_texture(binding.texture);
+    gpu::release_sampler(binding.sampler);
 
     for (size_t i = 0; i < raw_mipmaps.size(); i++)
         free(raw_mipmaps[i]);
