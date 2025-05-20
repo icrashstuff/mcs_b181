@@ -37,6 +37,8 @@
 #error "DEBUG_USE_AFTER_FREE shouldn't be used on release builds!"
 #endif
 
+static SDL_AtomicInt num_fences = {};
+
 struct gpu::fence_t
 {
     SDL_AtomicInt ref_counter = { 1 };
@@ -46,6 +48,9 @@ struct gpu::fence_t
 
     /** When submitted == true this is valid */
     SDL_GPUFence* fence = nullptr;
+
+    fence_t() { SDL_AddAtomicInt(&num_fences, 1); }
+    ~fence_t() { SDL_AddAtomicInt(&num_fences, -1); }
 
     void release(int count)
     {
@@ -82,6 +87,14 @@ void gpu::init()
 
 void gpu::quit()
 {
+    if (SDL_GetAtomicInt(&num_fences) != 0)
+        dc_log_warn("%d fence(s) were leaked!", SDL_GetAtomicInt(&num_fences));
+    SDL_SetAtomicInt(&num_fences, 0);
+
+    if (fence_map.size())
+        dc_log_warn("%zu command_buffers(s) were leaked!", fence_map.size());
+    fence_map.clear();
+
     SDL_DestroyRWLock(fence_map_lock);
     fence_map_lock = nullptr;
 }
