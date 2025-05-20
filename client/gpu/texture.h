@@ -42,11 +42,11 @@ SDL_GPUTexture* create_texture(const SDL_GPUTextureCreateInfo& cinfo, SDL_PRINTF
  *
  * @param copy_pass Copy pass to upload texture on
  * @param tex Texture to upload to
- * @param format Format of texture data
+ * @param format Format of texture data (Used to calculate the size of the TBO for upload)
  * @param layer Texture layer to write to
  * @param miplevel Mip level to upload to
- * @param width Width of texture
- * @param height Height of texture
+ * @param width Width of texture region
+ * @param height Height of texture region
  * @param copy_callback Callback to fill the transfer buffer with data
  * @param cycle Use SDL GPU resource cycling
  *
@@ -60,11 +60,11 @@ bool upload_to_texture2d(SDL_GPUCopyPass* const copy_pass, SDL_GPUTexture* const
  *
  * @param copy_pass Copy pass to upload texture on
  * @param tex Texture to upload to
- * @param format Format of texture data
+ * @param format Format of texture data (Used to calculate the size of the TBO for upload)
  * @param layer Texture layer to write to
  * @param miplevel Mip level to upload to
- * @param width Width of texture
- * @param height Height of texture
+ * @param width Width of texture region
+ * @param height Height of texture region
  * @param data Buffer to copy data from (Must have a size of at least `SDL_CalculateGPUTextureFormatSize(format, width, height, 1) >> (miplevel * 2)`)
  * @param cycle Use SDL GPU resource cycling
  *

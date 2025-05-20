@@ -33,7 +33,7 @@ bool gpu::upload_to_texture2d(SDL_GPUCopyPass* const copy_pass, SDL_GPUTexture* 
     if (!copy_pass || !tex || !width || !height || !copy_callback || format == SDL_GPU_TEXTUREFORMAT_INVALID)
         return false;
 
-    Uint32 buf_size = SDL_CalculateGPUTextureFormatSize(format, width, height, 1) >> (miplevel * 2);
+    Uint32 buf_size = SDL_CalculateGPUTextureFormatSize(format, width, height, 1);
 
     SDL_GPUTransferBufferCreateInfo cinfo_tbo = {};
     cinfo_tbo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
@@ -82,7 +82,7 @@ bool gpu::upload_to_texture2d(SDL_GPUCopyPass* const copy_pass, SDL_GPUTexture* 
 bool gpu::upload_to_texture2d(SDL_GPUCopyPass* const copy_pass, SDL_GPUTexture* const tex, const SDL_GPUTextureFormat format, const Uint32 layer,
     const Uint32 miplevel, const Uint32 width, const Uint32 height, const void* const data, const bool cycle)
 {
-    Uint32 buf_size = SDL_CalculateGPUTextureFormatSize(format, width, height, 1) >> (miplevel * 2);
+    Uint32 buf_size = SDL_CalculateGPUTextureFormatSize(format, width, height, 1);
     return upload_to_texture2d(
         copy_pass, tex, format, layer, miplevel, width, height,
         [&data, &buf_size](void* tbo_data, Uint32 tbo_size) {
