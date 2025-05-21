@@ -138,8 +138,8 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
 
     /* ======================== RIGHT SIDE ======================== */
 
-    add_text(ctx, drawlist, 1, cursor_r, "Chunk mesh memory: %.1lf/%.1lf MiB", double(lvl->mesh_buffer_offset >> 10) / 1024.0,
-        double(lvl->mesh_buffer_size >> 10) / 1024.0);
+    add_text(ctx, drawlist, 1, cursor_r, "Chunk mesh memory: %.1lf/%.1lf MiB", double(lvl->mesh_buffer.get_size_in_bytes() >> 10) / 1024.0,
+        double(lvl->mesh_buffer.get_size_in_bytes() >> 10) / 1024.0);
     add_text(ctx, drawlist, 1, cursor_r, "Chunk data memory: %zu MiB", mem_chunk >> 20);
 
     /* Memory usage */
@@ -155,8 +155,11 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
 
             while (getline(&line, &line_len, fd) != -1 && line)
             {
-                if (line[line_len] == '\n')
-                    line[line_len] = '\0';
+                if (line_len == 0)
+                    continue;
+
+                if (line[line_len - 1] == '\n')
+                    line[line_len - 1] = '\0';
 
                 if (strncmp(line, "VmRSS", 5) == 0)
                 {
