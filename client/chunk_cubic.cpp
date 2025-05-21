@@ -33,6 +33,13 @@ void chunk_cubic_t::free_renderer_resources()
     quad_count_overlay = 0;
     quad_count_translucent = 0;
 
+    if (mesh_handle)
+    {
+        mesh_handle->release();
+        delete mesh_handle;
+        mesh_handle = nullptr;
+    }
+
     dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
 }
 

@@ -420,8 +420,7 @@ void level_t::set_terrain(texture_terrain_t* const _terrain)
     terrain = _terrain;
     clear_mesh(false);
 
-    SDL_ReleaseGPUBuffer(state::gpu_device, missing_ent_ssbo);
-    missing_ent_ssbo = nullptr;
+    gpu::release_buffer(missing_ent_ssbo);
     missing_ent_num_instances = 0;
 
     if (!terrain)
@@ -430,8 +429,7 @@ void level_t::set_terrain(texture_terrain_t* const _terrain)
 
 void level_t::upload_missing_ent_mesh(SDL_GPUCopyPass* const copy_pass)
 {
-    SDL_ReleaseGPUBuffer(state::gpu_device, missing_ent_ssbo);
-    missing_ent_ssbo = nullptr;
+    gpu::release_buffer(missing_ent_ssbo);
     missing_ent_num_instances = 0;
 
     /* Create missing entity mesh */
@@ -584,7 +582,7 @@ void level_t::render_stage_prepare(const glm::ivec2 win_size)
     tick();
 }
 
-bool level_t::mesh_queue_upload_item(SDL_GPUCopyPass* const copy_pass, mesh_queue_info_t& item)
+bool level_t::mesh_queue_upload_item(SDL_GPUCommandBuffer* const command_buffer, SDL_GPUCopyPass* const copy_pass, mesh_queue_info_t& item)
 {
     chunk_cubic_t* c = get_chunk(item.pos);
 
@@ -594,68 +592,37 @@ bool level_t::mesh_queue_upload_item(SDL_GPUCopyPass* const copy_pass, mesh_queu
 
     glm::ivec4 chunk_pos(c->pos.x, c->pos.y, c->pos.z, 0);
 
-    const Uint32 old_offset = mesh_buffer_offset;
-    const Uint32 new_offset = item.vertex_data_size + old_offset;
-
-    if (new_offset > mesh_buffer_size)
-    {
-        Uint32 new_size = new_offset;
-
-        /* 1iMB minimum size */
-        new_size = SDL_max(1 << 20, new_size);
-
-        /* I'm not entirely certain what this is rounding to, but it isn't the nearest power of two */
-        Uint32 round_mask = (new_size >> 3) - 1;
-        for (Uint32 i = 0; i < 32; i++)
-            round_mask |= round_mask >> i;
-        round_mask |= (1024 * 1024 * 1 - 1);
-        round_mask &= (1024 * 1024 * 16 - 1);
-        new_size = (new_size + round_mask) & ~round_mask;
-
-        SDL_GPUBufferCreateInfo cinfo_vbo = {};
-        cinfo_vbo.usage = SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ;
-        cinfo_vbo.size = new_size;
-        SDL_GPUBuffer* new_mesh_buffer = gpu::create_buffer(cinfo_vbo, "[Level]: Mesh buffer");
-
-        if (!new_mesh_buffer)
-            return false;
-
-        if (mesh_buffer)
-        {
-            SDL_GPUBufferLocation buf_loc_src = {};
-            SDL_GPUBufferLocation buf_loc_dst = {};
-
-            buf_loc_src.buffer = mesh_buffer;
-            buf_loc_dst.buffer = new_mesh_buffer;
-
-            SDL_CopyGPUBufferToBuffer(copy_pass, &buf_loc_src, &buf_loc_dst, mesh_buffer_size, false);
-            gpu::release_buffer(mesh_buffer);
-        }
-
-        mesh_buffer = new_mesh_buffer;
-        mesh_buffer_size = new_size;
-    }
-
-    if (!mesh_buffer)
+    Uint32 offset = 0;
+    if (!mesh_buffer.acquire_region(item.vertex_data_size / mesh_buffer.element_size, offset))
         return false;
 
+    TRACE("ACQUIRE: %08u <%d, %d, %d>", offset, c->pos.x, c->pos.y, c->pos.z);
+
+    assert((offset & 4) == 0);
+
     if (!gpu::upload_to_buffer(
-            copy_pass, mesh_buffer, old_offset, item.vertex_data_size,
+            copy_pass, mesh_buffer.get_buffer(), offset * mesh_buffer.element_size, item.vertex_data_size,
             [&](void* tbo_pointer, Uint32 tbo_size) {
                 assert(item.vertex_data_size == tbo_size);
                 memcpy(tbo_pointer, item.vertex_data, item.vertex_data_size);
             },
             false))
     {
+        TRACE("RELEASE: %08u <%d, %d, %d>", offset, c->pos.x, c->pos.y, c->pos.z);
+        mesh_buffer.release_region(offset);
         return false;
     }
+    else
+        mesh_buffer.mark_upload_from_command_buffer(command_buffer);
 
-    mesh_buffer_offset = new_offset;
-
-    /* TODO: Invalidate old regions */
-    /* TODO: Only set this after data is for sure uploaded */
+    /* TODO: Only set this after data is for sure uploaded, and the timestamp is recent enough */
     c->last_mesh_update_time = SDL_GetTicksNS();
-    c->mesh_buffer_offset_quads = old_offset / (sizeof(terrain_vertex_t) * 4);
+    if (c->mesh_handle)
+    {
+        c->mesh_handle->release();
+        delete c->mesh_handle;
+    }
+    c->mesh_handle = new gpu::subdiv_buffer_allocation_t(offset, &mesh_buffer);
     c->quad_count = item.quad_count;
     c->quad_count_overlay = item.quad_count_overlay;
     c->quad_count_translucent = item.quad_count_translucent;
@@ -663,7 +630,7 @@ bool level_t::mesh_queue_upload_item(SDL_GPUCopyPass* const copy_pass, mesh_queu
     return true;
 }
 
-void level_t::render_stage_copy(SDL_GPUCopyPass* const copy_pass)
+void level_t::render_stage_copy(SDL_GPUCommandBuffer* const command_buffer, SDL_GPUCopyPass* const copy_pass)
 {
     lightmap.update(copy_pass);
 
@@ -675,7 +642,7 @@ void level_t::render_stage_copy(SDL_GPUCopyPass* const copy_pass)
         mesh_queue_info_t item = mesh_queue.front();
         mesh_queue.pop_front();
 
-        if (mesh_queue_upload_item(copy_pass, item))
+        if (mesh_queue_upload_item(command_buffer, copy_pass, item))
             item.release_data();
         else
             mesh_queue.push_back(item);
@@ -686,15 +653,17 @@ void level_t::render_stage_copy(SDL_GPUCopyPass* const copy_pass)
     ImVector<SDL_GPUIndirectDrawCommand> overlay_commands;
     ImVector<SDL_GPUIndirectDrawCommand> translucent_commands;
 
+    mesh_buffer.mark_as_used_by_command_buffer(command_buffer);
+
     for (Uint32 i = 0; i < Uint32(chunks_render_order.size()); i++)
     {
         chunk_cubic_t* const c = chunks_render_order[i];
-        if (!c || !c->visible)
+        if (!c || !c->visible || !c->mesh_handle)
             continue;
         SDL_GPUIndirectDrawCommand base_cmd;
         base_cmd.first_vertex = pos_data.size() * 4;
         base_cmd.num_vertices = 4;
-        base_cmd.first_instance = c->mesh_buffer_offset_quads;
+        base_cmd.first_instance = c->mesh_handle->offset;
         base_cmd.num_instances = 0;
         pos_data.push_back(glm::ivec4(c->pos, 0));
         if (c->quad_count)
@@ -810,10 +779,10 @@ void level_t::render_stage_render(
     } ubo_frag = { !!(state::game_resources->use_texture) };
 
     bool render_resources_valid = 0;
-    if (mesh_buffer && indirect_buffers.pos)
+    if (mesh_buffer.get_buffer() && indirect_buffers.pos)
         render_resources_valid = 1;
 
-    SDL_GPUBuffer* storage_buffers[] = { mesh_buffer, indirect_buffers.pos };
+    SDL_GPUBuffer* storage_buffers[] = { mesh_buffer.get_buffer(), indirect_buffers.pos };
     SDL_PushGPUFragmentUniformData(command_buffer, 0, &ubo_frag, sizeof(ubo_frag));
     SDL_PushGPUVertexUniformData(command_buffer, 0, &ubo_world, sizeof(ubo_world));
     SDL_PushGPUVertexUniformData(command_buffer, 1, &ubo_tint, sizeof(ubo_tint));
@@ -990,15 +959,10 @@ void level_t::mesh_queue_info_t::release_data()
 
 void level_t::transient_indirect_buffers_t::release()
 {
-    SDL_ReleaseGPUBuffer(state::gpu_device, pos);
-    SDL_ReleaseGPUBuffer(state::gpu_device, cmd_solid);
-    SDL_ReleaseGPUBuffer(state::gpu_device, cmd_overlay);
-    SDL_ReleaseGPUBuffer(state::gpu_device, cmd_translucent);
-
-    pos = nullptr;
-    cmd_solid = nullptr;
-    cmd_overlay = nullptr;
-    cmd_translucent = nullptr;
+    gpu::release_buffer(pos);
+    gpu::release_buffer(cmd_solid);
+    gpu::release_buffer(cmd_overlay);
+    gpu::release_buffer(cmd_translucent);
 
     cmd_solid_len = 0;
     cmd_overlay_len = 0;
@@ -1009,11 +973,10 @@ level_t::transient_indirect_buffers_t::~transient_indirect_buffers_t() { release
 
 level_t::~level_t()
 {
-    for (auto it : mesh_queue)
+    for (auto& it : mesh_queue)
         it.release_data();
 
-    SDL_ReleaseGPUBuffer(state::gpu_device, missing_ent_ssbo);
-    SDL_ReleaseGPUBuffer(state::gpu_device, mesh_buffer);
+    gpu::release_buffer(missing_ent_ssbo);
     for (chunk_cubic_t* c : chunks_render_order)
         delete c;
 
@@ -1036,6 +999,9 @@ bool level_t::gamemode_set(int x)
 
 void level_t::clear()
 {
+    for (auto it : cmap)
+        delete it.second;
+
     chunks_light_order.clear();
     chunks_render_order.clear();
     cmap.clear();

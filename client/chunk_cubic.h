@@ -23,6 +23,7 @@
 #ifndef MCS_B181_CLIENT_CHUNK_CUBIC_H
 #define MCS_B181_CLIENT_CHUNK_CUBIC_H
 
+#include "gpu/subdiv_buffer.h"
 #include <SDL3/SDL.h>
 #include <glm/glm.hpp>
 
@@ -133,7 +134,7 @@ struct chunk_cubic_t
         chunk_cubic_t* neg_z = NULL;
     } neighbors;
 
-    Uint32 mesh_buffer_offset_quads = 0;
+    gpu::subdiv_buffer_allocation_t* mesh_handle = nullptr;
 
     Uint64 last_mesh_update_time = 0;
 

@@ -1174,7 +1174,7 @@ static void loop_stage_render(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUT
         SDL_GPUCopyPass* copy_pass = SDL_BeginGPUCopyPass(gpu_command_buffer);
 
         SDL_PushGPUDebugGroup(gpu_command_buffer, "[Level]: Copy pass");
-        game_selected->level->render_stage_copy(copy_pass);
+        game_selected->level->render_stage_copy(gpu_command_buffer, copy_pass);
         state::game_resources->terrain_atlas->update(copy_pass);
         SDL_PopGPUDebugGroup(gpu_command_buffer);
 

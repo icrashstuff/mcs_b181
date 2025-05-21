@@ -21,8 +21,8 @@
  * DEALINGS IN THE SOFTWARE.
  */
 
-#ifndef TETRA_CLIENT_LEVEL_H_INCLUDED
-#define TETRA_CLIENT_LEVEL_H_INCLUDED
+#ifndef MCS_B181__CLIENT__LEVEL_H_INCLUDED
+#define MCS_B181__CLIENT__LEVEL_H_INCLUDED
 
 #include "chunk_cubic.h"
 #include "entity/entity.h"
@@ -38,6 +38,7 @@
 #include <memory>
 #include <vector>
 
+#include "gpu/gpu.h"
 #include "state.h"
 
 /**
@@ -269,13 +270,16 @@ struct level_t
     /**
      * Perform data transfers
      *
+     * @param command_buffer Command buffer related to copy pass
      * @param copy_pass Copy pass to use
      */
-    void render_stage_copy(SDL_GPUCopyPass* const copy_pass);
+    void render_stage_copy(SDL_GPUCommandBuffer* const command_buffer, SDL_GPUCopyPass* const copy_pass);
 
     /**
      * Renders the world and entities
      *
+     * @param command_buffer Command buffer related to render pass
+     * @param render_pass Render pass to use
      * @param win_size Window size (used for projection matrix)
      * @param delta_time Time since last frame in seconds
      * @param render_pass Render pass to use
@@ -340,9 +344,7 @@ struct level_t
 
     size_t get_mesh_queue_size() { return mesh_queue.size(); }
 
-    SDL_GPUBuffer* mesh_buffer = nullptr;
-    Uint32 mesh_buffer_size = 0;
-    Uint32 mesh_buffer_offset = 0;
+    gpu::subdiv_buffer_t mesh_buffer = gpu::subdiv_buffer_t(SDL_GPU_BUFFERUSAGE_GRAPHICS_STORAGE_READ, sizeof(terrain_vertex_t) * 4, 0, 128);
 
 private:
     mc_id::gamemode_t gamemode = mc_id::GAMEMODE_SPECTATOR;
@@ -463,7 +465,7 @@ private:
      *
      * @returns true if the item should be popped from the queue and be released, false otherwise
      */
-    bool mesh_queue_upload_item(SDL_GPUCopyPass* const copy_pass, mesh_queue_info_t& item);
+    bool mesh_queue_upload_item(SDL_GPUCommandBuffer* const command_buffer, SDL_GPUCopyPass* const copy_pass, mesh_queue_info_t& item);
 
     bool mesh_queue_upload_items(mesh_queue_info_t& item);
 

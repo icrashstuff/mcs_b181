@@ -138,9 +138,11 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
 
     /* ======================== RIGHT SIDE ======================== */
 
-    add_text(ctx, drawlist, 1, cursor_r, "Chunk mesh memory: %.1lf/%.1lf MiB", double(lvl->mesh_buffer.get_size_in_bytes() >> 10) / 1024.0,
+    add_text(ctx, drawlist, 1, cursor_r, "Chunk mesh memory: %.1lf/%.1lf MiB", double(lvl->mesh_buffer.get_allocations_in_bytes() >> 10) / 1024.0,
         double(lvl->mesh_buffer.get_size_in_bytes() >> 10) / 1024.0);
     add_text(ctx, drawlist, 1, cursor_r, "Chunk data memory: %zu MiB", mem_chunk >> 20);
+    add_text(ctx, drawlist, 1, cursor_r, "Alloc: %u, Pend: %u, Free: %u%s", lvl->mesh_buffer.get_num_allocations(), lvl->mesh_buffer.get_num_pending_releases(),
+        lvl->mesh_buffer.get_num_avail_regions(), lvl->mesh_buffer.get_resize_in_progress() ? " (Resizing)" : "");
 
     /* Memory usage */
 #ifdef SDL_PLATFORM_LINUX
