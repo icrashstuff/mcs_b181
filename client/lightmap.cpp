@@ -35,7 +35,6 @@
 
 #include "tetra/util/convar.h"
 
-static convar_float_t r_light_brightness("r_light_brightness", 0.0, 0.0, 1.0, "Lightmap base brightness", CONVAR_FLAG_SAVE);
 static convar_float_t r_lightmap_gamma {
     "r_light_gamma",
     2.2,
@@ -89,9 +88,9 @@ void lightmap_t::set_preset(const lightmap_preset_t preset)
 
 lightmap_t::~lightmap_t()
 {
-    SDL_ReleaseGPUTexture(state::gpu_device, tex_id);
-    SDL_ReleaseGPUSampler(state::gpu_device, sampler_linear);
-    SDL_ReleaseGPUSampler(state::gpu_device, sampler_nearest);
+    gpu::release_texture(tex_id);
+    gpu::release_sampler(sampler_linear);
+    gpu::release_sampler(sampler_nearest);
 }
 
 SDL_FORCE_INLINE float mix_for_time_of_day(int time_of_day)
@@ -125,7 +124,6 @@ void lightmap_t::imgui_contents()
 
     ImGui::PlotLines("mix_for_time_of_day", mixes, SDL_arraysize(mixes), 0, NULL, 0.0f, 1.0f, ImVec2(0, 64));
 
-    r_light_brightness.imgui_edit();
     r_lightmap_gamma.imgui_edit();
 
     ImGui::SliderFloat("Flicker Strength", &flicker_strength, 0.0f, 1.0f);
