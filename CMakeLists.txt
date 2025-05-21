@@ -112,6 +112,7 @@ set(mcs_b181_client_SRC
     client/gpu/texture.cpp
     client/gpu/sampler.cpp
     client/gpu/pipeline.cpp
+    client/gpu/subdiv_buffer.cpp
     client/gpu/command_buffer.cpp
 
     client/sound/stb_vorbis.c

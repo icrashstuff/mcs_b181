@@ -25,6 +25,7 @@
 #include "buffer.h"
 #include "command_buffer.h"
 #include "sampler.h"
+#include "subdiv_buffer.h"
 #include "texture.h"
 
 namespace gpu
