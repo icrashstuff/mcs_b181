@@ -196,10 +196,13 @@ void gpu::ref_fence(fence_t* const fence, const Uint32 count)
         SDL_AddAtomicInt(&fence->ref_counter, count);
 }
 
-void gpu::release_fence(fence_t* const fence, Uint32 count)
+void gpu::release_fence(fence_t*& fence, const bool set_to_null, Uint32 count)
 {
     if (fence && count)
         fence->release(count);
+
+    if (set_to_null)
+        fence = nullptr;
 }
 bool gpu::is_fence_cancelled(fence_t* const fence) { return fence->is_cancelled(); }
 bool gpu::is_fence_done(fence_t* const fence) { return fence->is_done(); }

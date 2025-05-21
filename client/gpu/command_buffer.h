@@ -113,9 +113,10 @@ void ref_fence(fence_t* const fence, const Uint32 count = 1);
  * You must not reference the fence after calling this function.
  *
  * @param fence Fence to release (NULL is a safe no-op)
+ * @param set_to_null Set fence parameter to NULL
  * @param count Amount to decrement reference counter by
  */
-void release_fence(fence_t* const fence, const Uint32 count = 1);
+void release_fence(fence_t*& fence, const bool set_to_null = true, const Uint32 count = 1);
 
 /**
  * Wait on a single fence
