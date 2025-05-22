@@ -20,8 +20,8 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#ifndef CLIENT_IGHTMAP_H_INCLUDED
-#define CLIENT_IGHTMAP_H_INCLUDED
+#ifndef MCS_B181__CLIENT__LIGHTMAP_H_INCLUDED
+#define MCS_B181__CLIENT__LIGHTMAP_H_INCLUDED
 
 #include <SDL3/SDL.h>
 #include <glm/glm.hpp>
@@ -30,6 +30,16 @@
 class lightmap_t
 {
 public:
+    /* Matches ubo_lightmap_t from lightmap.glsl */
+    struct ubo_lightmap_t
+    {
+        alignas(16) glm::vec3 minimum_color;
+        alignas(16) glm::vec3 sky_color;
+        alignas(16) glm::vec3 block_color;
+        alignas(16) glm::vec3 light_flicker;
+        float gamma;
+    };
+
     enum lightmap_preset_t
     {
         LIGHTMAP_PRESET_OVERWORLD,
@@ -45,19 +55,13 @@ public:
     void set_preset(const lightmap_preset_t preset);
 
     /**
-     * Updates light map
+     * Update the uniform struct (Call this once per frame)
      */
-    void update(SDL_GPUCopyPass* const copy_pass);
+    void update();
+
+    const ubo_lightmap_t& get_uniform_struct() const { return uniform; }
 
     void imgui_contents();
-
-    SDL_GPUTexture* tex_id = nullptr;
-
-    SDL_GPUSampler* sampler_linear = nullptr;
-    SDL_GPUSampler* sampler_nearest = nullptr;
-
-    SDL_GPUTextureSamplerBinding binding_linear = {};
-    SDL_GPUTextureSamplerBinding binding_nearest = {};
 
     /**
      * Get mix between daytime and nighttime based on current time
@@ -74,6 +78,8 @@ public:
     glm::vec3 color_minimum = { 0.0f, 0.0f, 0.0f };
 
 private:
+    ubo_lightmap_t uniform;
+
     float flicker_strength = 0.25f;
     /**
      * Value from [-1.0, 1.0]
@@ -88,11 +94,6 @@ private:
     Uint64 mc_time = 0;
 
     int time_of_day_override = -1;
-
-    int width = 16;
-    int height = 16;
-
-    std::vector<Uint8> dat;
 
     float flicker_graph_values[512] = {};
     int flicker_graph_pos = 0;

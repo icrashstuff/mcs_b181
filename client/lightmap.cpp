@@ -26,13 +26,6 @@
 #include <glm/glm.hpp>
 #include <glm/gtc/type_ptr.hpp>
 
-#include "gpu/gpu.h"
-#include "state.h"
-
-#define BASE_R 1.0
-#define BASE_G 0.8
-#define BASE_B 0.6
-
 #include "tetra/util/convar.h"
 
 static convar_float_t r_lightmap_gamma {
@@ -86,12 +79,7 @@ void lightmap_t::set_preset(const lightmap_preset_t preset)
     }
 }
 
-lightmap_t::~lightmap_t()
-{
-    gpu::release_texture(tex_id);
-    gpu::release_sampler(sampler_linear);
-    gpu::release_sampler(sampler_nearest);
-}
+lightmap_t::~lightmap_t() { }
 
 SDL_FORCE_INLINE float mix_for_time_of_day(int time_of_day)
 {
@@ -149,29 +137,10 @@ void lightmap_t::imgui_contents()
 
     ImGui::SliderInt("Time override", &time_of_day_override, -1, 24000);
 
-    float tex_size = ImGui::GetContentRegionAvail().x / 2.2f;
-
-    binding_linear = { tex_id, sampler_linear };
-    binding_nearest = { tex_id, sampler_nearest };
-
-    if (!binding_linear.texture)
-        binding_linear.texture = state::gpu_debug_texture;
-    if (!binding_nearest.texture)
-        binding_nearest.texture = state::gpu_debug_texture;
-
-    if (!binding_linear.sampler)
-        binding_linear.sampler = state::gpu_debug_sampler;
-    if (!binding_nearest.sampler)
-        binding_nearest.sampler = state::gpu_debug_sampler;
-
-    ImGui::Image(reinterpret_cast<ImTextureID>(&binding_linear), ImVec2(tex_size, tex_size), ImVec2(0, 0), ImVec2(1, 1));
-    ImGui::SameLine();
-    ImGui::Image(reinterpret_cast<ImTextureID>(&binding_nearest), ImVec2(tex_size, tex_size), ImVec2(0, 0), ImVec2(1, 1));
-
     ImGui::EndGroup();
 }
 
-void lightmap_t::update(SDL_GPUCopyPass* const copy_pass)
+void lightmap_t::update()
 {
     Uint64 sdl_cur_tick = SDL_GetTicks();
     if (sdl_cur_tick - last_flicker_tick < ticks_per_flicker_tick)
@@ -191,78 +160,14 @@ void lightmap_t::update(SDL_GPUCopyPass* const copy_pass)
         flicker_graph_values[flicker_graph_pos] = flicker_value;
     }
 
-    dat.resize(width * height * 4);
-
     int time_of_day = mc_time % 24000;
 
     if (time_of_day_override > -1)
         time_of_day = time_of_day_override;
 
-    float flick = flicker_value * SDL_fabsf(flicker_value) * flicker_strength * 0.5f + flicker_midpoint;
-
-    float gamma = r_lightmap_gamma.get();
-
-    glm::vec3 sky_mix = glm::mix(color_night, color_day, mix_for_time_of_day(time_of_day));
-
-    for (int y = 0; y < height; y++)
-    {
-        const float v = y / float(height - 1);
-        const float v_gamma = glm::pow(v, gamma);
-        for (int x = 0; x < width; x++)
-        {
-            const float u = x / float(width - 1);
-            const float u_gamma = glm::pow(u, gamma);
-
-            /* Block Light */
-            float r = u_gamma * color_block.r * flick;
-            float g = u_gamma * color_block.g * flick;
-            float b = u_gamma * color_block.b * flick;
-
-            /* Sky light */
-            r += v_gamma * sky_mix.r;
-            g += v_gamma * sky_mix.g;
-            b += v_gamma * sky_mix.b;
-
-            /* Minimum light */
-            r = (r + color_minimum.r) / (1.0f + color_minimum.r);
-            g = (g + color_minimum.g) / (1.0f + color_minimum.g);
-            b = (b + color_minimum.b) / (1.0f + color_minimum.b);
-
-            dat[(y * width + x) * 4 + 0] = SDL_clamp(r, 0.0f, 1.0f) * 255;
-            dat[(y * width + x) * 4 + 1] = SDL_clamp(g, 0.0f, 1.0f) * 255;
-            dat[(y * width + x) * 4 + 2] = SDL_clamp(b, 0.0f, 1.0f) * 255;
-            dat[(y * width + x) * 4 + 3] = 255;
-        }
-    }
-
-    if (!tex_id)
-    {
-        SDL_GPUTextureCreateInfo cinfo_tex = {};
-        cinfo_tex.type = SDL_GPU_TEXTURETYPE_2D;
-        cinfo_tex.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
-        cinfo_tex.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
-        cinfo_tex.width = Uint32(width);
-        cinfo_tex.height = Uint32(height);
-        cinfo_tex.layer_count_or_depth = 1;
-        cinfo_tex.num_levels = 1;
-
-        tex_id = gpu::create_texture(cinfo_tex, "Lightmap");
-    }
-
-    if (!sampler_linear || !sampler_nearest)
-    {
-        SDL_GPUSamplerCreateInfo cinfo_sampler = {};
-        cinfo_sampler.min_filter = SDL_GPU_FILTER_LINEAR;
-        cinfo_sampler.mipmap_mode = SDL_GPU_SAMPLERMIPMAPMODE_LINEAR;
-        cinfo_sampler.address_mode_u = cinfo_sampler.address_mode_v = cinfo_sampler.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
-
-        cinfo_sampler.mag_filter = SDL_GPU_FILTER_LINEAR;
-        if (!sampler_linear)
-            sampler_linear = gpu::create_sampler(cinfo_sampler, "Linear lightmap sampler");
-        cinfo_sampler.mag_filter = SDL_GPU_FILTER_NEAREST;
-        if (!sampler_nearest)
-            sampler_nearest = gpu::create_sampler(cinfo_sampler, "Nearest lightmap sampler");
-    }
-
-    gpu::upload_to_texture2d(copy_pass, tex_id, SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM, 0, 0, width, height, dat.data(), 1);
+    uniform.light_flicker = glm::vec3(flicker_value * SDL_fabsf(flicker_value) * flicker_strength * 0.5f + flicker_midpoint);
+    uniform.sky_color = glm::mix(color_night, color_day, mix_for_time_of_day(time_of_day));
+    uniform.block_color = color_block;
+    uniform.minimum_color = color_minimum;
+    uniform.gamma = r_lightmap_gamma.get();
 }

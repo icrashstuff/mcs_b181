@@ -632,7 +632,7 @@ bool level_t::mesh_queue_upload_item(SDL_GPUCommandBuffer* const command_buffer,
 
 void level_t::render_stage_copy(SDL_GPUCommandBuffer* const command_buffer, SDL_GPUCopyPass* const copy_pass)
 {
-    lightmap.update(copy_pass);
+    lightmap.update();
 
     if (!missing_ent_ssbo || !missing_ent_num_instances)
         upload_missing_ent_mesh(copy_pass);
@@ -757,7 +757,6 @@ void level_t::render_stage_render(
 
     SDL_GPUTextureSamplerBinding binding_tex[] = {
         terrain->binding,
-        SDL_GPUTextureSamplerBinding { lightmap.tex_id, lightmap.sampler_linear },
     };
 
     SDL_BindGPUFragmentSamplers(render_pass, 0, binding_tex, SDL_arraysize(binding_tex));
@@ -784,6 +783,7 @@ void level_t::render_stage_render(
 
     SDL_GPUBuffer* storage_buffers[] = { mesh_buffer.get_buffer(), indirect_buffers.pos };
     SDL_PushGPUFragmentUniformData(command_buffer, 0, &ubo_frag, sizeof(ubo_frag));
+    SDL_PushGPUFragmentUniformData(command_buffer, 1, &lightmap.get_uniform_struct(), sizeof(lightmap.get_uniform_struct()));
     SDL_PushGPUVertexUniformData(command_buffer, 0, &ubo_world, sizeof(ubo_world));
     SDL_PushGPUVertexUniformData(command_buffer, 1, &ubo_tint, sizeof(ubo_tint));
 

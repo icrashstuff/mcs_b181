@@ -45,15 +45,17 @@ layout(location = 0) out vec4 out_color;
  */
 
 layout(set = 2, binding = 0) uniform sampler2D tex_atlas;
-layout(set = 2, binding = 1) uniform sampler2D tex_lightmap;
 
 const int ao_algorithm = 1;
 
 layout(std140, set = 3, binding = 0) uniform ubo_frag_t
 {
     uint use_texture;
-}
-ubo_frag;
+} ubo_frag;
+
+#define LIGHTMAP_SET 3
+#define LIGHTMAP_BINDING 1
+#include "lightmap.glsl"
 
 void main()
 {
@@ -91,5 +93,5 @@ void main()
         break;
     }
 
-    out_color *= texture(tex_lightmap, vec2(frag.light_block, frag.light_sky));
+    out_color *= vec4(calculate_lighting(frag.light_block, frag.light_sky), 1);
 }

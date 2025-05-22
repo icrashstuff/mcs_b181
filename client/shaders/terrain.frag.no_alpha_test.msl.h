@@ -5,7 +5,16 @@ static const unsigned char terrain_frag_no_alpha_test_msl[] = R"(
 
 using namespace metal;
 
-struct _11
+struct ubo_lightmap_t
+{
+    float3 minimum_color;
+    float3 sky_color;
+    float3 block_color;
+    packed_float3 light_flicker;
+    float gamma;
+};
+
+struct _69
 {
     float4 color;
     float2 uv;
@@ -33,10 +42,10 @@ struct main0_in
     float frag_light_sky [[user(locn4)]];
 };
 
-fragment main0_out main0(main0_in in [[stage_in]], constant ubo_frag_t& ubo_frag [[buffer(0)]], texture2d<float> tex_atlas [[texture(0)]], texture2d<float> tex_lightmap [[texture(1)]], sampler tex_atlasSmplr [[sampler(0)]], sampler tex_lightmapSmplr [[sampler(1)]])
+fragment main0_out main0(main0_in in [[stage_in]], constant ubo_frag_t& ubo_frag [[buffer(0)]], constant ubo_lightmap_t& ubo_lightmap [[buffer(1)]], texture2d<float> tex_atlas [[texture(0)]], sampler tex_atlasSmplr [[sampler(0)]])
 {
     main0_out out = {};
-    _11 frag = {};
+    _69 frag = {};
     frag.color = in.frag_color;
     frag.uv = in.frag_uv;
     frag.ao = in.frag_ao;
@@ -51,17 +60,17 @@ fragment main0_out main0(main0_in in [[stage_in]], constant ubo_frag_t& ubo_frag
     {
         out.out_color.w *= tex_atlas.sample(tex_atlasSmplr, frag.uv, bias(-1.0)).w;
     }
-    float4 _74 = out.out_color;
-    float3 _76 = _74.xyz * (1.0 - (frag.ao * 0.100000001490116119384765625));
-    out.out_color.x = _76.x;
-    out.out_color.y = _76.y;
-    out.out_color.z = _76.z;
-    float4 _95 = out.out_color;
-    float3 _97 = _95.xyz * fast::clamp(1.10000002384185791015625 - ((-0.100000001490116119384765625) / (frag.ao - 1.25)), 0.0, 1.0);
-    out.out_color.x = _97.x;
-    out.out_color.y = _97.y;
-    out.out_color.z = _97.z;
-    out.out_color *= tex_lightmap.sample(tex_lightmapSmplr, float2(frag.light_block, frag.light_sky));
+    float4 _126 = out.out_color;
+    float3 _128 = _126.xyz * (1.0 - (frag.ao * 0.100000001490116119384765625));
+    out.out_color.x = _128.x;
+    out.out_color.y = _128.y;
+    out.out_color.z = _128.z;
+    float4 _146 = out.out_color;
+    float3 _148 = _146.xyz * fast::clamp(1.10000002384185791015625 - ((-0.100000001490116119384765625) / (frag.ao - 1.25)), 0.0, 1.0);
+    out.out_color.x = _148.x;
+    out.out_color.y = _148.y;
+    out.out_color.z = _148.z;
+    out.out_color *= float4(fast::clamp(((((ubo_lightmap.block_color * float3(ubo_lightmap.light_flicker)) * powr(frag.light_block, ubo_lightmap.gamma)) + (ubo_lightmap.sky_color * powr(frag.light_sky, ubo_lightmap.gamma))) + ubo_lightmap.minimum_color) / (float3(1.0) + ubo_lightmap.minimum_color), float3(0.0), float3(1.0)), 1.0);
     return out;
 }
 

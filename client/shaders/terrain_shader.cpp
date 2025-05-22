@@ -55,8 +55,8 @@ void state::init_terrain_pipelines()
     SDL_GPUShaderCreateInfo cinfo_shader_frag_alpha_test = {};
     cinfo_shader_frag_alpha_test.entrypoint = "main";
     cinfo_shader_frag_alpha_test.stage = SDL_GPU_SHADERSTAGE_FRAGMENT;
-    cinfo_shader_frag_alpha_test.num_samplers = 2;
-    cinfo_shader_frag_alpha_test.num_uniform_buffers = 1;
+    cinfo_shader_frag_alpha_test.num_samplers = 1;
+    cinfo_shader_frag_alpha_test.num_uniform_buffers = 2;
     SDL_GPUShaderCreateInfo cinfo_shader_frag_no_alpha_test = cinfo_shader_frag_alpha_test;
 
     SDL_GPUShaderFormat formats = SDL_GetGPUShaderFormats(state::gpu_device);
