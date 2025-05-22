@@ -59,8 +59,13 @@ static convar_int_t cvr_r_biome_oversample {
 #pragma GCC optimize("Og")
 #endif
 
+#include <atomic>
+static std::atomic<Uint64> accumulator = { 0 };
+static std::atomic<Uint64> cycles = { 0 };
+
 void level_t::build_mesh(chunk_cubic_t* const center)
 {
+    Uint64 start_ns = SDL_GetTicksNS();
     if (!center)
     {
         dc_log_error("Attempt made to mesh NULL chunk");
@@ -2466,27 +2471,14 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
     mesh_queue.push_back(queue_info);
 
-    //     Uint32 buf_size = (vtx_solid.size() + 0x1F) & ~0x1F;
-    //
-    //     SDL_GPUBufferCreateInfo cinfo_buffer = { .usage = SDL_GPU_BUFFERUSAGE_VERTEX, .size = buf_size, .props = SDL_CreateProperties() };
-    //     if(cinfo_buffer.props)
-    //     {
-    //         char name[128];
-    //         stbsp_snprintf(name, IM_ARRAYSIZE(name), "[Level][Chunk]: <%d, %d, %d>: Vertex Buffer", center->pos.x, center->pos.y, center->pos.z);
-    //         SDL_SetStringProperty(cinfo_buffer.props, SDL_PROP_GPU_BUFFER_CREATE_NAME_STRING, name);
-    //     }
-    //
-    //     // SDL_CopyGPUBufferToBuffer();
-    //
-    //     if (!center->vbo)
-    //     {
-    //         glGenBuffers(1, &center->vbo);
-    //         tetra::gl_obj_label(GL_BUFFER, center->vbo, "[Level][Chunk]: <%d, %d, %d>: VBO", center->pos.x, center->pos.y, center->pos.z);
-    //         glBindBuffer(GL_ELEMENT_ARRAY_BUFFER, ebo);
-    //     }
-    //
-    //     glBindBuffer(GL_ARRAY_BUFFER, center->vbo);
-    //     glBufferData(GL_ARRAY_BUFFER, vtx_solid.size() * sizeof(vtx_solid[0]), vtx_solid.data(), GL_STATIC_DRAW);
+    accumulator += (SDL_GetTicksNS() - start_ns) / Uint64(100);
+    Uint64 cur_cycle = ++cycles;
+
+    if (cur_cycle && (cur_cycle % 1024) == 0)
+    {
+        Uint64 avg = accumulator / cur_cycle;
+        dc_log("avg: %.4f ms, cycles: %lu", avg / 10000.0, cur_cycle);
+    }
 }
 
 #include "shared/cubiomes/biomes.h"
