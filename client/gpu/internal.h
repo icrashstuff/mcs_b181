@@ -47,6 +47,10 @@
             SDL_SetStringProperty(cinfo_named.props, PROP_STRING, name);                                                        \
         }                                                                                                                       \
                                                                                                                                 \
+        /* We clear the current error because sometimes SDL won't set one, even though one occurred */                          \
+        /* (that or I'm doing something wrong), - Ian 2025-05-22 */                                                             \
+        SDL_ClearError();                                                                                                       \
+                                                                                                                                \
         SDL_GPU##RESOURCE_SUB_TYPE* ret = SDL_CreateGPU##RESOURCE_SUB_TYPE(state::gpu_device, &cinfo_named);                    \
                                                                                                                                 \
         if (!ret)                                                                                                               \

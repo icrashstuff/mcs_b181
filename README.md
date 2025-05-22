@@ -29,6 +29,7 @@ This project vendors and makes use of the following external software components
 | stb_image            | Copyright (c) 2006 - 2024 Sean Barrett, and others      | MIT License or Unlicense (full text under tetra/util/stb/stb_image.h)          |
 | stb_image_write      | Copyright (c) 2010 - 2024 Sean Barrett, and others      | MIT License or Unlicense (full text under tetra/util/stb/stb_image_write.h)    |
 | stb_sprintf          | Copyright (c) 2015 - 2024 Sean Barrett, and others      | MIT License or Unlicense (full text under tetra/util/stb_sprintf.h)            |
+| SMOL-V               | Copyright (c) 2016 - 2024 Aras Pranckevicius            | MIT license or Unlicense (full text under client/gpu/smol-v/license.txt)       |
 | Jzon                 | Copyright (c) 2015 Johannes Häggqvist                   | MIT license (full text under client/jzon)                                      |
 | Simplex Noise        | Copyright (c) 2012-2018 Sebastien Rombauts              | MIT license (full text under shared/simplex_noise/)                            |
 | SDL3 Net             | Copyright (C) 1997-2024 Sam Lantinga, and others        | zlib license (full text under sdl_net/)                                        |

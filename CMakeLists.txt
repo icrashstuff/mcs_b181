@@ -114,6 +114,7 @@ set(mcs_b181_client_SRC
     client/gpu/pipeline.cpp
     client/gpu/subdiv_buffer.cpp
     client/gpu/command_buffer.cpp
+    client/gpu/smol-v/smolv.cpp
 
     client/sound/stb_vorbis.c
     client/sound/sound_world.cpp

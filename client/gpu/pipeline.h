@@ -37,6 +37,8 @@ SDL_GPUShaderFormat get_shader_formats();
 /**
  * Create a named GPU Shader
  *
+ * NOTE: SMOL-V is accepted if the shader format is set to SDL_GPU_SHADERFORMAT_SPIRV
+ *
  * @param cinfo Creation info
  * @param fmt Shader name format string (Uses stb_sprintf) (NULL for no name)
  *

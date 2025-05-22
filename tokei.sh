@@ -15,5 +15,7 @@ exec tokei \
     -e cmake \
     -e shared/packet_gen_def.h \
     -e client/texture_ids.h \
+    -e client/gpu/smol-v/ \
+    -e client/shaders/compiled/ \
     -e client/sound/miniaudio_unifdef.h \
     "$@"
