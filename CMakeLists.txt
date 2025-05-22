@@ -253,26 +253,25 @@ if(MCS_B181_BUILD_SHADERS)
     add_executable(smolv_converter "client/gpu/smolv_converter.cpp;client/gpu/smol-v/smolv.cpp")
 
     set(mcs_b181_client_SHADERS
-        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/terrain.frag
-        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/terrain.vert
-        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/background.frag
-        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/background.vert
         ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/compile_shaders.sh
         ${CMAKE_CURRENT_BINARY_DIR}/smolv_converter
     )
 
-    set(mcs_b181_client_SHADER_HEADERS
-        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/terrain.frag.no_alpha_test.msl.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/terrain.frag.no_alpha_test.spv.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/terrain.frag.alpha_test.msl.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/terrain.frag.alpha_test.spv.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/terrain.vert.spv.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/terrain.vert.msl.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/background.frag.spv.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/background.frag.msl.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/background.vert.spv.h
-        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/background.vert.msl.h
-    )
+    set(mcs_b181_client_SHADER_HEADERS "")
+
+    function(add_shader in basename_out)
+        set(base_shader_dir "${CMAKE_CURRENT_SOURCE_DIR}/client/shaders")
+        set(mcs_b181_client_SHADERS        "${mcs_b181_client_SHADERS};${base_shader_dir}/${in}" PARENT_SCOPE)
+        set(mcs_b181_client_SHADER_HEADERS "${mcs_b181_client_SHADER_HEADERS};${base_shader_dir}/compiled/${basename_out}.msl.h"   PARENT_SCOPE)
+        set(mcs_b181_client_SHADER_HEADERS "${mcs_b181_client_SHADER_HEADERS};${base_shader_dir}/compiled/${basename_out}.smolv.h" PARENT_SCOPE)
+    endfunction()
+
+    add_shader(terrain.vert terrain.vert)
+    add_shader(terrain.frag terrain.frag.no_alpha_test)
+    add_shader(terrain.frag terrain.frag.alpha_test)
+
+    add_shader(background.vert background.vert)
+    add_shader(background.frag background.frag)
 
     add_custom_command(OUTPUT ${mcs_b181_client_SHADER_HEADERS}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/
