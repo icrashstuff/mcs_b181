@@ -63,7 +63,7 @@ struct connection_t
         Uint64 timestamp = 0;
         glm::ivec3 pos = { -1, -1, -1 };
         itemstack_t old;
-        bool fullfilled = 0;
+        bool fulfilled = 0;
     };
 
     inline connection_status_t get_status() const { return status; }

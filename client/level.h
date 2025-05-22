@@ -161,7 +161,7 @@ struct level_t
     void clear_mesh(const bool free_gpu);
 
     /**
-     * Switchs terrain texture for level
+     * Switches terrain texture for level
      *
      * NOTE: This will clear all the meshes because the atlas might be structurally different
      */

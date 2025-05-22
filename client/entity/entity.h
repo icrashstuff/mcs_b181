@@ -30,7 +30,7 @@
 #include "shared/misc.h"
 
 /**
- * This is seperate from minecraft's actual entity id system
+ * This is separate from minecraft's actual entity id system
  */
 enum entity_id_t : Uint8
 {

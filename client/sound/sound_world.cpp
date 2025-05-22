@@ -191,7 +191,7 @@ sound_world_t::sound_world_t(const Uint16 max_sources)
     dc_log("*** MA Samplerate: %d hz ***", ma_engine_get_sample_rate(engine));
     dc_log("*** SDL Driver:    %s ***", SDL_GetCurrentAudioDriver());
 
-    dc_log("Sound engine intialized in %.3f ms", double(SDL_GetTicksNS() - sdl_tick_start_ns) / 1000000.0);
+    dc_log("Sound engine initialized in %.3f ms", double(SDL_GetTicksNS() - sdl_tick_start_ns) / 1000000.0);
 }
 
 sound_world_t::~sound_world_t()

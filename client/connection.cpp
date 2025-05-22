@@ -613,9 +613,10 @@ void connection_t::run(level_t* const level)
                 /* Mark as fulfilled to delay erasing until after packet handling is finished */
                 for (tentative_block_t& it : tentative_blocks)
                 {
-                    if (it.fullfilled || it.pos != block_pos)
+                    if (it.fulfilled || it.pos != block_pos)
                         continue;
-                    it.fullfilled = 1;
+
+                    it.fulfilled = 1;
                     break;
                 }
                 break;
@@ -632,9 +633,9 @@ void connection_t::run(level_t* const level)
                     /* Mark as fulfilled to delay erasing until after packet handling is finished */
                     for (tentative_block_t& it : tentative_blocks)
                     {
-                        if (it.fullfilled || it.pos != block_pos)
+                        if (it.fulfilled || it.pos != block_pos)
                             continue;
-                        it.fullfilled = 1;
+                        it.fulfilled = 1;
                     }
                 }
                 break;
@@ -647,7 +648,7 @@ void connection_t::run(level_t* const level)
                 /* Mark as fulfilled to delay erasing until after packet handling is finished */
                 for (tentative_block_t& it : tentative_blocks)
                 {
-                    if (it.fullfilled)
+                    if (it.fulfilled)
                         continue;
                     if (!BETWEEN_INCL(it.pos.x, p->block_x, p->block_x + p->size_x))
                         continue;
@@ -655,7 +656,7 @@ void connection_t::run(level_t* const level)
                         continue;
                     if (!BETWEEN_INCL(it.pos.z, p->block_z, p->block_z + p->size_z))
                         continue;
-                    it.fullfilled = 1;
+                    it.fulfilled = 1;
                 }
 
                 break;
@@ -1060,7 +1061,7 @@ void connection_t::run(level_t* const level)
             it = next(it);
         else
         {
-            if (!it->fullfilled)
+            if (!it->fulfilled)
                 level->set_block(it->pos, it->old.id, it->old.damage);
             it = tentative_blocks.erase(it);
         }
