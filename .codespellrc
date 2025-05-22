@@ -1,0 +1,20 @@
+[codespell]
+skip = './build,
+    ./tetra,
+    ./sdl_net,
+    ./client/entt,
+    ./client/jzon,
+    ./shared/simplex_noise,
+    ./docs,
+    ./shared/cubiomes,
+    ./client/sound/stb_vorbis.c,
+    ./client/sound/stb_vorbis.h,
+    ./cmake,
+    ./shared/packet_gen_def.h,
+    ./client/texture_ids.h,
+    ./client/gpu/smol-v,
+    ./client/shaders/compiled,
+    ./client/sound/miniaudio_unifdef.h,'
+count =
+quiet-level = 3
+ignore-words-list = Ore,ore
