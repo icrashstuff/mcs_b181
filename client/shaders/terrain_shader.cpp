@@ -20,12 +20,12 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#include "terrain.frag.alpha_test.msl.h"
-#include "terrain.frag.alpha_test.spv.h"
-#include "terrain.frag.no_alpha_test.msl.h"
-#include "terrain.frag.no_alpha_test.spv.h"
-#include "terrain.vert.msl.h"
-#include "terrain.vert.spv.h"
+#include "compiled/terrain.frag.alpha_test.msl.h"
+#include "compiled/terrain.frag.alpha_test.smolv.h"
+#include "compiled/terrain.frag.no_alpha_test.msl.h"
+#include "compiled/terrain.frag.no_alpha_test.smolv.h"
+#include "compiled/terrain.vert.msl.h"
+#include "compiled/terrain.vert.smolv.h"
 
 #include "client/gpu/pipeline.h"
 #include "client/state.h"
@@ -62,16 +62,16 @@ void state::init_terrain_pipelines()
     SDL_GPUShaderFormat formats = SDL_GetGPUShaderFormats(state::gpu_device);
     if (formats & SDL_GPU_SHADERFORMAT_SPIRV)
     {
-        cinfo_shader_vert.code = terrain_vert_spv;
-        cinfo_shader_vert.code_size = terrain_vert_spv_len;
+        cinfo_shader_vert.code = terrain_vert_smolv;
+        cinfo_shader_vert.code_size = terrain_vert_smolv_len;
         cinfo_shader_vert.format = SDL_GPU_SHADERFORMAT_SPIRV;
 
-        cinfo_shader_frag_alpha_test.code = terrain_frag_alpha_test_spv;
-        cinfo_shader_frag_alpha_test.code_size = terrain_frag_alpha_test_spv_len;
+        cinfo_shader_frag_alpha_test.code = terrain_frag_alpha_test_smolv;
+        cinfo_shader_frag_alpha_test.code_size = terrain_frag_alpha_test_smolv_len;
         cinfo_shader_frag_alpha_test.format = SDL_GPU_SHADERFORMAT_SPIRV;
 
-        cinfo_shader_frag_no_alpha_test.code = terrain_frag_no_alpha_test_spv;
-        cinfo_shader_frag_no_alpha_test.code_size = terrain_frag_no_alpha_test_spv_len;
+        cinfo_shader_frag_no_alpha_test.code = terrain_frag_no_alpha_test_smolv;
+        cinfo_shader_frag_no_alpha_test.code_size = terrain_frag_no_alpha_test_smolv_len;
         cinfo_shader_frag_no_alpha_test.format = SDL_GPU_SHADERFORMAT_SPIRV;
     }
     else if (formats & SDL_GPU_SHADERFORMAT_MSL)

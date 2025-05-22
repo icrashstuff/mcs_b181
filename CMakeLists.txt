@@ -236,10 +236,10 @@ endfunction()
 if(IOS)
     set(MCS_B181_BUNDLED_RESOURCES "" CACHE STRING "ZIP/JAR File containing all resources")
     set(MCS_B181_BUNDLED_ASSETS "" CACHE STRING "ZIP File containing all assets")
-    
+
     message(STATUS "MCS_B181_BUNDLED_ASSETS: ${MCS_B181_BUNDLED_ASSETS}")
     message(STATUS "MCS_B181_BUNDLED_RESOURCES: ${MCS_B181_BUNDLED_RESOURCES}")
-    
+
     ios_resource("${MCS_B181_BUNDLED_ASSETS}")
     ios_resource("${MCS_B181_BUNDLED_RESOURCES}")
 endif()
@@ -247,12 +247,18 @@ endif()
 option(MCS_B181_BUILD_SHADERS "Automatically run compile_shaders.sh (Only use if writing shaders)" OFF)
 message(STATUS "MCS_B181_BUILD_SHADERS: ${MCS_B181_BUILD_SHADERS}")
 if(MCS_B181_BUILD_SHADERS)
+    if(CMAKE_CROSSCOMPILING)
+        message(FATAL_ERROR "Shader building is not supported for cross compilation builds")
+    endif()
+    add_executable(smolv_converter "client/gpu/smolv_converter.cpp;client/gpu/smol-v/smolv.cpp")
+
     set(mcs_b181_client_SHADERS
         ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/terrain.frag
         ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/terrain.vert
         ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/background.frag
         ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/background.vert
         ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/compile_shaders.sh
+        ${CMAKE_CURRENT_BINARY_DIR}/smolv_converter
     )
 
     set(mcs_b181_client_SHADER_HEADERS
@@ -270,7 +276,7 @@ if(MCS_B181_BUILD_SHADERS)
 
     add_custom_command(OUTPUT ${mcs_b181_client_SHADER_HEADERS}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/
-        COMMAND           ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/compile_shaders.sh
+        COMMAND           ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/compile_shaders.sh ${CMAKE_CURRENT_BINARY_DIR}/smolv_converter
         DEPENDS           ${mcs_b181_client_SHADERS}
         COMMENT           "Compiling shaders"
         )

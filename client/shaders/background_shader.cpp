@@ -20,10 +20,10 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#include "background.frag.msl.h"
-#include "background.frag.spv.h"
-#include "background.vert.msl.h"
-#include "background.vert.spv.h"
+#include "compiled/background.frag.msl.h"
+#include "compiled/background.frag.smolv.h"
+#include "compiled/background.vert.msl.h"
+#include "compiled/background.vert.smolv.h"
 
 #include "../state.h"
 #include "background_shader.h"
@@ -53,12 +53,12 @@ void state::init_background_pipelines()
     SDL_GPUShaderFormat formats = gpu::get_shader_formats();
     if (formats & SDL_GPU_SHADERFORMAT_SPIRV)
     {
-        cinfo_shader_vert.code = background_vert_spv;
-        cinfo_shader_vert.code_size = background_vert_spv_len;
+        cinfo_shader_vert.code = background_vert_smolv;
+        cinfo_shader_vert.code_size = background_vert_smolv_len;
         cinfo_shader_vert.format = SDL_GPU_SHADERFORMAT_SPIRV;
 
-        cinfo_shader_frag.code = background_frag_spv;
-        cinfo_shader_frag.code_size = background_frag_spv_len;
+        cinfo_shader_frag.code = background_frag_smolv;
+        cinfo_shader_frag.code_size = background_frag_smolv_len;
         cinfo_shader_frag.format = SDL_GPU_SHADERFORMAT_SPIRV;
     }
     else if (formats & SDL_GPU_SHADERFORMAT_MSL)
