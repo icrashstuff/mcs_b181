@@ -61,7 +61,7 @@ void level_t::clear_mesh(const bool free_gpu)
     for (chunk_cubic_t* c : chunks_render_order)
     {
         if (free_gpu)
-            c->free_renderer_resources();
+            c->free_renderer_resources(chunk_cubic_t::DIRTY_LEVEL_MESH);
         if (c->dirty_level < chunk_cubic_t::DIRTY_LEVEL_MESH)
             c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
     }
@@ -212,10 +212,7 @@ void level_t::build_dirty_meshes()
                 c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_MESH;
 
                 if (!light_can_leave)
-                {
-                    c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_NONE;
-                    c->free_renderer_resources();
-                }
+                    c->free_renderer_resources(chunk_cubic_t::DIRTY_LEVEL_NONE);
             }
         }
 

@@ -2440,7 +2440,7 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
     if (!vtx_solid.size() && !vtx_translucent.size())
     {
-        center->free_renderer_resources();
+        center->free_renderer_resources(chunk_cubic_t::DIRTY_LEVEL_NONE);
         return;
     }
 

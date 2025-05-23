@@ -27,7 +27,7 @@
 #define IM_ARRAYSIZE(X) (int(SDL_arraysize(X)))
 #endif
 
-void chunk_cubic_t::free_renderer_resources()
+void chunk_cubic_t::free_renderer_resources(const chunk_cubic_t::dirty_level_t new_dirty_level)
 {
     quad_count = 0;
     quad_count_overlay = 0;
@@ -40,7 +40,7 @@ void chunk_cubic_t::free_renderer_resources()
         mesh_handle = nullptr;
     }
 
-    dirty_level = chunk_cubic_t::DIRTY_LEVEL_LIGHT_PASS_INTERNAL;
+    dirty_level = new_dirty_level;
 }
 
 /* There is no special reason that this function uses |= instead of +=, other than if one happens to be faster (which is unlikely) it would probably be |= */

@@ -160,7 +160,7 @@ struct chunk_cubic_t
         memset(data_metadata, 0, sizeof(data_metadata));
     }
 
-    ~chunk_cubic_t() { free_renderer_resources(); }
+    ~chunk_cubic_t() { free_renderer_resources(DIRTY_LEVEL_NONE); }
 
     /**
      * Update renderer hints
@@ -242,7 +242,15 @@ struct chunk_cubic_t
         return ret;
     }
 
-    void free_renderer_resources();
+    /**
+     * Free renderer resources (duh..)
+     *
+     * In the past this function reset the dirty_level to DIRTY_LEVEL_LIGHT_PASS_INTERNAL,
+     * however that caused problems when this function was used under the assumption that it would not change the dirty_level
+     *
+     * @param new_dirty_level The dirty level to set
+     */
+    void free_renderer_resources(const chunk_cubic_t::dirty_level_t new_dirty_level);
 
     /**
      * Finds a chunk by recursively searching from the origin

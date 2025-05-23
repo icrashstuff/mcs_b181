@@ -1397,8 +1397,7 @@ static void process_event(SDL_Event& event, bool* done)
             {
                 if (chunk_coords != c->pos)
                     continue;
-                c->free_renderer_resources();
-                c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_NONE;
+                c->free_renderer_resources(chunk_cubic_t::DIRTY_LEVEL_NONE);
             }
             break;
         }
