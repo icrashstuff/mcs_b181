@@ -107,6 +107,7 @@ set(mcs_b181_client_SRC
     client/time_blended_modifer.cpp
     client/chunk_cubic.cpp
     client/touch.cpp
+    client/task_timer.cpp
 
     client/gpu/buffer.cpp
     client/gpu/texture.cpp

@@ -64,6 +64,8 @@
 #include "state.h"
 #include "touch.h"
 
+#include "task_timer.h"
+
 #ifdef SDL_PLATFORM_IOS
 const bool state::on_ios = 1;
 #else
@@ -1496,6 +1498,7 @@ static void process_event(SDL_Event& event, bool* done)
         }
 }
 
+static convar_int_t cvr_gui_profiling("gui_profiling", 0, 0, 1, "Show profiling window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 static convar_int_t cvr_gui_renderer("gui_renderer", 0, 0, 1, "Show renderer internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 static convar_int_t cvr_gui_lightmap("gui_lightmap", 0, 0, 1, "Show lightmap internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
 static convar_int_t cvr_gui_sound("gui_sound", 0, 0, 1, "Show sound engine internals window", CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_INT_IS_BOOL);
@@ -2017,6 +2020,8 @@ void setup_static_gpu_state()
     gpu::release_fence(fence);
 }
 
+static task_timer_t timer_frametimes("Frametimes");
+
 #include <SDL3/SDL_main.h>
 int main(int argc, char* argv[])
 {
@@ -2327,15 +2332,27 @@ int main(int argc, char* argv[])
                 break;
             }
 
+            static task_timer_t timer_process_input("Loop stage: Process input");
+            static task_timer_t timer_stage_prerender("Loop stage: Pre-render");
+            static task_timer_t timer_stage_render("Loop stage: Render");
+
             gui_game_manager();
+
             loop_stage_ensure_game_selected();
 
+            timer_process_input.start();
             loop_stage_process_queued_input();
+            timer_process_input.finish();
 
             bool render_world = 0;
             bool display_dirt = 0;
+            timer_stage_prerender.start();
             loop_stage_prerender(win_size, render_world, display_dirt);
+            timer_stage_prerender.finish();
+
+            timer_stage_render.start();
             loop_stage_render(command_buffer, window_target, clear_color, win_size, render_world, display_dirt);
+            timer_stage_render.finish();
 
             if (game_selected && game_selected->level && cvr_gui_renderer.get())
             {
@@ -2483,6 +2500,34 @@ int main(int argc, char* argv[])
             else
                 sound_engine_main_menu->update(glm::f64vec3(0, 0, 0), glm::vec3(0, 0, 1), glm::vec3(0, 1, 0));
 
+            if (cvr_gui_profiling.get())
+            {
+                ImGui::BeginCVR("Basic profiling", &cvr_gui_profiling);
+
+                timer_process_input.draw_imgui();
+                timer_stage_prerender.draw_imgui();
+                timer_stage_render.draw_imgui();
+                timer_frametimes.draw_imgui();
+
+                if (game_selected && game_selected->level)
+                {
+                    level_t* level = game_selected->level;
+
+                    level->timer_tick.draw_imgui();
+                    level->timer_build_dirty_meshes.draw_imgui();
+                    level->timer_build_dirty_meshes_prep.draw_imgui();
+                    level->timer_build_dirty_meshes_dirty_prop.draw_imgui();
+                    level->timer_build_dirty_meshes_light_cull.draw_imgui();
+                    level->timer_build_dirty_meshes_light.draw_imgui();
+                    level->timer_build_dirty_meshes_mesh.draw_imgui();
+                    level->timer_cull_chunks.draw_imgui();
+                    level->timer_render_stage_copy.draw_imgui();
+                    level->timer_render_stage_render.draw_imgui();
+                }
+
+                ImGui::End();
+            }
+
             break;
         }
         case ENGINE_STATE_SHUTDOWN:
@@ -2528,6 +2573,7 @@ int main(int argc, char* argv[])
         }
         else
             gpu::submit_command_buffer(command_buffer);
+        timer_frametimes.push_back(SDL_GetTicksNS() - loop_start_time);
         tetra::limit_framerate();
         last_loop_time = SDL_GetTicksNS() - loop_start_time;
     }

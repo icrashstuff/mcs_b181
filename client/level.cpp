@@ -70,6 +70,7 @@ void level_t::clear_mesh(const bool free_gpu)
 /* Ideally this would use the Gribb/Hartmann method to extract the planes from a projection/camera matrix to get the plane normals */
 void level_t::cull_chunks(const glm::ivec2 win_size, const int render_distance)
 {
+    auto timer_scoped = timer_cull_chunks.start_scoped();
     update_chunk_renderer_hints();
     camera_direction.x = SDL_cosf(glm::radians(yaw)) * SDL_cosf(glm::radians(pitch));
     camera_direction.y = SDL_sinf(glm::radians(pitch));
@@ -136,6 +137,8 @@ void level_t::update_chunk_renderer_hints()
 
 void level_t::build_dirty_meshes()
 {
+    auto timer_scoped_full = timer_build_dirty_meshes.start_scoped();
+    auto timer_prep = timer_build_dirty_meshes_prep.start_scoped();
     update_chunk_renderer_hints();
 
     size_t built;
@@ -159,6 +162,9 @@ void level_t::build_dirty_meshes()
         last_light_order_sort_time = SDL_GetTicks();
         request_light_order_sort = 0;
     }
+
+    timer_prep.finish();
+    auto timer_dirty = timer_build_dirty_meshes_dirty_prop.start_scoped();
 
     /* Dirty level propagation pass (Backwards and forwards, twice just to be sure) */
     PASS_TIMER_START();
@@ -186,6 +192,8 @@ void level_t::build_dirty_meshes()
         built++;
     }
     PASS_TIMER_STOP(0, "Propagated dirty level for %zu chunks in %.2f ms (%.2f ms per)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
+    timer_dirty.finish();
+    auto timer_light_cull = timer_build_dirty_meshes_light_cull.start_scoped();
 
     ImVector<chunk_cubic_t*> chunks_needing_light;
 
@@ -223,6 +231,8 @@ void level_t::build_dirty_meshes()
         built++;
     }
     PASS_TIMER_STOP(enable_timer_log_light, "Cleared %zu chunks in %.2f ms (%.2f ms per) (Pass 1)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
+    timer_light_cull.finish();
+    auto timer_light = timer_build_dirty_meshes_light.start_scoped();
 
     /* First Light Pass */
     PASS_TIMER_START();
@@ -277,6 +287,8 @@ void level_t::build_dirty_meshes()
     PASS_TIMER_STOP(enable_timer_log_light, "Lit %zu chunks in %.2f ms (%.2f ms per) (Pass 3)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
     last_perf_light_pass3.duration = elapsed;
     last_perf_light_pass3.built = built;
+    timer_light.finish();
+    auto timer_mesh = timer_build_dirty_meshes_mesh.start_scoped();
 
     /* Mesh Pass */
     PASS_TIMER_START();
@@ -287,7 +299,7 @@ void level_t::build_dirty_meshes()
         if (c->dirty_level != chunk_cubic_t::DIRTY_LEVEL_MESH || !c->visible)
             continue;
         /* Bypass mesh throttle for nearby chunks (To stop holes from being punched in the world) */
-        if (throttle < 0 && (abs(c->pos.x - pos_cam.x) > 1 || abs(c->pos.y - pos_cam.y) > 1 || abs(c->pos.z - pos_cam.z) > 1))
+        if (throttle <= 0 && (abs(c->pos.x - pos_cam.x) > 1 || abs(c->pos.y - pos_cam.y) > 1 || abs(c->pos.z - pos_cam.z) > 1))
             continue;
         build_mesh(c);
         c->dirty_level = chunk_cubic_t::DIRTY_LEVEL_NONE;
@@ -297,6 +309,7 @@ void level_t::build_dirty_meshes()
     PASS_TIMER_STOP(enable_timer_log_mesh, "Built %zu meshes in %.2f ms (%.2f ms per)", built, elapsed / 1000000.0, elapsed / built / 1000000.0);
     last_perf_mesh_pass.duration = elapsed;
     last_perf_mesh_pass.built = built;
+    timer_mesh.finish();
 }
 
 void level_t::set_block(const glm::ivec3 pos, const itemstack_t block, chunk_cubic_t*& cache)
@@ -632,6 +645,7 @@ bool level_t::mesh_queue_upload_item(SDL_GPUCommandBuffer* const command_buffer,
 
 void level_t::render_stage_copy(SDL_GPUCommandBuffer* const command_buffer, SDL_GPUCopyPass* const copy_pass)
 {
+    auto timer_scoped = timer_render_stage_copy.start_scoped();
     lightmap.update();
 
     if (!missing_ent_ssbo || !missing_ent_num_instances)
@@ -720,6 +734,7 @@ void level_t::render_stage_copy(SDL_GPUCommandBuffer* const command_buffer, SDL_
 SDL_GPURenderPass* level_t::render_stage_render(
     SDL_GPUCommandBuffer* const command_buffer, SDL_GPUColorTargetInfo tinfo_color, const glm::ivec2 target_size, const float delta_time)
 {
+    auto timer_scoped = timer_render_stage_render.start_scoped();
     SDL_PushGPUDebugGroup(command_buffer, "level_t::render_stage_render()");
     const int render_distance = (render_distance_override > 0) ? render_distance_override : r_render_distance.get();
 
@@ -1084,6 +1099,7 @@ level_t::dimension_switch_result level_t::dimension_switch(const int dim)
 
 void level_t::tick()
 {
+    auto timer_scoped = timer_tick.start_scoped();
     Uint64 start_time = SDL_GetTicks();
     mc_tick_t cur_tick = start_time / 50;
 

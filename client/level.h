@@ -40,6 +40,7 @@
 
 #include "gpu/gpu.h"
 #include "state.h"
+#include "task_timer.h"
 
 /**
  * Handles both level data and the rendering of said level data
@@ -266,6 +267,15 @@ struct level_t
      * @param win_size Window size (used for culling)
      */
     void render_stage_prepare(const glm::ivec2 win_size);
+    /* Given that all level_t::render_stage_prepare() does is call these other functions, it doesn't have a timer */
+    task_timer_t timer_tick = { "level_t::tick" };
+    task_timer_t timer_cull_chunks = { "level_t::cull_chunks" };
+    task_timer_t timer_build_dirty_meshes = { "level_t::build_dirty_meshes" };
+    task_timer_t timer_build_dirty_meshes_prep = { "level_t::build_dirty_meshes__prep" };
+    task_timer_t timer_build_dirty_meshes_dirty_prop = { "level_t::build_dirty_meshes__dirty_prop" };
+    task_timer_t timer_build_dirty_meshes_light_cull = { "level_t::build_dirty_meshes__light_cull" };
+    task_timer_t timer_build_dirty_meshes_light = { "level_t::build_dirty_meshes__light" };
+    task_timer_t timer_build_dirty_meshes_mesh = { "level_t::build_dirty_meshes__mesh" };
 
     /**
      * Perform data transfers
@@ -274,6 +284,7 @@ struct level_t
      * @param copy_pass Copy pass to use
      */
     void render_stage_copy(SDL_GPUCommandBuffer* const command_buffer, SDL_GPUCopyPass* const copy_pass);
+    task_timer_t timer_render_stage_copy = { "level_t::render_stage_copy" };
 
     /**
      * Renders the world and entities
@@ -287,6 +298,7 @@ struct level_t
      */
     SDL_GPURenderPass* render_stage_render(
         SDL_GPUCommandBuffer* const command_buffer, SDL_GPUColorTargetInfo tinfo_color, const glm::ivec2 target_size, const float delta_time);
+    task_timer_t timer_render_stage_render = { "level_t::render_stage_render" };
 
     inline glm::vec3 get_camera_pos() const { return foot_pos + glm::vec3(0, camera_offset_height, 0) + camera_direction * camera_offset_radius; }
 
