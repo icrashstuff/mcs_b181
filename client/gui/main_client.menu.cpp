@@ -1602,15 +1602,13 @@ static void init_mc_gui_shaders()
     blend_state.alpha_blend_op = SDL_GPU_BLENDOP_ADD;
     blend_state.color_write_mask = SDL_GPU_COLORCOMPONENT_R | SDL_GPU_COLORCOMPONENT_G | SDL_GPU_COLORCOMPONENT_B | SDL_GPU_COLORCOMPONENT_A;
 
-    SDL_GPUColorTargetDescription color_target_desc[1];
+    SDL_GPUColorTargetDescription color_target_desc[1] {};
     color_target_desc[0].format = v->ColorTargetFormat;
     color_target_desc[0].blend_state = blend_state;
 
     SDL_GPUGraphicsPipelineTargetInfo target_info = {};
-    target_info.num_color_targets = 1;
+    target_info.num_color_targets = SDL_arraysize(color_target_desc);
     target_info.color_target_descriptions = color_target_desc;
-    target_info.has_depth_stencil_target = true;
-    target_info.depth_stencil_format = state::gpu_tex_format_best_depth_only;
 
     SDL_GPUGraphicsPipelineCreateInfo pipeline_info = {};
     pipeline_info.vertex_shader = bd->VertexShader;

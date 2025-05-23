@@ -279,13 +279,14 @@ struct level_t
      * Renders the world and entities
      *
      * @param command_buffer Command buffer related to render pass
-     * @param render_pass Render pass to use
-     * @param win_size Window size (used for projection matrix)
+     * @param tinfo_color Color target info to be used for rendering
+     * @param target_size Color target texture size
      * @param delta_time Time since last frame in seconds
-     * @param render_pass Render pass to use
+     *
+     * @returns A render pass compatible with tinfo_color, and *WITHOUT* a depth/stencil target (ie. Compatible with Dear ImGui)
      */
-    void render_stage_render(
-        SDL_GPUCommandBuffer* const command_buffer, SDL_GPURenderPass* const render_pass, const glm::ivec2 win_size, const float delta_time);
+    SDL_GPURenderPass* render_stage_render(
+        SDL_GPUCommandBuffer* const command_buffer, SDL_GPUColorTargetInfo tinfo_color, const glm::ivec2 target_size, const float delta_time);
 
     inline glm::vec3 get_camera_pos() const { return foot_pos + glm::vec3(0, camera_offset_height, 0) + camera_direction * camera_offset_radius; }
 

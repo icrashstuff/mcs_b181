@@ -717,12 +717,13 @@ void level_t::render_stage_copy(SDL_GPUCommandBuffer* const command_buffer, SDL_
         indirect_buffers.cmd_translucent_len = translucent_commands.size();
 }
 
-void level_t::render_stage_render(
-    SDL_GPUCommandBuffer* const command_buffer, SDL_GPURenderPass* const render_pass, const glm::ivec2 win_size, const float delta_time)
+SDL_GPURenderPass* level_t::render_stage_render(
+    SDL_GPUCommandBuffer* const command_buffer, SDL_GPUColorTargetInfo tinfo_color, const glm::ivec2 target_size, const float delta_time)
 {
+    SDL_PushGPUDebugGroup(command_buffer, "level_t::render_stage_render()");
     const int render_distance = (render_distance_override > 0) ? render_distance_override : r_render_distance.get();
 
-    glm::mat4 mat_proj = glm::perspective(glm::radians(fov), (float)win_size.x / (float)win_size.y, render_distance * 32.0f, 1.f / 16.f);
+    glm::mat4 mat_proj = glm::perspective(glm::radians(fov), (float)target_size.x / (float)target_size.y, render_distance * 32.0f, 1.f / 16.f);
 
     glm::mat4 mat_cam = glm::lookAt(get_camera_pos(), get_camera_pos() + camera_direction, camera_up);
     damage_tilt = SDL_clamp(damage_tilt, 0.0f, 1.0f);
@@ -754,6 +755,27 @@ void level_t::render_stage_render(
             last_render_order_cpos = cpos;
         }
     }
+
+    SDL_GPUTextureCreateInfo cinfo_depth_tex = {};
+    cinfo_depth_tex.type = SDL_GPU_TEXTURETYPE_2D;
+    cinfo_depth_tex.format = state::gpu_tex_format_best_depth_only;
+    cinfo_depth_tex.usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER;
+    cinfo_depth_tex.width = Uint32(target_size.x);
+    cinfo_depth_tex.height = Uint32(target_size.y);
+    cinfo_depth_tex.layer_count_or_depth = 1;
+    cinfo_depth_tex.num_levels = 1;
+
+    SDL_GPUDepthStencilTargetInfo tinfo_depth = {};
+    tinfo_depth.texture = gpu::create_texture(cinfo_depth_tex, "Depth texture");
+    tinfo_depth.clear_depth = 0.0f;
+    tinfo_depth.load_op = SDL_GPU_LOADOP_CLEAR;
+    tinfo_depth.store_op = SDL_GPU_STOREOP_DONT_CARE;
+    tinfo_depth.stencil_load_op = SDL_GPU_LOADOP_DONT_CARE;
+    tinfo_depth.stencil_store_op = SDL_GPU_STOREOP_DONT_CARE;
+    tinfo_depth.clear_stencil = 0;
+
+    SDL_GPURenderPass* render_pass = SDL_BeginGPURenderPass(command_buffer, &tinfo_color, 1, &tinfo_depth);
+    gpu::release_texture(tinfo_depth.texture);
 
     SDL_GPUTextureSamplerBinding binding_tex[] = {
         terrain->binding,
@@ -824,6 +846,11 @@ void level_t::render_stage_render(
         SDL_DrawGPUPrimitivesIndirect(render_pass, indirect_buffers.cmd_translucent, 0, indirect_buffers.cmd_translucent_len);
         SDL_PopGPUDebugGroup(command_buffer);
     }
+
+    SDL_EndGPURenderPass(render_pass);
+    SDL_PopGPUDebugGroup(command_buffer);
+    tinfo_color.load_op = SDL_GPU_LOADOP_LOAD;
+    return SDL_BeginGPURenderPass(command_buffer, &tinfo_color, 1, NULL);
 }
 
 void level_t::remove_chunk(const glm::ivec3 pos)

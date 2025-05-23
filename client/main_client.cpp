@@ -1190,28 +1190,18 @@ static void loop_stage_render(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUT
     if (display_dirt)
         tinfo_color.load_op = SDL_GPU_LOADOP_DONT_CARE;
 
-    SDL_GPUTextureCreateInfo cinfo_depth_tex = {};
-    cinfo_depth_tex.type = SDL_GPU_TEXTURETYPE_2D;
-    cinfo_depth_tex.format = state::gpu_tex_format_best_depth_only;
-    cinfo_depth_tex.usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET;
-    cinfo_depth_tex.width = Uint32(win_size.x);
-    cinfo_depth_tex.height = Uint32(win_size.y);
-    cinfo_depth_tex.layer_count_or_depth = 1;
-    cinfo_depth_tex.num_levels = 1;
+    SDL_GPURenderPass* render_pass = nullptr;
 
-    SDL_GPUDepthStencilTargetInfo tinfo_depth = {};
-    tinfo_depth.texture = SDL_CreateGPUTexture(state::gpu_device, &cinfo_depth_tex);
-    tinfo_depth.clear_depth = 0.0f;
-    tinfo_depth.load_op = SDL_GPU_LOADOP_CLEAR;
-    tinfo_depth.store_op = SDL_GPU_STOREOP_DONT_CARE;
-    tinfo_depth.stencil_load_op = SDL_GPU_LOADOP_DONT_CARE;
-    tinfo_depth.stencil_store_op = SDL_GPU_STOREOP_DONT_CARE;
-    tinfo_depth.clear_stencil = 0;
+    if (render_world)
+    {
+        ImGui::SetCurrentContext(last_ctx);
+        render_pass = game_selected->level->render_stage_render(gpu_command_buffer, tinfo_color, win_size, delta_time);
+        ImGui::SetCurrentContext(imgui_ctx_main_menu);
 
-    SDL_GPURenderPass* render_pass = SDL_BeginGPURenderPass(gpu_command_buffer, &tinfo_color, 1, &tinfo_depth);
-    SDL_ReleaseGPUTexture(state::gpu_device, tinfo_depth.texture);
-
-    if (display_dirt)
+        if (!render_pass)
+            render_pass = SDL_BeginGPURenderPass(gpu_command_buffer, &tinfo_color, 1, NULL);
+    }
+    else if (display_dirt)
     {
         double side_len = 32.0 * double(SDL_max(1, mc_gui::global_ctx->menu_scale));
 
@@ -1227,6 +1217,8 @@ static void loop_stage_render(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUT
         ubo_lighting.cursor_pos = ImVec2_to_dvec2(ImGui::GetMousePos()) / ImVec2_to_dvec2(ImGui::GetMainViewport()->Size);
         ubo_lighting.ambient_brightness = 32.f / 255.f;
 
+        render_pass = SDL_BeginGPURenderPass(gpu_command_buffer, &tinfo_color, 1, NULL);
+
         SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_background);
 
         SDL_PushGPUFragmentUniformData(gpu_command_buffer, 0, &ubo_lighting, sizeof(ubo_lighting));
@@ -1234,15 +1226,6 @@ static void loop_stage_render(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUT
         SDL_BindGPUFragmentSamplers(render_pass, 1, reinterpret_cast<SDL_GPUTextureSamplerBinding*>(mc_gui_global_ctx.tex_id_bg_normal), 1);
 
         SDL_DrawGPUPrimitives(render_pass, 4, 1, 0, 0);
-    }
-
-    if (render_world)
-    {
-        ImGui::SetCurrentContext(last_ctx);
-        SDL_PushGPUDebugGroup(gpu_command_buffer, "[Level]: Render pass");
-        game_selected->level->render_stage_render(gpu_command_buffer, render_pass, win_size, delta_time);
-        SDL_PopGPUDebugGroup(gpu_command_buffer);
-        ImGui::SetCurrentContext(imgui_ctx_main_menu);
     }
 
     ImGui::SetCurrentContext(imgui_ctx_main_menu);
@@ -1713,8 +1696,8 @@ static SDL_GPUTransferBuffer* screenshot_func_prepare(
         SDL_EndGPUCopyPass(copy_pass);
     }
 
-    SDL_ReleaseGPUTexture(state::gpu_device, tex_swapchain_fmt);
-    SDL_ReleaseGPUTexture(state::gpu_device, tex_screenshot_fmt);
+    gpu::release_texture(tex_swapchain_fmt);
+    gpu::release_texture(tex_screenshot_fmt);
 
     return tbo;
 }

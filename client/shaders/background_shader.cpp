@@ -101,8 +101,6 @@ void state::init_background_pipelines()
     SDL_GPUGraphicsPipelineTargetInfo target_info = {};
     target_info.color_target_descriptions = color_target_desc;
     target_info.num_color_targets = SDL_arraysize(color_target_desc);
-    target_info.depth_stencil_format = state::gpu_tex_format_best_depth_only;
-    target_info.has_depth_stencil_target = 1;
 
     SDL_GPUGraphicsPipelineCreateInfo cinfo_pipeline = {};
     cinfo_pipeline.vertex_shader = shader_vert;
