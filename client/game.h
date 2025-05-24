@@ -91,6 +91,7 @@ struct game_t
      * NOTE: This does not call game_resources_t::reload()
      *
      * @param resources New resources struct to pull from (NULL to reuse existing one)
+     * @param force_null Allows setting resources to a null object
      */
     void reload_resources(const game_resources_t* const resources = nullptr, const bool force_null = false);
 

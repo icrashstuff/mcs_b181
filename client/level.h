@@ -514,7 +514,6 @@ private:
     /**
      * Generate biome ids with a certain amount of oversample
      *
-     * @param level Level to pull information from
      * @param chunk_pos Chunk position in chunk coordinates
      * @param biome_ids Output vector for biome ids, index: (Z * (oversample * 2 + SUBCHUNK_SIZE_X) + X)
      * @param oversample Amount of blocks to oversample the ids by

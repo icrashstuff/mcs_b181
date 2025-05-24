@@ -121,7 +121,7 @@ public:
      * @param flail If true then the clock flails around, if false then it follows mc_time
      * @param mc_time Current minecraft time (in 20hz ticks)
      */
-    void set_mc_time(const bool flail, const Uint64 _mc_time) { clock_flail = flail, clock_mc_time = _mc_time; }
+    void set_mc_time(const bool flail, const Uint64 mc_time) { clock_flail = flail, clock_mc_time = mc_time; }
 
     /**
      * Set the compass rotation

@@ -95,12 +95,6 @@ game_t::game_t(const game_resources_t* const _resources)
     dc_log("Created internal game with id %d", game_id);
 }
 
-/**
- * Forces a reload of all resources
- *
- * @param resources New resources struct to pull from (NULL to reuse existing one)
- * @param force_null Allows setting resources to a null object
- */
 void game_t::reload_resources(const game_resources_t* const _resources, const bool force_null)
 {
     if (_resources || force_null)

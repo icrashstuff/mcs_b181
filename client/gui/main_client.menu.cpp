@@ -120,7 +120,7 @@ public:
     }
 
     /**
-     * @param draw_list This will be passed to the menu to use instead of ImGui::GetBackgroundDrawList()
+     * @param drawlist This will be passed to the menu to use instead of ImGui::GetBackgroundDrawList()
      */
     client_menu_return_t run_last_in_stack(glm::ivec2 win_size, ImDrawList* drawlist)
     {
