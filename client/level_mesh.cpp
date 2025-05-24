@@ -339,13 +339,13 @@ void level_t::build_mesh(chunk_cubic_t* const center)
             BLOCK_SIMPLE_NO_CASE(mc_id::FACE_DIRT);
 
             faces_overlay[0] = terrain->get_face(mc_id::FACE_GRASS_SIDE_OVERLAY);
-            faces_overlay[1] = terrain->get_face(mc_id::FACE_GRASS_TOP);
+            faces[1] = terrain->get_face(mc_id::FACE_GRASS_TOP);
             faces_overlay[2] = faces_overlay[0];
             faces_overlay[3] = faces_overlay[0];
             faces_overlay[5] = faces_overlay[0];
 
             use_overlay[0] = true;
-            use_overlay[1] = true;
+            use_overlay[1] = false;
             use_overlay[2] = true;
             use_overlay[3] = true;
             use_overlay[5] = true;
@@ -2062,26 +2062,52 @@ void level_t::build_mesh(chunk_cubic_t* const center)
                 corner_t bl[4] = { templ[0].first, templ[1].first, templ[2].first, templ[3].first };
                 corner_t sl[4] = { templ[0].second, templ[1].second, templ[2].second, templ[3].second };
 
-                vtx->push_back({
-                    { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
-                    { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl[3].get(), sl[3].get() },
-                    faces[1].corners[0],
-                });
-                vtx->push_back({
-                    { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[1] },
-                    { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl[1].get(), sl[1].get() },
-                    faces[1].corners[2],
-                });
-                vtx->push_back({
-                    { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[2] },
-                    { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl[2].get(), sl[2].get() },
-                    faces[1].corners[1],
-                });
-                vtx->push_back({
-                    { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[0] },
-                    { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl[0].get(), sl[0].get() },
-                    faces[1].corners[3],
-                });
+                if (type == BLOCK_ID_GRASS)
+                {
+                    vtx->push_back({
+                        { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
+                        { r_overlay * r_overlay_1x_1z, g_overlay * g_overlay_1x_1z, b_overlay * b_overlay_1x_1z, bl[3].get(), sl[3].get() },
+                        faces[1].corners[0],
+                    });
+                    vtx->push_back({
+                        { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[1] },
+                        { r_overlay * r_overlay_1x_0z, g_overlay * g_overlay_1x_0z, b_overlay * b_overlay_1x_0z, bl[1].get(), sl[1].get() },
+                        faces[1].corners[2],
+                    });
+                    vtx->push_back({
+                        { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[2] },
+                        { r_overlay * r_overlay_0x_1z, g_overlay * g_overlay_0x_1z, b_overlay * b_overlay_0x_1z, bl[2].get(), sl[2].get() },
+                        faces[1].corners[1],
+                    });
+                    vtx->push_back({
+                        { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[0] },
+                        { r_overlay * r_overlay_0x_0z, g_overlay * g_overlay_0x_0z, b_overlay * b_overlay_0x_0z, bl[0].get(), sl[0].get() },
+                        faces[1].corners[3],
+                    });
+                }
+                else
+                {
+                    vtx->push_back({
+                        { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
+                        { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl[3].get(), sl[3].get() },
+                        faces[1].corners[0],
+                    });
+                    vtx->push_back({
+                        { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[1] },
+                        { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl[1].get(), sl[1].get() },
+                        faces[1].corners[2],
+                    });
+                    vtx->push_back({
+                        { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[2] },
+                        { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl[2].get(), sl[2].get() },
+                        faces[1].corners[1],
+                    });
+                    vtx->push_back({
+                        { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[0] },
+                        { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl[0].get(), sl[0].get() },
+                        faces[1].corners[3],
+                    });
+                }
 
                 if (use_overlay[1])
                 {
