@@ -217,7 +217,7 @@ int tetra::init_gui(const char* const window_title, const SDL_GPUShaderFormat sh
     for (int i = 0; i < SDL_GetNumGPUDrivers(); i++)
     {
         const char* driver_name = SDL_GetGPUDriver(i);
-        dc_log("- Driver %d: \"%s\", Shader formats: %s", i, driver_name, SDL_GPUShaderFormat_to_string(get_shaders_supported_by_driver(driver_name)).c_str());
+        dc_log("- Driver %d: \"%s\"", i, driver_name);
     }
 
     const SDL_GPUShaderFormat shader_formats_imgui = get_imgui_shader_formats();

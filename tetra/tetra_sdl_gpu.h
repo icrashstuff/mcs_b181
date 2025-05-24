@@ -185,6 +185,9 @@ std::string SDL_GPUShaderFormat_to_string(SDL_GPUShaderFormat formats);
 /**
  * Get the shader formats supported by a particular driver
  *
+ * WARNING: This function takes a *long* time to execute
+ * WARNING: This function does not play well with valgrind
+ *
  * @param driver_name Driver name as reported by SDL_GetGPUDriver or SDL_GetGPUDeviceDriver
  *
  * @returns Supported shader format flag-set for the specified driver
