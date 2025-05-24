@@ -1,3 +1,4 @@
+#version 460 core
 /* SPDX-License-Identifier: MIT
  *
  * SPDX-FileCopyrightText: Copyright (c) 2025 Ian Hangartner <icrashstuff at outlook dot com>
@@ -20,19 +21,19 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#ifndef MCS_B181__CLIENT__SHADERS__TERRAIN_SHADER
-#define MCS_B181__CLIENT__SHADERS__TERRAIN_SHADER
 
-#include <SDL3/SDL_gpu.h>
+/* ================ BEGIN Fragment outputs ================ */
+layout(location = 0) out vec4 out_color;
+/* ================ END Fragment outputs ================ */
 
-namespace state
-{
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_opaque_no_alpha;
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_opaque_alpha_test;
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_overlay;
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_depth_peel_0;
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_depth_peel_n;
-void init_terrain_pipelines();
-void destroy_terrain_pipelines();
-};
-#endif
+/**
+ * Modified excerpt from SDL_gpu.h about resource bindings
+ *
+ * Fragment shaders:
+ * - set=2: Sampled textures, followed by storage textures, followed by storage buffers
+ * - set=3: Uniform buffers
+ */
+
+layout(set = 2, binding = 0) uniform sampler2D tex;
+
+void main() { out_color = texelFetch(tex, ivec2(gl_FragCoord.xy), 0); }

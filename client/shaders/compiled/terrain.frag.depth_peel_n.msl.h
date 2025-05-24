@@ -1,5 +1,5 @@
 // clang-format off
-static const unsigned char terrain_frag_alpha_test_msl[] = R"(
+static const unsigned char terrain_frag_depth_peel_n_msl[] = R"(
 #include <metal_stdlib>
 #include <simd/simd.h>
 
@@ -42,7 +42,7 @@ struct main0_in
     float frag_light_sky [[user(locn4)]];
 };
 
-fragment main0_out main0(main0_in in [[stage_in]], constant ubo_frag_t& ubo_frag [[buffer(0)]], constant ubo_lightmap_t& ubo_lightmap [[buffer(1)]], texture2d<float> tex_atlas [[texture(0)]], sampler tex_atlasSmplr [[sampler(0)]])
+fragment main0_out main0(main0_in in [[stage_in]], constant ubo_frag_t& ubo_frag [[buffer(0)]], constant ubo_lightmap_t& ubo_lightmap [[buffer(1)]], texture2d<float> tex_atlas [[texture(0)]], texture2d<float> tex_depth_near [[texture(1)]], sampler tex_atlasSmplr [[sampler(0)]], sampler tex_depth_nearSmplr [[sampler(1)]], float4 gl_FragCoord [[position]])
 {
     main0_out out = {};
     _69 frag = {};
@@ -60,23 +60,33 @@ fragment main0_out main0(main0_in in [[stage_in]], constant ubo_frag_t& ubo_frag
     {
         out.out_color.w *= tex_atlas.sample(tex_atlasSmplr, frag.uv, bias(-1.0)).w;
     }
-    if (out.out_color.w < 0.125)
+    bool _126 = out.out_color.w < 0.00390625;
+    bool _136;
+    if (!_126)
+    {
+        _136 = gl_FragCoord.z >= tex_depth_near.read(uint2(int2(gl_FragCoord.xy)), 0).x;
+    }
+    else
+    {
+        _136 = _126;
+    }
+    if (_136)
     {
         discard_fragment();
     }
-    float4 _133 = out.out_color;
-    float3 _135 = _133.xyz * (1.0 - (frag.ao * 0.100000001490116119384765625));
-    out.out_color.x = _135.x;
-    out.out_color.y = _135.y;
-    out.out_color.z = _135.z;
-    float4 _153 = out.out_color;
-    float3 _155 = _153.xyz * fast::clamp(1.10000002384185791015625 - ((-0.100000001490116119384765625) / (frag.ao - 1.25)), 0.0, 1.0);
-    out.out_color.x = _155.x;
-    out.out_color.y = _155.y;
-    out.out_color.z = _155.z;
+    float4 _154 = out.out_color;
+    float3 _156 = _154.xyz * (1.0 - (frag.ao * 0.100000001490116119384765625));
+    out.out_color.x = _156.x;
+    out.out_color.y = _156.y;
+    out.out_color.z = _156.z;
+    float4 _172 = out.out_color;
+    float3 _174 = _172.xyz * fast::clamp(1.10000002384185791015625 - ((-0.100000001490116119384765625) / (frag.ao - 1.25)), 0.0, 1.0);
+    out.out_color.x = _174.x;
+    out.out_color.y = _174.y;
+    out.out_color.z = _174.z;
     out.out_color *= float4(fast::clamp(((((ubo_lightmap.block_color * float3(ubo_lightmap.light_flicker)) * powr(frag.light_block, ubo_lightmap.gamma)) + (ubo_lightmap.sky_color * powr(frag.light_sky, ubo_lightmap.gamma))) + ubo_lightmap.minimum_color) / (float3(1.0) + ubo_lightmap.minimum_color), float3(0.0), float3(1.0)), 1.0);
     return out;
 }
 
 )";
-static const unsigned int terrain_frag_alpha_test_msl_len = sizeof(terrain_frag_alpha_test_msl);
+static const unsigned int terrain_frag_depth_peel_n_msl_len = sizeof(terrain_frag_depth_peel_n_msl);

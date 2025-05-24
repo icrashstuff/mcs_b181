@@ -548,10 +548,10 @@ void level_t::render_entities(SDL_GPUCommandBuffer* const command_buffer, SDL_GP
 
     return;
 
-    if (state::pipeline_shader_terrain_opaque)
+    if (state::pipeline_shader_terrain_opaque_alpha_test)
     {
         SDL_PushGPUDebugGroup(command_buffer, "Entities");
-        SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_opaque);
+        SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_opaque_alpha_test);
         SDL_BindGPUVertexStorageBuffers(render_pass, 0, &missing_ent_ssbo, 1);
         for (auto [entity, id, pos] : view.each())
         {
@@ -728,8 +728,95 @@ void level_t::render_stage_copy(SDL_GPUCommandBuffer* const command_buffer, SDL_
         indirect_buffers.cmd_translucent_len = translucent_commands.size();
 }
 
+static void end_render_pass(SDL_GPURenderPass*& render_pass)
+{
+    if (!render_pass)
+        return;
+    SDL_EndGPURenderPass(render_pass);
+    render_pass = nullptr;
+}
+
+static void copy_opaque_depth(
+    SDL_GPUCommandBuffer* const command_buffer, SDL_GPUTexture* const opaque, SDL_GPUTexture* const next, const glm::ivec2 target_size)
+{
+    SDL_GPUTextureLocation loc_src = {};
+    SDL_GPUTextureLocation loc_dest = {};
+
+    loc_src.texture = opaque;
+    loc_dest.texture = next;
+
+    SDL_GPUCopyPass* copy_pass = SDL_BeginGPUCopyPass(command_buffer);
+    SDL_CopyGPUTextureToTexture(copy_pass, &loc_src, &loc_dest, target_size.x, target_size.y, 1, false);
+    SDL_EndGPUCopyPass(copy_pass);
+}
+
+struct scoped_debug_group_t
+{
+    SDL_GPUCommandBuffer* const command_buffer;
+    scoped_debug_group_t(SDL_GPUCommandBuffer* _command_buffer, const char* fmt, ...)
+        : command_buffer(_command_buffer)
+    {
+        char name[1024] = "";
+
+        va_list args;
+        va_start(args, fmt);
+        stbsp_vsnprintf(name, SDL_arraysize(name), fmt, args);
+        va_end(args);
+
+        SDL_PushGPUDebugGroup(command_buffer, name);
+    }
+    ~scoped_debug_group_t() { SDL_PopGPUDebugGroup(command_buffer); }
+};
+
+static convar_int_t r_depth_peel_num_layers {
+    "r_depth_peel_num_layers",
+    4,
+    1,
+    32,
+    "Number of layers to use for depth peeling.\n"
+    "More layers will lead to better looking translucency, however performance will also degrade.\n"
+    "For anyone's edification the specific algorithm used is Single Layer Depth peeling as described by Cass Everitt in"
+    " /Interactive Order-Independent Transparency/.\n"
+    "Presentation: https://developer.download.nvidia.com/assets/gamedev/docs/OrderIndependentTransparency.pdf\n"
+    "Paper: https://my.eng.utah.edu/~cs5610/handouts/order_independent_transparency.pdf",
+    CONVAR_FLAG_SAVE,
+};
+
+/* Depth peeling pseudo-code
+ *
+ * For opaque
+ * - Bind opaque color as color
+ * - Bind opaque depth as depth
+ * - Render opaque
+ * - Render overlay
+ * - Render entities
+ * - Render sky
+ *
+ * Disable blend
+ *
+ * For first layer
+ * - Copy opaque depth to l0 depth
+ * - Bind l0 depth as RW depth far
+ * - Bind l0 color as color
+ * - Render translucent
+ *
+ * For layers (1...n)
+ * - Copy opaque depth to l(n) depth
+ * - Bind l(n)   depth as RW depth far
+ * - Bind l(n-1) depth as sampler depth near
+ * - Bind l(n)   color as color
+ * - Render translucent
+ * - Discard l(n-1) depth
+ *
+ * Composite
+ * - Enable blend
+ * - Bind opaque   color as color
+ * - Bind l(n...0) color as sampler color
+ * - Render layers
+ */
+
 SDL_GPURenderPass* level_t::render_stage_render(
-    SDL_GPUCommandBuffer* const command_buffer, SDL_GPUColorTargetInfo tinfo_color, const glm::ivec2 target_size, const float delta_time)
+    SDL_GPUCommandBuffer* const command_buffer, SDL_GPUColorTargetInfo tinfo_color_parent, const glm::ivec2 target_size, const float delta_time)
 {
     auto timer_scoped = timer_render_stage_render.start_scoped();
     SDL_PushGPUDebugGroup(command_buffer, "level_t::render_stage_render()");
@@ -768,32 +855,44 @@ SDL_GPURenderPass* level_t::render_stage_render(
         }
     }
 
-    SDL_GPUTextureCreateInfo cinfo_depth_tex = {};
-    cinfo_depth_tex.type = SDL_GPU_TEXTURETYPE_2D;
-    cinfo_depth_tex.format = state::gpu_tex_format_best_depth_only;
-    cinfo_depth_tex.usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER;
-    cinfo_depth_tex.width = Uint32(target_size.x);
-    cinfo_depth_tex.height = Uint32(target_size.y);
-    cinfo_depth_tex.layer_count_or_depth = 1;
-    cinfo_depth_tex.num_levels = 1;
+    /** Creation info for all depth targets */
+    SDL_GPUTextureCreateInfo cinfo_depth_target = {};
+    cinfo_depth_target.type = SDL_GPU_TEXTURETYPE_2D;
+    cinfo_depth_target.format = state::gpu_tex_format_best_depth_only;
+    cinfo_depth_target.usage = SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER;
+    cinfo_depth_target.width = Uint32(target_size.x);
+    cinfo_depth_target.height = Uint32(target_size.y);
+    cinfo_depth_target.layer_count_or_depth = 1;
+    cinfo_depth_target.num_levels = 1;
 
-    SDL_GPUDepthStencilTargetInfo tinfo_depth = {};
-    tinfo_depth.texture = gpu::create_texture(cinfo_depth_tex, "Depth texture");
-    tinfo_depth.clear_depth = 0.0f;
-    tinfo_depth.load_op = SDL_GPU_LOADOP_CLEAR;
-    tinfo_depth.store_op = SDL_GPU_STOREOP_DONT_CARE;
-    tinfo_depth.stencil_load_op = SDL_GPU_LOADOP_DONT_CARE;
-    tinfo_depth.stencil_store_op = SDL_GPU_STOREOP_DONT_CARE;
-    tinfo_depth.clear_stencil = 0;
+    /** Creation info for intermediate color targets */
+    SDL_GPUTextureCreateInfo cinfo_color_target = cinfo_depth_target;
+    cinfo_color_target.format = SDL_GetGPUSwapchainTextureFormat(state::gpu_device, state::window);
+    cinfo_color_target.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER;
 
-    SDL_GPURenderPass* render_pass = SDL_BeginGPURenderPass(command_buffer, &tinfo_color, 1, &tinfo_depth);
-    gpu::release_texture(tinfo_depth.texture);
+    /** Color target info for peels */
+    SDL_GPUColorTargetInfo tinfo_color_peel = {};
+    tinfo_color_peel.clear_color = SDL_FColor { 0, 0, 0, 0 };
+    tinfo_color_peel.load_op = SDL_GPU_LOADOP_CLEAR;
+    tinfo_color_peel.store_op = SDL_GPU_STOREOP_STORE;
 
-    SDL_GPUTextureSamplerBinding binding_tex[] = {
-        terrain->binding,
-    };
+    /** Depth target info for opaque */
+    SDL_GPUDepthStencilTargetInfo tinfo_depth_opaque = {};
+    tinfo_depth_opaque.texture = gpu::create_texture(cinfo_depth_target, "Depth opaque far");
+    tinfo_depth_opaque.clear_depth = 0.0f;
+    tinfo_depth_opaque.load_op = SDL_GPU_LOADOP_CLEAR;
+    tinfo_depth_opaque.store_op = SDL_GPU_STOREOP_STORE;
+    tinfo_depth_opaque.stencil_load_op = SDL_GPU_LOADOP_DONT_CARE;
+    tinfo_depth_opaque.stencil_store_op = SDL_GPU_STOREOP_DONT_CARE;
+    tinfo_depth_opaque.clear_stencil = 0;
 
-    SDL_BindGPUFragmentSamplers(render_pass, 0, binding_tex, SDL_arraysize(binding_tex));
+    /** Depth target info for peels */
+    SDL_GPUDepthStencilTargetInfo tinfo_depth_peel = tinfo_depth_opaque;
+    tinfo_depth_peel.load_op = SDL_GPU_LOADOP_LOAD;
+    tinfo_depth_peel.store_op = SDL_GPU_STOREOP_STORE;
+
+    tinfo_color_parent.store_op = SDL_GPU_STOREOP_STORE;
+    SDL_GPURenderPass* render_pass = SDL_BeginGPURenderPass(command_buffer, &tinfo_color_parent, 1, &tinfo_depth_opaque);
 
     struct alignas(16) ubo_world_t
     {
@@ -821,48 +920,125 @@ SDL_GPURenderPass* level_t::render_stage_render(
     SDL_PushGPUVertexUniformData(command_buffer, 0, &ubo_world, sizeof(ubo_world));
     SDL_PushGPUVertexUniformData(command_buffer, 1, &ubo_tint, sizeof(ubo_tint));
 
-    if (state::pipeline_shader_terrain_opaque && render_resources_valid && indirect_buffers.cmd_solid)
+    /* Opaque */
+    if (state::pipeline_shader_terrain_opaque_alpha_test && render_resources_valid && indirect_buffers.cmd_solid)
     {
-        SDL_PushGPUDebugGroup(command_buffer, "Opaque");
+        scoped_debug_group_t gpu_group(command_buffer, "Opaque");
+        SDL_BindGPUFragmentSamplers(render_pass, 0, &terrain->binding, 1);
         SDL_BindGPUVertexStorageBuffers(render_pass, 0, storage_buffers, 2);
-        SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_opaque);
+        SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_opaque_alpha_test);
         SDL_DrawGPUPrimitivesIndirect(render_pass, indirect_buffers.cmd_solid, 0, indirect_buffers.cmd_solid_len);
-        SDL_PopGPUDebugGroup(command_buffer);
     }
 
+    /* Overlay */
     if (state::pipeline_shader_terrain_overlay && render_resources_valid && indirect_buffers.cmd_overlay_len)
     {
-        SDL_PushGPUDebugGroup(command_buffer, "Overlay");
+        scoped_debug_group_t gpu_group(command_buffer, "Overlay");
+        SDL_BindGPUFragmentSamplers(render_pass, 0, &terrain->binding, 1);
         SDL_BindGPUVertexStorageBuffers(render_pass, 0, storage_buffers, 2);
         SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_overlay);
         SDL_DrawGPUPrimitivesIndirect(render_pass, indirect_buffers.cmd_overlay, 0, indirect_buffers.cmd_overlay_len);
-        SDL_PopGPUDebugGroup(command_buffer);
     }
 
     render_entities(command_buffer, render_pass);
 
-    if (state::pipeline_shader_terrain_translucent_depth && render_resources_valid && indirect_buffers.cmd_translucent_len)
+    end_render_pass(render_pass);
+    tinfo_color_parent.load_op = SDL_GPU_LOADOP_LOAD;
+
+    SDL_GPUTexture* depth_opaque = tinfo_depth_opaque.texture;
+    SDL_GPUTexture* depth_last = gpu::create_texture(cinfo_depth_target, "Depth peel near 0");
+    SDL_GPUTexture* depth_next = gpu::create_texture(cinfo_depth_target, "Depth peel near 1");
+    SDL_GPUSampler* simple_sampler = gpu::create_sampler(SDL_GPUSamplerCreateInfo {}, "Simple sampler");
+
+    if (!depth_opaque || !depth_last || !depth_next || !simple_sampler || !render_resources_valid || !indirect_buffers.cmd_translucent_len)
     {
-        SDL_PushGPUDebugGroup(command_buffer, "Translucent Depth");
-        SDL_BindGPUVertexStorageBuffers(render_pass, 0, storage_buffers, 2);
-        SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_translucent_depth);
-        SDL_DrawGPUPrimitivesIndirect(render_pass, indirect_buffers.cmd_translucent, 0, indirect_buffers.cmd_translucent_len);
-        SDL_PopGPUDebugGroup(command_buffer);
+        gpu::release_texture(depth_opaque);
+        gpu::release_texture(depth_last);
+        gpu::release_texture(depth_next);
+        gpu::release_sampler(simple_sampler);
+
+        return SDL_BeginGPURenderPass(command_buffer, &tinfo_color_parent, 1, NULL);
     }
 
-    if (state::pipeline_shader_terrain_translucent && render_resources_valid && indirect_buffers.cmd_translucent_len)
+    std::vector<SDL_GPUTexture*> color_targets;
+
+    /* Depth peel layer 0 */
+    tinfo_color_peel.texture = gpu::create_texture(cinfo_color_target, "Color peel layer 0");
+    if (state::pipeline_shader_terrain_depth_peel_0 && tinfo_color_peel.texture)
     {
-        SDL_PushGPUDebugGroup(command_buffer, "Translucent Color");
+        scoped_debug_group_t gpu_group(command_buffer, "Depth peel 0");
+
+        std::swap(depth_last, depth_next);
+        copy_opaque_depth(command_buffer, depth_opaque, depth_next, target_size);
+        tinfo_depth_peel.texture = depth_next;
+        color_targets.push_back(tinfo_color_peel.texture);
+        render_pass = SDL_BeginGPURenderPass(command_buffer, &tinfo_color_peel, 1, &tinfo_depth_peel);
+
+        SDL_BindGPUFragmentSamplers(render_pass, 0, &terrain->binding, 1);
         SDL_BindGPUVertexStorageBuffers(render_pass, 0, storage_buffers, 2);
-        SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_translucent);
+        SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_depth_peel_0);
         SDL_DrawGPUPrimitivesIndirect(render_pass, indirect_buffers.cmd_translucent, 0, indirect_buffers.cmd_translucent_len);
-        SDL_PopGPUDebugGroup(command_buffer);
+
+        end_render_pass(render_pass);
     }
 
-    SDL_EndGPURenderPass(render_pass);
+    /* Depth peel layers (1...n) */
+    for (int i = 1; i < r_depth_peel_num_layers.get(); i++)
+    {
+        tinfo_color_peel.texture = gpu::create_texture(cinfo_color_target, "Color peel layer %d", i);
+        if (state::pipeline_shader_terrain_depth_peel_n && tinfo_color_peel.texture)
+        {
+            scoped_debug_group_t gpu_group(command_buffer, "Depth peel %d", i);
+
+            std::swap(depth_last, depth_next);
+            copy_opaque_depth(command_buffer, depth_opaque, depth_next, target_size);
+            tinfo_depth_peel.texture = depth_next;
+            color_targets.push_back(tinfo_color_peel.texture);
+            render_pass = SDL_BeginGPURenderPass(command_buffer, &tinfo_color_peel, 1, &tinfo_depth_peel);
+
+            SDL_GPUTextureSamplerBinding binding_tex[] = {
+                terrain->binding,
+                SDL_GPUTextureSamplerBinding { depth_last, simple_sampler },
+            };
+
+            SDL_BindGPUFragmentSamplers(render_pass, 0, binding_tex, IM_ARRAYSIZE(binding_tex));
+            SDL_BindGPUVertexStorageBuffers(render_pass, 0, storage_buffers, 2);
+            SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_depth_peel_n);
+            SDL_DrawGPUPrimitivesIndirect(render_pass, indirect_buffers.cmd_translucent, 0, indirect_buffers.cmd_translucent_len);
+
+            end_render_pass(render_pass);
+        }
+    }
+    gpu::release_texture(depth_opaque);
+    gpu::release_texture(depth_last);
+    gpu::release_texture(depth_next);
+
+    /* Create the render pass to return/use for compositing */
+    render_pass = SDL_BeginGPURenderPass(command_buffer, &tinfo_color_parent, 1, NULL);
+
+    /* Compositing */
+    if (color_targets.size() && state::pipeline_composite)
+    {
+        scoped_debug_group_t gpu_group(command_buffer, "Depth peel composite");
+        std::reverse(color_targets.begin(), color_targets.end());
+        for (SDL_GPUTexture* t : color_targets)
+        {
+            SDL_GPUTextureSamplerBinding binding_tex { t, simple_sampler };
+
+            SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_composite);
+            SDL_BindGPUFragmentSamplers(render_pass, 0, &binding_tex, 1);
+
+            SDL_DrawGPUPrimitives(render_pass, 4, 1, 0, 0);
+        }
+    }
+
+    gpu::release_sampler(simple_sampler);
+
+    for (SDL_GPUTexture* t : color_targets)
+        gpu::release_texture(t);
+
     SDL_PopGPUDebugGroup(command_buffer);
-    tinfo_color.load_op = SDL_GPU_LOADOP_LOAD;
-    return SDL_BeginGPURenderPass(command_buffer, &tinfo_color, 1, NULL);
+    return render_pass;
 }
 
 void level_t::remove_chunk(const glm::ivec3 pos)

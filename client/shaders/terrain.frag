@@ -45,6 +45,9 @@ layout(location = 0) out vec4 out_color;
  */
 
 layout(set = 2, binding = 0) uniform sampler2D tex_atlas;
+#if (DEPTH_PEELING == 2)
+layout(set = 2, binding = 1) uniform sampler2D tex_depth_near;
+#endif
 
 const int ao_algorithm = 1;
 
@@ -57,6 +60,10 @@ layout(std140, set = 3, binding = 0) uniform ubo_frag_t
 #define LIGHTMAP_BINDING 1
 #include "lightmap.glsl"
 
+#if (USE_ALPHA_TEST) && (DEPTH_PEELING)
+#error "Alpha testing is not compatible with depth peeling!"
+#endif
+
 void main()
 {
     out_color = frag.color;
@@ -66,8 +73,15 @@ void main()
     else
         out_color.a *= texture(tex_atlas, frag.uv, -1.0).a;
 
-#if (USE_ALPHA_TEST)
-    if (out_color.a < 0.0625)
+#if (DEPTH_PEELING) == 1
+    if(out_color.a < (1.0/256.0))
+        discard;
+#elif (DEPTH_PEELING) == 2
+    const float layerDepth = texelFetch(tex_depth_near, ivec2(gl_FragCoord.xy), 0).r;
+    if(out_color.a < (1.0/256.0) || gl_FragCoord.z >= layerDepth)
+        discard;
+#elif (USE_ALPHA_TEST)
+    if (out_color.a < 0.125)
         discard;
 #endif
 

@@ -28,6 +28,7 @@
 #include <SDL3/SDL.h>
 
 #include "shaders/background_shader.h"
+#include "shaders/composite_shader.h"
 #include "shaders/terrain_shader.h"
 
 /* Forward declaration(s) */

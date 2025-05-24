@@ -1,5 +1,5 @@
 // clang-format off
-static const unsigned char terrain_frag_alpha_test_msl[] = R"(
+static const unsigned char terrain_frag_depth_peel_0_msl[] = R"(
 #include <metal_stdlib>
 #include <simd/simd.h>
 
@@ -60,7 +60,7 @@ fragment main0_out main0(main0_in in [[stage_in]], constant ubo_frag_t& ubo_frag
     {
         out.out_color.w *= tex_atlas.sample(tex_atlasSmplr, frag.uv, bias(-1.0)).w;
     }
-    if (out.out_color.w < 0.125)
+    if (out.out_color.w < 0.00390625)
     {
         discard_fragment();
     }
@@ -79,4 +79,4 @@ fragment main0_out main0(main0_in in [[stage_in]], constant ubo_frag_t& ubo_frag
 }
 
 )";
-static const unsigned int terrain_frag_alpha_test_msl_len = sizeof(terrain_frag_alpha_test_msl);
+static const unsigned int terrain_frag_depth_peel_0_msl_len = sizeof(terrain_frag_depth_peel_0_msl);

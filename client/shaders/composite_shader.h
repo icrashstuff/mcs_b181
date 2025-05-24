@@ -20,19 +20,13 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#ifndef MCS_B181__CLIENT__SHADERS__TERRAIN_SHADER
-#define MCS_B181__CLIENT__SHADERS__TERRAIN_SHADER
+#pragma once
 
 #include <SDL3/SDL_gpu.h>
 
 namespace state
 {
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_opaque_no_alpha;
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_opaque_alpha_test;
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_overlay;
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_depth_peel_0;
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_depth_peel_n;
-void init_terrain_pipelines();
-void destroy_terrain_pipelines();
+extern SDL_GPUGraphicsPipeline* pipeline_composite;
+void init_composite_pipelines();
+void destroy_composite_pipelines();
 };
-#endif

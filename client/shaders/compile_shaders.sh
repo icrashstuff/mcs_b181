@@ -67,9 +67,14 @@ compile_shader()
 }
 
 compile_shader "vertex"   "terrain.vert" ""
-compile_shader "fragment" "terrain.frag" ".alpha_test"    -DUSE_ALPHA_TEST=1
-compile_shader "fragment" "terrain.frag" ".no_alpha_test" -DUSE_ALPHA_TEST=0
+compile_shader "fragment" "terrain.frag" ".opaque"       -DUSE_ALPHA_TEST=0 -DDEPTH_PEELING=0
+compile_shader "fragment" "terrain.frag" ".alpha_test"   -DUSE_ALPHA_TEST=1 -DDEPTH_PEELING=0
+compile_shader "fragment" "terrain.frag" ".depth_peel_0" -DUSE_ALPHA_TEST=0 -DDEPTH_PEELING=1
+compile_shader "fragment" "terrain.frag" ".depth_peel_n" -DUSE_ALPHA_TEST=0 -DDEPTH_PEELING=2
 
 
 compile_shader "vertex"   "background.vert" ""
 compile_shader "fragment" "background.frag" ""
+
+compile_shader "vertex"   "composite.vert" ""
+compile_shader "fragment" "composite.frag" ""

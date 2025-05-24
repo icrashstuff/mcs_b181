@@ -133,6 +133,7 @@ set(mcs_b181_client_SRC
     client/entity/entity_physics.cpp
 
     client/shaders/terrain_shader.cpp
+    client/shaders/composite_shader.cpp
     client/shaders/background_shader.cpp
 
     client/sys/device_state.cpp
@@ -260,19 +261,24 @@ if(MCS_B181_BUILD_SHADERS)
 
     set(mcs_b181_client_SHADER_HEADERS "")
 
-    function(add_shader in basename_out)
+    function(add_shader in suffix)
         set(base_shader_dir "${CMAKE_CURRENT_SOURCE_DIR}/client/shaders")
         set(mcs_b181_client_SHADERS        "${mcs_b181_client_SHADERS};${base_shader_dir}/${in}" PARENT_SCOPE)
-        set(mcs_b181_client_SHADER_HEADERS "${mcs_b181_client_SHADER_HEADERS};${base_shader_dir}/compiled/${basename_out}.msl.h"   PARENT_SCOPE)
-        set(mcs_b181_client_SHADER_HEADERS "${mcs_b181_client_SHADER_HEADERS};${base_shader_dir}/compiled/${basename_out}.smolv.h" PARENT_SCOPE)
+        set(mcs_b181_client_SHADER_HEADERS "${mcs_b181_client_SHADER_HEADERS};${base_shader_dir}/compiled/${in}${suffix}.msl.h"   PARENT_SCOPE)
+        set(mcs_b181_client_SHADER_HEADERS "${mcs_b181_client_SHADER_HEADERS};${base_shader_dir}/compiled/${in}${suffix}.smolv.h" PARENT_SCOPE)
     endfunction()
 
-    add_shader(terrain.vert terrain.vert)
-    add_shader(terrain.frag terrain.frag.no_alpha_test)
-    add_shader(terrain.frag terrain.frag.alpha_test)
+    add_shader(terrain.vert "")
+    add_shader(terrain.frag ".opaque")
+    add_shader(terrain.frag ".alpha_test")
+    add_shader(terrain.frag ".depth_peel_0")
+    add_shader(terrain.frag ".depth_peel_n")
 
-    add_shader(background.vert background.vert)
-    add_shader(background.frag background.frag)
+    add_shader(background.vert "")
+    add_shader(background.frag "")
+
+    add_shader("composite.vert" "")
+    add_shader("composite.frag" "")
 
     add_custom_command(OUTPUT ${mcs_b181_client_SHADER_HEADERS}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/

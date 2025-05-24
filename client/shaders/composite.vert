@@ -1,3 +1,4 @@
+#version 460 core
 /* SPDX-License-Identifier: MIT
  *
  * SPDX-FileCopyrightText: Copyright (c) 2025 Ian Hangartner <icrashstuff at outlook dot com>
@@ -20,19 +21,10 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#ifndef MCS_B181__CLIENT__SHADERS__TERRAIN_SHADER
-#define MCS_B181__CLIENT__SHADERS__TERRAIN_SHADER
 
-#include <SDL3/SDL_gpu.h>
-
-namespace state
+void main()
 {
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_opaque_no_alpha;
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_opaque_alpha_test;
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_overlay;
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_depth_peel_0;
-extern SDL_GPUGraphicsPipeline* pipeline_shader_terrain_depth_peel_n;
-void init_terrain_pipelines();
-void destroy_terrain_pipelines();
-};
-#endif
+    vec2 uv = vec2(gl_VertexIndex & 1, (gl_VertexIndex >> 1) & 1);
+
+    gl_Position = vec4(uv * 2.0 - 1.0, 0, 1);
+}

@@ -147,6 +147,7 @@ static void compile_shaders()
 {
     state::init_background_pipelines();
     state::init_terrain_pipelines();
+    state::init_composite_pipelines();
 }
 
 static std::vector<game_t*> games;
@@ -238,6 +239,7 @@ static bool deinitialize_resources()
 
     state::destroy_background_pipelines();
     state::destroy_terrain_pipelines();
+    state::destroy_composite_pipelines();
 
     for (game_t* g : games)
         if (g)
