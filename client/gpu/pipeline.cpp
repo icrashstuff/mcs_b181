@@ -86,7 +86,7 @@ SDL_GPUShader* gpu::create(const SDL_GPUShaderCreateInfo& cinfo, const char* fmt
     SDL_GPUShader* ret = SDL_CreateGPUShader(state::gpu_device, &cinfo_named);
 
     if (!ret)
-        dc_log_error("Failed to acquire %s! SDL_ReleaseGPU%s: %s", "Shader", "Shader", SDL_GetError());
+        dc_log_error("Failed to acquire %s! SDL_CreateGPU%s: %s", "Shader", "Shader", SDL_GetError());
 
     SDL_DestroyProperties(cinfo_named.props);
 

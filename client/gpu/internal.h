@@ -27,38 +27,38 @@
 #include "tetra/log.h"
 #include "tetra/util/stb_sprintf.h"
 
-#define CREATE_FUNC_DEF(FUNCTION_NAME, RESOURCE_SUB_TYPE, PROP_STRING)                                                          \
-    SDL_GPU##RESOURCE_SUB_TYPE* gpu::FUNCTION_NAME(const SDL_GPU##RESOURCE_SUB_TYPE##CreateInfo& cinfo, const char* fmt, ...)   \
-    {                                                                                                                           \
-        SDL_GPU##RESOURCE_SUB_TYPE##CreateInfo cinfo_named = cinfo;                                                             \
-        cinfo_named.props = SDL_CreateProperties();                                                                             \
-        if (cinfo.props)                                                                                                        \
-            SDL_CopyProperties(cinfo.props, cinfo_named.props);                                                                 \
-                                                                                                                                \
-        if (fmt)                                                                                                                \
-        {                                                                                                                       \
-            char name[1024] = "";                                                                                               \
-                                                                                                                                \
-            va_list args;                                                                                                       \
-            va_start(args, fmt);                                                                                                \
-            stbsp_vsnprintf(name, SDL_arraysize(name), fmt, args);                                                              \
-            va_end(args);                                                                                                       \
-                                                                                                                                \
-            SDL_SetStringProperty(cinfo_named.props, PROP_STRING, name);                                                        \
-        }                                                                                                                       \
-                                                                                                                                \
-        /* We clear the current error because sometimes SDL won't set one, even though one occurred */                          \
-        /* (that or I'm doing something wrong), - Ian 2025-05-22 */                                                             \
-        SDL_ClearError();                                                                                                       \
-                                                                                                                                \
-        SDL_GPU##RESOURCE_SUB_TYPE* ret = SDL_CreateGPU##RESOURCE_SUB_TYPE(state::gpu_device, &cinfo_named);                    \
-                                                                                                                                \
-        if (!ret)                                                                                                               \
-            dc_log_error("Failed to acquire %s! SDL_ReleaseGPU%s: %s", #RESOURCE_SUB_TYPE, #RESOURCE_SUB_TYPE, SDL_GetError()); \
-                                                                                                                                \
-        SDL_DestroyProperties(cinfo_named.props);                                                                               \
-                                                                                                                                \
-        return ret;                                                                                                             \
+#define CREATE_FUNC_DEF(FUNCTION_NAME, RESOURCE_SUB_TYPE, PROP_STRING)                                                         \
+    SDL_GPU##RESOURCE_SUB_TYPE* gpu::FUNCTION_NAME(const SDL_GPU##RESOURCE_SUB_TYPE##CreateInfo& cinfo, const char* fmt, ...)  \
+    {                                                                                                                          \
+        SDL_GPU##RESOURCE_SUB_TYPE##CreateInfo cinfo_named = cinfo;                                                            \
+        cinfo_named.props = SDL_CreateProperties();                                                                            \
+        if (cinfo.props)                                                                                                       \
+            SDL_CopyProperties(cinfo.props, cinfo_named.props);                                                                \
+                                                                                                                               \
+        if (fmt)                                                                                                               \
+        {                                                                                                                      \
+            char name[1024] = "";                                                                                              \
+                                                                                                                               \
+            va_list args;                                                                                                      \
+            va_start(args, fmt);                                                                                               \
+            stbsp_vsnprintf(name, SDL_arraysize(name), fmt, args);                                                             \
+            va_end(args);                                                                                                      \
+                                                                                                                               \
+            SDL_SetStringProperty(cinfo_named.props, PROP_STRING, name);                                                       \
+        }                                                                                                                      \
+                                                                                                                               \
+        /* We clear the current error because sometimes SDL won't set one, even though one occurred */                         \
+        /* (that or I'm doing something wrong), - Ian 2025-05-22 */                                                            \
+        SDL_ClearError();                                                                                                      \
+                                                                                                                               \
+        SDL_GPU##RESOURCE_SUB_TYPE* ret = SDL_CreateGPU##RESOURCE_SUB_TYPE(state::gpu_device, &cinfo_named);                   \
+                                                                                                                               \
+        if (!ret)                                                                                                              \
+            dc_log_error("Failed to acquire %s! SDL_CreateGPU%s: %s", #RESOURCE_SUB_TYPE, #RESOURCE_SUB_TYPE, SDL_GetError()); \
+                                                                                                                               \
+        SDL_DestroyProperties(cinfo_named.props);                                                                              \
+                                                                                                                               \
+        return ret;                                                                                                            \
     }
 
 #define RELEASE_FUNC_DEF(FUNCTION_NAME, RESOURCE_SUB_TYPE)                                 \
