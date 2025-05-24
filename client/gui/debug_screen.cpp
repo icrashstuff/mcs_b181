@@ -60,7 +60,8 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
     ImVec2 cursor_l(ctx->menu_scale * 2, ctx->menu_scale * 1.5f);
     ImVec2 cursor_r(ImGui::GetMainViewport()->Size.x - ctx->menu_scale * 2, ctx->menu_scale * 1.5f);
 
-    add_text(ctx, drawlist, 0, cursor_l, "mcs_b181_client (%s) (%.0f FPS)", build_info::ver_string::client().c_str(), ImGui::GetIO().Framerate);
+    add_text(ctx, drawlist, 0, cursor_l, "mcs_b181_client (%s) (%s) (%.0f FPS)", build_info::ver_string::client().c_str(), build_info::build_mode,
+        ImGui::GetIO().Framerate);
 
     size_t mem_chunk = 0;
 
@@ -75,7 +76,7 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
         for (auto it : cvec)
         {
             num_visible += it->visible;
-            num_meshed += (it->quad_count || it->quad_count_overlay || it->quad_count_translucent);
+            num_meshed += !!(it->mesh_handle);
             num_dirty += it->dirty_level != chunk_cubic_t::DIRTY_LEVEL_NONE;
             num_dirty_visible += it->visible ? (it->dirty_level != chunk_cubic_t::DIRTY_LEVEL_NONE) : 0;
         }
