@@ -2467,11 +2467,12 @@ void level_t::build_mesh(chunk_cubic_t* const center)
         /* ============ END: IS_NORMAL ============ */
     }
 
-    TRACE("Chunk: <%d, %d, %d>, Vertices (Solid): %d, Indices: %d", chunk_x, chunk_y, chunk_z, vtx_solid.size(), vtx_solid.size() / 4 * 6);
-    TRACE("Chunk: <%d, %d, %d>, Vertices (Trans): %d, Indices: %d", chunk_x, chunk_y, chunk_z, vtx_translucent.size(), vtx_translucent.size() / 4 * 6);
-    TRACE("Chunk: <%d, %d, %d>, Vertices (Overlay): %d, Indices: %d", chunk_x, chunk_y, chunk_z, vtx_overlay.size(), vtx_overlay.size() / 4 * 6);
+    TRACE("Chunk: <%d, %d, %d>, Quads (Solid): %d", chunk_x, chunk_y, chunk_z, vtx_solid.size() / 4);
+    TRACE("Chunk: <%d, %d, %d>, Quads (Alpha): %d", chunk_x, chunk_y, chunk_z, vtx_alpha.size() / 4);
+    TRACE("Chunk: <%d, %d, %d>, Quads (Trans): %d", chunk_x, chunk_y, chunk_z, vtx_translucent.size() / 4);
+    TRACE("Chunk: <%d, %d, %d>, Quads (Overlay): %d", chunk_x, chunk_y, chunk_z, vtx_overlay.size() / 4);
 
-    if (!vtx_solid.size() && !vtx_translucent.size())
+    if (!vtx_solid.size() && !vtx_alpha.size() && !vtx_translucent.size())
     {
         center->free_renderer_resources(chunk_cubic_t::DIRTY_LEVEL_NONE);
         return;
