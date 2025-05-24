@@ -29,7 +29,8 @@
 
 void chunk_cubic_t::free_renderer_resources(const chunk_cubic_t::dirty_level_t new_dirty_level)
 {
-    quad_count = 0;
+    quad_count_opaque = 0;
+    quad_count_alpha_test = 0;
     quad_count_overlay = 0;
     quad_count_translucent = 0;
 

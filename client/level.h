@@ -430,7 +430,8 @@ private:
 
     struct mesh_queue_info_t
     {
-        Uint32 quad_count = 0;
+        Uint32 quad_count_opaque = 0;
+        Uint32 quad_count_alpha_test = 0;
         Uint32 quad_count_overlay = 0;
         Uint32 quad_count_translucent = 0;
 
@@ -452,10 +453,12 @@ private:
     {
         SDL_GPUBuffer* pos = nullptr;
         SDL_GPUBuffer* cmd_solid = nullptr;
+        SDL_GPUBuffer* cmd_alpha = nullptr;
         SDL_GPUBuffer* cmd_overlay = nullptr;
         SDL_GPUBuffer* cmd_translucent = nullptr;
 
         Uint32 cmd_solid_len = 0;
+        Uint32 cmd_alpha_len = 0;
         Uint32 cmd_overlay_len = 0;
         Uint32 cmd_translucent_len = 0;
 

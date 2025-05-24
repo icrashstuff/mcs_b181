@@ -138,7 +138,8 @@ struct chunk_cubic_t
 
     Uint64 last_mesh_update_time = 0;
 
-    Uint32 quad_count = 0;
+    Uint32 quad_count_opaque = 0;
+    Uint32 quad_count_alpha_test = 0;
     Uint32 quad_count_overlay = 0;
     Uint32 quad_count_translucent = 0;
 

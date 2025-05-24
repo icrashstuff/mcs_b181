@@ -633,7 +633,8 @@ bool level_t::mesh_queue_upload_item(SDL_GPUCommandBuffer* const command_buffer,
         delete c->mesh_handle;
     }
     c->mesh_handle = new gpu::subdiv_buffer_allocation_t(offset, &mesh_buffer);
-    c->quad_count = item.quad_count;
+    c->quad_count_opaque = item.quad_count_opaque;
+    c->quad_count_alpha_test = item.quad_count_alpha_test;
     c->quad_count_overlay = item.quad_count_overlay;
     c->quad_count_translucent = item.quad_count_translucent;
 
@@ -661,6 +662,7 @@ void level_t::render_stage_copy(SDL_GPUCommandBuffer* const command_buffer, SDL_
 
     ImVector<glm::ivec4> pos_data;
     ImVector<SDL_GPUIndirectDrawCommand> solid_commands;
+    ImVector<SDL_GPUIndirectDrawCommand> alpha_commands;
     ImVector<SDL_GPUIndirectDrawCommand> overlay_commands;
     ImVector<SDL_GPUIndirectDrawCommand> translucent_commands;
 
@@ -677,11 +679,17 @@ void level_t::render_stage_copy(SDL_GPUCommandBuffer* const command_buffer, SDL_
         base_cmd.first_instance = c->mesh_handle->offset;
         base_cmd.num_instances = 0;
         pos_data.push_back(glm::ivec4(c->pos, 0));
-        if (c->quad_count)
+        if (c->quad_count_opaque)
         {
-            base_cmd.num_instances = c->quad_count;
+            base_cmd.num_instances = c->quad_count_opaque;
             solid_commands.push_back(base_cmd);
-            base_cmd.first_instance += c->quad_count;
+            base_cmd.first_instance += c->quad_count_opaque;
+        }
+        if (c->quad_count_alpha_test)
+        {
+            base_cmd.num_instances = c->quad_count_alpha_test;
+            alpha_commands.push_back(base_cmd);
+            base_cmd.first_instance += c->quad_count_alpha_test;
         }
         if (c->quad_count_overlay)
         {
@@ -709,23 +717,16 @@ void level_t::render_stage_copy(SDL_GPUCommandBuffer* const command_buffer, SDL_
     SDL_GPUBufferCreateInfo cinfo_indirect = {};
     cinfo_indirect.usage = SDL_GPU_BUFFERUSAGE_INDIRECT;
 
-    cinfo_indirect.size = solid_commands.size_in_bytes();
-    indirect_buffers.cmd_solid = gpu::create_buffer(cinfo_indirect, "[Level]: solid indirect commands");
+#define CREATE_AND_UPLOAD(NAME)                                                                                                         \
+    cinfo_indirect.size = NAME##_commands.size_in_bytes();                                                                              \
+    indirect_buffers.cmd_##NAME = gpu::create_buffer(cinfo_indirect, "[Level]: %s indirect commands", #NAME);                           \
+    if (gpu::upload_to_buffer(copy_pass, indirect_buffers.cmd_##NAME, 0, NAME##_commands.size_in_bytes(), NAME##_commands.Data, false)) \
+        indirect_buffers.cmd_##NAME##_len = NAME##_commands.size();
 
-    cinfo_indirect.size = overlay_commands.size_in_bytes();
-    indirect_buffers.cmd_overlay = gpu::create_buffer(cinfo_indirect, "[Level]: overlay indirect commands");
-
-    cinfo_indirect.size = translucent_commands.size_in_bytes();
-    indirect_buffers.cmd_translucent = gpu::create_buffer(cinfo_indirect, "[Level]: translucent indirect commands");
-
-    if (gpu::upload_to_buffer(copy_pass, indirect_buffers.cmd_solid, 0, solid_commands.size_in_bytes(), solid_commands.Data, false))
-        indirect_buffers.cmd_solid_len = solid_commands.size();
-
-    if (gpu::upload_to_buffer(copy_pass, indirect_buffers.cmd_overlay, 0, overlay_commands.size_in_bytes(), overlay_commands.Data, false))
-        indirect_buffers.cmd_overlay_len = overlay_commands.size();
-
-    if (gpu::upload_to_buffer(copy_pass, indirect_buffers.cmd_translucent, 0, translucent_commands.size_in_bytes(), translucent_commands.Data, false))
-        indirect_buffers.cmd_translucent_len = translucent_commands.size();
+    CREATE_AND_UPLOAD(solid);
+    CREATE_AND_UPLOAD(alpha);
+    CREATE_AND_UPLOAD(overlay);
+    CREATE_AND_UPLOAD(translucent);
 }
 
 static void end_render_pass(SDL_GPURenderPass*& render_pass)
@@ -921,13 +922,23 @@ SDL_GPURenderPass* level_t::render_stage_render(
     SDL_PushGPUVertexUniformData(command_buffer, 1, &ubo_tint, sizeof(ubo_tint));
 
     /* Opaque */
-    if (state::pipeline_shader_terrain_opaque_alpha_test && render_resources_valid && indirect_buffers.cmd_solid)
+    if (state::pipeline_shader_terrain_opaque_no_alpha && render_resources_valid && indirect_buffers.cmd_solid)
     {
         scoped_debug_group_t gpu_group(command_buffer, "Opaque");
         SDL_BindGPUFragmentSamplers(render_pass, 0, &terrain->binding, 1);
         SDL_BindGPUVertexStorageBuffers(render_pass, 0, storage_buffers, 2);
-        SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_opaque_alpha_test);
+        SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_opaque_no_alpha);
         SDL_DrawGPUPrimitivesIndirect(render_pass, indirect_buffers.cmd_solid, 0, indirect_buffers.cmd_solid_len);
+    }
+
+    /* Alpha-test */
+    if (state::pipeline_shader_terrain_opaque_alpha_test && render_resources_valid && indirect_buffers.cmd_alpha)
+    {
+        scoped_debug_group_t gpu_group(command_buffer, "Alpha");
+        SDL_BindGPUFragmentSamplers(render_pass, 0, &terrain->binding, 1);
+        SDL_BindGPUVertexStorageBuffers(render_pass, 0, storage_buffers, 2);
+        SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_shader_terrain_opaque_alpha_test);
+        SDL_DrawGPUPrimitivesIndirect(render_pass, indirect_buffers.cmd_alpha, 0, indirect_buffers.cmd_alpha_len);
     }
 
     /* Overlay */
@@ -1176,10 +1187,12 @@ void level_t::transient_indirect_buffers_t::release()
 {
     gpu::release_buffer(pos);
     gpu::release_buffer(cmd_solid);
+    gpu::release_buffer(cmd_alpha);
     gpu::release_buffer(cmd_overlay);
     gpu::release_buffer(cmd_translucent);
 
     cmd_solid_len = 0;
+    cmd_alpha_len = 0;
     cmd_overlay_len = 0;
     cmd_translucent_len = 0;
 }

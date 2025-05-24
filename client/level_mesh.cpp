@@ -110,6 +110,7 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
     /* We use ImVector instead of std::vector because we can pull the Data variable out */
     ImVector<terrain_vertex_t> vtx_solid;
+    ImVector<terrain_vertex_t> vtx_alpha;
     ImVector<terrain_vertex_t> vtx_overlay;
     ImVector<terrain_vertex_t> vtx_translucent;
 
@@ -154,7 +155,13 @@ void level_t::build_mesh(chunk_cubic_t* const center)
             continue;
         }
 
-        ImVector<terrain_vertex_t>* vtx = is_translucent[type] ? &vtx_translucent : &vtx_solid;
+        ImVector<terrain_vertex_t>* vtx = nullptr;
+        if (is_translucent[type])
+            vtx = &vtx_translucent;
+        else if (is_transparent[type])
+            vtx = &vtx_alpha;
+        else
+            vtx = &vtx_solid;
 
         float r = 1.0f, g = 1.0f, b = 1.0f;
         float r_overlay = r, g_overlay = g, b_overlay = b;
@@ -2446,15 +2453,21 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
     mesh_queue_info_t queue_info = {};
 
-    queue_info.quad_count = vtx_solid.size() / 4;
+    queue_info.quad_count_opaque = vtx_solid.size() / 4;
+    queue_info.quad_count_alpha_test = vtx_alpha.size() / 4;
     queue_info.quad_count_overlay = vtx_overlay.size() / 4;
     queue_info.quad_count_translucent = vtx_translucent.size() / 4;
 
     /* Combine vectors into one */
     int vtx_solid_idx = vtx_solid.size();
-    vtx_solid.resize(vtx_solid.size() + vtx_overlay.size() + vtx_translucent.size());
+    vtx_solid.resize(vtx_solid.size() + vtx_alpha.size() + vtx_overlay.size() + vtx_translucent.size());
+
+    memcpy(vtx_solid.Data + vtx_solid_idx, vtx_alpha.Data, vtx_alpha.size_in_bytes());
+    vtx_solid_idx += vtx_alpha.size();
+
     memcpy(vtx_solid.Data + vtx_solid_idx, vtx_overlay.Data, vtx_overlay.size_in_bytes());
     vtx_solid_idx += vtx_overlay.size();
+
     memcpy(vtx_solid.Data + vtx_solid_idx, vtx_translucent.Data, vtx_translucent.size_in_bytes());
     vtx_solid_idx += vtx_translucent.size();
 
