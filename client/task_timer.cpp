@@ -44,6 +44,7 @@ void task_timer_t::finish()
     SDL_assert(recording);
     if (!recording)
         return;
+    recording = false;
     push_back(SDL_GetTicksNS() - current_start);
 }
 
