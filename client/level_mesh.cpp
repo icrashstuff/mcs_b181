@@ -63,6 +63,20 @@ static convar_int_t cvr_r_biome_oversample {
 static std::atomic<Uint64> accumulator = { 0 };
 static std::atomic<Uint64> cycles = { 0 };
 
+static void add_backface(ImVector<terrain_vertex_t>& verts)
+{
+    terrain_vertex_t temp[4];
+
+    memcpy(temp, verts.Data + verts.Size - 4, sizeof(temp));
+
+    std::swap(temp[0], temp[3]);
+
+    verts.push_back(temp[0]);
+    verts.push_back(temp[1]);
+    verts.push_back(temp[2]);
+    verts.push_back(temp[3]);
+}
+
 void level_t::build_mesh(chunk_cubic_t* const center)
 {
     Uint64 start_ns = SDL_GetTicksNS();
@@ -1335,6 +1349,8 @@ void level_t::build_mesh(chunk_cubic_t* const center)
                     { r, g, b, bl[0], slight_sky[1][2][1] },
                     face_top.corners[0],
                 });
+
+                add_backface(*vtx_fluid);
             }
 
             /* Negative Y */
@@ -1364,6 +1380,8 @@ void level_t::build_mesh(chunk_cubic_t* const center)
                     { r, g, b, bl[3], slight_sky[1][0][1] },
                     face_still.corners[2],
                 });
+
+                add_backface(*vtx_fluid);
             }
 
             fluid_corners_t corner_tex_heights;
@@ -1424,6 +1442,8 @@ void level_t::build_mesh(chunk_cubic_t* const center)
                     face_side.corners[0],
                 });
 
+                add_backface(*vtx_fluid);
+
                 if (max_corner_heights != min_corner_heights)
                 {
                     vtx_fluid->push_back({
@@ -1446,6 +1466,8 @@ void level_t::build_mesh(chunk_cubic_t* const center)
                         { r, g, b, bl[3], slight_sky[2][1][1] },
                         face_side_tri.corners[which_height ? 2 : 0],
                     });
+
+                    add_backface(*vtx_fluid);
                 }
             }
 
@@ -1479,6 +1501,8 @@ void level_t::build_mesh(chunk_cubic_t* const center)
                     face_side.corners[2],
                 });
 
+                add_backface(*vtx_fluid);
+
                 if (max_corner_heights != min_corner_heights)
                 {
 
@@ -1502,6 +1526,8 @@ void level_t::build_mesh(chunk_cubic_t* const center)
                         { r, g, b, bl[0], slight_sky[0][1][1] },
                         face_side_tri.corners[2],
                     });
+
+                    add_backface(*vtx_fluid);
                 }
             }
 
@@ -1535,6 +1561,8 @@ void level_t::build_mesh(chunk_cubic_t* const center)
                     face_side.corners[2],
                 });
 
+                add_backface(*vtx_fluid);
+
                 if (max_corner_heights != min_corner_heights)
                 {
                     vtx_fluid->push_back({
@@ -1557,6 +1585,8 @@ void level_t::build_mesh(chunk_cubic_t* const center)
                         { r, g, b, bl[0], slight_sky[1][1][2] },
                         face_side_tri.corners[2],
                     });
+
+                    add_backface(*vtx_fluid);
                 }
             }
             /* Negative Z */
@@ -1589,6 +1619,8 @@ void level_t::build_mesh(chunk_cubic_t* const center)
                     face_side.corners[0],
                 });
 
+                add_backface(*vtx_fluid);
+
                 if (max_corner_heights != min_corner_heights)
                 {
                     vtx_fluid->push_back({
@@ -1611,6 +1643,8 @@ void level_t::build_mesh(chunk_cubic_t* const center)
                         { r, g, b, bl[3], slight_sky[1][1][0] },
                         face_side_tri.corners[which_height ? 2 : 0],
                     });
+
+                    add_backface(*vtx_fluid);
                 }
             }
 #undef FLUID_CALC_SIDE_HEIGHTS
