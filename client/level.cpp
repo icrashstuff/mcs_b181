@@ -581,7 +581,7 @@ static convar_float_t cvr_r_damage_tilt_rate {
     CONVAR_FLAG_SAVE,
 };
 
-void level_t::render_stage_prepare(const glm::ivec2 win_size)
+void level_t::render_stage_prepare(const glm::ivec2 win_size, const float delta_time)
 {
     const int render_distance = (render_distance_override > 0) ? render_distance_override : r_render_distance.get();
 
@@ -590,6 +590,32 @@ void level_t::render_stage_prepare(const glm::ivec2 win_size)
     build_dirty_meshes();
 
     tick();
+
+    glm::vec3 col_day(0.0f);
+    const glm::vec3 pos = get_camera_pos();
+    const float kernel[] = { 0.1f, 0.125f, 0.175f, 0.20f, 0.175f, 0.125f, 0.1f };
+    const int offsets[IM_ARRAYSIZE(kernel)] = { -2, -1, 0, 1, 2 };
+    for (int v = 0; v < IM_ARRAYSIZE(kernel) * IM_ARRAYSIZE(kernel) * IM_ARRAYSIZE(kernel); v++)
+    {
+        const int i = v % IM_ARRAYSIZE(kernel);
+        const int j = (v / IM_ARRAYSIZE(kernel)) % IM_ARRAYSIZE(kernel);
+        const int k = v / (IM_ARRAYSIZE(kernel) * IM_ARRAYSIZE(kernel));
+
+        const glm::vec3 offset(offsets[i], offsets[j], offsets[k]);
+        const float blur = kernel[i] * kernel[j] * kernel[k];
+
+        col_day += mc_id::get_biome_color_sky(get_biome_at(glm::round(pos + offset))) * blur;
+    }
+    if (dimension == mc_id::DIMENSION_OVERWORLD)
+    {
+        glm::vec3 col_night = lightmap.color_night;
+        col_night += lightmap.color_minimum;
+        col_night /= 3.0f;
+
+        col_day = glm::mix(col_night, col_day, lightmap.get_mix_for_time(mc_time));
+    }
+
+    sky_color = glm::mix(sky_color, glm::vec4(col_day.r, col_day.g, col_day.b, 1.0f), delta_time);
 }
 
 bool level_t::mesh_queue_upload_item(SDL_GPUCommandBuffer* const command_buffer, SDL_GPUCopyPass* const copy_pass, mesh_queue_info_t& item)
@@ -892,6 +918,7 @@ SDL_GPURenderPass* level_t::render_stage_render(
     tinfo_depth_peel.load_op = SDL_GPU_LOADOP_LOAD;
     tinfo_depth_peel.store_op = SDL_GPU_STOREOP_STORE;
 
+    tinfo_color_parent.clear_color = SDL_FColor { sky_color.r, sky_color.g, sky_color.b, sky_color.a };
     tinfo_color_parent.store_op = SDL_GPU_STOREOP_STORE;
     SDL_GPURenderPass* render_pass = SDL_BeginGPURenderPass(command_buffer, &tinfo_color_parent, 1, &tinfo_depth_opaque);
 

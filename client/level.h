@@ -249,6 +249,8 @@ struct level_t
      */
     mc_id::biome_t get_biome_at(const glm::ivec3 pos);
 
+    glm::vec4 sky_color;
+
     /**
      * Clears all chunks and entities
      */
@@ -265,8 +267,9 @@ struct level_t
      * Prepare world for rendering
      *
      * @param win_size Window size (used for culling)
+     * @param delta_time Time since last frame in seconds
      */
-    void render_stage_prepare(const glm::ivec2 win_size);
+    void render_stage_prepare(const glm::ivec2 win_size, const float delta_time);
     /* Given that all level_t::render_stage_prepare() does is call these other functions, it doesn't have a timer */
     task_timer_t timer_tick = { "level_t::tick" };
     task_timer_t timer_cull_chunks = { "level_t::cull_chunks" };

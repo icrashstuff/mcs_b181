@@ -1146,11 +1146,11 @@ static void loop_stage_prerender(glm::ivec2 win_size, bool& render_world, bool& 
     ImGui::SetCurrentContext(last_ctx);
 
     if (game_selected)
-        game_selected->level->render_stage_prepare(win_size);
+        game_selected->level->render_stage_prepare(win_size, delta_time);
 }
 
-static void loop_stage_render(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture* gpu_target, const ImVec4 clear_color, const glm::ivec2 win_size,
-    bool render_world, bool display_dirt)
+static void loop_stage_render(
+    SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUTexture* gpu_target, const glm::ivec2 win_size, bool render_world, bool display_dirt)
 {
     if (!game_selected)
         render_world = 0;
@@ -1187,7 +1187,7 @@ static void loop_stage_render(SDL_GPUCommandBuffer* gpu_command_buffer, SDL_GPUT
 
     SDL_GPUColorTargetInfo tinfo_color = {};
     tinfo_color.texture = gpu_target;
-    tinfo_color.clear_color = SDL_FColor { clear_color.x, clear_color.y, clear_color.z, clear_color.w };
+    tinfo_color.clear_color = SDL_FColor { .1f, .1f, .1f, .1f };
     tinfo_color.load_op = SDL_GPU_LOADOP_CLEAR;
     tinfo_color.store_op = SDL_GPU_STOREOP_STORE;
 
@@ -1876,7 +1876,7 @@ static void profile_light()
 
         dc_log("Emptiness: %.3f%%", double((emptiness * 1000000) / total) / 10000.0);
 
-        game.level->render_stage_prepare({ 10, 10 });
+        game.level->render_stage_prepare({ 10, 10 }, 0.0f);
 
         /* Add to individual counters */
         timers[using_sdl_rand][0] += game.level->last_perf_light_pass1;
@@ -2214,36 +2214,6 @@ int main(int argc, char* argv[])
         Uint64 loop_start_time = SDL_GetTicksNS();
         delta_time = (double)last_loop_time / 1000000000.0;
 
-        ImVec4 clear_color(0.1f, 0.1f, 0.1f, 1.0f);
-        if (game_selected)
-        {
-            glm::vec3 col_day(0.0f);
-            const glm::vec3 pos = game_selected->level->get_camera_pos();
-            const float kernel[] = { 0.1f, 0.125f, 0.175f, 0.20f, 0.175f, 0.125f, 0.1f };
-            const int offsets[IM_ARRAYSIZE(kernel)] = { -2, -1, 0, 1, 2 };
-            for (int v = 0; v < IM_ARRAYSIZE(kernel) * IM_ARRAYSIZE(kernel) * IM_ARRAYSIZE(kernel); v++)
-            {
-                const int i = v % IM_ARRAYSIZE(kernel);
-                const int j = (v / IM_ARRAYSIZE(kernel)) % IM_ARRAYSIZE(kernel);
-                const int k = v / (IM_ARRAYSIZE(kernel) * IM_ARRAYSIZE(kernel));
-
-                const glm::vec3 offset(offsets[i], offsets[j], offsets[k]);
-                const float blur = kernel[i] * kernel[j] * kernel[k];
-
-                col_day += mc_id::get_biome_color_sky(game_selected->level->get_biome_at(glm::round(pos + offset))) * blur;
-            }
-            if (game_selected->level->dimension_get() == mc_id::DIMENSION_OVERWORLD)
-            {
-                glm::vec3 col_night = game_selected->level->lightmap.color_night;
-                col_night += game_selected->level->lightmap.color_minimum;
-                col_night /= 3.0f;
-
-                col_day = glm::mix(col_night, col_day, game_selected->level->lightmap.get_mix_for_time(game_selected->level->mc_time));
-            }
-
-            clear_color = ImVec4(col_day.r, col_day.g, col_day.b, 1.0f);
-        }
-
         engine_state_step();
 
         tetra::show_imgui_ctx_main(engine_state_current != ENGINE_STATE_RUNNING);
@@ -2352,7 +2322,7 @@ int main(int argc, char* argv[])
             timer_stage_prerender.finish();
 
             timer_stage_render.start();
-            loop_stage_render(command_buffer, window_target, clear_color, win_size, render_world, display_dirt);
+            loop_stage_render(command_buffer, window_target, win_size, render_world, display_dirt);
             timer_stage_render.finish();
 
             if (game_selected && game_selected->level && cvr_gui_renderer.get())
