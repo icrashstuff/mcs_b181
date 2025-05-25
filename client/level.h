@@ -403,6 +403,7 @@ private:
 
     Uint64 last_render_order_sort_time = 0;
     Uint64 last_light_order_sort_time = 0;
+    Uint64 last_out_of_range_mesh_clear_time = 0;
 
     glm::i64vec3 last_render_order_cpos = { 0, 0, 0 };
 
@@ -412,7 +413,7 @@ private:
      * TODO: Throttle light?
      * TODO: Wait for either a timeout to pass or all surrounding chunks to be loaded before building
      */
-    void build_dirty_meshes();
+    void build_dirty_meshes(const int render_distance);
 
     /**
      * Propagate dirty levels between chunks (Basically light propagation)

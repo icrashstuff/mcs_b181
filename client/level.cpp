@@ -94,7 +94,7 @@ void level_t::cull_chunks(const glm::ivec2 win_size, const int render_distance)
 
     /* Convert camera position to 1/2 chunk coords and translate it to center chunk positions */
     const glm::ivec3 camera_half_chunk_pos = (glm::ivec3(get_camera_pos()) >> 3) - glm::ivec3(1, 1, 1);
-    const float render_distance_half_chunk = render_distance * 2.0f;
+    const float render_distance_half_chunk_squared = render_distance * 2.0f * render_distance * 2.0f;
     const float min_dist = -4.0f;
 
 #define CULL_REJECT_IF(condition) \
@@ -110,7 +110,7 @@ void level_t::cull_chunks(const glm::ivec2 win_size, const int render_distance)
         const glm::vec3 chunk_center = glm::vec3((c->pos << 1) - camera_half_chunk_pos);
 
         /* Beyond render distance culling */
-        CULL_REJECT_IF(glm::length(glm::vec2(chunk_center.x, chunk_center.z)) > render_distance_half_chunk);
+        CULL_REJECT_IF((chunk_center.x * chunk_center.x + chunk_center.z * chunk_center.z) > render_distance_half_chunk_squared);
 
         /* Behind the camera culling */
         CULL_REJECT_IF(glm::dot(camera_direction, chunk_center) < min_dist);
@@ -135,7 +135,7 @@ void level_t::update_chunk_renderer_hints()
     }
 }
 
-void level_t::build_dirty_meshes()
+void level_t::build_dirty_meshes(const int render_distance)
 {
     auto timer_scoped_full = timer_build_dirty_meshes.start_scoped();
     auto timer_prep = timer_build_dirty_meshes_prep.start_scoped();
@@ -161,6 +161,28 @@ void level_t::build_dirty_meshes()
         });
         last_light_order_sort_time = SDL_GetTicks();
         request_light_order_sort = 0;
+    }
+    else if (tick_func_start_ms - last_out_of_range_mesh_clear_time > 50)
+    {
+        int throttle = r_mesh_throttle.get() * 2;
+        const glm::ivec3 camera_half_chunk_pos = (glm::ivec3(get_camera_pos()) >> 3) - glm::ivec3(1, 1, 1);
+        const int unmesh_distance_squared = (render_distance + 2) * (render_distance + 2) * 4 * 1.125f;
+        for (chunk_cubic_t* c : chunks_render_order)
+        {
+            const glm::ivec3 chunk_center = glm::ivec3((c->pos << 1) - camera_half_chunk_pos);
+            if (c->mesh_handle && (chunk_center.x * chunk_center.x + chunk_center.z * chunk_center.z) > unmesh_distance_squared)
+            {
+                chunk_cubic_t::dirty_level_t dirt_lvl = c->dirty_level;
+                if (dirt_lvl == chunk_cubic_t::DIRTY_LEVEL_NONE)
+                    dirt_lvl = chunk_cubic_t::DIRTY_LEVEL_MESH;
+                c->free_renderer_resources(dirt_lvl);
+                c->visible = 0;
+                if (throttle-- < 0)
+                    break;
+            }
+        }
+
+        last_out_of_range_mesh_clear_time = SDL_GetTicks();
     }
 
     timer_prep.finish();
@@ -587,7 +609,7 @@ void level_t::render_stage_prepare(const glm::ivec2 win_size, const float delta_
 
     cull_chunks(win_size, render_distance);
 
-    build_dirty_meshes();
+    build_dirty_meshes(render_distance);
 
     tick();
 
