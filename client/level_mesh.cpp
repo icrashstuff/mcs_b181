@@ -63,19 +63,48 @@ static convar_int_t cvr_r_biome_oversample {
 static std::atomic<Uint64> accumulator = { 0 };
 static std::atomic<Uint64> cycles = { 0 };
 
-static void add_backface(ImVector<terrain_vertex_t>& verts)
+static void add_backface(const ImVector<terrain_vertex_t>* const in, ImVector<terrain_vertex_t>* const out)
 {
     terrain_vertex_t temp[4];
 
-    memcpy(temp, verts.Data + verts.Size - 4, sizeof(temp));
+    memcpy(temp, in->Data + in->Size - 4, sizeof(temp));
 
     std::swap(temp[0], temp[3]);
 
-    verts.push_back(temp[0]);
-    verts.push_back(temp[1]);
-    verts.push_back(temp[2]);
-    verts.push_back(temp[3]);
+    out->push_back(temp[0]);
+    out->push_back(temp[1]);
+    out->push_back(temp[2]);
+    out->push_back(temp[3]);
 }
+
+enum mesh_id_t
+{
+    MESH_ID_GENERIC,
+    MESH_ID_POS_X,
+    MESH_ID_POS_Y,
+    MESH_ID_POS_Z,
+    MESH_ID_NEG_X,
+    MESH_ID_NEG_Y,
+    MESH_ID_NEG_Z,
+    MESH_ID_MAX,
+};
+
+template <typename T, int array_size> struct simple_array_t
+{
+    inline T& operator[](const mesh_id_t i)
+    {
+        assert(i >= 0 && i < array_size);
+        return _data[i];
+    }
+    inline const T& operator[](const mesh_id_t i) const
+    {
+        assert(i >= 0 && i < array_size);
+        return _data[i];
+    }
+
+private:
+    T _data[array_size];
+};
 
 void level_t::build_mesh(chunk_cubic_t* const center)
 {
@@ -122,11 +151,12 @@ void level_t::build_mesh(chunk_cubic_t* const center)
         rubik[ix + 1][iy + 1][iz + 1] = center->find_chunk(center, center->pos + glm::ivec3(ix, iy, iz));
     }
 
-    /* We use ImVector instead of std::vector because we can pull the Data variable out */
-    ImVector<terrain_vertex_t> vtx_solid;
-    ImVector<terrain_vertex_t> vtx_alpha;
-    ImVector<terrain_vertex_t> vtx_overlay;
-    ImVector<terrain_vertex_t> vtx_translucent;
+    /* We use ImVector instead of std::vector because we don't need the complication of std::vector */
+    /* We use simple_array_t instead of std::array because it only has the [] operator and doesn't decay to a pointer */
+    simple_array_t<ImVector<terrain_vertex_t>, MESH_ID_MAX> vtx_solid;
+    simple_array_t<ImVector<terrain_vertex_t>, MESH_ID_MAX> vtx_alpha;
+    simple_array_t<ImVector<terrain_vertex_t>, MESH_ID_MAX> vtx_overlay;
+    simple_array_t<ImVector<terrain_vertex_t>, MESH_ID_MAX> vtx_translucent;
 
     bool is_transparent[256];
     bool is_translucent[256];
@@ -169,13 +199,18 @@ void level_t::build_mesh(chunk_cubic_t* const center)
             continue;
         }
 
-        ImVector<terrain_vertex_t>* vtx = nullptr;
+        simple_array_t<ImVector<terrain_vertex_t>*, MESH_ID_MAX> vtx;
         if (is_translucent[type])
-            vtx = &vtx_translucent;
+            for (int i = 0; i < MESH_ID_MAX; i++)
+                vtx[(mesh_id_t)i] = &vtx_translucent[(mesh_id_t)i];
         else if (is_transparent[type])
-            vtx = &vtx_alpha;
+            for (int i = 0; i < MESH_ID_MAX; i++)
+                vtx[(mesh_id_t)i] = &vtx_alpha[(mesh_id_t)i];
         else
-            vtx = &vtx_solid;
+            for (int i = 0; i < MESH_ID_MAX; i++)
+                vtx[(mesh_id_t)i] = &vtx_solid[(mesh_id_t)i];
+
+        auto& vtx_fluid = vtx;
 
         float r = 1.0f, g = 1.0f, b = 1.0f;
         float r_overlay = r, g_overlay = g, b_overlay = b;
@@ -845,22 +880,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
                 faces[1].corners[1] = { faces[1].corners[3].x, faces[1].corners[0].y };
                 faces[1].corners[2] = { faces[1].corners[0].x, faces[1].corners[3].y };
 
-                vtx->push_back({
+                vtx[MESH_ID_POS_Y]->push_back({
                     { 1, Sint16(x * 16 + 9), Sint16(y * 16 + 10), Sint16(z * 16 + 9), ao[3] },
                     { r, g, b, bl[3], sl[3] },
                     faces[1].corners[0],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_Y]->push_back({
                     { 1, Sint16(x * 16 + 9), Sint16(y * 16 + 10), Sint16(z * 16 + 7), ao[1] },
                     { r, g, b, bl[1], sl[1] },
                     faces[1].corners[2],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_Y]->push_back({
                     { 1, Sint16(x * 16 + 7), Sint16(y * 16 + 10), Sint16(z * 16 + 9), ao[2] },
                     { r, g, b, bl[2], sl[2] },
                     faces[1].corners[1],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_Y]->push_back({
                     { 1, Sint16(x * 16 + 7), Sint16(y * 16 + 10), Sint16(z * 16 + 7), ao[0] },
                     { r, g, b, bl[0], sl[0] },
                     faces[1].corners[3],
@@ -869,22 +904,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
             /* Positive X */
             {
-                vtx->push_back({
+                vtx[MESH_ID_POS_X]->push_back({
                     { 1, Sint16(x * 16 + 9), Sint16(y * 16 + 0), Sint16(z * 16 + 0), ao[0] },
                     { r, g, b, bl[0], sl[0] },
                     faces[0].corners[3],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_X]->push_back({
                     { 1, Sint16(x * 16 + 9), Sint16(y * 16 + 16), Sint16(z * 16 + 0), ao[1] },
                     { r, g, b, bl[1], sl[1] },
                     faces[0].corners[1],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_X]->push_back({
                     { 1, Sint16(x * 16 + 9), Sint16(y * 16 + 0), Sint16(z * 16 + 16), ao[2] },
                     { r, g, b, bl[2], sl[2] },
                     faces[0].corners[2],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_X]->push_back({
                     { 1, Sint16(x * 16 + 9), Sint16(y * 16 + 16), Sint16(z * 16 + 16), ao[3] },
                     { r, g, b, bl[3], sl[3] },
                     faces[0].corners[0],
@@ -893,22 +928,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
             /* Negative X */
             {
-                vtx->push_back({
+                vtx[MESH_ID_NEG_X]->push_back({
                     { 1, Sint16(x * 16 + 7), Sint16(y * 16 + 16), Sint16(z * 16 + 16), ao[3] },
                     { r, g, b, bl[3], sl[3] },
                     faces[3].corners[1],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_X]->push_back({
                     { 1, Sint16(x * 16 + 7), Sint16(y * 16 + 16), Sint16(z * 16 + 0), ao[1] },
                     { r, g, b, bl[1], sl[1] },
                     faces[3].corners[0],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_X]->push_back({
                     { 1, Sint16(x * 16 + 7), Sint16(y * 16 + 0), Sint16(z * 16 + 16), ao[2] },
                     { r, g, b, bl[2], sl[2] },
                     faces[3].corners[3],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_X]->push_back({
                     { 1, Sint16(x * 16 + 7), Sint16(y * 16 + 0), Sint16(z * 16 + 0), ao[0] },
                     { r, g, b, bl[0], sl[0] },
                     faces[3].corners[2],
@@ -917,22 +952,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
             /* Positive Z */
             {
-                vtx->push_back({
+                vtx[MESH_ID_POS_Z]->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 16), Sint16(z * 16 + 9), ao[3] },
                     { r, g, b, bl[3], sl[3] },
                     faces[2].corners[1],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_Z]->push_back({
                     { 1, Sint16(x * 16 + 0), Sint16(y * 16 + 16), Sint16(z * 16 + 9), ao[1] },
                     { r, g, b, bl[1], sl[1] },
                     faces[2].corners[0],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_Z]->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 0), Sint16(z * 16 + 9), ao[2] },
                     { r, g, b, bl[2], sl[2] },
                     faces[2].corners[3],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_Z]->push_back({
                     { 1, Sint16(x * 16 + 0), Sint16(y * 16 + 0), Sint16(z * 16 + 9), ao[0] },
                     { r, g, b, bl[0], sl[0] },
                     faces[2].corners[2],
@@ -941,22 +976,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
             /* Negative Z */
             {
-                vtx->push_back({
+                vtx[MESH_ID_NEG_Z]->push_back({
                     { 1, Sint16(x * 16 + 0), Sint16(y * 16 + 0), Sint16(z * 16 + 7), ao[0] },
                     { r, g, b, bl[0], sl[0] },
                     faces[5].corners[3],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_Z]->push_back({
                     { 1, Sint16(x * 16 + 0), Sint16(y * 16 + 16), Sint16(z * 16 + 7), ao[1] },
                     { r, g, b, bl[1], sl[1] },
                     faces[5].corners[1],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_Z]->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 0), Sint16(z * 16 + 7), ao[2] },
                     { r, g, b, bl[2], sl[2] },
                     faces[5].corners[2],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_Z]->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 16), Sint16(z * 16 + 7), ao[3] },
                     { r, g, b, bl[3], sl[3] },
                     faces[5].corners[0],
@@ -975,22 +1010,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
                 Uint8 bl[] = { slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1] };
 
-                vtx->push_back({
+                vtx[MESH_ID_GENERIC]->push_back({
                     { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 0), Sint16(z * 16 + 1), ao[0] },
                     { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl[0], slight_sky[1][1][1] },
                     faces[0].corners[3],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_GENERIC]->push_back({
                     { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 16), Sint16(z * 16 + 1), ao[1] },
                     { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl[1], slight_sky[1][1][1] },
                     faces[0].corners[1],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_GENERIC]->push_back({
                     { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 0), Sint16(z * 16 + 15), ao[2] },
                     { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl[2], slight_sky[1][1][1] },
                     faces[0].corners[2],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_GENERIC]->push_back({
                     { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 16), Sint16(z * 16 + 15), ao[3] },
                     { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl[3], slight_sky[1][1][1] },
                     faces[0].corners[0],
@@ -1003,22 +1038,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
                 Uint8 bl[] = { slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1] };
 
-                vtx->push_back({
+                vtx[MESH_ID_GENERIC]->push_back({
                     { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 16), Sint16(z * 16 + 15), ao[3] },
                     { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl[3], slight_sky[1][1][1] },
                     faces[3].corners[1],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_GENERIC]->push_back({
                     { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 16), Sint16(z * 16 + 1), ao[1] },
                     { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl[1], slight_sky[1][1][1] },
                     faces[3].corners[0],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_GENERIC]->push_back({
                     { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 0), Sint16(z * 16 + 15), ao[2] },
                     { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl[2], slight_sky[1][1][1] },
                     faces[3].corners[3],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_GENERIC]->push_back({
                     { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 0), Sint16(z * 16 + 1), ao[0] },
                     { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl[0], slight_sky[1][1][1] },
                     faces[3].corners[2],
@@ -1031,22 +1066,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
                 Uint8 bl[] = { slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1] };
 
-                vtx->push_back({
+                vtx[MESH_ID_GENERIC]->push_back({
                     { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 16), Sint16(z * 16 + 15), ao[3] },
                     { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl[3], slight_sky[1][1][1] },
                     faces[2].corners[1],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_GENERIC]->push_back({
                     { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 16), Sint16(z * 16 + 1), ao[1] },
                     { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl[1], slight_sky[1][1][1] },
                     faces[2].corners[0],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_GENERIC]->push_back({
                     { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 0), Sint16(z * 16 + 15), ao[2] },
                     { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl[2], slight_sky[1][1][1] },
                     faces[2].corners[3],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_GENERIC]->push_back({
                     { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 0), Sint16(z * 16 + 1), ao[0] },
                     { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl[0], slight_sky[1][1][1] },
                     faces[2].corners[2],
@@ -1059,22 +1094,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
                 Uint8 bl[] = { slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1], slight_block[1][1][1] };
 
-                vtx->push_back({
+                vtx[MESH_ID_GENERIC]->push_back({
                     { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 0), Sint16(z * 16 + 1), ao[0] },
                     { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl[0], slight_sky[1][1][1] },
                     faces[5].corners[3],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_GENERIC]->push_back({
                     { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 16), Sint16(z * 16 + 1), ao[1] },
                     { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl[1], slight_sky[1][1][1] },
                     faces[5].corners[1],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_GENERIC]->push_back({
                     { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 0), Sint16(z * 16 + 15), ao[2] },
                     { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl[2], slight_sky[1][1][1] },
                     faces[5].corners[2],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_GENERIC]->push_back({
                     { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 16), Sint16(z * 16 + 15), ao[3] },
                     { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl[3], slight_sky[1][1][1] },
                     faces[5].corners[0],
@@ -1098,7 +1133,6 @@ void level_t::build_mesh(chunk_cubic_t* const center)
             type = stypes[1][1][1];
 
             bool is_water = (type == BLOCK_ID_WATER_SOURCE);
-            ImVector<terrain_vertex_t>* vtx_fluid = vtx;
 
             mc_id::terrain_face_t face_flow = terrain->get_face(is_water ? mc_id::FACE_WATER_FLOW : mc_id::FACE_LAVA_FLOW);
             mc_id::terrain_face_t face_still = terrain->get_face(is_water ? mc_id::FACE_WATER_STILL : mc_id::FACE_LAVA_STILL);
@@ -1329,28 +1363,28 @@ void level_t::build_mesh(chunk_cubic_t* const center)
                     face_top.corners[3] = (face_top.corners[3] + glm::vec2(0.5f, 0.5f)) * face_flow_tsize + face_flow.corners[0];
                 }
 
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_GENERIC]->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + corner_heights.both), Sint16(z * 16 + 16), ao[3] },
                     { r, g, b, bl[3], slight_sky[1][2][1] },
                     face_top.corners[3],
                 });
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_GENERIC]->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + corner_heights.posx), Sint16(z * 16 + 00), ao[1] },
                     { r, g, b, bl[1], slight_sky[1][2][1] },
                     face_top.corners[1],
                 });
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_GENERIC]->push_back({
                     { 1, Sint16(x * 16 + 00), Sint16(y * 16 + corner_heights.posz), Sint16(z * 16 + 16), ao[2] },
                     { r, g, b, bl[2], slight_sky[1][2][1] },
                     face_top.corners[2],
                 });
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_GENERIC]->push_back({
                     { 1, Sint16(x * 16 + 00), Sint16(y * 16 + corner_heights.zero), Sint16(z * 16 + 00), ao[0] },
                     { r, g, b, bl[0], slight_sky[1][2][1] },
                     face_top.corners[0],
                 });
 
-                add_backface(*vtx_fluid);
+                add_backface(vtx_fluid[MESH_ID_GENERIC], vtx_fluid[MESH_ID_GENERIC]);
             }
 
             /* Negative Y */
@@ -1360,28 +1394,28 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
                 Uint8 bl[] = { Uint8(slight_block[1][1][1]), Uint8(slight_block[1][1][1]), Uint8(slight_block[1][1][1]), Uint8(slight_block[1][1][1]) };
 
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_NEG_Y]->push_back({
                     { 1, Sint16(x * 16 + 00), Sint16(y * 16 + 00), Sint16(z * 16 + 00), ao[0] },
                     { r, g, b, bl[0], slight_sky[1][0][1] },
                     face_still.corners[1],
                 });
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_NEG_Y]->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 00), Sint16(z * 16 + 00), ao[1] },
                     { r, g, b, bl[1], slight_sky[1][0][1] },
                     face_still.corners[0],
                 });
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_NEG_Y]->push_back({
                     { 1, Sint16(x * 16 + 00), Sint16(y * 16 + 00), Sint16(z * 16 + 16), ao[2] },
                     { r, g, b, bl[2], slight_sky[1][0][1] },
                     face_still.corners[3],
                 });
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_NEG_Y]->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 00), Sint16(z * 16 + 16), ao[3] },
                     { r, g, b, bl[3], slight_sky[1][0][1] },
                     face_still.corners[2],
                 });
 
-                add_backface(*vtx_fluid);
+                add_backface(vtx_fluid[MESH_ID_NEG_Y], vtx_fluid[MESH_ID_POS_Y]);
             }
 
             fluid_corners_t corner_tex_heights;
@@ -1421,53 +1455,53 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
                 FLUID_CALC_SIDE_HEIGHTS(posx, both);
 
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_POS_X]->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 00), Sint16(z * 16 + 00), ao[0] },
                     { r, g, b, bl[0], slight_sky[2][1][1] },
                     face_side.corners[3],
                 });
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_POS_X]->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 00), ao[1] },
                     { r, g, b, bl[1], slight_sky[2][1][1] },
                     face_side.corners[1],
                 });
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_POS_X]->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 00), Sint16(z * 16 + 16), ao[2] },
                     { r, g, b, bl[2], slight_sky[2][1][1] },
                     face_side.corners[2],
                 });
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_POS_X]->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 16), ao[3] },
                     { r, g, b, bl[3], slight_sky[2][1][1] },
                     face_side.corners[0],
                 });
 
-                add_backface(*vtx_fluid);
+                add_backface(vtx_fluid[MESH_ID_POS_X], vtx_fluid[MESH_ID_NEG_X]);
 
                 if (max_corner_heights != min_corner_heights)
                 {
-                    vtx_fluid->push_back({
+                    vtx_fluid[MESH_ID_POS_X]->push_back({
                         { 1, Sint16(x * 16 + 16), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 00), ao[0] },
                         { r, g, b, bl[0], slight_sky[2][1][1] },
                         face_side_tri.corners[3],
                     });
-                    vtx_fluid->push_back({
+                    vtx_fluid[MESH_ID_POS_X]->push_back({
                         { 1, Sint16(x * 16 + 16), Sint16(y * 16 + corner_heights.posx), Sint16(z * 16 + 00), ao[1] },
                         { r, g, b, bl[1], slight_sky[2][1][1] },
                         face_side_tri.corners[which_height ? 1 : 3],
                     });
-                    vtx_fluid->push_back({
+                    vtx_fluid[MESH_ID_POS_X]->push_back({
                         { 1, Sint16(x * 16 + 16), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 16), ao[2] },
                         { r, g, b, bl[2], slight_sky[2][1][1] },
                         face_side_tri.corners[2],
                     });
-                    vtx_fluid->push_back({
+                    vtx_fluid[MESH_ID_POS_X]->push_back({
                         { 1, Sint16(x * 16 + 16), Sint16(y * 16 + corner_heights.both), Sint16(z * 16 + 16), ao[3] },
                         { r, g, b, bl[3], slight_sky[2][1][1] },
                         face_side_tri.corners[which_height ? 2 : 0],
                     });
 
-                    add_backface(*vtx_fluid);
+                    add_backface(vtx_fluid[MESH_ID_POS_X], vtx_fluid[MESH_ID_NEG_X]);
                 }
             }
 
@@ -1480,54 +1514,54 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
                 FLUID_CALC_SIDE_HEIGHTS(zero, posz);
 
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_NEG_X]->push_back({
                     { 1, Sint16(x * 16 + 00), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 16), ao[3] },
                     { r, g, b, bl[3], slight_sky[0][1][1] },
                     face_side.corners[1],
                 });
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_NEG_X]->push_back({
                     { 1, Sint16(x * 16 + 00), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 00), ao[1] },
                     { r, g, b, bl[1], slight_sky[0][1][1] },
                     face_side.corners[0],
                 });
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_NEG_X]->push_back({
                     { 1, Sint16(x * 16 + 00), Sint16(y * 16 + 00), Sint16(z * 16 + 16), ao[2] },
                     { r, g, b, bl[2], slight_sky[0][1][1] },
                     face_side.corners[3],
                 });
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_NEG_X]->push_back({
                     { 1, Sint16(x * 16 + 00), Sint16(y * 16 + 00), Sint16(z * 16 + 00), ao[0] },
                     { r, g, b, bl[0], slight_sky[0][1][1] },
                     face_side.corners[2],
                 });
 
-                add_backface(*vtx_fluid);
+                add_backface(vtx_fluid[MESH_ID_NEG_X], vtx_fluid[MESH_ID_POS_X]);
 
                 if (max_corner_heights != min_corner_heights)
                 {
 
-                    vtx_fluid->push_back({
+                    vtx_fluid[MESH_ID_NEG_X]->push_back({
                         { 1, Sint16(x * 16 + 00), Sint16(y * 16 + corner_heights.posz), Sint16(z * 16 + 16), ao[3] },
                         { r, g, b, bl[3], slight_sky[0][1][1] },
                         face_side_tri.corners[!which_height ? 1 : 3],
                     });
-                    vtx_fluid->push_back({
+                    vtx_fluid[MESH_ID_NEG_X]->push_back({
                         { 1, Sint16(x * 16 + 00), Sint16(y * 16 + corner_heights.zero), Sint16(z * 16 + 00), ao[1] },
                         { r, g, b, bl[1], slight_sky[0][1][1] },
                         face_side_tri.corners[!which_height ? 2 : 0],
                     });
-                    vtx_fluid->push_back({
+                    vtx_fluid[MESH_ID_NEG_X]->push_back({
                         { 1, Sint16(x * 16 + 00), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 16), ao[2] },
                         { r, g, b, bl[2], slight_sky[0][1][1] },
                         face_side_tri.corners[3],
                     });
-                    vtx_fluid->push_back({
+                    vtx_fluid[MESH_ID_NEG_X]->push_back({
                         { 1, Sint16(x * 16 + 00), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 00), ao[0] },
                         { r, g, b, bl[0], slight_sky[0][1][1] },
                         face_side_tri.corners[2],
                     });
 
-                    add_backface(*vtx_fluid);
+                    add_backface(vtx_fluid[MESH_ID_NEG_X], vtx_fluid[MESH_ID_POS_X]);
                 }
             }
 
@@ -1540,53 +1574,53 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
                 FLUID_CALC_SIDE_HEIGHTS(both, posz);
 
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_POS_Z]->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 16), ao[3] },
                     { r, g, b, bl[3], slight_sky[1][1][2] },
                     face_side.corners[1],
                 });
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_POS_Z]->push_back({
                     { 1, Sint16(x * 16 + 00), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 16), ao[1] },
                     { r, g, b, bl[1], slight_sky[1][1][2] },
                     face_side.corners[0],
                 });
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_POS_Z]->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 00), Sint16(z * 16 + 16), ao[2] },
                     { r, g, b, bl[2], slight_sky[1][1][2] },
                     face_side.corners[3],
                 });
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_POS_Z]->push_back({
                     { 1, Sint16(x * 16 + 00), Sint16(y * 16 + 00), Sint16(z * 16 + 16), ao[0] },
                     { r, g, b, bl[0], slight_sky[1][1][2] },
                     face_side.corners[2],
                 });
 
-                add_backface(*vtx_fluid);
+                add_backface(vtx_fluid[MESH_ID_POS_Z], vtx_fluid[MESH_ID_NEG_Z]);
 
                 if (max_corner_heights != min_corner_heights)
                 {
-                    vtx_fluid->push_back({
+                    vtx_fluid[MESH_ID_POS_Z]->push_back({
                         { 1, Sint16(x * 16 + 16), Sint16(y * 16 + ((which_height) ? max_corner_heights : min_corner_heights)), Sint16(z * 16 + 16), ao[3] },
                         { r, g, b, bl[3], slight_sky[1][1][2] },
                         face_side_tri.corners[which_height ? 1 : 3],
                     });
-                    vtx_fluid->push_back({
+                    vtx_fluid[MESH_ID_POS_Z]->push_back({
                         { 1, Sint16(x * 16 + 00), Sint16(y * 16 + ((!which_height) ? max_corner_heights : min_corner_heights)), Sint16(z * 16 + 16), ao[1] },
                         { r, g, b, bl[1], slight_sky[1][1][2] },
                         face_side_tri.corners[which_height ? 2 : 0],
                     });
-                    vtx_fluid->push_back({
+                    vtx_fluid[MESH_ID_POS_Z]->push_back({
                         { 1, Sint16(x * 16 + 16), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 16), ao[2] },
                         { r, g, b, bl[2], slight_sky[1][1][2] },
                         face_side_tri.corners[3],
                     });
-                    vtx_fluid->push_back({
+                    vtx_fluid[MESH_ID_POS_Z]->push_back({
                         { 1, Sint16(x * 16 + 00), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 16), ao[0] },
                         { r, g, b, bl[0], slight_sky[1][1][2] },
                         face_side_tri.corners[2],
                     });
 
-                    add_backface(*vtx_fluid);
+                    add_backface(vtx_fluid[MESH_ID_POS_Z], vtx_fluid[MESH_ID_NEG_Z]);
                 }
             }
             /* Negative Z */
@@ -1598,53 +1632,53 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
                 FLUID_CALC_SIDE_HEIGHTS(zero, posx);
 
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_NEG_Z]->push_back({
                     { 1, Sint16(x * 16 + 00), Sint16(y * 16 + 00), Sint16(z * 16 + 00), ao[0] },
                     { r, g, b, bl[0], slight_sky[1][1][0] },
                     face_side.corners[3],
                 });
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_NEG_Z]->push_back({
                     { 1, Sint16(x * 16 + 00), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 00), ao[1] },
                     { r, g, b, bl[1], slight_sky[1][1][0] },
                     face_side.corners[1],
                 });
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_NEG_Z]->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 00), Sint16(z * 16 + 00), ao[2] },
                     { r, g, b, bl[2], slight_sky[1][1][0] },
                     face_side.corners[2],
                 });
-                vtx_fluid->push_back({
+                vtx_fluid[MESH_ID_NEG_Z]->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 00), ao[3] },
                     { r, g, b, bl[3], slight_sky[1][1][0] },
                     face_side.corners[0],
                 });
 
-                add_backface(*vtx_fluid);
+                add_backface(vtx_fluid[MESH_ID_NEG_Z], vtx_fluid[MESH_ID_POS_Z]);
 
                 if (max_corner_heights != min_corner_heights)
                 {
-                    vtx_fluid->push_back({
+                    vtx_fluid[MESH_ID_NEG_Z]->push_back({
                         { 1, Sint16(x * 16 + 00), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 00), ao[0] },
                         { r, g, b, bl[0], slight_sky[1][1][0] },
                         face_side_tri.corners[3],
                     });
-                    vtx_fluid->push_back({
+                    vtx_fluid[MESH_ID_NEG_Z]->push_back({
                         { 1, Sint16(x * 16 + 00), Sint16(y * 16 + ((which_height) ? max_corner_heights : min_corner_heights)), Sint16(z * 16 + 00), ao[1] },
                         { r, g, b, bl[1], slight_sky[1][1][0] },
                         face_side_tri.corners[which_height ? 1 : 3],
                     });
-                    vtx_fluid->push_back({
+                    vtx_fluid[MESH_ID_NEG_Z]->push_back({
                         { 1, Sint16(x * 16 + 16), Sint16(y * 16 + min_corner_heights), Sint16(z * 16 + 00), ao[2] },
                         { r, g, b, bl[2], slight_sky[1][1][0] },
                         face_side_tri.corners[2],
                     });
-                    vtx_fluid->push_back({
+                    vtx_fluid[MESH_ID_NEG_Z]->push_back({
                         { 1, Sint16(x * 16 + 16), Sint16(y * 16 + ((!which_height) ? max_corner_heights : min_corner_heights)), Sint16(z * 16 + 00), ao[3] },
                         { r, g, b, bl[3], slight_sky[1][1][0] },
                         face_side_tri.corners[which_height ? 2 : 0],
                     });
 
-                    add_backface(*vtx_fluid);
+                    add_backface(vtx_fluid[MESH_ID_NEG_Z], vtx_fluid[MESH_ID_POS_Z]);
                 }
             }
 #undef FLUID_CALC_SIDE_HEIGHTS
@@ -1674,22 +1708,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
             /* Positive Y */
             if (stypes[1][2][1] != BLOCK_ID_CACTUS)
             {
-                vtx->push_back({
+                vtx[MESH_ID_POS_Y]->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
                     { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl_top, sl_top },
                     faces[1].corners[0],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_Y]->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[1] },
                     { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl_top, sl_top },
                     faces[1].corners[2],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_Y]->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[2] },
                     { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl_top, sl_top },
                     faces[1].corners[1],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_Y]->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[0] },
                     { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl_top, sl_top },
                     faces[1].corners[3],
@@ -1699,22 +1733,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
             /* Negative Y */
             if (stypes[1][0][1] != BLOCK_ID_CACTUS)
             {
-                vtx->push_back({
+                vtx[MESH_ID_NEG_Y]->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
                     { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl_bot, sl_bot },
                     faces[4].corners[1],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_Y]->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[1] },
                     { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl_bot, sl_bot },
                     faces[4].corners[0],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_Y]->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 1), ao[2] },
                     { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl_bot, sl_bot },
                     faces[4].corners[3],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_Y]->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 1), ao[3] },
                     { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl_bot, sl_bot },
                     faces[4].corners[2],
@@ -1723,22 +1757,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
             /* Positive X */
             {
-                vtx->push_back({
+                vtx[MESH_ID_POS_X]->push_back({
                     { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 00), Sint16(z * 16 + 00), ao[0] },
                     { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl_bot, sl_bot },
                     faces[0].corners[3],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_X]->push_back({
                     { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 16), Sint16(z * 16 + 00), ao[1] },
                     { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl_top, sl_top },
                     faces[0].corners[1],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_X]->push_back({
                     { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 00), Sint16(z * 16 + 16), ao[2] },
                     { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl_bot, sl_bot },
                     faces[0].corners[2],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_X]->push_back({
                     { 1, Sint16(x * 16 + 15), Sint16(y * 16 + 16), Sint16(z * 16 + 16), ao[3] },
                     { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl_top, sl_top },
                     faces[0].corners[0],
@@ -1747,22 +1781,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
             /* Negative X */
             {
-                vtx->push_back({
+                vtx[MESH_ID_NEG_X]->push_back({
                     { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 16), Sint16(z * 16 + 16), ao[3] },
                     { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl_top, sl_top },
                     faces[3].corners[1],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_X]->push_back({
                     { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 16), Sint16(z * 16 + 00), ao[1] },
                     { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl_top, sl_top },
                     faces[3].corners[0],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_X]->push_back({
                     { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 00), Sint16(z * 16 + 16), ao[2] },
                     { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl_bot, sl_bot },
                     faces[3].corners[3],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_X]->push_back({
                     { 1, Sint16(x * 16 + 1), Sint16(y * 16 + 00), Sint16(z * 16 + 00), ao[0] },
                     { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl_bot, sl_bot },
                     faces[3].corners[2],
@@ -1771,22 +1805,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
             /* Positive Z */
             {
-                vtx->push_back({
+                vtx[MESH_ID_POS_Z]->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 16), Sint16(z * 16 + 15), ao[3] },
                     { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl_top, sl_top },
                     faces[2].corners[1],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_Z]->push_back({
                     { 1, Sint16(x * 16 + 00), Sint16(y * 16 + 16), Sint16(z * 16 + 15), ao[1] },
                     { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl_top, sl_top },
                     faces[2].corners[0],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_Z]->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 00), Sint16(z * 16 + 15), ao[2] },
                     { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl_bot, sl_bot },
                     faces[2].corners[3],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_Z]->push_back({
                     { 1, Sint16(x * 16 + 00), Sint16(y * 16 + 00), Sint16(z * 16 + 15), ao[0] },
                     { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl_bot, sl_bot },
                     faces[2].corners[2],
@@ -1795,22 +1829,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
             /* Negative Z */
             {
-                vtx->push_back({
+                vtx[MESH_ID_NEG_Z]->push_back({
                     { 1, Sint16(x * 16 + 00), Sint16(y * 16 + 00), Sint16(z * 16 + 1), ao[0] },
                     { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl_bot, sl_bot },
                     faces[5].corners[3],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_Z]->push_back({
                     { 1, Sint16(x * 16 + 00), Sint16(y * 16 + 16), Sint16(z * 16 + 1), ao[1] },
                     { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl_top, sl_top },
                     faces[5].corners[1],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_Z]->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 00), Sint16(z * 16 + 1), ao[2] },
                     { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl_bot, sl_bot },
                     faces[5].corners[2],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_Z]->push_back({
                     { 1, Sint16(x * 16 + 16), Sint16(y * 16 + 16), Sint16(z * 16 + 1), ao[3] },
                     { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl_top, sl_top },
                     faces[5].corners[0],
@@ -1917,43 +1951,43 @@ void level_t::build_mesh(chunk_cubic_t* const center)
             Uint8 sl_x0_z1 = slight_sky[1][1][1];
             Uint8 sl_x1_z1 = slight_sky[1][1][1];
 
-            vtx->push_back({
+            vtx[MESH_ID_GENERIC]->push_back({
                 { 1, Sint16(x * 16 + 16), Sint16(y * 16 + y_x1_z1), Sint16(z * 16 + 16), 0 },
                 { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl_x1_z1, sl_x1_z1 },
                 faces[0].corners[0],
             });
-            vtx->push_back({
+            vtx[MESH_ID_GENERIC]->push_back({
                 { 1, Sint16(x * 16 + 16), Sint16(y * 16 + y_x1_z0), Sint16(z * 16 + 00), 0 },
                 { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl_x1_z0, sl_x1_z0 },
                 faces[0].corners[2],
             });
-            vtx->push_back({
+            vtx[MESH_ID_GENERIC]->push_back({
                 { 1, Sint16(x * 16 + 00), Sint16(y * 16 + y_x0_z1), Sint16(z * 16 + 16), 0 },
                 { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl_x0_z1, sl_x0_z1 },
                 faces[0].corners[1],
             });
-            vtx->push_back({
+            vtx[MESH_ID_GENERIC]->push_back({
                 { 1, Sint16(x * 16 + 00), Sint16(y * 16 + y_x0_z0), Sint16(z * 16 + 00), 0 },
                 { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl_x0_z0, sl_x0_z0 },
                 faces[0].corners[3],
             });
 
-            vtx->push_back({
+            vtx[MESH_ID_GENERIC]->push_back({
                 { 1, Sint16(x * 16 + 00), Sint16(y * 16 + y_x0_z0), Sint16(z * 16 + 00), 0 },
                 { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl_x0_z0, sl_x0_z0 },
                 faces[0].corners[3],
             });
-            vtx->push_back({
+            vtx[MESH_ID_GENERIC]->push_back({
                 { 1, Sint16(x * 16 + 16), Sint16(y * 16 + y_x1_z0), Sint16(z * 16 + 00), 0 },
                 { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl_x1_z0, sl_x1_z0 },
                 faces[0].corners[2],
             });
-            vtx->push_back({
+            vtx[MESH_ID_GENERIC]->push_back({
                 { 1, Sint16(x * 16 + 00), Sint16(y * 16 + y_x0_z1), Sint16(z * 16 + 16), 0 },
                 { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl_x0_z1, sl_x0_z1 },
                 faces[0].corners[1],
             });
-            vtx->push_back({
+            vtx[MESH_ID_GENERIC]->push_back({
                 { 1, Sint16(x * 16 + 16), Sint16(y * 16 + y_x1_z1), Sint16(z * 16 + 16), 0 },
                 { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl_x1_z1, sl_x1_z1 },
                 faces[0].corners[0],
@@ -2098,22 +2132,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
                 if (type == BLOCK_ID_GRASS)
                 {
-                    vtx->push_back({
+                    vtx[MESH_ID_POS_Y]->push_back({
                         { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
                         { r_overlay * r_overlay_1x_1z, g_overlay * g_overlay_1x_1z, b_overlay * b_overlay_1x_1z, bl[3].get(), sl[3].get() },
                         faces[1].corners[0],
                     });
-                    vtx->push_back({
+                    vtx[MESH_ID_POS_Y]->push_back({
                         { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[1] },
                         { r_overlay * r_overlay_1x_0z, g_overlay * g_overlay_1x_0z, b_overlay * b_overlay_1x_0z, bl[1].get(), sl[1].get() },
                         faces[1].corners[2],
                     });
-                    vtx->push_back({
+                    vtx[MESH_ID_POS_Y]->push_back({
                         { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[2] },
                         { r_overlay * r_overlay_0x_1z, g_overlay * g_overlay_0x_1z, b_overlay * b_overlay_0x_1z, bl[2].get(), sl[2].get() },
                         faces[1].corners[1],
                     });
-                    vtx->push_back({
+                    vtx[MESH_ID_POS_Y]->push_back({
                         { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[0] },
                         { r_overlay * r_overlay_0x_0z, g_overlay * g_overlay_0x_0z, b_overlay * b_overlay_0x_0z, bl[0].get(), sl[0].get() },
                         faces[1].corners[3],
@@ -2121,22 +2155,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
                 }
                 else
                 {
-                    vtx->push_back({
+                    vtx[MESH_ID_POS_Y]->push_back({
                         { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
                         { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl[3].get(), sl[3].get() },
                         faces[1].corners[0],
                     });
-                    vtx->push_back({
+                    vtx[MESH_ID_POS_Y]->push_back({
                         { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[1] },
                         { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl[1].get(), sl[1].get() },
                         faces[1].corners[2],
                     });
-                    vtx->push_back({
+                    vtx[MESH_ID_POS_Y]->push_back({
                         { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[2] },
                         { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl[2].get(), sl[2].get() },
                         faces[1].corners[1],
                     });
-                    vtx->push_back({
+                    vtx[MESH_ID_POS_Y]->push_back({
                         { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[0] },
                         { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl[0].get(), sl[0].get() },
                         faces[1].corners[3],
@@ -2145,22 +2179,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
                 if (use_overlay[1])
                 {
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_POS_Y].push_back({
                         { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
                         { r_overlay * r_overlay_1x_1z, g_overlay * g_overlay_1x_1z, b_overlay * b_overlay_1x_1z, bl[3].get(), sl[3].get() },
                         faces_overlay[1].corners[0],
                     });
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_POS_Y].push_back({
                         { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[1] },
                         { r_overlay * r_overlay_1x_0z, g_overlay * g_overlay_1x_0z, b_overlay * b_overlay_1x_0z, bl[1].get(), sl[1].get() },
                         faces_overlay[1].corners[2],
                     });
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_POS_Y].push_back({
                         { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[2] },
                         { r_overlay * r_overlay_0x_1z, g_overlay * g_overlay_0x_1z, b_overlay * b_overlay_0x_1z, bl[2].get(), sl[2].get() },
                         faces_overlay[1].corners[1],
                     });
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_POS_Y].push_back({
                         { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[0] },
                         { r_overlay * r_overlay_0x_0z, g_overlay * g_overlay_0x_0z, b_overlay * b_overlay_0x_0z, bl[0].get(), sl[0].get() },
                         faces_overlay[1].corners[3],
@@ -2188,22 +2222,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
                 corner_t bl[4] = { templ[0].first, templ[1].first, templ[2].first, templ[3].first };
                 corner_t sl[4] = { templ[0].second, templ[1].second, templ[2].second, templ[3].second };
 
-                vtx->push_back({
+                vtx[MESH_ID_NEG_Y]->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
                     { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl[0].get(), sl[0].get() },
                     faces[4].corners[1],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_Y]->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[1] },
                     { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl[1].get(), sl[1].get() },
                     faces[4].corners[0],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_Y]->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 1), ao[2] },
                     { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl[2].get(), sl[2].get() },
                     faces[4].corners[3],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_Y]->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 1), ao[3] },
                     { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl[3].get(), sl[3].get() },
                     faces[4].corners[2],
@@ -2211,22 +2245,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
                 if (use_overlay[4])
                 {
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_NEG_Y].push_back({
                         { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
                         { r_overlay * r_overlay_0x_0z, g_overlay * g_overlay_0x_0z, b_overlay * b_overlay_0x_0z, bl[0].get(), sl[0].get() },
                         faces_overlay[4].corners[1],
                     });
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_NEG_Y].push_back({
                         { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[1] },
                         { r_overlay * r_overlay_1x_0z, g_overlay * g_overlay_1x_0z, b_overlay * b_overlay_1x_0z, bl[1].get(), sl[1].get() },
                         faces_overlay[4].corners[0],
                     });
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_NEG_Y].push_back({
                         { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 1), ao[2] },
                         { r_overlay * r_overlay_0x_1z, g_overlay * g_overlay_0x_1z, b_overlay * b_overlay_0x_1z, bl[2].get(), sl[2].get() },
                         faces_overlay[4].corners[3],
                     });
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_NEG_Y].push_back({
                         { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 1), ao[3] },
                         { r_overlay * r_overlay_1x_1z, g_overlay * g_overlay_1x_1z, b_overlay * b_overlay_1x_1z, bl[3].get(), sl[3].get() },
                         faces_overlay[4].corners[2],
@@ -2254,22 +2288,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
                 corner_t bl[4] = { templ[0].first, templ[1].first, templ[2].first, templ[3].first };
                 corner_t sl[4] = { templ[0].second, templ[1].second, templ[2].second, templ[3].second };
 
-                vtx->push_back({
+                vtx[MESH_ID_POS_X]->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[0] },
                     { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl[0].get(), sl[0].get() },
                     faces[0].corners[3],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_X]->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[1] },
                     { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl[1].get(), sl[1].get() },
                     faces[0].corners[1],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_X]->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 1), ao[2] },
                     { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl[2].get(), sl[2].get() },
                     faces[0].corners[2],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_X]->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
                     { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl[3].get(), sl[3].get() },
                     faces[0].corners[0],
@@ -2277,22 +2311,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
                 if (use_overlay[0])
                 {
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_POS_X].push_back({
                         { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[0] },
                         { r_overlay * r_overlay_1x_0z, g_overlay * g_overlay_1x_0z, b_overlay * b_overlay_1x_0z, bl[0].get(), sl[0].get() },
                         faces_overlay[0].corners[3],
                     });
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_POS_X].push_back({
                         { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[1] },
                         { r_overlay * r_overlay_1x_0z, g_overlay * g_overlay_1x_0z, b_overlay * b_overlay_1x_0z, bl[1].get(), sl[1].get() },
                         faces_overlay[0].corners[1],
                     });
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_POS_X].push_back({
                         { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 1), ao[2] },
                         { r_overlay * r_overlay_1x_1z, g_overlay * g_overlay_1x_1z, b_overlay * b_overlay_1x_1z, bl[2].get(), sl[2].get() },
                         faces_overlay[0].corners[2],
                     });
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_POS_X].push_back({
                         { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
                         { r_overlay * r_overlay_1x_1z, g_overlay * g_overlay_1x_1z, b_overlay * b_overlay_1x_1z, bl[3].get(), sl[3].get() },
                         faces_overlay[0].corners[0],
@@ -2320,22 +2354,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
                 corner_t bl[4] = { templ[0].first, templ[1].first, templ[2].first, templ[3].first };
                 corner_t sl[4] = { templ[0].second, templ[1].second, templ[2].second, templ[3].second };
 
-                vtx->push_back({
+                vtx[MESH_ID_NEG_X]->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[3] },
                     { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl[3].get(), sl[3].get() },
                     faces[3].corners[1],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_X]->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[1] },
                     { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl[1].get(), sl[1].get() },
                     faces[3].corners[0],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_X]->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 1), ao[2] },
                     { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl[2].get(), sl[2].get() },
                     faces[3].corners[3],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_X]->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
                     { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl[0].get(), sl[0].get() },
                     faces[3].corners[2],
@@ -2343,22 +2377,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
                 if (use_overlay[3])
                 {
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_NEG_X].push_back({
                         { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[3] },
                         { r_overlay * r_overlay_0x_1z, g_overlay * g_overlay_0x_1z, b_overlay * b_overlay_0x_1z, bl[3].get(), sl[3].get() },
                         faces_overlay[3].corners[1],
                     });
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_NEG_X].push_back({
                         { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[1] },
                         { r_overlay * r_overlay_0x_0z, g_overlay * g_overlay_0x_0z, b_overlay * b_overlay_0x_0z, bl[1].get(), sl[1].get() },
                         faces_overlay[3].corners[0],
                     });
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_NEG_X].push_back({
                         { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 1), ao[2] },
                         { r_overlay * r_overlay_0x_1z, g_overlay * g_overlay_0x_1z, b_overlay * b_overlay_0x_1z, bl[2].get(), sl[2].get() },
                         faces_overlay[3].corners[3],
                     });
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_NEG_X].push_back({
                         { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
                         { r_overlay * r_overlay_0x_0z, g_overlay * g_overlay_0x_0z, b_overlay * b_overlay_0x_0z, bl[0].get(), sl[0].get() },
                         faces_overlay[3].corners[2],
@@ -2386,22 +2420,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
                 corner_t bl[4] = { templ[0].first, templ[1].first, templ[2].first, templ[3].first };
                 corner_t sl[4] = { templ[0].second, templ[1].second, templ[2].second, templ[3].second };
 
-                vtx->push_back({
+                vtx[MESH_ID_POS_Z]->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
                     { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl[3].get(), sl[3].get() },
                     faces[2].corners[1],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_Z]->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[1] },
                     { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl[2].get(), sl[2].get() },
                     faces[2].corners[0],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_Z]->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 1), ao[2] },
                     { r * r_1x_1z, g * g_1x_1z, b * b_1x_1z, bl[1].get(), sl[1].get() },
                     faces[2].corners[3],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_POS_Z]->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 1), ao[0] },
                     { r * r_0x_1z, g * g_0x_1z, b * b_0x_1z, bl[0].get(), sl[0].get() },
                     faces[2].corners[2],
@@ -2409,22 +2443,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
                 if (use_overlay[2])
                 {
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_POS_Z].push_back({
                         { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 1), ao[3] },
                         { r_overlay * r_overlay_1x_1z, g_overlay * g_overlay_1x_1z, b_overlay * b_overlay_1x_1z, bl[3].get(), sl[3].get() },
                         faces_overlay[2].corners[1],
                     });
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_POS_Z].push_back({
                         { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 1), ao[1] },
                         { r_overlay * r_overlay_0x_1z, g_overlay * g_overlay_0x_1z, b_overlay * b_overlay_0x_1z, bl[2].get(), sl[2].get() },
                         faces_overlay[2].corners[0],
                     });
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_POS_Z].push_back({
                         { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 1), ao[2] },
                         { r_overlay * r_overlay_1x_1z, g_overlay * g_overlay_1x_1z, b_overlay * b_overlay_1x_1z, bl[1].get(), sl[1].get() },
                         faces_overlay[2].corners[3],
                     });
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_POS_Z].push_back({
                         { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 1), ao[0] },
                         { r_overlay * r_overlay_0x_1z, g_overlay * g_overlay_0x_1z, b_overlay * b_overlay_0x_1z, bl[0].get(), sl[0].get() },
                         faces_overlay[2].corners[2],
@@ -2452,22 +2486,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
                 corner_t bl[4] = { templ[0].first, templ[1].first, templ[2].first, templ[3].first };
                 corner_t sl[4] = { templ[0].second, templ[1].second, templ[2].second, templ[3].second };
 
-                vtx->push_back({
+                vtx[MESH_ID_NEG_Z]->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
                     { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl[0].get(), sl[0].get() },
                     faces[5].corners[3],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_Z]->push_back({
                     { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[1] },
                     { r * r_0x_0z, g * g_0x_0z, b * b_0x_0z, bl[2].get(), sl[2].get() },
                     faces[5].corners[1],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_Z]->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[2] },
                     { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl[1].get(), sl[1].get() },
                     faces[5].corners[2],
                 });
-                vtx->push_back({
+                vtx[MESH_ID_NEG_Z]->push_back({
                     { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[3] },
                     { r * r_1x_0z, g * g_1x_0z, b * b_1x_0z, bl[3].get(), sl[3].get() },
                     faces[5].corners[0],
@@ -2475,22 +2509,22 @@ void level_t::build_mesh(chunk_cubic_t* const center)
 
                 if (use_overlay[5])
                 {
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_NEG_Z].push_back({
                         { 16, Sint16(x + 0), Sint16(y + 0), Sint16(z + 0), ao[0] },
                         { r_overlay * r_overlay_0x_0z, g_overlay * g_overlay_0x_0z, b_overlay * b_overlay_0x_0z, bl[0].get(), sl[0].get() },
                         faces_overlay[5].corners[3],
                     });
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_NEG_Z].push_back({
                         { 16, Sint16(x + 0), Sint16(y + 1), Sint16(z + 0), ao[1] },
                         { r_overlay * r_overlay_0x_0z, g_overlay * g_overlay_0x_0z, b_overlay * b_overlay_0x_0z, bl[2].get(), sl[2].get() },
                         faces_overlay[5].corners[1],
                     });
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_NEG_Z].push_back({
                         { 16, Sint16(x + 1), Sint16(y + 0), Sint16(z + 0), ao[2] },
                         { r_overlay * r_overlay_1x_0z, g_overlay * g_overlay_1x_0z, b_overlay * b_overlay_1x_0z, bl[1].get(), sl[1].get() },
                         faces_overlay[5].corners[2],
                     });
-                    vtx_overlay.push_back({
+                    vtx_overlay[MESH_ID_NEG_Z].push_back({
                         { 16, Sint16(x + 1), Sint16(y + 1), Sint16(z + 0), ao[3] },
                         { r_overlay * r_overlay_1x_0z, g_overlay * g_overlay_1x_0z, b_overlay * b_overlay_1x_0z, bl[3].get(), sl[3].get() },
                         faces_overlay[5].corners[0],
@@ -2501,47 +2535,50 @@ void level_t::build_mesh(chunk_cubic_t* const center)
         /* ============ END: IS_NORMAL ============ */
     }
 
-    TRACE("Chunk: <%d, %d, %d>, Quads (Solid): %d", chunk_x, chunk_y, chunk_z, vtx_solid.size() / 4);
-    TRACE("Chunk: <%d, %d, %d>, Quads (Alpha): %d", chunk_x, chunk_y, chunk_z, vtx_alpha.size() / 4);
-    TRACE("Chunk: <%d, %d, %d>, Quads (Trans): %d", chunk_x, chunk_y, chunk_z, vtx_translucent.size() / 4);
-    TRACE("Chunk: <%d, %d, %d>, Quads (Overlay): %d", chunk_x, chunk_y, chunk_z, vtx_overlay.size() / 4);
+    mesh_queue_info_t queue_info = {};
 
-    if (!vtx_solid.size() && !vtx_alpha.size() && !vtx_translucent.size())
+    for (int _i = 0; _i < MESH_ID_MAX; _i++)
+    {
+        mesh_id_t i = (mesh_id_t)_i;
+        queue_info.quad_count_opaque += vtx_solid[i].size() / 4;
+        queue_info.quad_count_alpha_test += vtx_alpha[i].size() / 4;
+        queue_info.quad_count_overlay += vtx_overlay[i].size() / 4;
+        queue_info.quad_count_translucent += vtx_translucent[i].size() / 4;
+    }
+
+    TRACE("Chunk: <%d, %d, %d>, Quads (Solid): %d", chunk_x, chunk_y, chunk_z, queue_info.quad_count_opaque);
+    TRACE("Chunk: <%d, %d, %d>, Quads (Alpha): %d", chunk_x, chunk_y, chunk_z, queue_info.quad_count_alpha_test);
+    TRACE("Chunk: <%d, %d, %d>, Quads (Trans): %d", chunk_x, chunk_y, chunk_z, queue_info.quad_count_overlay);
+    TRACE("Chunk: <%d, %d, %d>, Quads (Overlay): %d", chunk_x, chunk_y, chunk_z, queue_info.quad_count_translucent);
+
+    if (!queue_info.quad_count_opaque && !queue_info.quad_count_alpha_test && !queue_info.quad_count_translucent)
     {
         center->free_renderer_resources(chunk_cubic_t::DIRTY_LEVEL_NONE);
         return;
     }
 
-    mesh_queue_info_t queue_info = {};
+    int num_verts = queue_info.quad_count_opaque + queue_info.quad_count_alpha_test + queue_info.quad_count_overlay + queue_info.quad_count_translucent;
+    num_verts *= 4;
 
-    queue_info.quad_count_opaque = vtx_solid.size() / 4;
-    queue_info.quad_count_alpha_test = vtx_alpha.size() / 4;
-    queue_info.quad_count_overlay = vtx_overlay.size() / 4;
-    queue_info.quad_count_translucent = vtx_translucent.size() / 4;
+    queue_info.vertex_data = SDL_aligned_alloc(sizeof(terrain_vertex_t), num_verts * sizeof(terrain_vertex_t));
+    queue_info.vertex_data_size = num_verts * sizeof(terrain_vertex_t);
+    queue_info.vertex_freefunc = [](void* b) { SDL_aligned_free(b); };
+    queue_info.pos = center->pos;
 
     /* Combine vectors into one */
-    int vtx_solid_idx = vtx_solid.size();
-    vtx_solid.resize(vtx_solid.size() + vtx_alpha.size() + vtx_overlay.size() + vtx_translucent.size());
+    int vtx_solid_idx = 0;
 
-    memcpy(vtx_solid.Data + vtx_solid_idx, vtx_alpha.Data, vtx_alpha.size_in_bytes());
-    vtx_solid_idx += vtx_alpha.size();
+    for (const auto& vtx_group : { vtx_solid, vtx_alpha, vtx_overlay, vtx_translucent })
+    {
+        for (int _i = 0; _i < MESH_ID_MAX; _i++)
+        {
+            mesh_id_t i = (mesh_id_t)_i;
+            memcpy(static_cast<terrain_vertex_t*>(queue_info.vertex_data) + vtx_solid_idx, vtx_group[i].Data, vtx_group[i].size_in_bytes());
+            vtx_solid_idx += vtx_group[i].size();
+        }
+    }
 
-    memcpy(vtx_solid.Data + vtx_solid_idx, vtx_overlay.Data, vtx_overlay.size_in_bytes());
-    vtx_solid_idx += vtx_overlay.size();
-
-    memcpy(vtx_solid.Data + vtx_solid_idx, vtx_translucent.Data, vtx_translucent.size_in_bytes());
-    vtx_solid_idx += vtx_translucent.size();
-
-    assert(vtx_solid_idx == vtx_solid.size());
-
-    /* Rip data out of vtx vector */
-    queue_info.vertex_data = vtx_solid.Data;
-    queue_info.vertex_data_size = vtx_solid.size_in_bytes();
-    queue_info.vertex_freefunc = [](void* b) { IM_FREE(b); };
-    vtx_solid.Data = nullptr;
-    vtx_solid.Size = vtx_solid.Capacity = 0;
-
-    queue_info.pos = center->pos;
+    assert(vtx_solid_idx == num_verts);
 
     mesh_queue.push_back(queue_info);
 
