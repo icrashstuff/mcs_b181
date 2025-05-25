@@ -1,16 +1,11 @@
 Client TODO:
-- Prevent AO from bleeding in corners
+- Prevent AO from bleeding in corners (ie. Fix AO calculations)
 - Rotate triangles to best align with light values
-- Proper translucency support
-  - Idea:
-    - Custom EBOs for nearby chunks
-    - Forward/Reverse EBO for non-nearby chunks
 - Improve crosshair contrast
 - Occlusion culling
 - GUI
   - Chat
   - 1.3+ Style Creative window
-  - Button sounds
   - Inventory windows
   - Finish Item rendering
 - Proper block placing/destroying
@@ -29,6 +24,8 @@ Client TODO:
   - ...
 - Proper assets integration
 - Finish block models
+  - Tiled dirt
+  - Portals
   - Ladders
   - Torches
   - Doors
@@ -36,11 +33,18 @@ Client TODO:
   - Moss
   - Fence
   - Stairs
+  - Redstone
+  - Redstone repeater
   - Buttons
+  - Pumpkins
+  - Pistons
+  - Beds
+  - Wheat
   - Pressure plates
+  - Iron bars
+  - Glass panes
   - Fire
   - etc.
-  - Water backface
 - Particles
 - Weather
   - Rain
@@ -52,15 +56,19 @@ Client TODO:
 - Vignette
 - Distance fog
   - High in lava
-- Rotate on damage
 - View bobbing
 - More parallelization
   - Meshing/Lighting engine on separate thread
 - Explosions
+- Fix pixel holes in meshes
+  - Probably just need to adjust the mesh position by some epsilon (0.001)?
+- Take advantage of split meshes
+- Make holding down a mouse button do something
+- Mesh chunks in between swapchain acquires?
 
 Client Wants:
 - Colored Lighting
   - Maybe with some form of refraction?
-- Vulkan, bgfx, or SDL3_GPU?
-- Basic directional lighting for sun/moon/thunder (Shadow mapping)
-- Further optimize light flood algorithm, possibly with intrinsics or ASM
+- Vulkan
+  - Mainly I want descriptor indexing
+- Basic directional lighting for sun/moon/thunder
