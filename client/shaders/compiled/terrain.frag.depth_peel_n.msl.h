@@ -21,11 +21,15 @@ struct _69
     float ao;
     float light_block;
     float light_sky;
+    float fog_dist;
 };
 
 struct ubo_frag_t
 {
+    float4 fog_color;
     uint use_texture;
+    float fog_min;
+    float fog_max;
 };
 
 struct main0_out
@@ -40,6 +44,7 @@ struct main0_in
     float frag_ao [[user(locn2)]];
     float frag_light_block [[user(locn3)]];
     float frag_light_sky [[user(locn4)]];
+    float frag_fog_dist [[user(locn5)]];
 };
 
 fragment main0_out main0(main0_in in [[stage_in]], constant ubo_frag_t& ubo_frag [[buffer(0)]], constant ubo_lightmap_t& ubo_lightmap [[buffer(1)]], texture2d<float> tex_atlas [[texture(0)]], texture2d<float> tex_depth_near [[texture(1)]], sampler tex_atlasSmplr [[sampler(0)]], sampler tex_depth_nearSmplr [[sampler(1)]], float4 gl_FragCoord [[position]])
@@ -51,6 +56,7 @@ fragment main0_out main0(main0_in in [[stage_in]], constant ubo_frag_t& ubo_frag
     frag.ao = in.frag_ao;
     frag.light_block = in.frag_light_block;
     frag.light_sky = in.frag_light_sky;
+    frag.fog_dist = in.frag_fog_dist;
     out.out_color = frag.color;
     if (ubo_frag.use_texture == 1u)
     {
@@ -85,6 +91,11 @@ fragment main0_out main0(main0_in in [[stage_in]], constant ubo_frag_t& ubo_frag
     out.out_color.y = _174.y;
     out.out_color.z = _174.z;
     out.out_color *= float4(fast::clamp(((((ubo_lightmap.block_color * float3(ubo_lightmap.light_flicker)) * powr(frag.light_block, ubo_lightmap.gamma)) + (ubo_lightmap.sky_color * powr(frag.light_sky, ubo_lightmap.gamma))) + ubo_lightmap.minimum_color) / (float3(1.0) + ubo_lightmap.minimum_color), float3(0.0), float3(1.0)), 1.0);
+    float4 _261 = out.out_color;
+    float3 _269 = mix(_261.xyz, ubo_frag.fog_color.xyz, float3(smoothstep(ubo_frag.fog_min, ubo_frag.fog_max, frag.fog_dist)));
+    out.out_color.x = _269.x;
+    out.out_color.y = _269.y;
+    out.out_color.z = _269.z;
     return out;
 }
 

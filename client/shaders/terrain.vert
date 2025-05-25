@@ -63,6 +63,7 @@ layout(location = 0) out struct
     float ao;
     float light_block;
     float light_sky;
+    float fog_dist;
 } frag;
 /* ================ END Vertex outputs ================ */
 
@@ -95,7 +96,11 @@ void main()
     pos.x = float(int(bitfieldExtract(vtx.pos_ao,  0, 10)) - 256 + draw_pos.pos[idx_draw].x * 512) / 32.0;
     pos.y = float(int(bitfieldExtract(vtx.pos_ao, 10, 10)) - 256 + draw_pos.pos[idx_draw].y * 512) / 32.0;
     pos.z = float(int(bitfieldExtract(vtx.pos_ao, 20, 10)) - 256 + draw_pos.pos[idx_draw].z * 512) / 32.0;
-    gl_Position = ubo_world.projection * ubo_world.camera * (vec4(pos, 1.0));
+    vec4 camera_space_pos = ubo_world.camera * vec4(pos, 1.0);
+
+    frag.fog_dist = length(camera_space_pos.xyz);
+
+    gl_Position = ubo_world.projection * camera_space_pos;
 
     frag.ao = float(bitfieldExtract(vtx.pos_ao, 30, 2)) / 3.0;
 

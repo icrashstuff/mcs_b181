@@ -935,8 +935,16 @@ SDL_GPURenderPass* level_t::render_stage_render(
 
     struct alignas(16) ubo_frag_t
     {
+        glm::vec4 fog_color;
         Uint32 use_texture;
-    } ubo_frag = { !!(state::game_resources->use_texture) };
+        float fog_min;
+        float fog_max;
+    } ubo_frag = {};
+
+    ubo_frag.use_texture = state::game_resources->use_texture;
+    ubo_frag.fog_min = render_distance * 0.45 * 16.0;
+    ubo_frag.fog_max = render_distance * 0.90 * 16.0;
+    ubo_frag.fog_color = sky_color;
 
     bool render_resources_valid = 0;
     if (mesh_buffer.get_buffer() && indirect_buffers.pos)

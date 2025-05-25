@@ -21,6 +21,10 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
+/* ================ BEGIN Fragment outputs ================ */
+layout(location = 0) out vec4 out_color;
+/* ================ END Fragment outputs ================ */
+
 /* ================ BEGIN Fragment inputs ================ */
 layout(location = 0) in struct
 {
@@ -29,12 +33,9 @@ layout(location = 0) in struct
     float ao;
     float light_block;
     float light_sky;
+    float fog_dist;
 } frag;
 /* ================ END Fragment inputs ================ */
-
-/* ================ BEGIN Fragment outputs ================ */
-layout(location = 0) out vec4 out_color;
-/* ================ END Fragment outputs ================ */
 
 /**
  * Modified excerpt from SDL_gpu.h about resource bindings
@@ -53,7 +54,10 @@ const int ao_algorithm = 1;
 
 layout(std140, set = 3, binding = 0) uniform ubo_frag_t
 {
+    vec4 fog_color;
     uint use_texture;
+    float fog_min;
+    float fog_max;
 } ubo_frag;
 
 #define LIGHTMAP_SET 3
@@ -107,5 +111,10 @@ void main()
         break;
     }
 
+    /* Lighting */
     out_color *= vec4(calculate_lighting(frag.light_block, frag.light_sky), 1);
+
+    /* Simple distance fog */
+    float fog_factor = smoothstep(ubo_frag.fog_min, ubo_frag.fog_max, frag.fog_dist);
+    out_color.xyz = mix(out_color.rgb, ubo_frag.fog_color.rgb, fog_factor);
 }
