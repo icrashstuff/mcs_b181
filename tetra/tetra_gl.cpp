@@ -479,6 +479,20 @@ void tetra::deinit_gui()
     if (tetra::gl::init_counter != 0)
         return;
 
+    if (SDL_GetWindowRelativeMouseMode(window) || SDL_GetWindowMouseGrab(window))
+    {
+        int x = 0, y = 0;
+
+        SDL_GetWindowSize(window, &x, &y);
+
+        x /= 2;
+        y /= 2;
+
+        SDL_WarpMouseInWindow(window, x, y);
+        SDL_SetWindowRelativeMouseMode(window, 0);
+        SDL_SetWindowMouseGrab(window, 0);
+    }
+
     ImGui::SetCurrentContext(im_ctx_overlay);
     ImGui_ImplOpenGL3_Shutdown();
     ImGui_ImplSDL3_Shutdown();
