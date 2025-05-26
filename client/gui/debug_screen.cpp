@@ -54,6 +54,22 @@ static void IM_FMTARGS(5) add_text(mc_gui::mc_gui_ctx* ctx, ImDrawList* const dr
 
 static float get_y_spacing() { return ImGui::GetStyle().ItemSpacing.y; }
 
+static const char* get_direction_name(int dir)
+{
+    switch (dir)
+    {
+    default:
+    case 0:
+        return "(South) (+Z)";
+    case 1:
+        return "(West) (-X)";
+    case 2:
+        return "(North) (-Z)";
+    case 3:
+        return "(East) (+X)";
+    }
+}
+
 void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist)
 {
     const level_t* const lvl = game->level;
@@ -102,7 +118,8 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
     add_text(ctx, drawlist, 0, cursor_l, "x: %.3f", game->level->foot_pos.x);
     add_text(ctx, drawlist, 0, cursor_l, "y: %.3f", game->level->foot_pos.y);
     add_text(ctx, drawlist, 0, cursor_l, "z: %.3f", game->level->foot_pos.z);
-    add_text(ctx, drawlist, 0, cursor_l, "f: %d (%.0f)", (int(game->level->yaw + 360.f - 45.f) % 360) / 90, game->level->yaw);
+    int dir = (int(game->level->yaw + 360.f - 45.f) % 360) / 90;
+    add_text(ctx, drawlist, 0, cursor_l, "f: %d %s (%.0f)", dir, get_direction_name(dir), game->level->yaw);
 
     cursor_l.y += get_y_spacing();
     {
