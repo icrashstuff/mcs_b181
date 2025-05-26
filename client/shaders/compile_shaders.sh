@@ -10,7 +10,7 @@ shift 1
 
 # This snippet was copied from build-shaders.sh from SDL3
 make_header_binary() {
-    echo "// clang-format off" > "compiled/$1.h"
+    cat shader_header.txt > "compiled/$1.h"
     xxd -i "$1" | sed \
         -e 's/^unsigned /const unsigned /g' \
         -e 's,^const,static const,' \
@@ -20,7 +20,7 @@ make_header_binary() {
 make_header_text() {
     ARRAY_NAME="$(echo "$1" | sed -e 's/\./_/g')"
 
-    echo "// clang-format off" > "compiled/$1.h"
+    cat shader_header.txt > "compiled/$1.h"
     echo "static const unsigned char ${ARRAY_NAME}[] = R\"(" >> "compiled/$1.h"
     cat  "$1"  >> "compiled/$1.h"
     echo ")\";"  >> "compiled/$1.h"
