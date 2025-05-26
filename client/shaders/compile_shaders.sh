@@ -72,9 +72,11 @@ compile_shader "fragment" "terrain.frag" ".alpha_test"   -DUSE_ALPHA_TEST=1 -DDE
 compile_shader "fragment" "terrain.frag" ".depth_peel_0" -DUSE_ALPHA_TEST=0 -DDEPTH_PEELING=1
 compile_shader "fragment" "terrain.frag" ".depth_peel_n" -DUSE_ALPHA_TEST=0 -DDEPTH_PEELING=2
 
-
 compile_shader "vertex"   "background.vert" ""
 compile_shader "fragment" "background.frag" ""
 
 compile_shader "vertex"   "composite.vert" ""
 compile_shader "fragment" "composite.frag" ""
+
+compile_shader "vertex"   "clouds.vert" ""
+compile_shader "fragment" "clouds.frag" ""

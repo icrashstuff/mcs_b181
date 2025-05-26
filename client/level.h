@@ -249,7 +249,8 @@ struct level_t
      */
     mc_id::biome_t get_biome_at(const glm::ivec3 pos);
 
-    glm::vec4 sky_color;
+    glm::vec4 sky_color = glm::vec4(0);
+    glm::vec4 sky_color_biome = glm::vec4(-1);
 
     /**
      * Clears all chunks and entities
@@ -404,6 +405,8 @@ private:
     Uint64 last_render_order_sort_time = 0;
     Uint64 last_light_order_sort_time = 0;
     Uint64 last_out_of_range_mesh_clear_time = 0;
+
+    float last_cloud_height = 160.0f;
 
     glm::i64vec3 last_render_order_cpos = { 0, 0, 0 };
 

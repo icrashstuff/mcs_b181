@@ -108,6 +108,7 @@ set(mcs_b181_client_SRC
     client/chunk_cubic.cpp
     client/touch.cpp
     client/task_timer.cpp
+    client/textures.cpp
 
     client/gpu/buffer.cpp
     client/gpu/texture.cpp
@@ -132,6 +133,7 @@ set(mcs_b181_client_SRC
     client/entity/entity.cpp
     client/entity/entity_physics.cpp
 
+    client/shaders/clouds_shader.cpp
     client/shaders/terrain_shader.cpp
     client/shaders/composite_shader.cpp
     client/shaders/background_shader.cpp
@@ -280,6 +282,9 @@ if(MCS_B181_BUILD_SHADERS)
 
     add_shader("composite.vert" "")
     add_shader("composite.frag" "")
+
+    add_shader("clouds.vert" "")
+    add_shader("clouds.frag" "")
 
     add_custom_command(OUTPUT ${mcs_b181_client_SHADER_HEADERS}
         WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/

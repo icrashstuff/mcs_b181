@@ -66,6 +66,8 @@
 
 #include "task_timer.h"
 
+#include "textures.h"
+
 #ifdef SDL_PLATFORM_IOS
 const bool state::on_ios = 1;
 #else
@@ -147,6 +149,7 @@ static void compile_shaders()
 {
     state::init_background_pipelines();
     state::init_terrain_pipelines();
+    state::init_clouds_pipelines();
     state::init_composite_pipelines();
 }
 
@@ -204,11 +207,15 @@ static bool initialize_resources()
 
     std::vector<SDL_GPUFence*> fences;
 
-    /* In the future parsing of one of the indexes at /assets/indexes/ will need to happen here (For sound) */
     state::game_resources = new game_resources_t();
 
     fences.push_back(state::game_resources->reload());
     fences.push_back(mc_gui::global_ctx->load_resources());
+    SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(state::gpu_device);
+    SDL_GPUCopyPass* copy_pass = (command_buffer ? SDL_BeginGPUCopyPass(command_buffer) : nullptr);
+    state::init_textures(copy_pass);
+    SDL_EndGPUCopyPass(copy_pass);
+    fences.push_back(SDL_SubmitGPUCommandBufferAndAcquireFence(command_buffer));
 
     /* Ideally we would just reload the font here rather than completely restarting the mc_gui/ImGui context.
      * But for some reason I gave up trying to figure out, only reloading the font resulted in a all black texture
@@ -240,6 +247,8 @@ static bool deinitialize_resources()
     state::destroy_background_pipelines();
     state::destroy_terrain_pipelines();
     state::destroy_composite_pipelines();
+    state::destroy_clouds_pipelines();
+    state::destroy_textures();
 
     for (game_t* g : games)
         if (g)

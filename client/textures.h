@@ -19,38 +19,26 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
- *
- * TODO: Fold/Flatten game_resources_t into this?
  */
-#ifndef MCS_B181__CLIENT__STATE_H_INCLUDED
-#define MCS_B181__CLIENT__STATE_H_INCLUDED
+#pragma once
 
-#include <SDL3/SDL.h>
+#include <SDL3/SDL_gpu.h>
 
-#include "shaders/background_shader.h"
-#include "shaders/clouds_shader.h"
-#include "shaders/composite_shader.h"
-#include "shaders/terrain_shader.h"
-
-#include "textures.h"
-
-/* Forward declaration(s) */
-struct game_resources_t;
+namespace state::textures::environment
+{
+extern SDL_GPUTextureSamplerBinding clouds;
+extern SDL_GPUTextureSamplerBinding end_sky;
+extern SDL_GPUTextureSamplerBinding moon_phases;
+extern SDL_GPUTextureSamplerBinding rain;
+extern SDL_GPUTextureSamplerBinding snow;
+extern SDL_GPUTextureSamplerBinding sun;
+}
 
 namespace state
 {
-extern game_resources_t* game_resources;
-extern SDL_Window* window;
-extern SDL_GPUDevice* gpu_device;
-/** Guaranteed to exist */
-extern SDL_GPUTexture* gpu_debug_texture;
-/** Guaranteed to exist */
-extern SDL_GPUSampler* gpu_debug_sampler;
-extern SDL_GPUTextureFormat gpu_tex_format_best_depth_only;
-
-extern const bool on_ios;
-extern const bool on_android;
-extern const bool on_mobile;
-}
-
-#endif
+/**
+ * @param copy_pass Copy pass to upload textures on
+ */
+void init_textures(SDL_GPUCopyPass* copy_pass);
+void destroy_textures();
+};

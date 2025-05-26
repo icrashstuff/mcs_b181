@@ -1,3 +1,4 @@
+#version 450 core
 /* SPDX-License-Identifier: MIT
  *
  * SPDX-FileCopyrightText: Copyright (c) 2025 Ian Hangartner <icrashstuff at outlook dot com>
@@ -19,38 +20,50 @@
  * LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
- *
- * TODO: Fold/Flatten game_resources_t into this?
  */
-#ifndef MCS_B181__CLIENT__STATE_H_INCLUDED
-#define MCS_B181__CLIENT__STATE_H_INCLUDED
 
-#include <SDL3/SDL.h>
+/* ================ BEGIN Vertex outputs ================ */
+layout(location = 0) flat out vec3 out_camera_pos;
+layout(location = 1) out vec3 out_cloud_pos;
+/* ================ END Vertex outputs ================ */
 
-#include "shaders/background_shader.h"
-#include "shaders/clouds_shader.h"
-#include "shaders/composite_shader.h"
-#include "shaders/terrain_shader.h"
+/**
+ * Modified excerpt from SDL_gpu.h about resource bindings
+ *
+ * Vertex shaders:
+ * - set=0: Sampled textures, followed by storage textures, followed by storage buffers
+ * - set=1: Uniform buffers
+ */
 
-#include "textures.h"
-
-/* Forward declaration(s) */
-struct game_resources_t;
-
-namespace state
+layout(std140, set = 1, binding = 0) uniform ubo_world_t
 {
-extern game_resources_t* game_resources;
-extern SDL_Window* window;
-extern SDL_GPUDevice* gpu_device;
-/** Guaranteed to exist */
-extern SDL_GPUTexture* gpu_debug_texture;
-/** Guaranteed to exist */
-extern SDL_GPUSampler* gpu_debug_sampler;
-extern SDL_GPUTextureFormat gpu_tex_format_best_depth_only;
-
-extern const bool on_ios;
-extern const bool on_android;
-extern const bool on_mobile;
+    mat4 camera;
+    mat4 projection;
 }
+ubo_world;
 
-#endif
+layout(std140, set = 1, binding = 1) uniform ubo_cloud_vert_t
+{
+    vec4 camera_pos;
+    float height;
+    float render_distance;
+}
+ubo_cloud_vert;
+
+void main()
+{
+    vec3 pos = vec3(ubo_cloud_vert.render_distance * 16.0 * 1.6, ubo_cloud_vert.height, ubo_cloud_vert.render_distance * 16.0 * 1.6);
+
+    if(bool(bitfieldExtract(gl_VertexIndex, 0, 1)))
+        pos.x *= -1.0;
+
+    if(bool(bitfieldExtract(gl_VertexIndex, 1, 1)))
+        pos.z *= -1.0;
+
+    pos.xz += ubo_cloud_vert.camera_pos.xz;
+
+    out_cloud_pos = pos;
+    out_camera_pos = ubo_cloud_vert.camera_pos.xyz;
+
+    gl_Position = ubo_world.projection * ubo_world.camera * vec4(pos, 1.0);
+}

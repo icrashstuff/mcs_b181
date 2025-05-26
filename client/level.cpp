@@ -613,7 +613,7 @@ void level_t::render_stage_prepare(const glm::ivec2 win_size, const float delta_
 
     tick();
 
-    glm::vec3 col_day(0.0f);
+    glm::vec3 col_biome(0.0f);
     const glm::vec3 pos = get_camera_pos();
     const float kernel[] = { 0.1f, 0.125f, 0.175f, 0.20f, 0.175f, 0.125f, 0.1f };
     const int offsets[IM_ARRAYSIZE(kernel)] = { -2, -1, 0, 1, 2 };
@@ -626,18 +626,24 @@ void level_t::render_stage_prepare(const glm::ivec2 win_size, const float delta_
         const glm::vec3 offset(offsets[i], offsets[j], offsets[k]);
         const float blur = kernel[i] * kernel[j] * kernel[k];
 
-        col_day += mc_id::get_biome_color_sky(get_biome_at(glm::round(pos + offset))) * blur;
+        col_biome += mc_id::get_biome_color_sky(get_biome_at(glm::round(pos + offset))) * blur;
     }
+
+    if (sky_color_biome.a < 0)
+        sky_color_biome = glm::vec4(col_biome, 1.0f);
+    else
+        sky_color_biome = glm::mix(sky_color_biome, glm::vec4(col_biome, 1.0f), delta_time);
+
     if (dimension == mc_id::DIMENSION_OVERWORLD)
     {
         glm::vec3 col_night = lightmap.color_night;
         col_night += lightmap.color_minimum;
         col_night /= 3.0f;
 
-        col_day = glm::mix(col_night, col_day, lightmap.get_mix_for_time(mc_time));
+        sky_color = glm::mix(glm::vec4(col_night, 1), sky_color_biome, lightmap.get_mix_for_time(mc_time));
     }
-
-    sky_color = glm::mix(sky_color, glm::vec4(col_day.r, col_day.g, col_day.b, 1.0f), delta_time);
+    else
+        sky_color = sky_color_biome;
 }
 
 bool level_t::mesh_queue_upload_item(SDL_GPUCommandBuffer* const command_buffer, SDL_GPUCopyPass* const copy_pass, mesh_queue_info_t& item)
@@ -963,6 +969,27 @@ SDL_GPURenderPass* level_t::render_stage_render(
         float fog_max;
     } ubo_frag = {};
 
+    struct alignas(16) ubo_cloud_vert_t
+    {
+        glm::vec4 camera_pos;
+        float height;
+        float render_distance;
+    } ubo_cloud_vert = {};
+    struct ubo_cloud_frag_t
+    {
+        glm::vec4 color;
+        float offset;
+    } ubo_cloud_frag = {};
+    {
+        ubo_cloud_frag.color = glm::vec4(lightmap.get_mix_for_time(mc_time));
+        ubo_cloud_frag.color.a = 1.0f;
+        last_cloud_height = glm::mix(last_cloud_height, 160 + SDL_randf() * 8.f, delta_time * 0.1f);
+        ubo_cloud_vert.camera_pos = glm::vec4(get_camera_pos(), 1.f);
+        ubo_cloud_vert.height = last_cloud_height;
+        ubo_cloud_vert.render_distance = render_distance;
+        ubo_cloud_frag.offset = double(SDL_GetTicks() % (1 << 21)) / double((1 << 21) - 1);
+    }
+
     ubo_frag.use_texture = state::game_resources->use_texture;
     ubo_frag.fog_min = render_distance * 0.45 * 16.0;
     ubo_frag.fog_max = render_distance * 0.90 * 16.0;
@@ -1008,6 +1035,20 @@ SDL_GPURenderPass* level_t::render_stage_render(
         SDL_DrawGPUPrimitivesIndirect(render_pass, indirect_buffers.cmd_overlay, 0, indirect_buffers.cmd_overlay_len);
     }
 
+    /* Clouds */
+    bool clouds_visible = (fabs(get_camera_pos().y - ubo_cloud_vert.height) < 2);
+    clouds_visible = SDL_max(clouds_visible, (pitch > fov / -2.f) && get_camera_pos().y < ubo_cloud_vert.height);
+    clouds_visible = SDL_max(clouds_visible, (pitch < fov / 2.f) && get_camera_pos().y > ubo_cloud_vert.height);
+    if (dimension == mc_id::DIMENSION_OVERWORLD && clouds_visible && state::pipeline_clouds)
+    {
+        scoped_debug_group_t gpu_group(command_buffer, "Clouds");
+        SDL_BindGPUGraphicsPipeline(render_pass, state::pipeline_clouds);
+        SDL_PushGPUFragmentUniformData(command_buffer, 1, &ubo_cloud_frag, sizeof(ubo_cloud_frag));
+        SDL_PushGPUVertexUniformData(command_buffer, 1, &ubo_cloud_vert, sizeof(ubo_cloud_vert));
+        SDL_BindGPUFragmentSamplers(render_pass, 0, &state::textures::environment::clouds, 1);
+        SDL_DrawGPUPrimitives(render_pass, 4, 1, 0, 0);
+    }
+
     render_entities(command_buffer, render_pass);
 
     end_render_pass(render_pass);
@@ -1029,6 +1070,12 @@ SDL_GPURenderPass* level_t::render_stage_render(
     }
 
     std::vector<SDL_GPUTexture*> color_targets;
+
+    /* Reset uniform buffer state */
+    SDL_PushGPUFragmentUniformData(command_buffer, 0, &ubo_frag, sizeof(ubo_frag));
+    SDL_PushGPUFragmentUniformData(command_buffer, 1, &lightmap.get_uniform_struct(), sizeof(lightmap.get_uniform_struct()));
+    SDL_PushGPUVertexUniformData(command_buffer, 0, &ubo_world, sizeof(ubo_world));
+    SDL_PushGPUVertexUniformData(command_buffer, 1, &ubo_tint, sizeof(ubo_tint));
 
     /* Depth peel layer 0 */
     tinfo_color_peel.texture = gpu::create_texture(cinfo_color_target, "Color peel layer 0");
@@ -1316,6 +1363,8 @@ level_t::dimension_switch_result level_t::dimension_switch(const int dim)
 
     if (music < glm::mix(0.3f, 0.6f, SDL_randf()))
         music = glm::mix(0.4f, 0.7f, SDL_randf());
+
+    sky_color_biome.a = -1;
 
     sound_engine.kill_all();
 
