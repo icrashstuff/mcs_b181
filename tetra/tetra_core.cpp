@@ -31,6 +31,8 @@
 // - Introduction, links and more at the top of imgui.cpp
 
 #include <SDL3/SDL.h>
+#include <SDL3/SDL_revision.h>
+#include <SDL3/SDL_version.h>
 
 #include "tetra/gui/console.h"
 #include "tetra/util/cli_parser.h"
@@ -56,6 +58,13 @@ void tetra::init(const char* organization, const char* appname, const char* cfg_
         dc_log_warn("[tetra_core]: Skipping initialization as tetra_core has already been initialized (You are probably doing something wrong!)");
         return;
     }
+
+    dc_log("SDL Revision (Compiled Against): %s", SDL_REVISION);
+    dc_log("SDL Revision (Linked Against):   %s", SDL_GetRevision());
+    dc_log("SDL Version (Compiled Against): %d.%d.%d", SDL_MAJOR_VERSION, SDL_MINOR_VERSION, SDL_MICRO_VERSION);
+    const int linked_version = SDL_GetVersion();
+    dc_log("SDL Version (Linked Against):   %d.%d.%d", SDL_VERSIONNUM_MAJOR(linked_version), SDL_VERSIONNUM_MINOR(linked_version),
+        SDL_VERSIONNUM_MICRO(linked_version));
 
     if (set_sdl_app_metadata)
     {
