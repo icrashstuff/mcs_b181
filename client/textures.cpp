@@ -33,7 +33,6 @@
 
 static SDL_GPUSampler* sampler_edge_clamp = nullptr;
 static SDL_GPUSampler* sampler_edge_repeat = nullptr;
-static SDL_GPUSampler* sampler_edge_mirrored_repeat = nullptr;
 
 #define DO_X()                                                                         \
     X(state::textures::environment::clouds, repeat, "environment/clouds.png")          \
@@ -101,9 +100,6 @@ void state::init_textures(SDL_GPUCopyPass* copy_pass)
     cinfo_sampler.address_mode_u = cinfo_sampler.address_mode_v = cinfo_sampler.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_REPEAT;
     sampler_edge_repeat = gpu::create_sampler(cinfo_sampler, "textures.cpp::sampler_edge_repeat");
 
-    cinfo_sampler.address_mode_u = cinfo_sampler.address_mode_v = cinfo_sampler.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_MIRRORED_REPEAT;
-    sampler_edge_mirrored_repeat = gpu::create_sampler(cinfo_sampler, "textures.cpp::sampler_edge_mirrored_repeat");
-
     cinfo_sampler.address_mode_u = cinfo_sampler.address_mode_v = cinfo_sampler.address_mode_w = SDL_GPU_SAMPLERADDRESSMODE_CLAMP_TO_EDGE;
     sampler_edge_clamp = gpu::create_sampler(cinfo_sampler, "textures.cpp::sampler_edge_clamp");
 
@@ -112,9 +108,6 @@ void state::init_textures(SDL_GPUCopyPass* copy_pass)
 
     if (!sampler_edge_repeat)
         sampler_edge_repeat = state::gpu_debug_sampler;
-
-    if (!sampler_edge_mirrored_repeat)
-        sampler_edge_mirrored_repeat = state::gpu_debug_sampler;
 
 #define X(binding, edge, path) binding = { create_texture(copy_pass, path), sampler_edge_##edge };
     DO_X();
