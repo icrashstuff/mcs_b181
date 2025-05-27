@@ -26,7 +26,7 @@ layout(location = 0) out vec4 out_color;
 /* ================ END Fragment outputs ================ */
 
 /* ================ BEGIN Fragment inputs ================ */
-layout(location = 0) in vec3 camera_pos;
+layout(location = 0) flat in vec3 camera_pos;
 layout(location = 1) in vec3 cloud_pos;
 /* ================ END Fragment inputs ================ */
 

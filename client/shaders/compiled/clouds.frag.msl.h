@@ -49,7 +49,7 @@ struct main0_out
 
 struct main0_in
 {
-    float3 camera_pos [[user(locn0)]];
+    float3 camera_pos [[user(locn0), flat]];
     float3 cloud_pos [[user(locn1)]];
 };
 
