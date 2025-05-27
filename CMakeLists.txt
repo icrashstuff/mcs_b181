@@ -70,6 +70,7 @@ set(SDL_CAMERA OFF)
 set(SDL_OPENGL OFF)
 # set(SDL_OPENGLES OFF) # SDL Refuses to build for some reason if this is disabled
 set(SDL_SHARED OFF)
+set(SDL_RENDER OFF)
 set(SDL_STATIC ON)
 set(SDL_VENDOR_INFO "MCS_B181")
 
