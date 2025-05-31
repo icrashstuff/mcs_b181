@@ -257,7 +257,7 @@ if(MCS_B181_BUILD_SHADERS)
     endif()
     add_executable(smolv_converter "client/gpu/smolv_converter.cpp;client/gpu/smol-v/smolv.cpp")
 
-    set(mcs_b181_client_SHADERS
+    set(mcs_b181_client_COMMON_DEPS
         ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/compile_shaders.sh
         ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/shader_header.txt
         ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/lightmap.glsl
@@ -266,34 +266,42 @@ if(MCS_B181_BUILD_SHADERS)
 
     set(mcs_b181_client_SHADER_HEADERS "")
 
-    function(add_shader in suffix)
-        set(base_shader_dir "${CMAKE_CURRENT_SOURCE_DIR}/client/shaders")
-        set(mcs_b181_client_SHADERS        "${mcs_b181_client_SHADERS};${base_shader_dir}/${in}" PARENT_SCOPE)
-        set(mcs_b181_client_SHADER_HEADERS "${mcs_b181_client_SHADER_HEADERS};${base_shader_dir}/compiled/${in}${suffix}.msl.h"   PARENT_SCOPE)
-        set(mcs_b181_client_SHADER_HEADERS "${mcs_b181_client_SHADER_HEADERS};${base_shader_dir}/compiled/${in}${suffix}.smolv.h" PARENT_SCOPE)
+    function(add_shader stage in suffix)
+        set(CURRENT_SHADER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/client/shaders")
+        set(SHADER_HEADERS "")
+        set(SHADER_HEADERS "${SHADER_HEADERS};${CURRENT_SHADER_DIR}/compiled/${in}${suffix}.msl.h"  )
+        set(SHADER_HEADERS "${SHADER_HEADERS};${CURRENT_SHADER_DIR}/compiled/${in}${suffix}.smolv.h")
+
+        add_custom_command(OUTPUT ${SHADER_HEADERS}
+            WORKING_DIRECTORY   ${CURRENT_SHADER_DIR}
+            COMMAND             ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/compile_shaders.sh
+                                ${CMAKE_CURRENT_BINARY_DIR}/smolv_converter
+                                "${stage}"
+                                "${CURRENT_SHADER_DIR}/${in}"
+                                "${CURRENT_SHADER_DIR}/compiled/${in}${suffix}"
+                                ${ARGN}
+            DEPENDS             ${SHADERS} ${mcs_b181_client_COMMON_DEPS}
+            COMMENT             "Stage: ${stage} Input: ${in}, Suffix: ${suffix}, glslc opts: ${ARGN}"
+            )
+
+        set(mcs_b181_client_SHADER_HEADERS "${mcs_b181_client_SHADER_HEADERS};${SHADER_HEADERS}" PARENT_SCOPE)
     endfunction()
 
-    add_shader(terrain.vert "")
-    add_shader(terrain.frag ".opaque")
-    add_shader(terrain.frag ".alpha_test")
-    add_shader(terrain.frag ".depth_peel_0")
-    add_shader(terrain.frag ".depth_peel_n")
+    add_shader("vertex"   "terrain.vert" "")
+    add_shader("fragment" "terrain.frag" ".opaque"       -DUSE_ALPHA_TEST=0 -DDEPTH_PEELING=0)
+    add_shader("fragment" "terrain.frag" ".alpha_test"   -DUSE_ALPHA_TEST=1 -DDEPTH_PEELING=0)
+    add_shader("fragment" "terrain.frag" ".depth_peel_0" -DUSE_ALPHA_TEST=0 -DDEPTH_PEELING=1)
+    add_shader("fragment" "terrain.frag" ".depth_peel_n" -DUSE_ALPHA_TEST=0 -DDEPTH_PEELING=2)
 
-    add_shader(background.vert "")
-    add_shader(background.frag "")
+    add_shader("vertex"   "background.vert" "")
+    add_shader("fragment" "background.frag" "")
 
-    add_shader("composite.vert" "")
-    add_shader("composite.frag" "")
+    add_shader("vertex"   "composite.vert" "")
+    add_shader("fragment" "composite.frag" "")
 
-    add_shader("clouds.vert" "")
-    add_shader("clouds.frag" "")
+    add_shader("vertex"   "clouds.vert" "")
+    add_shader("fragment" "clouds.frag" "")
 
-    add_custom_command(OUTPUT ${mcs_b181_client_SHADER_HEADERS}
-        WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/
-        COMMAND           ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/compile_shaders.sh ${CMAKE_CURRENT_BINARY_DIR}/smolv_converter
-        DEPENDS           ${mcs_b181_client_SHADERS}
-        COMMENT           "Compiling shaders"
-        )
     add_custom_target(shaders ALL DEPENDS ${mcs_b181_client_SHADER_HEADERS})
     add_dependencies(mcs_b181_client shaders)
 endif()

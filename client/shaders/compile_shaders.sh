@@ -5,39 +5,39 @@ set -eu
 
 SMOLV_CONVERTER="$1"
 
-# Discard first parameter
+# Discard first parameter (SMOLV path)
 shift 1
 
 # This snippet was copied from build-shaders.sh from SDL3
 make_header_binary() {
-    cat shader_header.txt > "compiled/$1.h"
-    xxd -i "$1" | sed \
+    ARRAY_NAME="$(basename "$1" | sed -e 's/\./_/g')"
+
+    cat shader_header.txt > "$1.h"
+    xxd -n "${ARRAY_NAME}" -i "$1" | sed \
         -e 's/^unsigned /const unsigned /g' \
         -e 's,^const,static const,' \
-        >> "compiled/$1.h"
-    rm -f "$1"
+        >> "$1.h"
 }
 make_header_text() {
-    ARRAY_NAME="$(echo "$1" | sed -e 's/\./_/g')"
+    ARRAY_NAME="$(basename "$1" | sed -e 's/\./_/g')"
 
-    cat shader_header.txt > "compiled/$1.h"
-    echo "static const unsigned char ${ARRAY_NAME}[] = R\"(" >> "compiled/$1.h"
-    cat  "$1"  >> "compiled/$1.h"
-    echo ")\";"  >> "compiled/$1.h"
-    echo "static const unsigned int ${ARRAY_NAME}_len = sizeof(${ARRAY_NAME});" >> "compiled/$1.h"
-    rm -f "$1"
+    cat shader_header.txt > "$1.h"
+    echo "static const unsigned char ${ARRAY_NAME}[] = R\"(" >> "$1.h"
+    cat  "$1"  >> "$1.h"
+    echo ")\";"  >> "$1.h"
+    echo "static const unsigned int ${ARRAY_NAME}_len = sizeof(${ARRAY_NAME});" >> "$1.h"
 }
 
 compile_shader()
 {
     STAGE="$1"
     FILE_IN="$2"
-    FILE_OUT_SPIRV="$2$3.spv"
-    FILE_OUT_SMOLV="$2$3.smolv"
-    FILE_OUT_METAL="$2$3.msl"
-    FILE_OUT_DXIL="$2$3.dxil"
+    FILE_OUT_SPIRV="$3.spv"
+    FILE_OUT_SMOLV="$3.smolv"
+    FILE_OUT_METAL="$3.msl"
+    FILE_OUT_DXIL="$3.dxil"
 
-    mkdir -p "${PWD}/compiled/"
+    mkdir -p "$(dirname "$3")"
 
     # Discard first three parameters
     shift 3
@@ -48,13 +48,13 @@ compile_shader()
     rm -f "${FILE_OUT_SPIRV}" "${FILE_OUT_SMOLV}" "${FILE_OUT_METAL}" "${FILE_OUT_DXIL}"
 
     echo "==> $STAGE: ${FILE_IN} -> ${FILE_OUT_SPIRV}"
-    glslc "$@" -fshader-stage="${STAGE}" -c "$PWD/${FILE_IN}" -o - | spirv-opt -Os  - -o "${FILE_OUT_SPIRV}"
+    glslc "$@" -fshader-stage="${STAGE}" -c "${FILE_IN}" -o - | spirv-opt -Os  - -o "${FILE_OUT_SPIRV}"
 
     echo "==> $STAGE: ${FILE_OUT_SPIRV} -> ${FILE_OUT_METAL}"
     shadercross "${FILE_OUT_SPIRV}" --source SPIRV --dest MSL --entrypoint main --stage "${STAGE}" --output "${FILE_OUT_METAL}"
 
     echo "==> $STAGE: ${FILE_OUT_SPIRV} -> ${FILE_OUT_SMOLV}"
-    "${SMOLV_CONVERTER}" spv2smolv "$PWD/${FILE_OUT_SPIRV}" "$PWD/${FILE_OUT_SMOLV}"
+    "${SMOLV_CONVERTER}" spv2smolv "${FILE_OUT_SPIRV}" "${FILE_OUT_SMOLV}"
 
     # Doesn't work, besides I (Ian) don't target d3d12
     # echo "==> $STAGE: ${FILE_OUT_SPIRV} -> ${FILE_OUT_DXIL}"
@@ -63,20 +63,9 @@ compile_shader()
     make_header_binary "${FILE_OUT_SMOLV}"
     make_header_text "${FILE_OUT_METAL}"
 
+    rm "${FILE_OUT_SMOLV}"
+    rm "${FILE_OUT_METAL}"
     rm "${FILE_OUT_SPIRV}"
 }
 
-compile_shader "vertex"   "terrain.vert" ""
-compile_shader "fragment" "terrain.frag" ".opaque"       -DUSE_ALPHA_TEST=0 -DDEPTH_PEELING=0
-compile_shader "fragment" "terrain.frag" ".alpha_test"   -DUSE_ALPHA_TEST=1 -DDEPTH_PEELING=0
-compile_shader "fragment" "terrain.frag" ".depth_peel_0" -DUSE_ALPHA_TEST=0 -DDEPTH_PEELING=1
-compile_shader "fragment" "terrain.frag" ".depth_peel_n" -DUSE_ALPHA_TEST=0 -DDEPTH_PEELING=2
-
-compile_shader "vertex"   "background.vert" ""
-compile_shader "fragment" "background.frag" ""
-
-compile_shader "vertex"   "composite.vert" ""
-compile_shader "fragment" "composite.frag" ""
-
-compile_shader "vertex"   "clouds.vert" ""
-compile_shader "fragment" "clouds.frag" ""
+compile_shader "$@"
