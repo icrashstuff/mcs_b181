@@ -252,10 +252,12 @@ endif()
 option(MCS_B181_BUILD_SHADERS "Automatically run compile_shaders.sh (Only use if writing shaders)" OFF)
 message(STATUS "MCS_B181_BUILD_SHADERS: ${MCS_B181_BUILD_SHADERS}")
 if(MCS_B181_BUILD_SHADERS)
+    # TODO-OPT: Allow cross compilation by specifying MCS_B181_smolv_converter_EXECUTABLE?
     if(CMAKE_CROSSCOMPILING)
-        message(FATAL_ERROR "Shader building is not supported for cross compilation builds")
+        message(FATAL_ERROR "Shader building is not supported for cross compilation builds (smol-v converter)")
+    else()
+        add_executable(smolv_converter "client/gpu/smolv_converter.cpp;client/gpu/smol-v/smolv.cpp")
     endif()
-    add_executable(smolv_converter "client/gpu/smolv_converter.cpp;client/gpu/smol-v/smolv.cpp")
 
     set(mcs_b181_client_COMMON_DEPS
         ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/compile_shaders.sh
@@ -264,7 +266,7 @@ if(MCS_B181_BUILD_SHADERS)
         ${CMAKE_CURRENT_BINARY_DIR}/smolv_converter
     )
 
-    set(mcs_b181_client_SHADER_HEADERS "")
+    add_custom_target(mcs_b181_client_shaders DEPENDS ${mcs_b181_client_COMMON_DEPS})
 
     function(add_shader stage in suffix)
         set(CURRENT_SHADER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/client/shaders")
@@ -280,11 +282,11 @@ if(MCS_B181_BUILD_SHADERS)
                                 "${CURRENT_SHADER_DIR}/${in}"
                                 "${CURRENT_SHADER_DIR}/compiled/${in}${suffix}"
                                 ${ARGN}
-            DEPENDS             ${SHADERS} ${mcs_b181_client_COMMON_DEPS}
+            DEPENDS             "${CURRENT_SHADER_DIR}/${in}" ${mcs_b181_client_COMMON_DEPS}
             COMMENT             "Stage: ${stage} Input: ${in}, Suffix: ${suffix}, glslc opts: ${ARGN}"
             )
 
-        set(mcs_b181_client_SHADER_HEADERS "${mcs_b181_client_SHADER_HEADERS};${SHADER_HEADERS}" PARENT_SCOPE)
+        target_sources(mcs_b181_client_shaders PRIVATE ${SHADER_HEADERS})
     endfunction()
 
     add_shader("vertex"   "terrain.vert" "")
@@ -302,6 +304,5 @@ if(MCS_B181_BUILD_SHADERS)
     add_shader("vertex"   "clouds.vert" "")
     add_shader("fragment" "clouds.frag" "")
 
-    add_custom_target(shaders ALL DEPENDS ${mcs_b181_client_SHADER_HEADERS})
-    add_dependencies(mcs_b181_client shaders)
+    add_dependencies(mcs_b181_client mcs_b181_client_shaders)
 endif()
