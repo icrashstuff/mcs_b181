@@ -261,7 +261,7 @@ if(MCS_B181_BUILD_SHADERS)
 
     set(mcs_b181_client_COMMON_DEPS
         ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/compile_shaders.sh
-        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/shader_header.txt
+        ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/shader_header.h
         ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/lightmap.glsl
         ${CMAKE_CURRENT_BINARY_DIR}/smolv_converter
     )

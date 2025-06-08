@@ -12,7 +12,7 @@ shift 1
 make_header_binary() {
     ARRAY_NAME="$(basename "$1" | sed -e 's/\./_/g')"
 
-    cat shader_header.txt > "$1.h"
+    cat shader_header.h > "$1.h"
     xxd -n "${ARRAY_NAME}" -i "$1" | sed \
         -e 's/^unsigned /const unsigned /g' \
         -e 's,^const,static const,' \
@@ -21,7 +21,7 @@ make_header_binary() {
 make_header_text() {
     ARRAY_NAME="$(basename "$1" | sed -e 's/\./_/g')"
 
-    cat shader_header.txt > "$1.h"
+    cat shader_header.h > "$1.h"
     echo "static const unsigned char ${ARRAY_NAME}[] = R\"(" >> "$1.h"
     cat  "$1"  >> "$1.h"
     echo ")\";"  >> "$1.h"
