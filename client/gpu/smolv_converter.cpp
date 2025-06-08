@@ -47,11 +47,15 @@ enum direction_t
 
 static void print(const char* fmt, ...)
 {
+#if 0
     va_list args;
 
     va_start(args, fmt);
     vfprintf(stderr, fmt, args);
     va_end(args);
+#else
+    (void)fmt;
+#endif
 }
 
 int main(const int argc, const char** argv)
