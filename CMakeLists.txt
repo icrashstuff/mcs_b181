@@ -77,6 +77,7 @@ set(SDL_VENDOR_INFO "MCS_B181")
 ensure_target(SDL3   SDL3::SDL3)
 ensure_target(glm    glm::glm)
 ensure_target(ZLIB   ZLIB::ZLIB)
+ensure_target(Vulkan Vulkan::Headers)
 
 set(mcs_b181_server_SRC
     server/main_server.cpp
@@ -111,6 +112,7 @@ set(mcs_b181_client_SRC
     client/task_timer.cpp
     client/textures.cpp
 
+    client/gpu/gpu.cpp
     client/gpu/buffer.cpp
     client/gpu/texture.cpp
     client/gpu/sampler.cpp
@@ -118,6 +120,8 @@ set(mcs_b181_client_SRC
     client/gpu/subdiv_buffer.cpp
     client/gpu/command_buffer.cpp
     client/gpu/smol-v/smolv.cpp
+
+    client/gpu/volk/volk.c
 
     client/sound/stb_vorbis.c
     client/sound/sound_world.cpp
@@ -226,6 +230,7 @@ add_bin_common(mcs_b181_client)
 target_link_libraries(mcs_b181_client EnTT::EnTT)
 target_link_libraries(mcs_b181_client cubiomes_static)
 target_link_libraries(mcs_b181_client tetra::sdl_gpu)
+target_link_libraries(mcs_b181_client Vulkan::Headers)
 
 target_link_libraries(mcs_b181_bridge tetra::sdl_gpu)
 

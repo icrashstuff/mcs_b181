@@ -1,0 +1,110 @@
+From 714ef4ca6eb7759596438282469c13a35872d1e5 Mon Sep 17 00:00:00 2001
+From: Ian Hangartner <icrashstuff@outlook.com>
+Date: Sun, 1 Jun 2025 16:40:53 -0800
+Subject: [PATCH] KDevelop workarounds
+
+---
+ README.md |  8 ++++++++
+ volk.c    |  7 +++++++
+ volk.h    | 19 ++++++++++++++++++-
+ 3 files changed, 33 insertions(+), 1 deletion(-)
+
+diff --git a/README.md b/README.md
+index 8d5ff0b..826c532 100644
+--- a/README.md
++++ b/README.md
+@@ -1,3 +1,11 @@
++# This folder contains a modified version of volk 1.4.316
++Changes are denoted by a comment with the text [mcs_b181]
++
++List of changes (as of 2025-06-01)
++- Workarounds for KDevelop's parser/autocomplete
++
++# Original volk README past this point
++
+ # 🐺 volk [![Build Status](https://github.com/zeux/volk/workflows/build/badge.svg)](https://github.com/zeux/volk/actions)
+
+ ## Purpose
+diff --git a/volk.c b/volk.c
+index 291dc89..8c26635 100644
+--- a/volk.c
++++ b/volk.c
+@@ -2,6 +2,9 @@
+ /* clang-format off */
+ #include "volk.h"
+
++/* [mcs_b181]: Enable prototypes for KDevelop's parser, see comment at the top of the volk.h header file */
++#ifndef KDEVELOP_PARSER_RUN
++
+ #ifdef _WIN32
+ 	typedef const char* LPCSTR;
+ 	typedef struct HINSTANCE__* HINSTANCE;
+@@ -3465,4 +3468,8 @@ PFN_vkAcquireNextImage2KHR vkAcquireNextImage2KHR;
+ #ifdef __cplusplus
+ }
+ #endif
++
++/* [mcs_b181]: Enable prototypes for KDevelop's parser, see comment at the top of the volk.h header file */
++#endif /* #ifndef KDEVELOP_PARSER_RUN */
++
+ /* clang-format on */
+diff --git a/volk.h b/volk.h
+index d8673db..3e2fb06 100644
+--- a/volk.h
++++ b/volk.h
+@@ -10,6 +10,14 @@
+ #ifndef VOLK_H_
+ #define VOLK_H_
+
++/* [mcs_b181]: KDevelop's autocomplete doesn't work as well with function pointers
++ * My solution is to enable prototypes during parser, but disable them during build
++ *
++ * KDevelop's parser doesn't seem to have a special predefined macro so KDEVELOP_PARSER_RUN
++ * needs to be manually set in project settings.
++ *
++ * - Ian Hangartner
++ */
+ #if defined(VULKAN_H_) && !defined(VK_NO_PROTOTYPES)
+ #	error To use volk, you need to define VK_NO_PROTOTYPES before including vulkan.h
+ #endif
+@@ -18,7 +26,8 @@
+ #define VOLK_HEADER_VERSION 316
+ /* VOLK_GENERATE_VERSION_DEFINE */
+
+-#ifndef VK_NO_PROTOTYPES
++/* [mcs_b181]: Enable prototypes for KDevelop's parser, see comment at the top of the volk.h header file */
++#if !defined(VK_NO_PROTOTYPES) && !defined(KDEVELOP_PARSER_RUN)
+ #	define VK_NO_PROTOTYPES
+ #endif
+
+@@ -28,6 +37,8 @@
+ #	else /* Platform headers included below */
+ #		include <vulkan/vk_platform.h>
+ #		include <vulkan/vulkan_core.h>
++/* [mcs_b181]: Add vk_enum_string_helper */
++#		include <vulkan/vk_enum_string_helper.h>
+ #	endif
+ #endif
+
+@@ -1477,6 +1488,9 @@ struct VolkDeviceTable
+ extern "C" {
+ #endif
+
++/* [mcs_b181]: Enable prototypes for KDevelop's parser, see comment at the top of the volk.h header file */
++#ifndef KDEVELOP_PARSER_RUN
++
+ /* VOLK_GENERATE_PROTOTYPES_H */
+ #if defined(VK_VERSION_1_0)
+ extern PFN_vkAllocateCommandBuffers vkAllocateCommandBuffers;
+@@ -2610,6 +2624,9 @@ extern PFN_vkAcquireNextImage2KHR vkAcquireNextImage2KHR;
+ #endif /* (defined(VK_KHR_device_group) && defined(VK_KHR_swapchain)) || (defined(VK_KHR_swapchain) && defined(VK_VERSION_1_1)) */
+ /* VOLK_GENERATE_PROTOTYPES_H */
+
++/* [mcs_b181]: Enable prototypes for KDevelop's parser, see comment at the top of the volk.h header file */
++#endif /* #ifndef KDEVELOP_PARSER_RUN */
++
+ #ifdef __cplusplus
+ }
+ #endif
+--
+2.49.0

@@ -27,6 +27,12 @@
 #include "tetra/log.h"
 #include "tetra/util/stb_sprintf.h"
 
+namespace gpu::internal
+{
+void init_gpu_fences();
+void quit_gpu_fences();
+}
+
 #define CREATE_FUNC_DEF(FUNCTION_NAME, RESOURCE_SUB_TYPE, PROP_STRING)                                                         \
     SDL_GPU##RESOURCE_SUB_TYPE* gpu::FUNCTION_NAME(const SDL_GPU##RESOURCE_SUB_TYPE##CreateInfo& cinfo, const char* fmt, ...)  \
     {                                                                                                                          \

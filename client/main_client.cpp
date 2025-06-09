@@ -2056,6 +2056,9 @@ int main(int argc, char* argv[])
 
     tetra::init("icrashstuff", "mcs_b181", "mcs_b181_client", argc, (const char**)argv, false);
     gpu::init();
+    gpu::quit();
+    tetra::deinit();
+    return 0;
 
     SDL_InitSubSystem(SDL_INIT_AUDIO);
 

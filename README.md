@@ -32,6 +32,7 @@ This project vendors and makes use of the following external software components
 | SMOL-V               | Copyright (c) 2016 - 2024 Aras Pranckevicius            | MIT license or Unlicense (full text under client/gpu/smol-v/license.txt)       |
 | Jzon                 | Copyright (c) 2015 Johannes Häggqvist                   | MIT license (full text under client/jzon)                                      |
 | Simplex Noise        | Copyright (c) 2012-2018 Sebastien Rombauts              | MIT license (full text under shared/simplex_noise/)                            |
+| Volk                 | Copyright (c) 2018-2025 Arseny Kapoulkine               | MIT License (full text under client/gpu/volk/LICENSE.md)                       |
 | SDL3 Net             | Copyright (C) 1997-2024 Sam Lantinga, and others        | zlib license (full text under sdl_net/)                                        |
 
 The files docs/wiki_vg_protocol_v17.html and docs/wiki_vg_protocol_v17.mediawiki were extracted from a wiki.vg backup and are licensed under the CC-BY-SA 3.0

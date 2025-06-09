@@ -24,8 +24,7 @@
 
 #include "gpu.h"
 
-#include "../state.h"
-#include "tetra/log.h"
+#include "internal.h"
 #include <map>
 #include <vector>
 
@@ -79,13 +78,13 @@ struct gpu::fence_t
 static std::map<const SDL_GPUCommandBuffer*, gpu::fence_t*> fence_map;
 static SDL_RWLock* fence_map_lock = nullptr;
 
-void gpu::init()
+void gpu::internal::init_gpu_fences()
 {
-    quit();
+    internal::quit_gpu_fences();
     fence_map_lock = SDL_CreateRWLock();
 }
 
-void gpu::quit()
+void gpu::internal::quit_gpu_fences()
 {
     if (SDL_GetAtomicInt(&num_fences) != 0)
         dc_log_warn("%d fence(s) were leaked!", SDL_GetAtomicInt(&num_fences));

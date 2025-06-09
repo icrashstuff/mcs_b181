@@ -28,9 +28,21 @@
 #include "subdiv_buffer.h"
 #include "texture.h"
 
+#include "volk/volk.h"
+
 namespace gpu
 {
+/**
+ * Init GPU api
+ *
+ * This will either return on success, or exit the program on failure!
+ */
 void init();
 
 void quit();
+
+extern SDL_Window* window;
+extern VkInstance instance;
+extern VkPhysicalDevice physical_device;
+extern VkDevice device;
 }
