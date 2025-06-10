@@ -41,6 +41,10 @@ void init();
 
 void quit();
 
+extern VkQueue graphics_queue;
+extern VkQueue transfer_queue;
+extern VkQueue present_queue;
+
 extern SDL_Window* window;
 extern VkInstance instance;
 extern VkPhysicalDevice physical_device;

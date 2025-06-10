@@ -24,11 +24,10 @@
 
 #include "internal.h"
 
-#include <SDL3/SDL_vulkan.h>
-
 #include "tetra/util/convar.h"
-
 #include "tetra/util/misc.h"
+#include <SDL3/SDL_vulkan.h>
+#include <set>
 
 SDL_Window* gpu::window = nullptr;
 
@@ -44,6 +43,10 @@ static convar_int_t r_debug_vulkan {
 VkInstance gpu::instance = VK_NULL_HANDLE;
 VkPhysicalDevice gpu::physical_device = VK_NULL_HANDLE;
 VkDevice gpu::device = VK_NULL_HANDLE;
+
+VkQueue gpu::graphics_queue = VK_NULL_HANDLE;
+VkQueue gpu::transfer_queue = VK_NULL_HANDLE;
+VkQueue gpu::present_queue = VK_NULL_HANDLE;
 
 #define VK_DIE(_CALL)                                                                              \
     do                                                                                             \
@@ -394,13 +397,20 @@ static bool select_physical_device(VkInstance instance, const std::vector<const 
 
 static VkDevice init_device(VkInstance instance, physical_device_info_t device_info, const std::vector<const char*>& required_device_extensions)
 {
-    VkDeviceQueueCreateInfo cinfo_queue {};
-    cinfo_queue.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
-    cinfo_queue.queueFamilyIndex = device_info.graphics_queue_idx;
-    cinfo_queue.queueCount = 1;
+    std::set<Uint32> queue_families = { device_info.graphics_queue_idx, device_info.present_queue_idx, device_info.transfer_queue_idx };
 
     float queue_priority = 1.f;
-    cinfo_queue.pQueuePriorities = &queue_priority;
+    std::vector<VkDeviceQueueCreateInfo> cinfo_queues;
+
+    for (uint32_t family : queue_families)
+    {
+        VkDeviceQueueCreateInfo cinfo_queue {};
+        cinfo_queue.sType = VK_STRUCTURE_TYPE_DEVICE_QUEUE_CREATE_INFO;
+        cinfo_queue.queueFamilyIndex = family;
+        cinfo_queue.queueCount = 1;
+        cinfo_queue.pQueuePriorities = &queue_priority;
+        cinfo_queues.push_back(cinfo_queue);
+    }
 
     VkPhysicalDeviceFeatures2 features_10 = {};
     VkPhysicalDeviceVulkan11Features features_11 = {};
@@ -421,8 +431,8 @@ static VkDevice init_device(VkInstance instance, physical_device_info_t device_i
     VkDeviceCreateInfo cinfo_device {};
     cinfo_device.sType = VK_STRUCTURE_TYPE_DEVICE_CREATE_INFO;
     cinfo_device.pNext = &features_10;
-    cinfo_device.queueCreateInfoCount = 1;
-    cinfo_device.pQueueCreateInfos = &cinfo_queue;
+    cinfo_device.queueCreateInfoCount = cinfo_queues.size();
+    cinfo_device.pQueueCreateInfos = cinfo_queues.data();
     cinfo_device.enabledExtensionCount = required_device_extensions.size();
     cinfo_device.ppEnabledExtensionNames = required_device_extensions.data();
     cinfo_device.enabledLayerCount = required_device_layers.size();
@@ -471,11 +481,19 @@ void gpu::init()
 
     device = init_device(instance, device_info, required_device_extensions);
     volkLoadDevice(device);
-}
+
+    vkGetDeviceQueue(device, device_info.graphics_queue_idx, 0, &graphics_queue);
+    vkGetDeviceQueue(device, device_info.transfer_queue_idx, 0, &transfer_queue);
+    vkGetDeviceQueue(device, device_info.present_queue_idx, 0, &present_queue);
+};
 
 void gpu::quit()
 {
     internal::quit_gpu_fences();
+
+    graphics_queue = VK_NULL_HANDLE;
+    transfer_queue = VK_NULL_HANDLE;
+    present_queue = VK_NULL_HANDLE;
 
     vkDestroyDevice(device, nullptr);
     device = VK_NULL_HANDLE;
