@@ -1,6 +1,6 @@
 # mcs_b181
 
-A minecraft beta 1.8.x server / bridge / client. This project is purely for my own entertainment
+A minecraft beta 1.8.x server / bridge / client. This project exists so that I can experiment with technologies/apis while staying interested.
 
 ## Notes on the client
 
