@@ -250,13 +250,6 @@ static bool select_physical_device(VkInstance instance, const std::vector<const 
             physical_device_info_t info = {};
             info.device = device;
 
-            assert(info.props_10.pNext == &info.props_11);
-            assert(info.props_11.pNext == &info.props_12);
-            assert(info.props_12.pNext == nullptr);
-            assert(info.features_10.pNext == &info.features_11);
-            assert(info.features_11.pNext == &info.features_12);
-            assert(info.features_12.pNext == nullptr);
-
             vkGetPhysicalDeviceProperties2(device, &info.props_10);
             vkGetPhysicalDeviceFeatures2(device, &info.features_10);
 
@@ -280,7 +273,7 @@ static bool select_physical_device(VkInstance instance, const std::vector<const 
         }
     }
 
-    /* Dump info on all vulkan devices, and cull unsuitable ones */
+    /* Dump info on all vulkan devices, while culling unsuitable ones */
     dc_log("Available Vulkan Devices: %zu", devices.size());
     for (auto it_dev = devices.begin(); it_dev != devices.end();)
     {
@@ -293,6 +286,26 @@ static bool select_physical_device(VkInstance instance, const std::vector<const 
         Uint32 api_ver_variant = VK_API_VERSION_VARIANT(it_dev->props_10.properties.apiVersion);
 
         dc_log("API Version %u.%u.%u, Variant: %u", api_ver_major, api_ver_minor, api_ver_patch, api_ver_variant);
+
+        dc_log("Driver id: %s", string_VkDriverId(it_dev->props_12.driverID));
+        dc_log("Driver name: %s", it_dev->props_12.driverName);
+        dc_log("Driver info: %s", it_dev->props_12.driverInfo);
+
+        dc_log("Conformance Version: %u.%u.%u.%u", it_dev->props_12.conformanceVersion.major, it_dev->props_12.conformanceVersion.minor,
+            it_dev->props_12.conformanceVersion.subminor, it_dev->props_12.conformanceVersion.patch);
+
+#define UUID_FMT "%02x%02x%02x%02x-%02x%02x-%02x%02x-%02x%02x-%02x%02x%02x%02x%02x%02x"
+#define UUID_ARGS(x) x[0], x[1], x[2], x[3], x[4], x[5], x[6], x[7], x[8], x[9], x[10], x[11], x[12], x[13], x[14], x[15]
+
+        dc_log("Pipeline cache UUID: " UUID_FMT, UUID_ARGS(it_dev->props_10.properties.pipelineCacheUUID));
+        dc_log("Driver UUID: " UUID_FMT, UUID_ARGS(it_dev->props_11.driverUUID));
+        dc_log("Device UUID: " UUID_FMT, UUID_ARGS(it_dev->props_11.deviceUUID));
+
+#undef UUID_FMT
+#undef UUID_ARGS
+
+        /* stb_sprintf will automatically do SI prefix conversion when '$$' is inserted between the '%' and the format code */
+        dc_log("Memory allocation max size: %lu bytes (%$$luB)", it_dev->props_11.maxMemoryAllocationSize, it_dev->props_11.maxMemoryAllocationSize);
 
         bool suitable = true;
 
@@ -375,8 +388,8 @@ static bool select_physical_device(VkInstance instance, const std::vector<const 
 
     dc_log("Compatible Vulkan Devices: %zu", devices.size());
 
-    for (auto& it : devices)
-        dc_log("%s %s", string_VkPhysicalDeviceType(it.props_10.properties.deviceType), it.props_10.properties.deviceName);
+    for (const physical_device_info_t& it_dev : devices)
+        dc_log("  %s %s", string_VkPhysicalDeviceType(it_dev.props_10.properties.deviceType), it_dev.props_10.properties.deviceName);
 
     for (const auto type : {
              VK_PHYSICAL_DEVICE_TYPE_DISCRETE_GPU,
@@ -386,11 +399,11 @@ static bool select_physical_device(VkInstance instance, const std::vector<const 
              VK_PHYSICAL_DEVICE_TYPE_OTHER,
          })
     {
-        for (auto& it : devices)
+        for (const physical_device_info_t& it_dev : devices)
         {
-            if (it.props_10.properties.deviceType == type)
+            if (it_dev.props_10.properties.deviceType == type)
             {
-                out = it;
+                out = it_dev;
                 return true;
             }
         }
