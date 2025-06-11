@@ -74,12 +74,15 @@ static VkInstance init_instance(std::vector<const char*> required_instance_exten
     ainfo_instance.pEngineName = "mcs_b181_client";
     ainfo_instance.apiVersion = VK_API_VERSION_1_2;
 
-    if (instance_version < ainfo_instance.apiVersion)
-        util::die("Unsupported Vulkan instance version: %u-%u.%u.%u", VK_API_VERSION_VARIANT(instance_version), VK_API_VERSION_MAJOR(instance_version),
-            VK_API_VERSION_MINOR(instance_version), VK_API_VERSION_PATCH(instance_version));
+    Uint32 inst_ver_major = VK_API_VERSION_MAJOR(instance_version);
+    Uint32 inst_ver_minor = VK_API_VERSION_MINOR(instance_version);
+    Uint32 inst_ver_patch = VK_API_VERSION_PATCH(instance_version);
+    Uint32 inst_ver_variant = VK_API_VERSION_VARIANT(instance_version);
 
-    dc_log("Instance version: %u-%u.%u.%u", VK_API_VERSION_VARIANT(instance_version), VK_API_VERSION_MAJOR(instance_version),
-        VK_API_VERSION_MINOR(instance_version), VK_API_VERSION_PATCH(instance_version));
+    if (instance_version < ainfo_instance.apiVersion)
+        util::die("Unsupported Vulkan instance version: %u.%u.%u, Variant %u", inst_ver_major, inst_ver_minor, inst_ver_patch, inst_ver_variant);
+
+    dc_log("Instance version: %u.%u.%u, Variant %u", inst_ver_major, inst_ver_minor, inst_ver_patch, inst_ver_variant);
 
     {
         Uint32 sdl_ext_count = 0;
@@ -283,6 +286,13 @@ static bool select_physical_device(VkInstance instance, const std::vector<const 
     {
         dc_log("================ %s (%s) ================", string_VkPhysicalDeviceType(it_dev->props_10.properties.deviceType),
             it_dev->props_10.properties.deviceName);
+
+        Uint32 api_ver_major = VK_API_VERSION_MAJOR(it_dev->props_10.properties.apiVersion);
+        Uint32 api_ver_minor = VK_API_VERSION_MINOR(it_dev->props_10.properties.apiVersion);
+        Uint32 api_ver_patch = VK_API_VERSION_PATCH(it_dev->props_10.properties.apiVersion);
+        Uint32 api_ver_variant = VK_API_VERSION_VARIANT(it_dev->props_10.properties.apiVersion);
+
+        dc_log("API Version %u.%u.%u, Variant: %u", api_ver_major, api_ver_minor, api_ver_patch, api_ver_variant);
 
         bool suitable = true;
 
