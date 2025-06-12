@@ -2056,6 +2056,7 @@ int main(int argc, char* argv[])
 
     tetra::init("icrashstuff", "mcs_b181", "mcs_b181_client", argc, (const char**)argv, false);
     gpu::init();
+    gpu::simple_test_app();
     gpu::quit();
     tetra::deinit();
     return 0;

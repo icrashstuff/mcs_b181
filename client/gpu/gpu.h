@@ -39,6 +39,11 @@ namespace gpu
  */
 void init();
 
+/**
+ * Run a little test app to verify some things are working
+ */
+void simple_test_app();
+
 void quit();
 
 extern VkQueue graphics_queue;
@@ -46,7 +51,56 @@ extern VkQueue transfer_queue;
 extern VkQueue present_queue;
 
 extern SDL_Window* window;
+extern VkSurfaceKHR window_surface;
+extern VkSwapchainKHR window_swapchain;
 extern VkInstance instance;
-extern VkPhysicalDevice physical_device;
+/** Value passed to VkApplicationInfo::apiVersion */
+extern const Uint32 instance_api_version;
 extern VkDevice device;
+
+struct swapchain_info_t
+{
+    std::vector<VkSurfaceFormatKHR> formats;
+
+    std::vector<VkPresentModeKHR> present_modes;
+
+    VkSurfaceCapabilitiesKHR capabilities = {};
+};
+
+struct physical_device_info_t
+{
+    VkPhysicalDevice device = VK_NULL_HANDLE;
+    VkPhysicalDeviceProperties2 props_10 = {};
+    VkPhysicalDeviceVulkan11Properties props_11 = {};
+    VkPhysicalDeviceVulkan12Properties props_12 = {};
+
+    VkPhysicalDeviceFeatures2 features_10 = {};
+    VkPhysicalDeviceVulkan11Features features_11 = {};
+    VkPhysicalDeviceVulkan12Features features_12 = {};
+
+    std::vector<VkExtensionProperties> extensions;
+
+    /** Queue families available the the physical device */
+    std::vector<VkQueueFamilyProperties> queue_families;
+
+    /**
+     * Get current swapchain related info for a corresponding physical device and surface combination
+     *
+     * Silently fails on an error
+     */
+    swapchain_info_t get_current_swapchain_info(VkSurfaceKHR const surface) const;
+
+    bool has_graphics_queue = 0;
+    bool has_transfer_queue = 0;
+    bool has_present_queue = 0;
+
+    Uint32 graphics_queue_idx = 0;
+    Uint32 transfer_queue_idx = 0;
+    Uint32 present_queue_idx = 0;
+
+    physical_device_info_t();
+};
+
+/**  Device info associated with gpu::device */
+extern physical_device_info_t device_info;
 }

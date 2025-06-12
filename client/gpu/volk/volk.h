@@ -37,8 +37,9 @@
 #	else /* Platform headers included below */
 #		include <vulkan/vk_platform.h>
 #		include <vulkan/vulkan_core.h>
-/* [mcs_b181]: Add vk_enum_string_helper */
+/* [mcs_b181]: Add vk_enum_string_helper and vk_format_utils */
 #		include <vulkan/vk_enum_string_helper.h>
+#		include <vulkan/utility/vk_format_utils.h>
 #	endif
 #endif
 

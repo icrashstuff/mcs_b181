@@ -24,9 +24,11 @@
 
 #include "internal.h"
 
+#include "tetra/tetra_core.h"
 #include "tetra/util/convar.h"
 #include "tetra/util/misc.h"
 #include <SDL3/SDL_vulkan.h>
+#include <algorithm>
 #include <set>
 
 SDL_Window* gpu::window = nullptr;
@@ -36,18 +38,22 @@ static convar_int_t r_debug_vulkan {
     false,
     false,
     true,
-    "Attempt to create VkInstance and VkDevice with the validation layers enabled",
+    "Attempt to create VkInstance and VkDevice with the validation layers and debug extensions enabled",
     CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_DEV_ONLY,
 };
 
+gpu::physical_device_info_t gpu::device_info = {};
+
 VkInstance gpu::instance = VK_NULL_HANDLE;
-VkPhysicalDevice gpu::physical_device = VK_NULL_HANDLE;
 VkDevice gpu::device = VK_NULL_HANDLE;
+VkSurfaceKHR gpu::window_surface = VK_NULL_HANDLE;
+VkSwapchainKHR gpu::window_swapchain = VK_NULL_HANDLE;
 
 VkQueue gpu::graphics_queue = VK_NULL_HANDLE;
 VkQueue gpu::transfer_queue = VK_NULL_HANDLE;
 VkQueue gpu::present_queue = VK_NULL_HANDLE;
 
+/** Die on an error from a function returning VkResult */
 #define VK_DIE(_CALL)                                                                              \
     do                                                                                             \
     {                                                                                              \
@@ -55,6 +61,17 @@ VkQueue gpu::present_queue = VK_NULL_HANDLE;
         if (result__ != VK_SUCCESS)                                                                \
             util::die("%s failed with code: %d: %s", #_CALL, result__, string_VkResult(result__)); \
     } while (0)
+
+/** Log an error from a function returning VkResult */
+#define VK_TRY(_CALL)                                                                                 \
+    do                                                                                                \
+    {                                                                                                 \
+        VkResult result__ = _CALL;                                                                    \
+        if (result__ != VK_SUCCESS)                                                                   \
+            dc_log_error("%s failed with code: %d: %s", #_CALL, result__, string_VkResult(result__)); \
+    } while (0)
+
+const Uint32 gpu::instance_api_version = VK_API_VERSION_1_2;
 
 /**
  * @param required_instance_extensions Required instance-level extensions
@@ -72,7 +89,7 @@ static VkInstance init_instance(std::vector<const char*> required_instance_exten
     ainfo_instance.sType = VK_STRUCTURE_TYPE_APPLICATION_INFO;
     ainfo_instance.pApplicationName = "mcs_b181_client";
     ainfo_instance.pEngineName = "mcs_b181_client";
-    ainfo_instance.apiVersion = VK_API_VERSION_1_2;
+    ainfo_instance.apiVersion = gpu::instance_api_version;
 
     Uint32 inst_ver_major = VK_API_VERSION_MAJOR(instance_version);
     Uint32 inst_ver_minor = VK_API_VERSION_MINOR(instance_version);
@@ -166,46 +183,42 @@ static VkInstance init_instance(std::vector<const char*> required_instance_exten
     return instance;
 }
 
-struct physical_device_info_t
+gpu::swapchain_info_t gpu::physical_device_info_t::get_current_swapchain_info(VkSurfaceKHR const surface) const
 {
-    VkPhysicalDevice device = VK_NULL_HANDLE;
-    VkPhysicalDeviceProperties2 props_10 = {};
-    VkPhysicalDeviceVulkan11Properties props_11 = {};
-    VkPhysicalDeviceVulkan12Properties props_12 = {};
+    swapchain_info_t info {};
+    uint32_t surface_formats_count = 0;
+    VK_TRY(vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &surface_formats_count, nullptr));
+    info.formats.resize(surface_formats_count);
+    VK_TRY(vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &surface_formats_count, info.formats.data()));
+    info.formats.resize(surface_formats_count);
 
-    VkPhysicalDeviceFeatures2 features_10 = {};
-    VkPhysicalDeviceVulkan11Features features_11 = {};
-    VkPhysicalDeviceVulkan12Features features_12 = {};
+    uint32_t present_modes_count = 0;
+    VK_TRY(vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &present_modes_count, nullptr));
+    info.present_modes.resize(present_modes_count);
+    VK_TRY(vkGetPhysicalDeviceSurfacePresentModesKHR(device, surface, &present_modes_count, info.present_modes.data()));
+    info.present_modes.resize(present_modes_count);
 
-    std::vector<VkExtensionProperties> extensions;
+    VK_TRY(vkGetPhysicalDeviceSurfaceCapabilitiesKHR(device, surface, &info.capabilities));
 
-    std::vector<VkQueueFamilyProperties> queue_families;
+    return info;
+}
 
-    bool has_graphics_queue = 0;
-    bool has_transfer_queue = 0;
-    bool has_present_queue = 0;
+gpu::physical_device_info_t::physical_device_info_t()
+{
+    props_10.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
+    props_11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_PROPERTIES;
+    props_12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES;
 
-    Uint32 graphics_queue_idx = 0;
-    Uint32 transfer_queue_idx = 0;
-    Uint32 present_queue_idx = 0;
+    props_10.pNext = &props_11;
+    props_11.pNext = &props_12;
 
-    physical_device_info_t()
-    {
-        props_10.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_PROPERTIES_2;
-        props_11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_PROPERTIES;
-        props_12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_PROPERTIES;
+    features_10.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
+    features_11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
+    features_12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
 
-        props_10.pNext = &props_11;
-        props_11.pNext = &props_12;
-
-        features_10.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_FEATURES_2;
-        features_11.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_1_FEATURES;
-        features_12.sType = VK_STRUCTURE_TYPE_PHYSICAL_DEVICE_VULKAN_1_2_FEATURES;
-
-        features_10.pNext = &features_11;
-        features_11.pNext = &features_12;
-    }
-};
+    features_10.pNext = &features_11;
+    features_11.pNext = &features_12;
+}
 
 static bool find_queue(const std::vector<VkQueueFamilyProperties>& v, const VkQueueFlags flags, Uint32& idx)
 {
@@ -233,10 +246,20 @@ static bool find_present_queue(const std::vector<VkQueueFamilyProperties>& v, Vk
     return false;
 }
 
-/* TODO: Add option to force a device by name? */
-static bool select_physical_device(VkInstance instance, const std::vector<const char*>& required_device_extensions, physical_device_info_t& out)
+static bool is_extension_present(const std::vector<VkExtensionProperties>& extensions, const char* name)
 {
-    std::vector<physical_device_info_t> devices;
+    for (const auto& it : extensions)
+        if (it.extensionName == name)
+            return true;
+    return false;
+}
+
+/* TODO: Add option to force a device by name? */
+static bool select_physical_device(
+    VkInstance instance, VkSurfaceKHR surface, const std::vector<const char*>& required_device_extensions, gpu::physical_device_info_t& out)
+{
+    std::vector<gpu::physical_device_info_t> devices;
+    std::vector<gpu::swapchain_info_t> swapchain_infos;
 
     {
         Uint32 physical_devices_count = 0;
@@ -247,7 +270,7 @@ static bool select_physical_device(VkInstance instance, const std::vector<const 
 
         for (auto& device : physical_devices)
         {
-            physical_device_info_t info = {};
+            gpu::physical_device_info_t info = {};
             info.device = device;
 
             vkGetPhysicalDeviceProperties2(device, &info.props_10);
@@ -279,6 +302,8 @@ static bool select_physical_device(VkInstance instance, const std::vector<const 
     {
         dc_log("================ %s (%s) ================", string_VkPhysicalDeviceType(it_dev->props_10.properties.deviceType),
             it_dev->props_10.properties.deviceName);
+
+        gpu::swapchain_info_t it_swap = it_dev->get_current_swapchain_info(surface);
 
         Uint32 api_ver_major = VK_API_VERSION_MAJOR(it_dev->props_10.properties.apiVersion);
         Uint32 api_ver_minor = VK_API_VERSION_MINOR(it_dev->props_10.properties.apiVersion);
@@ -317,7 +342,7 @@ static bool select_physical_device(VkInstance instance, const std::vector<const 
                 found = (strcmp(it, it_dev->extensions[i].extensionName) == 0);
             if (!found)
             {
-                dc_log_error("Does not have: %s", it);
+                dc_log_warn("Does not have: %s", it);
                 suitable = false;
             }
             else
@@ -328,7 +353,7 @@ static bool select_physical_device(VkInstance instance, const std::vector<const 
             dc_log("Has graphics queue");
         else
         {
-            dc_log("Does not have graphics quue");
+            dc_log_warn("Does not have graphics quue");
             suitable = false;
         }
 
@@ -336,7 +361,7 @@ static bool select_physical_device(VkInstance instance, const std::vector<const 
             dc_log("Has present queue");
         else
         {
-            dc_log("Does not have present quue");
+            dc_log_warn("Does not have present quue");
             suitable = false;
         }
 
@@ -344,7 +369,31 @@ static bool select_physical_device(VkInstance instance, const std::vector<const 
             dc_log("Has transfer queue");
         else
         {
-            dc_log("Does not have transfer quue");
+            dc_log_warn("Does not have transfer quue");
+            suitable = false;
+        }
+
+        if (it_swap.formats.size())
+        {
+            dc_log("Surface formats: %zu", it_swap.formats.size());
+            for (VkSurfaceFormatKHR it : it_swap.formats)
+                dc_log("  %s %s", string_VkColorSpaceKHR(it.colorSpace), string_VkFormat(it.format));
+        }
+        else
+        {
+            dc_log_warn("Does not have any surface formats");
+            suitable = false;
+        }
+
+        if (it_swap.present_modes.size())
+        {
+            dc_log("Present modes: %zu", it_swap.present_modes.size());
+            for (VkPresentModeKHR it : it_swap.present_modes)
+                dc_log("  %s", string_VkPresentModeKHR(it));
+        }
+        else
+        {
+            dc_log_warn("Does not have any present modes");
             suitable = false;
         }
 
@@ -388,7 +437,7 @@ static bool select_physical_device(VkInstance instance, const std::vector<const 
 
     dc_log("Compatible Vulkan Devices: %zu", devices.size());
 
-    for (const physical_device_info_t& it_dev : devices)
+    for (const gpu::physical_device_info_t& it_dev : devices)
         dc_log("  %s %s", string_VkPhysicalDeviceType(it_dev.props_10.properties.deviceType), it_dev.props_10.properties.deviceName);
 
     for (const auto type : {
@@ -399,7 +448,7 @@ static bool select_physical_device(VkInstance instance, const std::vector<const 
              VK_PHYSICAL_DEVICE_TYPE_OTHER,
          })
     {
-        for (const physical_device_info_t& it_dev : devices)
+        for (const gpu::physical_device_info_t& it_dev : devices)
         {
             if (it_dev.props_10.properties.deviceType == type)
             {
@@ -418,7 +467,7 @@ static bool select_physical_device(VkInstance instance, const std::vector<const 
     return false;
 }
 
-static VkDevice init_device(VkInstance instance, physical_device_info_t device_info, const std::vector<const char*>& required_device_extensions)
+static VkDevice init_device(VkInstance instance, gpu::physical_device_info_t device_info, const std::vector<const char*>& required_device_extensions)
 {
     std::set<Uint32> queue_families = { device_info.graphics_queue_idx, device_info.present_queue_idx, device_info.transfer_queue_idx };
 
@@ -473,6 +522,103 @@ static VkDevice init_device(VkInstance instance, physical_device_info_t device_i
     return device;
 }
 
+/* Technically speaking this should never fail since an unsuitable device should
+ * have already been removed, but I don't feel like changing this right now */
+static bool get_swapchain_format(const gpu::swapchain_info_t& info, VkFormat& out_format, VkColorSpaceKHR out_colorspace)
+{
+#define SWAPCHAIN_FORMAT_IF(COND)                    \
+    for (const VkSurfaceFormatKHR it : info.formats) \
+        if (COND)                                    \
+        {                                            \
+            out_format = it.format;                  \
+            out_colorspace = it.colorSpace;          \
+            return true;                             \
+        }
+
+    SWAPCHAIN_FORMAT_IF(it.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR && vkuFormatIsSRGB(it.format));
+    SWAPCHAIN_FORMAT_IF(it.colorSpace == VK_COLOR_SPACE_SRGB_NONLINEAR_KHR);
+
+    if (info.formats.size())
+    {
+        out_format = info.formats.front().format;
+        out_colorspace = info.formats.front().colorSpace;
+        return true;
+    }
+
+    return false;
+#undef SWAPCHAIN_FORMAT_IF
+}
+
+/* TODO: VK_PRESENT_MODE_MAILBOX_KHR, and others */
+static VkPresentModeKHR get_present_mode(const gpu::swapchain_info_t& info) { return VK_PRESENT_MODE_FIFO_KHR; }
+
+static VkSwapchainKHR create_swapchain(
+    gpu::physical_device_info_t& device_info, VkDevice device, SDL_Window* window, VkSurfaceKHR surface, VkSwapchainKHR old_swapchain)
+{
+    gpu::swapchain_info_t swapchain_info = device_info.get_current_swapchain_info(surface);
+
+    VkSwapchainCreateInfoKHR cinfo {};
+    cinfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
+    cinfo.surface = surface;
+
+    cinfo.minImageCount = swapchain_info.capabilities.minImageCount + 1;
+
+    if (swapchain_info.capabilities.maxImageCount) /* If non-zero then enforce the maximum image count */
+        cinfo.minImageCount = SDL_min(cinfo.minImageCount, swapchain_info.capabilities.maxImageCount);
+
+    if (!get_swapchain_format(swapchain_info, cinfo.imageFormat, cinfo.imageColorSpace))
+        return VK_NULL_HANDLE;
+
+    if (swapchain_info.capabilities.currentExtent.width != 0xFFFFFFFF)
+        cinfo.imageExtent = swapchain_info.capabilities.currentExtent;
+    else /* Find a suitably close window size (At least that is what I think this path is for) */
+    {
+        int w = 0, h = 0;
+        SDL_GetWindowSizeInPixels(window, &w, &h);
+
+        const VkExtent2D min_extent = swapchain_info.capabilities.minImageExtent;
+        const VkExtent2D max_extent = swapchain_info.capabilities.maxImageExtent;
+
+        cinfo.imageExtent.width = SDL_clamp(static_cast<Uint32>(w), min_extent.width, max_extent.width);
+        cinfo.imageExtent.height = SDL_clamp(static_cast<Uint32>(h), min_extent.height, max_extent.height);
+    }
+
+    cinfo.imageArrayLayers = 1;
+    cinfo.imageUsage = VK_IMAGE_USAGE_COLOR_ATTACHMENT_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
+    /* Determine image sharing mode */
+    std::vector<Uint32> queue_families;
+    {
+        std::set<Uint32> queue_families_set = {
+            device_info.graphics_queue_idx,
+            device_info.present_queue_idx,
+            device_info.transfer_queue_idx,
+        };
+        for (Uint32 it : queue_families_set)
+            queue_families.push_back(it);
+    }
+    if (queue_families.size() == 1)
+        cinfo.imageSharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    else
+    {
+        cinfo.imageSharingMode = VK_SHARING_MODE_CONCURRENT;
+        cinfo.queueFamilyIndexCount = queue_families.size();
+        cinfo.pQueueFamilyIndices = queue_families.data();
+    }
+
+    cinfo.preTransform = swapchain_info.capabilities.currentTransform;
+    cinfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
+    cinfo.presentMode = get_present_mode(swapchain_info);
+    cinfo.clipped = VK_TRUE;
+    cinfo.oldSwapchain = old_swapchain;
+
+    VkSwapchainKHR swapchain = VK_NULL_HANDLE;
+
+    VK_DIE(vkCreateSwapchainKHR(device, &cinfo, nullptr, &swapchain));
+
+    return swapchain;
+}
+
 void gpu::init()
 {
     internal::init_gpu_fences();
@@ -491,16 +637,18 @@ void gpu::init()
     instance = init_instance();
     volkLoadInstanceOnly(gpu::instance);
 
+    if (!SDL_Vulkan_CreateSurface(window, instance, nullptr, &window_surface))
+        util::die("Unable to create vulkan surface! %s", SDL_GetError());
+
     std::vector<const char*> required_device_extensions = {
         VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME, /* Promoted to vulkan 1.3 */
         VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME, /* Promoted to vulkan 1.3 */
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     };
 
-    physical_device_info_t device_info;
-    if (!select_physical_device(instance, required_device_extensions, device_info))
+    if (!select_physical_device(instance, window_surface, required_device_extensions, device_info))
         util::die("Unable to find suitable Vulkan Device!\n"
                   "Try updating your Operating System and/or Graphics drivers");
-    physical_device = device_info.device;
 
     device = init_device(instance, device_info, required_device_extensions);
     volkLoadDevice(device);
@@ -508,11 +656,53 @@ void gpu::init()
     vkGetDeviceQueue(device, device_info.graphics_queue_idx, 0, &graphics_queue);
     vkGetDeviceQueue(device, device_info.transfer_queue_idx, 0, &transfer_queue);
     vkGetDeviceQueue(device, device_info.present_queue_idx, 0, &present_queue);
+
+    window_swapchain = create_swapchain(device_info, device, window, window_surface, window_swapchain);
 };
+
+void gpu::simple_test_app()
+{
+    SDL_ShowWindow(window);
+    SDL_SetWindowResizable(window, 1);
+
+    bool done = 0;
+    bool window_resized = 0;
+    while (!done)
+    {
+        SDL_Event event;
+        while (SDL_PollEvent(&event))
+        {
+            switch (event.type)
+            {
+            case SDL_EVENT_WINDOW_RESIZED:
+                window_resized = 1;
+                break;
+            case SDL_EVENT_QUIT:
+                done = 1;
+                break;
+            }
+        }
+        if (window_resized)
+        {
+            dc_log("Resizing window");
+            VkSwapchainKHR new_swapchain = create_swapchain(device_info, device, window, window_surface, window_swapchain);
+            if (window_swapchain)
+                vkDestroySwapchainKHR(device, window_swapchain, nullptr);
+            window_swapchain = new_swapchain;
+            window_resized = 0;
+        }
+
+        static tetra::iteration_limiter_t fps_cap(1);
+        fps_cap.wait();
+    }
+}
 
 void gpu::quit()
 {
     internal::quit_gpu_fences();
+
+    vkDestroySwapchainKHR(device, window_swapchain, nullptr);
+    window_swapchain = VK_NULL_HANDLE;
 
     graphics_queue = VK_NULL_HANDLE;
     transfer_queue = VK_NULL_HANDLE;
@@ -520,7 +710,10 @@ void gpu::quit()
 
     vkDestroyDevice(device, nullptr);
     device = VK_NULL_HANDLE;
-    physical_device = VK_NULL_HANDLE;
+    device_info = {};
+
+    SDL_Vulkan_DestroySurface(instance, window_surface, nullptr);
+    window_surface = VK_NULL_HANDLE;
 
     vkDestroyInstance(instance, nullptr);
     instance = VK_NULL_HANDLE;
