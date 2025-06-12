@@ -281,7 +281,6 @@ if(MCS_B181_BUILD_SHADERS)
     function(add_shader stage in suffix)
         set(CURRENT_SHADER_DIR "${CMAKE_CURRENT_SOURCE_DIR}/client/shaders")
         set(SHADER_HEADERS "")
-        set(SHADER_HEADERS "${SHADER_HEADERS};${CURRENT_SHADER_DIR}/compiled/${in}${suffix}.msl.h"  )
         set(SHADER_HEADERS "${SHADER_HEADERS};${CURRENT_SHADER_DIR}/compiled/${in}${suffix}.smolv.h")
 
         add_custom_command(OUTPUT ${SHADER_HEADERS}
