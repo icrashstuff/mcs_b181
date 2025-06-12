@@ -256,9 +256,14 @@ if(IOS)
     ios_resource("${MCS_B181_BUNDLED_RESOURCES}")
 endif()
 
-option(MCS_B181_BUILD_SHADERS "Automatically run compile_shaders.sh (Only use if writing shaders)" OFF)
+option(MCS_B181_BUILD_SHADERS "DEPRECATED: Automatically compile shaders" ON)
 message(STATUS "MCS_B181_BUILD_SHADERS: ${MCS_B181_BUILD_SHADERS}")
+if(NOT MCS_B181_BUILD_SHADERS)
+    message(WARNING "Soon(TM) shader compilation will be mandatory")
+endif()
 if(MCS_B181_BUILD_SHADERS)
+    find_package(Vulkan COMPONENTS glslc REQUIRED)
+
     # TODO-OPT: Allow cross compilation by specifying MCS_B181_smolv_converter_EXECUTABLE?
     if(NOT DEFINED MCS_B181_smolv_converter_EXECUTABLE)
         if(CMAKE_CROSSCOMPILING)
