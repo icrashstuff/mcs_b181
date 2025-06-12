@@ -260,17 +260,20 @@ option(MCS_B181_BUILD_SHADERS "Automatically run compile_shaders.sh (Only use if
 message(STATUS "MCS_B181_BUILD_SHADERS: ${MCS_B181_BUILD_SHADERS}")
 if(MCS_B181_BUILD_SHADERS)
     # TODO-OPT: Allow cross compilation by specifying MCS_B181_smolv_converter_EXECUTABLE?
-    if(CMAKE_CROSSCOMPILING)
-        message(FATAL_ERROR "Shader building is not supported for cross compilation builds (smol-v converter)")
-    else()
-        add_executable(smolv_converter "client/gpu/smolv_converter.cpp;client/gpu/smol-v/smolv.cpp")
+    if(NOT DEFINED MCS_B181_smolv_converter_EXECUTABLE)
+        if(CMAKE_CROSSCOMPILING)
+            message(FATAL_ERROR "For cross-compiliation builds: Please compile smol-v converter and add \"-DMCS_B181_smolv_converter_EXECUTABLE=/path/to/smolv_converter\" to cmake args")
+        else()
+            add_executable(smolv_converter "client/gpu/smolv_converter.cpp;client/gpu/smol-v/smolv.cpp")
+            set(MCS_B181_smolv_converter_EXECUTABLE "${CMAKE_CURRENT_BINARY_DIR}/smolv_converter")
+        endif()
     endif()
 
     set(mcs_b181_client_COMMON_DEPS
         ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/compile_shaders.sh
         ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/shader_header.h
         ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/lightmap.glsl
-        ${CMAKE_CURRENT_BINARY_DIR}/smolv_converter
+        "${MCS_B181_smolv_converter_EXECUTABLE}"
     )
 
     add_custom_target(mcs_b181_client_shaders DEPENDS ${mcs_b181_client_COMMON_DEPS})
@@ -284,7 +287,7 @@ if(MCS_B181_BUILD_SHADERS)
         add_custom_command(OUTPUT ${SHADER_HEADERS}
             WORKING_DIRECTORY   ${CURRENT_SHADER_DIR}
             COMMAND             ${CMAKE_CURRENT_SOURCE_DIR}/client/shaders/compile_shaders.sh
-                                ${CMAKE_CURRENT_BINARY_DIR}/smolv_converter
+                                "${MCS_B181_smolv_converter_EXECUTABLE}"
                                 "${stage}"
                                 "${CURRENT_SHADER_DIR}/${in}"
                                 "${CURRENT_SHADER_DIR}/compiled/${in}${suffix}"
