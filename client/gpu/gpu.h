@@ -46,9 +46,16 @@ void simple_test_app();
 
 void quit();
 
+extern SDL_Mutex* graphics_queue_lock;
+extern SDL_Mutex* transfer_queue_lock;
+extern SDL_Mutex* present_queue_lock;
+
 extern VkQueue graphics_queue;
 extern VkQueue transfer_queue;
 extern VkQueue present_queue;
+
+/** Locks all queues, calls vkDeviceWaitIdle, and then unlocks all queues  */
+void wait_for_device_idle();
 
 extern SDL_Window* window;
 extern VkSurfaceKHR window_surface;

@@ -53,6 +53,10 @@ VkQueue gpu::graphics_queue = VK_NULL_HANDLE;
 VkQueue gpu::transfer_queue = VK_NULL_HANDLE;
 VkQueue gpu::present_queue = VK_NULL_HANDLE;
 
+SDL_Mutex* gpu::graphics_queue_lock = nullptr;
+SDL_Mutex* gpu::transfer_queue_lock = nullptr;
+SDL_Mutex* gpu::present_queue_lock = nullptr;
+
 /** Die on an error from a function returning VkResult */
 #define VK_DIE(_CALL)                                                                              \
     do                                                                                             \
@@ -555,6 +559,8 @@ static VkPresentModeKHR get_present_mode(const gpu::swapchain_info_t& info) { re
 static VkSwapchainKHR create_swapchain(
     gpu::physical_device_info_t& device_info, VkDevice device, SDL_Window* window, VkSurfaceKHR surface, VkSwapchainKHR old_swapchain)
 {
+    gpu::wait_for_device_idle();
+
     gpu::swapchain_info_t swapchain_info = device_info.get_current_swapchain_info(surface);
 
     VkSwapchainCreateInfoKHR cinfo {};
@@ -619,6 +625,7 @@ static VkSwapchainKHR create_swapchain(
     return swapchain;
 }
 
+static std::vector<SDL_Mutex*> queue_locks;
 void gpu::init()
 {
     internal::init_gpu_fences();
@@ -657,8 +664,69 @@ void gpu::init()
     vkGetDeviceQueue(device, device_info.transfer_queue_idx, 0, &transfer_queue);
     vkGetDeviceQueue(device, device_info.present_queue_idx, 0, &present_queue);
 
+    std::set<Uint32> queue_families = { device_info.graphics_queue_idx, device_info.present_queue_idx, device_info.transfer_queue_idx };
+    for (const Uint32 family_idx : queue_families)
+    {
+        SDL_Mutex* const lock = SDL_CreateMutex();
+        queue_locks.push_back(lock);
+        if (device_info.graphics_queue_idx == family_idx)
+            graphics_queue_lock = lock;
+        if (device_info.transfer_queue_idx == family_idx)
+            transfer_queue_lock = lock;
+        if (device_info.present_queue_idx == family_idx)
+            present_queue_lock = lock;
+    }
+
     window_swapchain = create_swapchain(device_info, device, window, window_surface, window_swapchain);
 };
+
+void gpu::wait_for_device_idle()
+{
+    SDL_LockMutex(gpu::graphics_queue_lock);
+    SDL_LockMutex(gpu::transfer_queue_lock);
+    SDL_LockMutex(gpu::present_queue_lock);
+    vkDeviceWaitIdle(device);
+    SDL_UnlockMutex(gpu::graphics_queue_lock);
+    SDL_UnlockMutex(gpu::transfer_queue_lock);
+    SDL_UnlockMutex(gpu::present_queue_lock);
+}
+
+void gpu::quit()
+{
+    wait_for_device_idle();
+
+    internal::quit_gpu_fences();
+
+    vkDestroySwapchainKHR(device, window_swapchain, nullptr);
+    window_swapchain = VK_NULL_HANDLE;
+
+    graphics_queue = VK_NULL_HANDLE;
+    transfer_queue = VK_NULL_HANDLE;
+    present_queue = VK_NULL_HANDLE;
+
+    graphics_queue_lock = nullptr;
+    transfer_queue_lock = nullptr;
+    present_queue_lock = nullptr;
+
+    for (SDL_Mutex* const m : queue_locks)
+        SDL_DestroyMutex(m);
+    queue_locks.clear();
+
+    vkDestroyDevice(device, nullptr);
+    device = VK_NULL_HANDLE;
+    device_info = {};
+
+    SDL_Vulkan_DestroySurface(instance, window_surface, nullptr);
+    window_surface = VK_NULL_HANDLE;
+
+    vkDestroyInstance(instance, nullptr);
+    instance = VK_NULL_HANDLE;
+
+    volkFinalize();
+
+    SDL_DestroyWindow(window);
+    window = nullptr;
+}
 
 void gpu::simple_test_app()
 {
@@ -695,31 +763,4 @@ void gpu::simple_test_app()
         static tetra::iteration_limiter_t fps_cap(1);
         fps_cap.wait();
     }
-}
-
-void gpu::quit()
-{
-    internal::quit_gpu_fences();
-
-    vkDestroySwapchainKHR(device, window_swapchain, nullptr);
-    window_swapchain = VK_NULL_HANDLE;
-
-    graphics_queue = VK_NULL_HANDLE;
-    transfer_queue = VK_NULL_HANDLE;
-    present_queue = VK_NULL_HANDLE;
-
-    vkDestroyDevice(device, nullptr);
-    device = VK_NULL_HANDLE;
-    device_info = {};
-
-    SDL_Vulkan_DestroySurface(instance, window_surface, nullptr);
-    window_surface = VK_NULL_HANDLE;
-
-    vkDestroyInstance(instance, nullptr);
-    instance = VK_NULL_HANDLE;
-
-    volkFinalize();
-
-    SDL_DestroyWindow(window);
-    window = nullptr;
 }
