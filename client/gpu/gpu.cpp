@@ -114,6 +114,8 @@ static VkInstance init_instance(std::vector<const char*> required_instance_exten
 
     if (r_debug_vulkan.get())
     {
+        dc_log("Requiring validation layers and %s", VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
+
         required_instance_extensions.push_back(VK_EXT_DEBUG_UTILS_EXTENSION_NAME);
 
         required_instance_layers.push_back("VK_LAYER_KHRONOS_validation");
