@@ -60,6 +60,7 @@ void wait_for_device_idle();
 extern SDL_Window* window;
 extern VkSurfaceKHR window_surface;
 extern VkSwapchainKHR window_swapchain;
+extern VkSurfaceFormatKHR window_swapchain_format;
 extern VkInstance instance;
 /** Value passed to VkApplicationInfo::apiVersion */
 extern const Uint32 instance_api_version;
@@ -89,13 +90,6 @@ struct physical_device_info_t
 
     /** Queue families available the the physical device */
     std::vector<VkQueueFamilyProperties> queue_families;
-
-    /**
-     * Get current swapchain related info for a corresponding physical device and surface combination
-     *
-     * Silently fails on an error
-     */
-    swapchain_info_t get_current_swapchain_info(VkSurfaceKHR const surface) const;
 
     bool has_graphics_queue = 0;
     bool has_transfer_queue = 0;

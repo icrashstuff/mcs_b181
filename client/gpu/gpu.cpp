@@ -48,6 +48,7 @@ VkInstance gpu::instance = VK_NULL_HANDLE;
 VkDevice gpu::device = VK_NULL_HANDLE;
 VkSurfaceKHR gpu::window_surface = VK_NULL_HANDLE;
 VkSwapchainKHR gpu::window_swapchain = VK_NULL_HANDLE;
+VkSurfaceFormatKHR gpu::window_swapchain_format = {};
 
 VkQueue gpu::graphics_queue = VK_NULL_HANDLE;
 VkQueue gpu::transfer_queue = VK_NULL_HANDLE;
@@ -198,9 +199,9 @@ static VkInstance init_instance(std::vector<const char*> required_instance_exten
     return instance;
 }
 
-gpu::swapchain_info_t gpu::physical_device_info_t::get_current_swapchain_info(VkSurfaceKHR const surface) const
+static gpu::swapchain_info_t get_current_swapchain_info(VkPhysicalDevice const device, VkSurfaceKHR const surface)
 {
-    swapchain_info_t info {};
+    gpu::swapchain_info_t info {};
     uint32_t surface_formats_count = 0;
     VK_TRY(vkGetPhysicalDeviceSurfaceFormatsKHR(device, surface, &surface_formats_count, nullptr));
     info.formats.resize(surface_formats_count);
@@ -318,7 +319,7 @@ static bool select_physical_device(
         dc_log("================ %s (%s) ================", string_VkPhysicalDeviceType(it_dev->props_10.properties.deviceType),
             it_dev->props_10.properties.deviceName);
 
-        gpu::swapchain_info_t it_swap = it_dev->get_current_swapchain_info(surface);
+        gpu::swapchain_info_t it_swap = get_current_swapchain_info(it_dev->device, surface);
 
         Uint32 api_ver_major = VK_API_VERSION_MAJOR(it_dev->props_10.properties.apiVersion);
         Uint32 api_ver_minor = VK_API_VERSION_MINOR(it_dev->props_10.properties.apiVersion);
@@ -567,12 +568,24 @@ static bool get_swapchain_format(const gpu::swapchain_info_t& info, VkFormat& ou
 /* TODO: VK_PRESENT_MODE_MAILBOX_KHR, and others */
 static VkPresentModeKHR get_present_mode(const gpu::swapchain_info_t& info) { return VK_PRESENT_MODE_FIFO_KHR; }
 
-static VkSwapchainKHR create_swapchain(
-    gpu::physical_device_info_t& device_info, VkDevice device, SDL_Window* window, VkSurfaceKHR surface, VkSwapchainKHR old_swapchain)
+/**
+ * Create (or recreate) a swapchain
+ *
+ * NOTE: This function calls gpu::wait_for_device_idle()
+ *
+ * @param device_info Physical device info related to the device parameter
+ * @param device Logical device associated with swapchain
+ * @param window Window associated with surface
+ * @param surface Surface associated with the swapchain
+ * @param old_swapchain Pre-existing swapchain to retire and *destroy*
+ * @param format On success the selected surface format will be written to this parameter
+ */
+static VkSwapchainKHR create_swapchain(const gpu::physical_device_info_t& device_info, VkDevice device, SDL_Window* window, VkSurfaceKHR surface,
+    VkSwapchainKHR old_swapchain, VkSurfaceFormatKHR& format)
 {
     gpu::wait_for_device_idle();
 
-    gpu::swapchain_info_t swapchain_info = device_info.get_current_swapchain_info(surface);
+    gpu::swapchain_info_t swapchain_info = get_current_swapchain_info(device_info.device, surface);
 
     VkSwapchainCreateInfoKHR cinfo {};
     cinfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -634,8 +647,14 @@ static VkSwapchainKHR create_swapchain(
     VkResult result;
     VK_TRY_STORE(result, vkCreateSwapchainKHR(device, &cinfo, nullptr, &swapchain));
 
+    if (old_swapchain)
+        vkDestroySwapchainKHR(device, old_swapchain, nullptr);
+
     if (result != VK_SUCCESS)
         return VK_NULL_HANDLE;
+
+    format.format = cinfo.imageFormat;
+    format.colorSpace = cinfo.imageColorSpace;
 
     return swapchain;
 }
@@ -692,7 +711,7 @@ void gpu::init()
             present_queue_lock = lock;
     }
 
-    window_swapchain = create_swapchain(device_info, device, window, window_surface, window_swapchain);
+    window_swapchain = create_swapchain(device_info, device, window, window_surface, window_swapchain, window_swapchain_format);
 };
 
 void gpu::wait_for_device_idle()
@@ -768,10 +787,7 @@ void gpu::simple_test_app()
         if (window_resized)
         {
             dc_log("Resizing window");
-            VkSwapchainKHR new_swapchain = create_swapchain(device_info, device, window, window_surface, window_swapchain);
-            if (window_swapchain)
-                vkDestroySwapchainKHR(device, window_swapchain, nullptr);
-            window_swapchain = new_swapchain;
+            window_swapchain = create_swapchain(device_info, device, window, window_surface, window_swapchain, window_swapchain_format);
             window_resized = 0;
         }
 
