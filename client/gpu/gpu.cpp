@@ -75,6 +75,15 @@ SDL_Mutex* gpu::present_queue_lock = nullptr;
             dc_log_error("%s failed with code: %d: %s", #_CALL, result__, string_VkResult(result__)); \
     } while (0)
 
+/** Log an error from a function returning VkResult, and save the result */
+#define VK_TRY_STORE(RESULT, _CALL)                                                               \
+    do                                                                                            \
+    {                                                                                             \
+        RESULT = _CALL;                                                                           \
+        if (RESULT != VK_SUCCESS)                                                                 \
+            dc_log_error("%s failed with code: %d: %s", #_CALL, RESULT, string_VkResult(RESULT)); \
+    } while (0)
+
 const Uint32 gpu::instance_api_version = VK_API_VERSION_1_2;
 
 /**
@@ -622,7 +631,11 @@ static VkSwapchainKHR create_swapchain(
 
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
 
-    VK_DIE(vkCreateSwapchainKHR(device, &cinfo, nullptr, &swapchain));
+    VkResult result;
+    VK_TRY_STORE(result, vkCreateSwapchainKHR(device, &cinfo, nullptr, &swapchain));
+
+    if (result != VK_SUCCESS)
+        return VK_NULL_HANDLE;
 
     return swapchain;
 }
