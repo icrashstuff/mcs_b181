@@ -821,7 +821,7 @@ struct frame_t
 {
     VkImage image;
     VkImageView image_view;
-    VkCommandPool command_pool;
+    VkCommandBuffer cmd_graphics;
     VkSemaphore swap_present;
     VkFence done;
 };
@@ -870,6 +870,15 @@ void gpu::simple_test_app()
         VK_DIE(vkCreateFence(device, &cinfo_fence, nullptr, &acquire_fence));
     }
 
+    VkCommandPool command_pool_graphics = VK_NULL_HANDLE;
+    {
+        VkCommandPoolCreateInfo cinfo_command_pool {};
+        cinfo_command_pool.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+        cinfo_command_pool.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
+        cinfo_command_pool.queueFamilyIndex = gpu::device_info.graphics_queue_idx;
+        VK_DIE(vkCreateCommandPool(device, &cinfo_command_pool, nullptr, &command_pool_graphics));
+    }
+
     bool done = 0;
     bool swapchain_rebuild_needed = 1;
     while (!done)
@@ -897,7 +906,7 @@ void gpu::simple_test_app()
 
             for (frame_t f : frames)
             {
-                vkDestroyCommandPool(gpu::device, f.command_pool, nullptr);
+                vkFreeCommandBuffers(gpu::device, command_pool_graphics, 1, &f.cmd_graphics);
                 vkDestroyImageView(gpu::device, f.image_view, nullptr);
                 vkDestroySemaphore(gpu::device, f.swap_present, nullptr);
                 vkDestroyFence(gpu::device, f.done, nullptr);
@@ -938,16 +947,18 @@ void gpu::simple_test_app()
                 cinfo_semaphore.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
                 VK_DIE(vkCreateSemaphore(gpu::device, &cinfo_semaphore, nullptr, &frames[i].swap_present));
 
-                VkCommandPoolCreateInfo cinfo_command_pool {};
-                cinfo_command_pool.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-                cinfo_command_pool.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
-                cinfo_command_pool.queueFamilyIndex = gpu::device_info.graphics_queue_idx;
-                VK_DIE(vkCreateCommandPool(device, &cinfo_command_pool, nullptr, &frames[i].command_pool));
-
                 VkFenceCreateInfo cinfo_fence {};
                 cinfo_fence.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
                 cinfo_fence.flags = VK_FENCE_CREATE_SIGNALED_BIT;
                 VK_DIE(vkCreateFence(device, &cinfo_fence, nullptr, &frames[i].done));
+
+                VkCommandBufferAllocateInfo ainfo_command_buffer {};
+                ainfo_command_buffer.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+                ainfo_command_buffer.commandPool = command_pool_graphics;
+                ainfo_command_buffer.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+                ainfo_command_buffer.commandBufferCount = 1;
+
+                VK_DIE(vkAllocateCommandBuffers(device, &ainfo_command_buffer, &frames[i].cmd_graphics));
             }
 
             TRACE("Swapchain has %u images", image_count);
@@ -991,20 +1002,11 @@ void gpu::simple_test_app()
             frame_t& frame = frames[image_idx];
             VK_DIE(vkResetFences(gpu::device, 1, &frame.done));
 
-            VkCommandBuffer command_buffer = VK_NULL_HANDLE;
-            VkCommandBufferAllocateInfo ainfo_command_buffer {};
-            ainfo_command_buffer.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-            ainfo_command_buffer.commandPool = frame.command_pool;
-            ainfo_command_buffer.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-            ainfo_command_buffer.commandBufferCount = 1;
-
-            VK_DIE(vkAllocateCommandBuffers(device, &ainfo_command_buffer, &command_buffer));
-
             VkCommandBufferBeginInfo binfo_command_buffer {};
             binfo_command_buffer.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
             binfo_command_buffer.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-            VK_DIE(vkBeginCommandBuffer(command_buffer, &binfo_command_buffer));
+            VK_DIE(vkBeginCommandBuffer(frame.cmd_graphics, &binfo_command_buffer));
 
             VkRenderingAttachmentInfo color_attachment {};
             color_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
@@ -1020,22 +1022,22 @@ void gpu::simple_test_app()
             binfo_rendering.colorAttachmentCount = 1;
             binfo_rendering.pColorAttachments = &color_attachment;
 
-            transition_image(command_buffer, frame.image, VK_IMAGE_LAYOUT_UNDEFINED, color_attachment.imageLayout);
+            transition_image(frame.cmd_graphics, frame.image, VK_IMAGE_LAYOUT_UNDEFINED, color_attachment.imageLayout);
 
-            vkCmdBeginRenderingKHR(command_buffer, &binfo_rendering);
+            vkCmdBeginRenderingKHR(frame.cmd_graphics, &binfo_rendering);
 
-            ImGui_ImplVulkan_RenderDrawData(draw_data, command_buffer, VK_NULL_HANDLE);
+            ImGui_ImplVulkan_RenderDrawData(draw_data, frame.cmd_graphics, VK_NULL_HANDLE);
 
-            vkCmdEndRenderingKHR(command_buffer);
+            vkCmdEndRenderingKHR(frame.cmd_graphics);
 
-            transition_image(command_buffer, frame.image, color_attachment.imageLayout, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+            transition_image(frame.cmd_graphics, frame.image, color_attachment.imageLayout, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
-            vkEndCommandBuffer(command_buffer);
+            vkEndCommandBuffer(frame.cmd_graphics);
 
             VkSubmitInfo sinfo {};
             sinfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
             sinfo.commandBufferCount = 1;
-            sinfo.pCommandBuffers = &command_buffer;
+            sinfo.pCommandBuffers = &frame.cmd_graphics;
             sinfo.signalSemaphoreCount = 1;
             sinfo.pSignalSemaphores = &frame.swap_present;
 
@@ -1070,13 +1072,14 @@ void gpu::simple_test_app()
 
     for (frame_t f : frames)
     {
-        vkDestroyCommandPool(gpu::device, f.command_pool, nullptr);
+        vkFreeCommandBuffers(gpu::device, command_pool_graphics, 1, &f.cmd_graphics);
         vkDestroyImageView(gpu::device, f.image_view, nullptr);
         vkDestroySemaphore(gpu::device, f.swap_present, nullptr);
         vkDestroyFence(gpu::device, f.done, nullptr);
     }
     frames.resize(0);
 
+    vkDestroyCommandPool(gpu::device, command_pool_graphics, nullptr);
     vkDestroyFence(gpu::device, acquire_fence, nullptr);
 
     ImGui_ImplVulkan_Shutdown();
