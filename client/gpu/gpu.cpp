@@ -741,15 +741,25 @@ void gpu::init()
     }
 };
 
-void gpu::wait_for_device_idle()
+void gpu::lock_all_queues()
 {
     SDL_LockMutex(gpu::graphics_queue_lock);
     SDL_LockMutex(gpu::transfer_queue_lock);
     SDL_LockMutex(gpu::present_queue_lock);
-    vkDeviceWaitIdle(device);
+}
+
+void gpu::unlock_all_queues()
+{
     SDL_UnlockMutex(gpu::graphics_queue_lock);
     SDL_UnlockMutex(gpu::transfer_queue_lock);
     SDL_UnlockMutex(gpu::present_queue_lock);
+}
+
+void gpu::wait_for_device_idle()
+{
+    lock_all_queues();
+    vkDeviceWaitIdle(device);
+    unlock_all_queues();
 }
 
 void gpu::quit()
@@ -961,7 +971,10 @@ void gpu::simple_test_app()
                 VK_DIE(vkAllocateCommandBuffers(device, &ainfo_command_buffer, &frames[i].cmd_graphics));
             }
 
+            /* ImGui_ImplVulkan_SetMinImageCount() calls vkDeviceWaitIdle() which requires external synchronization */
+            gpu::lock_all_queues();
             ImGui_ImplVulkan_SetMinImageCount(image_count);
+            gpu::unlock_all_queues();
 
             TRACE("Swapchain has %u images", image_count);
 

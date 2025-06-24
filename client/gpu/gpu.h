@@ -57,6 +57,12 @@ extern VkQueue present_queue;
 /** Locks all queues, calls vkDeviceWaitIdle, and then unlocks all queues  */
 void wait_for_device_idle();
 
+/** Convenience function to call SDL_LockMutex() on each queue locks */
+extern void lock_all_queues();
+
+/** Convenience function to call SDL_UnlockMutex() on each queue locks */
+extern void unlock_all_queues();
+
 extern SDL_Window* window;
 extern VkSurfaceKHR window_surface;
 extern VkSwapchainKHR window_swapchain;
