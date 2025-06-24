@@ -961,6 +961,8 @@ void gpu::simple_test_app()
                 VK_DIE(vkAllocateCommandBuffers(device, &ainfo_command_buffer, &frames[i].cmd_graphics));
             }
 
+            ImGui_ImplVulkan_SetMinImageCount(image_count);
+
             TRACE("Swapchain has %u images", image_count);
 
             swapchain_rebuild_needed = 0;
