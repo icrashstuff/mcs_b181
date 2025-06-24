@@ -946,6 +946,7 @@ void gpu::simple_test_app()
 
                 VkFenceCreateInfo cinfo_fence {};
                 cinfo_fence.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+                cinfo_fence.flags = VK_FENCE_CREATE_SIGNALED_BIT;
                 VK_DIE(vkCreateFence(device, &cinfo_fence, nullptr, &frames[i].done));
             }
 
@@ -1048,7 +1049,7 @@ void gpu::simple_test_app()
 
             SDL_LockMutex(gpu::graphics_queue_lock);
             SDL_LockMutex(gpu::present_queue_lock);
-            VK_DIE(vkQueueSubmit(gpu::graphics_queue, 1, &sinfo, nullptr));
+            VK_DIE(vkQueueSubmit(gpu::graphics_queue, 1, &sinfo, frame.done));
             {
                 /* TODO: Handle VK_ERROR_OUT_OF_DATE_KHR? */
                 VkResult result = vkQueuePresentKHR(gpu::present_queue, &pinfo);
