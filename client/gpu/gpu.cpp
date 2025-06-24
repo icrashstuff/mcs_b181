@@ -24,6 +24,7 @@
 
 #include "internal.h"
 
+#include "shared/misc.h"
 #include "tetra/gui/imgui/backends/imgui_impl_sdl3.h"
 #include "tetra/gui/imgui/backends/imgui_impl_vulkan.h"
 #include "tetra/tetra_core.h"
@@ -880,10 +881,9 @@ void gpu::simple_test_app()
             }
         }
 
-        /* Todo: Check and handle VK_ERROR_OUT_OF_DATE_KHR + VK_SUBOPTIMAL_KHR */
         if (swapchain_rebuild_needed || window_swapchain == VK_NULL_HANDLE)
         {
-            dc_log("Rebuilding swapchain");
+            TRACE("Rebuilding swapchain");
             window_swapchain = create_swapchain(device_info, device, window, window_surface, window_swapchain, window_swapchain_format);
 
             for (frame_t f : frames)
@@ -940,7 +940,7 @@ void gpu::simple_test_app()
                 VK_DIE(vkCreateFence(device, &cinfo_fence, nullptr, &frames[i].done));
             }
 
-            dc_log("Swapchain has %u images", image_count);
+            TRACE("Swapchain has %u images", image_count);
 
             swapchain_rebuild_needed = 0;
         }
@@ -955,11 +955,28 @@ void gpu::simple_test_app()
         ImDrawData* draw_data = ImGui::GetDrawData();
         const bool is_minimized = (draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f);
         Uint32 image_idx = 0;
-        if (!is_minimized && frames.size())
+
+        bool should_render = (!is_minimized && frames.size());
+
+        if (should_render)
         {
             /* A semaphore might be a better way to delay this, but this is easier */
             VK_DIE(vkResetFences(gpu::device, 1, &acquire_fence));
-            VK_DIE(vkAcquireNextImageKHR(gpu::device, window_swapchain, UINT64_MAX, VK_NULL_HANDLE, acquire_fence, &image_idx));
+            VkResult result = vkAcquireNextImageKHR(gpu::device, window_swapchain, UINT64_MAX, VK_NULL_HANDLE, acquire_fence, &image_idx);
+            if (result == VK_SUBOPTIMAL_KHR)
+                swapchain_rebuild_needed = 1;
+            else if (result == VK_ERROR_OUT_OF_DATE_KHR)
+            {
+                swapchain_rebuild_needed = 1;
+                should_render = 0;
+            }
+            else
+                VK_DIE(result; (void)"vkAcquireNextImageKHR");
+        }
+
+        if (should_render)
+        {
+            /* A semaphore might be a better way to delay this, but this is easier */
             VK_DIE(vkWaitForFences(gpu::device, 1, &acquire_fence, 1, UINT64_MAX));
             frame_t& frame = frames[image_idx];
 
@@ -1024,11 +1041,12 @@ void gpu::simple_test_app()
             SDL_LockMutex(gpu::present_queue_lock);
             VK_DIE(vkQueueSubmit(gpu::graphics_queue, 1, &sinfo, nullptr));
             {
+                /* TODO: Handle VK_ERROR_OUT_OF_DATE_KHR? */
                 VkResult result = vkQueuePresentKHR(gpu::present_queue, &pinfo);
                 if (result == VK_SUBOPTIMAL_KHR)
                     swapchain_rebuild_needed = 1;
                 else
-                    VK_DIE(result);
+                    VK_DIE(result; (void)"vkQueuePresentKHR");
             }
             SDL_UnlockMutex(gpu::present_queue_lock);
             SDL_UnlockMutex(gpu::graphics_queue_lock);
