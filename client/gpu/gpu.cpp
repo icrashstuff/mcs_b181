@@ -827,6 +827,20 @@ static void transition_image(VkCommandBuffer const command_buffer, VkImage const
     vkCmdPipelineBarrier2KHR(command_buffer, &dinfo_image_layout);
 }
 
+static bool is_swapchain_result_non_fatal(const VkResult result)
+{
+    switch (result)
+    {
+    case VK_SUBOPTIMAL_KHR:
+    case VK_ERROR_OUT_OF_DATE_KHR:
+    case VK_ERROR_FULL_SCREEN_EXCLUSIVE_MODE_LOST_EXT:
+    case VK_ERROR_SURFACE_LOST_KHR:
+        return true;
+    default:
+        return false;
+    }
+}
+
 struct frame_t
 {
     VkImage image;
@@ -1001,7 +1015,9 @@ void gpu::simple_test_app()
             VkResult result = vkAcquireNextImageKHR(gpu::device, window_swapchain, UINT64_MAX, VK_NULL_HANDLE, acquire_fence, &image_idx);
             if (result == VK_SUBOPTIMAL_KHR)
                 swapchain_rebuild_needed = 1;
-            else if (result == VK_ERROR_OUT_OF_DATE_KHR)
+            else if (result == VK_TIMEOUT || result == VK_NOT_READY)
+                should_render = 0;
+            else if (is_swapchain_result_non_fatal(result))
             {
                 swapchain_rebuild_needed = 1;
                 should_render = 0;
@@ -1070,7 +1086,7 @@ void gpu::simple_test_app()
             {
                 /* TODO: Handle VK_ERROR_OUT_OF_DATE_KHR? */
                 VkResult result = vkQueuePresentKHR(gpu::present_queue, &pinfo);
-                if (result == VK_SUBOPTIMAL_KHR)
+                if (is_swapchain_result_non_fatal(result))
                     swapchain_rebuild_needed = 1;
                 else
                     VK_DIE(result; (void)"vkQueuePresentKHR");
