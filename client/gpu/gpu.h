@@ -60,6 +60,7 @@ void wait_for_device_idle();
 extern SDL_Window* window;
 extern VkSurfaceKHR window_surface;
 extern VkSwapchainKHR window_swapchain;
+extern VkExtent2D window_swapchain_extent;
 extern VkSurfaceFormatKHR window_swapchain_format;
 extern VkInstance instance;
 /** Value passed to VkApplicationInfo::apiVersion */

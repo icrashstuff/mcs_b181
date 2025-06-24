@@ -61,6 +61,8 @@ SDL_Mutex* gpu::graphics_queue_lock = nullptr;
 SDL_Mutex* gpu::transfer_queue_lock = nullptr;
 SDL_Mutex* gpu::present_queue_lock = nullptr;
 
+VkExtent2D gpu::window_swapchain_extent {};
+
 /** Die on an error from a function returning VkResult */
 #define VK_DIE(_CALL)                                                                              \
     do                                                                                             \
@@ -591,9 +593,12 @@ static VkPresentModeKHR get_present_mode(const gpu::swapchain_info_t& info) { re
  * @param surface Surface associated with the swapchain
  * @param old_swapchain Pre-existing swapchain to retire and *destroy*
  * @param format On success the selected surface format will be written to this parameter
+ * @param size On success the swapchain extent is written to this parameter
+ *
+ * @returns A new swapchain on success, VK_NULL_HANDLE on error
  */
 static VkSwapchainKHR create_swapchain(const gpu::physical_device_info_t& device_info, VkDevice device, SDL_Window* window, VkSurfaceKHR surface,
-    VkSwapchainKHR old_swapchain, VkSurfaceFormatKHR& format)
+    VkSwapchainKHR old_swapchain, VkSurfaceFormatKHR& format, VkExtent2D& size)
 {
     gpu::wait_for_device_idle();
 
@@ -668,6 +673,8 @@ static VkSwapchainKHR create_swapchain(const gpu::physical_device_info_t& device
 
     format.format = cinfo.imageFormat;
     format.colorSpace = cinfo.imageColorSpace;
+
+    size = cinfo.imageExtent;
 
     return swapchain;
 }
@@ -835,6 +842,7 @@ void gpu::simple_test_app()
     cinfo_imgui.DescriptorPoolSize = IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE + 1;
     cinfo_imgui.UseDynamicRendering = true;
 
+    /* FIXME!: Get this format from the swapchain, and re-init the Vulkan backend when this changes */
     VkFormat color_atachements_format[] = { VK_FORMAT_B8G8R8A8_UNORM };
     cinfo_imgui.PipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
     cinfo_imgui.PipelineRenderingCreateInfo.viewMask = 0;
@@ -884,7 +892,8 @@ void gpu::simple_test_app()
         if (swapchain_rebuild_needed || window_swapchain == VK_NULL_HANDLE)
         {
             TRACE("Rebuilding swapchain");
-            window_swapchain = create_swapchain(device_info, device, window, window_surface, window_swapchain, window_swapchain_format);
+            window_swapchain
+                = create_swapchain(device_info, device, window, window_surface, window_swapchain, window_swapchain_format, window_swapchain_extent);
 
             for (frame_t f : frames)
             {
@@ -979,6 +988,7 @@ void gpu::simple_test_app()
             /* A semaphore might be a better way to delay this, but this is easier */
             VK_DIE(vkWaitForFences(gpu::device, 1, &acquire_fence, 1, UINT64_MAX));
             frame_t& frame = frames[image_idx];
+            VK_DIE(vkResetFences(gpu::device, 1, &frame.done));
 
             VkCommandBuffer command_buffer = VK_NULL_HANDLE;
             VkCommandBufferAllocateInfo ainfo_command_buffer {};
@@ -1004,8 +1014,7 @@ void gpu::simple_test_app()
 
             VkRenderingInfoKHR binfo_rendering {};
             binfo_rendering.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
-            binfo_rendering.renderArea.extent.width = draw_data->DisplaySize.x;
-            binfo_rendering.renderArea.extent.height = draw_data->DisplaySize.y;
+            binfo_rendering.renderArea.extent = window_swapchain_extent;
             binfo_rendering.layerCount = 1;
             binfo_rendering.colorAttachmentCount = 1;
             binfo_rendering.pColorAttachments = &color_attachment;
