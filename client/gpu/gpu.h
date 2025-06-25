@@ -54,24 +54,127 @@ extern VkQueue graphics_queue;
 extern VkQueue transfer_queue;
 extern VkQueue present_queue;
 
-/** Locks all queues, calls vkDeviceWaitIdle, and then unlocks all queues  */
-void wait_for_device_idle();
-
-/** Convenience function to call SDL_LockMutex() on each queue locks */
-extern void lock_all_queues();
-
-/** Convenience function to call SDL_UnlockMutex() on each queue locks */
-extern void unlock_all_queues();
-
 extern SDL_Window* window;
-extern VkSurfaceKHR window_surface;
-extern VkSwapchainKHR window_swapchain;
-extern VkExtent2D window_swapchain_extent;
-extern VkSurfaceFormatKHR window_swapchain_format;
+
 extern VkInstance instance;
 /** Value passed to VkApplicationInfo::apiVersion */
 extern const Uint32 instance_api_version;
-extern VkDevice device;
+
+struct frame_t
+{
+    VkImage image = VK_NULL_HANDLE;
+    VkImageView image_view = VK_NULL_HANDLE;
+
+    /** Command buffer allocated for the graphics queue, from window_t::graphics_pool */
+    VkCommandBuffer cmd_graphics = VK_NULL_HANDLE;
+    bool used_graphics = 0;
+
+    /** Command buffer allocated for the transfer queue, from window_t::transfer_pool */
+    VkCommandBuffer cmd_transfer = VK_NULL_HANDLE;
+    bool used_transfer = 0;
+
+    VkSemaphore swap_present = VK_NULL_HANDLE;
+    VkFence done = VK_NULL_HANDLE;
+};
+
+struct window_t
+{
+    /* TODO: OpenXR handles here */
+    // XrSwapchain xr_swapchain = XR_NULL_HANDLE;
+
+    SDL_Window* sdl_window = nullptr;
+    VkSurfaceKHR sdl_surface = VK_NULL_HANDLE;
+    VkSwapchainKHR sdl_swapchain = VK_NULL_HANDLE;
+
+    VkExtent2D extent {};
+    VkSurfaceFormatKHR format {};
+    VkPresentModeKHR present_mode {};
+
+    VkCommandPool graphics_pool = VK_NULL_HANDLE;
+    VkCommandPool transfer_pool = VK_NULL_HANDLE;
+
+    /**
+     * Called when the swapchain format is changed
+     *
+     * The intended usage is for recreating pipelines that target the swapchain
+     *
+     * When this callback is fired, `window_t::format` will contain the new format
+     *
+     * @param format_changed Set to true when the underlying image format has changed
+     * @param colorspace_changed Set to true when the colorspace has changed
+     * @param userdata Set to the value of `window_t::format_callback_userdata`
+     */
+    void (*format_callback)(const bool format_changed, const bool colorspace_changed, void* userdata) = nullptr;
+    void* format_callback_userdata = nullptr;
+
+    /**
+     * Called when the number of swapchain frames changes
+     *
+     * The intended usage is for informing things like Dear ImGui's Vulkan backend that the number of images changed
+     *
+     * When this callback is fired, `window_t::frames.size()` will contain the new number of frames
+     *
+     * @param num_images Contains the new number of frames
+     * @param userdata Set to the value of `window_t::num_images_callback_userdata`
+     */
+    void (*num_images_callback)(const Uint32 num_images, void* userdata) = nullptr;
+    void* num_images_callback_userdata = nullptr;
+
+    std::vector<frame_t> frames;
+};
+
+struct device_t
+{
+    VkPhysicalDevice physical = VK_NULL_HANDLE;
+    VkDevice logical = VK_NULL_HANDLE;
+
+    Uint32 graphics_queue_idx = ~0;
+    Uint32 transfer_queue_idx = ~0;
+    Uint32 present_queue_idx = ~0;
+
+    VkQueue graphics_queue = VK_NULL_HANDLE;
+    VkQueue transfer_queue = VK_NULL_HANDLE;
+    VkQueue present_queue = VK_NULL_HANDLE;
+
+    SDL_Mutex* graphics_queue_lock = nullptr;
+    SDL_Mutex* transfer_queue_lock = nullptr;
+    SDL_Mutex* present_queue_lock = nullptr;
+
+    /**
+     * Acquire a frame for rendering
+     *
+     * WARNING: This may resize/reconfigure the swapchain
+     */
+    frame_t* acquire_next_frame(window_t* const window, const Uint64 timeout);
+
+    /**
+     * Submit a frame for presentation
+     *
+     * @param window the frame was acquired from
+     * @param frame frame to submit (You must not reference the frame after calling this function)
+     */
+    void submit_frame(window_t* const window, frame_t* frame);
+
+    /** Convenience function to call SDL_LockMutex() on each queue lock */
+    void lock_all_queues();
+
+    /** Convenience function to call SDL_UnlockMutex() on each queue lock */
+    void unlock_all_queues();
+
+    /** Locks all queues, calls vkDeviceWaitIdle(), and then unlocks all queues  */
+    void wait_for_device_idle();
+
+    device_t(SDL_Window* sdl_window);
+    ~device_t();
+
+    window_t window {};
+
+    VolkDeviceTable funcs;
+
+    friend struct frame_t;
+};
+
+extern device_t* device_new;
 
 struct swapchain_info_t
 {

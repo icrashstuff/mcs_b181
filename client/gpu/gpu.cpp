@@ -48,10 +48,6 @@ static convar_int_t r_debug_vulkan {
 gpu::physical_device_info_t gpu::device_info = {};
 
 VkInstance gpu::instance = VK_NULL_HANDLE;
-VkDevice gpu::device = VK_NULL_HANDLE;
-VkSurfaceKHR gpu::window_surface = VK_NULL_HANDLE;
-VkSwapchainKHR gpu::window_swapchain = VK_NULL_HANDLE;
-VkSurfaceFormatKHR gpu::window_swapchain_format = {};
 
 VkQueue gpu::graphics_queue = VK_NULL_HANDLE;
 VkQueue gpu::transfer_queue = VK_NULL_HANDLE;
@@ -60,8 +56,6 @@ VkQueue gpu::present_queue = VK_NULL_HANDLE;
 SDL_Mutex* gpu::graphics_queue_lock = nullptr;
 SDL_Mutex* gpu::transfer_queue_lock = nullptr;
 SDL_Mutex* gpu::present_queue_lock = nullptr;
-
-VkExtent2D gpu::window_swapchain_extent {};
 
 /** Die on an error from a function returning VkResult */
 #define VK_DIE(_CALL)                                                                              \
@@ -600,7 +594,7 @@ static VkPresentModeKHR get_present_mode(const gpu::swapchain_info_t& info) { re
 static VkSwapchainKHR create_swapchain(const gpu::physical_device_info_t& device_info, VkDevice device, SDL_Window* window, VkSurfaceKHR surface,
     VkSwapchainKHR old_swapchain, VkSurfaceFormatKHR& format, VkExtent2D& size)
 {
-    gpu::wait_for_device_idle();
+    gpu::device_new->wait_for_device_idle();
 
     gpu::swapchain_info_t swapchain_info = get_current_swapchain_info(device_info.device, surface);
 
@@ -680,6 +674,9 @@ static VkSwapchainKHR create_swapchain(const gpu::physical_device_info_t& device
 }
 
 static std::vector<SDL_Mutex*> queue_locks;
+
+gpu::device_t* gpu::device_new = nullptr;
+
 void gpu::init()
 {
     internal::init_gpu_fences();
@@ -699,6 +696,15 @@ void gpu::init()
     instance = init_instance();
     volkLoadInstanceOnly(gpu::instance);
 
+    device_new = new device_t(gpu::window);
+
+    graphics_queue = device_new->graphics_queue;
+    transfer_queue = device_new->transfer_queue;
+    present_queue = device_new->present_queue;
+    graphics_queue_lock = device_new->graphics_queue_lock;
+    transfer_queue_lock = device_new->transfer_queue_lock;
+    present_queue_lock = device_new->present_queue_lock;
+
     /* Load ImGui functions */
     ImGui_ImplVulkan_LoadFunctions(
         gpu::instance_api_version,
@@ -706,89 +712,15 @@ void gpu::init()
             return reinterpret_cast<PFN_vkGetInstanceProcAddr>(sdl_vkGetInstanceProcAddr)(gpu::instance, function_name);
         },
         reinterpret_cast<void*>(sdl_vkGetInstanceProcAddr));
-
-    if (!SDL_Vulkan_CreateSurface(window, instance, nullptr, &window_surface))
-        util::die("Unable to create vulkan surface! %s", SDL_GetError());
-
-    std::vector<const char*> required_device_extensions = {
-        VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME, /* Promoted to vulkan 1.3 */
-        VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME, /* Promoted to vulkan 1.3 */
-        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
-    };
-
-    if (!select_physical_device(instance, window_surface, required_device_extensions, device_info))
-        util::die("Unable to find suitable Vulkan Device!\n"
-                  "Try updating your Operating System and/or Graphics drivers");
-
-    device = init_device(instance, device_info, required_device_extensions);
-    volkLoadDevice(device);
-
-    vkGetDeviceQueue(device, device_info.graphics_queue_idx, 0, &graphics_queue);
-    vkGetDeviceQueue(device, device_info.transfer_queue_idx, 0, &transfer_queue);
-    vkGetDeviceQueue(device, device_info.present_queue_idx, 0, &present_queue);
-
-    std::set<Uint32> queue_families = { device_info.graphics_queue_idx, device_info.present_queue_idx, device_info.transfer_queue_idx };
-    for (const Uint32 family_idx : queue_families)
-    {
-        SDL_Mutex* const lock = SDL_CreateMutex();
-        queue_locks.push_back(lock);
-        if (device_info.graphics_queue_idx == family_idx)
-            graphics_queue_lock = lock;
-        if (device_info.transfer_queue_idx == family_idx)
-            transfer_queue_lock = lock;
-        if (device_info.present_queue_idx == family_idx)
-            present_queue_lock = lock;
-    }
 };
-
-void gpu::lock_all_queues()
-{
-    SDL_LockMutex(gpu::graphics_queue_lock);
-    SDL_LockMutex(gpu::transfer_queue_lock);
-    SDL_LockMutex(gpu::present_queue_lock);
-}
-
-void gpu::unlock_all_queues()
-{
-    SDL_UnlockMutex(gpu::graphics_queue_lock);
-    SDL_UnlockMutex(gpu::transfer_queue_lock);
-    SDL_UnlockMutex(gpu::present_queue_lock);
-}
-
-void gpu::wait_for_device_idle()
-{
-    lock_all_queues();
-    vkDeviceWaitIdle(device);
-    unlock_all_queues();
-}
 
 void gpu::quit()
 {
-    wait_for_device_idle();
+    device_new->wait_for_device_idle();
 
     internal::quit_gpu_fences();
 
-    vkDestroySwapchainKHR(device, window_swapchain, nullptr);
-    window_swapchain = VK_NULL_HANDLE;
-
-    graphics_queue = VK_NULL_HANDLE;
-    transfer_queue = VK_NULL_HANDLE;
-    present_queue = VK_NULL_HANDLE;
-
-    graphics_queue_lock = nullptr;
-    transfer_queue_lock = nullptr;
-    present_queue_lock = nullptr;
-
-    for (SDL_Mutex* const m : queue_locks)
-        SDL_DestroyMutex(m);
-    queue_locks.clear();
-
-    vkDestroyDevice(device, nullptr);
-    device = VK_NULL_HANDLE;
-    device_info = {};
-
-    SDL_Vulkan_DestroySurface(instance, window_surface, nullptr);
-    window_surface = VK_NULL_HANDLE;
+    delete device_new;
 
     vkDestroyInstance(instance, nullptr);
     instance = VK_NULL_HANDLE;
@@ -841,16 +773,7 @@ static bool is_swapchain_result_non_fatal(const VkResult result)
     }
 }
 
-struct frame_t
-{
-    VkImage image;
-    VkImageView image_view;
-    VkCommandBuffer cmd_graphics;
-    VkSemaphore swap_present;
-    VkFence done;
-};
-
-static std::vector<frame_t> frames;
+static std::vector<gpu::frame_t> frames;
 
 void gpu::simple_test_app()
 {
@@ -858,7 +781,7 @@ void gpu::simple_test_app()
     cinfo_imgui.ApiVersion = gpu::instance_api_version;
     cinfo_imgui.Instance = gpu::instance;
     cinfo_imgui.PhysicalDevice = gpu::device_info.device;
-    cinfo_imgui.Device = gpu::device;
+    cinfo_imgui.Device = gpu::device_new->logical;
 
     cinfo_imgui.Queue = gpu::graphics_queue;
     cinfo_imgui.ImageCount = cinfo_imgui.MinImageCount = 2;
@@ -891,7 +814,7 @@ void gpu::simple_test_app()
     {
         VkFenceCreateInfo cinfo_fence {};
         cinfo_fence.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-        VK_DIE(vkCreateFence(device, &cinfo_fence, nullptr, &acquire_fence));
+        VK_DIE(vkCreateFence(device_new->logical, &cinfo_fence, nullptr, &acquire_fence));
     }
 
     VkCommandPool command_pool_graphics = VK_NULL_HANDLE;
@@ -900,7 +823,7 @@ void gpu::simple_test_app()
         cinfo_command_pool.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         cinfo_command_pool.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
         cinfo_command_pool.queueFamilyIndex = gpu::device_info.graphics_queue_idx;
-        VK_DIE(vkCreateCommandPool(device, &cinfo_command_pool, nullptr, &command_pool_graphics));
+        VK_DIE(vkCreateCommandPool(device_new->logical, &cinfo_command_pool, nullptr, &command_pool_graphics));
     }
 
     bool done = 0;
@@ -922,28 +845,28 @@ void gpu::simple_test_app()
             }
         }
 
-        if (swapchain_rebuild_needed || window_swapchain == VK_NULL_HANDLE)
+        if (swapchain_rebuild_needed || device_new->window.sdl_swapchain == VK_NULL_HANDLE)
         {
             TRACE("Rebuilding swapchain");
-            window_swapchain
-                = create_swapchain(device_info, device, window, window_surface, window_swapchain, window_swapchain_format, window_swapchain_extent);
+            device_new->window.sdl_swapchain = create_swapchain(device_info, device_new->logical, window, device_new->window.sdl_surface,
+                device_new->window.sdl_swapchain, device_new->window.format, device_new->window.extent);
 
             for (frame_t f : frames)
             {
-                vkFreeCommandBuffers(gpu::device, command_pool_graphics, 1, &f.cmd_graphics);
-                vkDestroyImageView(gpu::device, f.image_view, nullptr);
-                vkDestroySemaphore(gpu::device, f.swap_present, nullptr);
-                vkDestroyFence(gpu::device, f.done, nullptr);
+                vkFreeCommandBuffers(gpu::device_new->logical, command_pool_graphics, 1, &f.cmd_graphics);
+                vkDestroyImageView(gpu::device_new->logical, f.image_view, nullptr);
+                vkDestroySemaphore(gpu::device_new->logical, f.swap_present, nullptr);
+                vkDestroyFence(gpu::device_new->logical, f.done, nullptr);
             }
             frames.resize(0);
         }
 
-        if (swapchain_rebuild_needed && window_swapchain != VK_NULL_HANDLE)
+        if (swapchain_rebuild_needed && device_new->window.sdl_swapchain != VK_NULL_HANDLE)
         {
             Uint32 image_count = 0;
-            VK_DIE(vkGetSwapchainImagesKHR(gpu::device, window_swapchain, &image_count, nullptr));
+            VK_DIE(vkGetSwapchainImagesKHR(gpu::device_new->logical, device_new->window.sdl_swapchain, &image_count, nullptr));
             std::vector<VkImage> swapchain_images(image_count);
-            VK_DIE(vkGetSwapchainImagesKHR(gpu::device, window_swapchain, &image_count, swapchain_images.data()));
+            VK_DIE(vkGetSwapchainImagesKHR(gpu::device_new->logical, device_new->window.sdl_swapchain, &image_count, swapchain_images.data()));
             swapchain_images.resize(image_count);
 
             frames.resize(image_count);
@@ -955,7 +878,7 @@ void gpu::simple_test_app()
                 cinfo_image_view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
                 cinfo_image_view.image = swapchain_images[i];
                 cinfo_image_view.viewType = VK_IMAGE_VIEW_TYPE_2D;
-                cinfo_image_view.format = window_swapchain_format.format;
+                cinfo_image_view.format = device_new->window.format.format;
                 cinfo_image_view.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
                 cinfo_image_view.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
                 cinfo_image_view.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
@@ -965,16 +888,16 @@ void gpu::simple_test_app()
                 cinfo_image_view.subresourceRange.levelCount = 1;
                 cinfo_image_view.subresourceRange.baseArrayLayer = 0;
                 cinfo_image_view.subresourceRange.layerCount = 1;
-                VK_DIE(vkCreateImageView(gpu::device, &cinfo_image_view, nullptr, &frames[i].image_view));
+                VK_DIE(vkCreateImageView(gpu::device_new->logical, &cinfo_image_view, nullptr, &frames[i].image_view));
 
                 VkSemaphoreCreateInfo cinfo_semaphore {};
                 cinfo_semaphore.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-                VK_DIE(vkCreateSemaphore(gpu::device, &cinfo_semaphore, nullptr, &frames[i].swap_present));
+                VK_DIE(vkCreateSemaphore(gpu::device_new->logical, &cinfo_semaphore, nullptr, &frames[i].swap_present));
 
                 VkFenceCreateInfo cinfo_fence {};
                 cinfo_fence.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
                 cinfo_fence.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-                VK_DIE(vkCreateFence(device, &cinfo_fence, nullptr, &frames[i].done));
+                VK_DIE(vkCreateFence(device_new->logical, &cinfo_fence, nullptr, &frames[i].done));
 
                 VkCommandBufferAllocateInfo ainfo_command_buffer {};
                 ainfo_command_buffer.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -982,13 +905,13 @@ void gpu::simple_test_app()
                 ainfo_command_buffer.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
                 ainfo_command_buffer.commandBufferCount = 1;
 
-                VK_DIE(vkAllocateCommandBuffers(device, &ainfo_command_buffer, &frames[i].cmd_graphics));
+                VK_DIE(vkAllocateCommandBuffers(device_new->logical, &ainfo_command_buffer, &frames[i].cmd_graphics));
             }
 
             /* ImGui_ImplVulkan_SetMinImageCount() calls vkDeviceWaitIdle() which requires external synchronization */
-            gpu::lock_all_queues();
+            gpu::device_new->lock_all_queues();
             ImGui_ImplVulkan_SetMinImageCount(image_count);
-            gpu::unlock_all_queues();
+            gpu::device_new->unlock_all_queues();
 
             TRACE("Swapchain has %u images", image_count);
 
@@ -1011,8 +934,9 @@ void gpu::simple_test_app()
         if (should_render)
         {
             /* A semaphore might be a better way to delay this, but this is easier */
-            VK_DIE(vkResetFences(gpu::device, 1, &acquire_fence));
-            VkResult result = vkAcquireNextImageKHR(gpu::device, window_swapchain, UINT64_MAX, VK_NULL_HANDLE, acquire_fence, &image_idx);
+            VK_DIE(vkResetFences(gpu::device_new->logical, 1, &acquire_fence));
+            VkResult result
+                = vkAcquireNextImageKHR(gpu::device_new->logical, device_new->window.sdl_swapchain, UINT64_MAX, VK_NULL_HANDLE, acquire_fence, &image_idx);
             if (result == VK_SUBOPTIMAL_KHR)
                 swapchain_rebuild_needed = 1;
             else if (result == VK_TIMEOUT || result == VK_NOT_READY)
@@ -1029,9 +953,9 @@ void gpu::simple_test_app()
         if (should_render)
         {
             /* A semaphore might be a better way to delay this, but this is easier */
-            VK_DIE(vkWaitForFences(gpu::device, 1, &acquire_fence, 1, UINT64_MAX));
+            VK_DIE(vkWaitForFences(gpu::device_new->logical, 1, &acquire_fence, 1, UINT64_MAX));
             frame_t& frame = frames[image_idx];
-            VK_DIE(vkResetFences(gpu::device, 1, &frame.done));
+            VK_DIE(vkResetFences(gpu::device_new->logical, 1, &frame.done));
 
             VkCommandBufferBeginInfo binfo_command_buffer {};
             binfo_command_buffer.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -1048,7 +972,7 @@ void gpu::simple_test_app()
 
             VkRenderingInfoKHR binfo_rendering {};
             binfo_rendering.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
-            binfo_rendering.renderArea.extent = window_swapchain_extent;
+            binfo_rendering.renderArea.extent = device_new->window.extent;
             binfo_rendering.layerCount = 1;
             binfo_rendering.colorAttachmentCount = 1;
             binfo_rendering.pColorAttachments = &color_attachment;
@@ -1077,7 +1001,7 @@ void gpu::simple_test_app()
             pinfo.waitSemaphoreCount = 1;
             pinfo.pWaitSemaphores = &frame.swap_present;
             pinfo.swapchainCount = 1;
-            pinfo.pSwapchains = &gpu::window_swapchain;
+            pinfo.pSwapchains = &gpu::device_new->window.sdl_swapchain;
             pinfo.pImageIndices = &image_idx;
 
             SDL_LockMutex(gpu::graphics_queue_lock);
@@ -1099,21 +1023,91 @@ void gpu::simple_test_app()
         fps_cap.wait();
     }
 
-    wait_for_device_idle();
+    device_new->wait_for_device_idle();
 
     for (frame_t f : frames)
     {
-        vkFreeCommandBuffers(gpu::device, command_pool_graphics, 1, &f.cmd_graphics);
-        vkDestroyImageView(gpu::device, f.image_view, nullptr);
-        vkDestroySemaphore(gpu::device, f.swap_present, nullptr);
-        vkDestroyFence(gpu::device, f.done, nullptr);
+        vkFreeCommandBuffers(gpu::device_new->logical, command_pool_graphics, 1, &f.cmd_graphics);
+        vkDestroyImageView(gpu::device_new->logical, f.image_view, nullptr);
+        vkDestroySemaphore(gpu::device_new->logical, f.swap_present, nullptr);
+        vkDestroyFence(gpu::device_new->logical, f.done, nullptr);
     }
     frames.resize(0);
 
-    vkDestroyCommandPool(gpu::device, command_pool_graphics, nullptr);
-    vkDestroyFence(gpu::device, acquire_fence, nullptr);
+    vkDestroyCommandPool(gpu::device_new->logical, command_pool_graphics, nullptr);
+    vkDestroyFence(gpu::device_new->logical, acquire_fence, nullptr);
 
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext(ImGui::GetCurrentContext());
+}
+
+gpu::device_t::device_t(SDL_Window* sdl_window)
+{
+    window.sdl_window = sdl_window;
+
+    if (!SDL_Vulkan_CreateSurface(window.sdl_window, instance, nullptr, &window.sdl_surface))
+        util::die("Unable to create vulkan surface! %s", SDL_GetError());
+
+    std::vector<const char*> required_device_extensions = {
+        VK_KHR_SYNCHRONIZATION_2_EXTENSION_NAME, /* Promoted to vulkan 1.3 */
+        VK_KHR_DYNAMIC_RENDERING_EXTENSION_NAME, /* Promoted to vulkan 1.3 */
+        VK_KHR_SWAPCHAIN_EXTENSION_NAME,
+    };
+
+    if (!select_physical_device(instance, window.sdl_surface, required_device_extensions, device_info))
+        util::die("Unable to find suitable Vulkan Device!\n"
+                  "Try updating your Operating System and/or Graphics drivers");
+
+    logical = init_device(instance, device_info, required_device_extensions);
+    volkLoadDevice(logical);
+    volkLoadDeviceTable(&funcs, logical);
+
+    funcs.vkGetDeviceQueue(logical, device_info.graphics_queue_idx, 0, &graphics_queue);
+    funcs.vkGetDeviceQueue(logical, device_info.transfer_queue_idx, 0, &transfer_queue);
+    funcs.vkGetDeviceQueue(logical, device_info.present_queue_idx, 0, &present_queue);
+
+    std::set<Uint32> queue_families = { device_info.graphics_queue_idx, device_info.present_queue_idx, device_info.transfer_queue_idx };
+    for (const Uint32 family_idx : queue_families)
+    {
+        SDL_Mutex* const lock = SDL_CreateMutex();
+        queue_locks.push_back(lock);
+        if (device_info.graphics_queue_idx == family_idx)
+            graphics_queue_lock = lock;
+        if (device_info.transfer_queue_idx == family_idx)
+            transfer_queue_lock = lock;
+        if (device_info.present_queue_idx == family_idx)
+            present_queue_lock = lock;
+    }
+}
+
+void gpu::device_t::lock_all_queues()
+{
+    SDL_LockMutex(graphics_queue_lock);
+    SDL_LockMutex(transfer_queue_lock);
+    SDL_LockMutex(present_queue_lock);
+}
+
+void gpu::device_t::unlock_all_queues()
+{
+    SDL_UnlockMutex(graphics_queue_lock);
+    SDL_UnlockMutex(transfer_queue_lock);
+    SDL_UnlockMutex(present_queue_lock);
+}
+
+void gpu::device_t::wait_for_device_idle()
+{
+    lock_all_queues();
+    funcs.vkDeviceWaitIdle(logical);
+    unlock_all_queues();
+}
+
+gpu::device_t::~device_t()
+{
+    wait_for_device_idle();
+    funcs.vkDestroySwapchainKHR(logical, window.sdl_swapchain, nullptr);
+    SDL_Vulkan_DestroySurface(instance, window.sdl_surface, nullptr);
+    for (SDL_Mutex* m : std::set<SDL_Mutex*> { graphics_queue_lock, transfer_queue_lock, present_queue_lock })
+        SDL_DestroyMutex(m);
+    funcs.vkDestroyDevice(logical, nullptr);
 }
