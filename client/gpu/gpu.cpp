@@ -854,9 +854,7 @@ void gpu::simple_test_app()
             for (frame_t f : frames)
             {
                 vkFreeCommandBuffers(gpu::device_new->logical, command_pool_graphics, 1, &f.cmd_graphics);
-                vkDestroyImageView(gpu::device_new->logical, f.image_view, nullptr);
-                vkDestroySemaphore(gpu::device_new->logical, f.swap_present, nullptr);
-                vkDestroyFence(gpu::device_new->logical, f.done, nullptr);
+                f.free();
             }
             frames.resize(0);
         }
@@ -872,6 +870,8 @@ void gpu::simple_test_app()
             frames.resize(image_count);
             for (size_t i = 0; i < image_count; i++)
             {
+                frames[i].device = device_new;
+
                 frames[i].image = swapchain_images[i];
 
                 VkImageViewCreateInfo cinfo_image_view {};
@@ -889,10 +889,6 @@ void gpu::simple_test_app()
                 cinfo_image_view.subresourceRange.baseArrayLayer = 0;
                 cinfo_image_view.subresourceRange.layerCount = 1;
                 VK_DIE(vkCreateImageView(gpu::device_new->logical, &cinfo_image_view, nullptr, &frames[i].image_view));
-
-                VkSemaphoreCreateInfo cinfo_semaphore {};
-                cinfo_semaphore.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
-                VK_DIE(vkCreateSemaphore(gpu::device_new->logical, &cinfo_semaphore, nullptr, &frames[i].swap_present));
 
                 VkFenceCreateInfo cinfo_fence {};
                 cinfo_fence.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
@@ -955,7 +951,7 @@ void gpu::simple_test_app()
             /* A semaphore might be a better way to delay this, but this is easier */
             VK_DIE(vkWaitForFences(gpu::device_new->logical, 1, &acquire_fence, 1, UINT64_MAX));
             frame_t& frame = frames[image_idx];
-            VK_DIE(vkResetFences(gpu::device_new->logical, 1, &frame.done));
+            frame.reset();
 
             VkCommandBufferBeginInfo binfo_command_buffer {};
             binfo_command_buffer.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
@@ -989,17 +985,19 @@ void gpu::simple_test_app()
 
             vkEndCommandBuffer(frame.cmd_graphics);
 
+            VkSemaphore present_semaphore = frame.acquire_semaphore();
+
             VkSubmitInfo sinfo {};
             sinfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
             sinfo.commandBufferCount = 1;
             sinfo.pCommandBuffers = &frame.cmd_graphics;
             sinfo.signalSemaphoreCount = 1;
-            sinfo.pSignalSemaphores = &frame.swap_present;
+            sinfo.pSignalSemaphores = &present_semaphore;
 
             VkPresentInfoKHR pinfo {};
             pinfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
             pinfo.waitSemaphoreCount = 1;
-            pinfo.pWaitSemaphores = &frame.swap_present;
+            pinfo.pWaitSemaphores = &present_semaphore;
             pinfo.swapchainCount = 1;
             pinfo.pSwapchains = &gpu::device_new->window.sdl_swapchain;
             pinfo.pImageIndices = &image_idx;
@@ -1028,9 +1026,7 @@ void gpu::simple_test_app()
     for (frame_t f : frames)
     {
         vkFreeCommandBuffers(gpu::device_new->logical, command_pool_graphics, 1, &f.cmd_graphics);
-        vkDestroyImageView(gpu::device_new->logical, f.image_view, nullptr);
-        vkDestroySemaphore(gpu::device_new->logical, f.swap_present, nullptr);
-        vkDestroyFence(gpu::device_new->logical, f.done, nullptr);
+        f.free();
     }
     frames.resize(0);
 
@@ -1040,6 +1036,35 @@ void gpu::simple_test_app()
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext(ImGui::GetCurrentContext());
+}
+
+VkSemaphore gpu::frame_t::acquire_semaphore()
+{
+    const size_t idx = next_semaphore_idx++;
+    if (idx >= semaphores.size())
+    {
+        VkSemaphore semaphore = VK_NULL_HANDLE;
+        VkSemaphoreCreateInfo cinfo {};
+        cinfo.sType = VK_STRUCTURE_TYPE_SEMAPHORE_CREATE_INFO;
+        cinfo.flags = VK_SEMAPHORE_TYPE_BINARY;
+        VK_DIE(device->funcs.vkCreateSemaphore(device->logical, &cinfo, nullptr, &semaphore));
+        semaphores.push_back(semaphore);
+    }
+    return semaphores[idx];
+}
+
+void gpu::frame_t::reset()
+{
+    VK_DIE(device->funcs.vkResetFences(gpu::device_new->logical, 1, &done));
+    next_semaphore_idx = 0;
+}
+
+void gpu::frame_t::free()
+{
+    device->funcs.vkDestroyImageView(gpu::device_new->logical, image_view, nullptr);
+    device->funcs.vkDestroyFence(gpu::device_new->logical, done, nullptr);
+    for (VkSemaphore s : semaphores)
+        device->funcs.vkDestroySemaphore(gpu::device_new->logical, s, nullptr);
 }
 
 gpu::device_t::device_t(SDL_Window* sdl_window)

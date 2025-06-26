@@ -60,8 +60,12 @@ extern VkInstance instance;
 /** Value passed to VkApplicationInfo::apiVersion */
 extern const Uint32 instance_api_version;
 
+struct device_t;
+
 struct frame_t
 {
+    device_t* device = nullptr;
+
     VkImage image = VK_NULL_HANDLE;
     VkImageView image_view = VK_NULL_HANDLE;
 
@@ -73,8 +77,16 @@ struct frame_t
     VkCommandBuffer cmd_transfer = VK_NULL_HANDLE;
     bool used_transfer = 0;
 
-    VkSemaphore swap_present = VK_NULL_HANDLE;
     VkFence done = VK_NULL_HANDLE;
+
+    VkSemaphore acquire_semaphore();
+
+    void reset();
+    void free();
+
+private:
+    size_t next_semaphore_idx = 0;
+    std::vector<VkSemaphore> semaphores;
 };
 
 struct window_t
@@ -94,7 +106,7 @@ struct window_t
     VkCommandPool transfer_pool = VK_NULL_HANDLE;
 
     /**
-     * Called when the swapchain format is changed
+     * Called when the swapchain format is changed, or when the swapchain is created
      *
      * The intended usage is for recreating pipelines that target the swapchain
      *
@@ -108,7 +120,7 @@ struct window_t
     void* format_callback_userdata = nullptr;
 
     /**
-     * Called when the number of swapchain frames changes
+     * Called when the number of swapchain frames changes, or when the swapchain is created
      *
      * The intended usage is for informing things like Dear ImGui's Vulkan backend that the number of images changed
      *
