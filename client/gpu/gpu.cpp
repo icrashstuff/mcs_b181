@@ -789,7 +789,11 @@ void gpu::simple_test_app()
     cinfo_imgui.DescriptorPoolSize = IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE + 1;
     cinfo_imgui.UseDynamicRendering = true;
 
-    /* FIXME!: Get this format from the swapchain, and re-init the Vulkan backend when this changes */
+    cinfo_imgui.QueueLockData = gpu::device_new->graphics_queue_lock;
+    cinfo_imgui.QueueLockFn = [](void* m) { SDL_LockMutex(static_cast<SDL_Mutex*>(m)); };
+    cinfo_imgui.QueueUnlockFn = [](void* m) { SDL_UnlockMutex(static_cast<SDL_Mutex*>(m)); };
+
+    /* FIXME!: Get this format from the swapchain, and re-init the Vulkan backend when this changes, or just re-init the pipeline */
     VkFormat color_atachements_format[] = { VK_FORMAT_B8G8R8A8_UNORM };
     cinfo_imgui.PipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
     cinfo_imgui.PipelineRenderingCreateInfo.viewMask = 0;
