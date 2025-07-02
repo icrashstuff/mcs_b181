@@ -87,6 +87,11 @@ struct ImGui_ImplVulkan_InitInfo
     uint32_t                        ImageCount;                 // >= MinImageCount
     VkSampleCountFlagBits           MSAASamples;                // 0 defaults to VK_SAMPLE_COUNT_1_BIT
 
+    // [tetra]: (Optional) Queue locking
+    void*                           QueueLockData;                      // Data passed to QueueLockFn()/QueueUnlockFn() callbacks, Probably a mutex
+    void                            (*QueueLockFn)(void* UserData);     // Called when access to the Queue field is required
+    void                            (*QueueUnlockFn)(void* UserData);   // Called after access to the Queue field is not required
+
     // (Optional)
     VkPipelineCache                 PipelineCache;
     uint32_t                        Subpass;

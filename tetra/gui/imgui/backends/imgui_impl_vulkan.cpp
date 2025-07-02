@@ -403,6 +403,28 @@ static void check_vk_result(VkResult err)
         v->CheckVkResultFn(err);
 }
 
+/* [tetra]: Add queue locking */
+static void lock_queue()
+{
+    ImGui_ImplVulkan_Data* bd = ImGui_ImplVulkan_GetBackendData();
+    if (!bd)
+        return;
+    ImGui_ImplVulkan_InitInfo* v = &bd->VulkanInitInfo;
+    if (v->QueueLockFn)
+        v->QueueLockFn(v->QueueLockData);
+}
+
+/* [tetra]: Add queue locking */
+static void unlock_queue()
+{
+    ImGui_ImplVulkan_Data* bd = ImGui_ImplVulkan_GetBackendData();
+    if (!bd)
+        return;
+    ImGui_ImplVulkan_InitInfo* v = &bd->VulkanInitInfo;
+    if (v->QueueUnlockFn)
+        v->QueueUnlockFn(v->QueueLockData);
+}
+
 // Same as IM_MEMALIGN(). 'alignment' must be a power of two.
 static inline VkDeviceSize AlignBufferSize(VkDeviceSize size, VkDeviceSize alignment)
 {
@@ -642,7 +664,9 @@ bool ImGui_ImplVulkan_CreateFontsTexture()
     // Destroy existing texture (if any)
     if (bd->FontTexture.DescriptorSet)
     {
+        lock_queue();
         vkQueueWaitIdle(v->Queue);
+        unlock_queue();
         ImGui_ImplVulkan_DestroyFontsTexture();
     }
 
@@ -816,10 +840,14 @@ bool ImGui_ImplVulkan_CreateFontsTexture()
     end_info.pCommandBuffers = &bd->TexCommandBuffer;
     err = vkEndCommandBuffer(bd->TexCommandBuffer);
     check_vk_result(err);
+    lock_queue();
     err = vkQueueSubmit(v->Queue, 1, &end_info, VK_NULL_HANDLE);
+    unlock_queue();
     check_vk_result(err);
 
+    lock_queue();
     err = vkQueueWaitIdle(v->Queue);
+    unlock_queue();
     check_vk_result(err);
 
     vkDestroyBuffer(v->Device, upload_buffer, v->Allocator);
@@ -1210,7 +1238,9 @@ void ImGui_ImplVulkan_SetMinImageCount(uint32_t min_image_count)
         return;
 
     ImGui_ImplVulkan_InitInfo* v = &bd->VulkanInitInfo;
-    VkResult err = vkDeviceWaitIdle(v->Device);
+    lock_queue();
+    VkResult err = vkQueueWaitIdle(v->Queue);
+    unlock_queue();
     check_vk_result(err);
     ImGui_ImplVulkan_DestroyWindowRenderBuffers(v->Device, &bd->MainWindowRenderBuffers, v->Allocator);
     bd->VulkanInitInfo.MinImageCount = min_image_count;
