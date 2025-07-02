@@ -69,11 +69,11 @@ struct frame_t
     VkImage image = VK_NULL_HANDLE;
     VkImageView image_view = VK_NULL_HANDLE;
 
-    /** Command buffer allocated for the graphics queue, from window_t::graphics_pool */
+    /** Command buffer allocated for the graphics queue, from `window_t::graphics_pool` */
     VkCommandBuffer cmd_graphics = VK_NULL_HANDLE;
     bool used_graphics = 0;
 
-    /** Command buffer allocated for the transfer queue, from window_t::transfer_pool */
+    /** Command buffer allocated for the transfer queue, from `window_t::transfer_pool` */
     VkCommandBuffer cmd_transfer = VK_NULL_HANDLE;
     bool used_transfer = 0;
 
@@ -106,7 +106,7 @@ struct window_t
     VkCommandPool transfer_pool = VK_NULL_HANDLE;
 
     /**
-     * Called when the swapchain format is changed, or when the swapchain is created
+     * Called when the swapchain format is changed, or when the swapchain is initially created
      *
      * The intended usage is for recreating pipelines that target the swapchain
      *
@@ -120,7 +120,7 @@ struct window_t
     void* format_callback_userdata = nullptr;
 
     /**
-     * Called when the number of swapchain frames changes, or when the swapchain is created
+     * Called when the number of swapchain frames changes, or when the swapchain is initially created
      *
      * The intended usage is for informing things like Dear ImGui's Vulkan backend that the number of images changed
      *
@@ -140,17 +140,10 @@ struct device_t
     VkPhysicalDevice physical = VK_NULL_HANDLE;
     VkDevice logical = VK_NULL_HANDLE;
 
-    Uint32 graphics_queue_idx = ~0;
-    Uint32 transfer_queue_idx = ~0;
-    Uint32 present_queue_idx = ~0;
+    /* ======================================================== */
+    /* ================ Window/Swapchain stuff ================ */
 
-    VkQueue graphics_queue = VK_NULL_HANDLE;
-    VkQueue transfer_queue = VK_NULL_HANDLE;
-    VkQueue present_queue = VK_NULL_HANDLE;
-
-    SDL_Mutex* graphics_queue_lock = nullptr;
-    SDL_Mutex* transfer_queue_lock = nullptr;
-    SDL_Mutex* present_queue_lock = nullptr;
+    window_t window {};
 
     /**
      * Acquire a frame for rendering
@@ -167,6 +160,21 @@ struct device_t
      */
     void submit_frame(window_t* const window, frame_t* frame);
 
+    /* ============================================= */
+    /* ================ Queue stuff ================ */
+
+    Uint32 graphics_queue_idx = ~0;
+    Uint32 transfer_queue_idx = ~0;
+    Uint32 present_queue_idx = ~0;
+
+    VkQueue graphics_queue = VK_NULL_HANDLE;
+    VkQueue transfer_queue = VK_NULL_HANDLE;
+    VkQueue present_queue = VK_NULL_HANDLE;
+
+    SDL_Mutex* graphics_queue_lock = nullptr;
+    SDL_Mutex* transfer_queue_lock = nullptr;
+    SDL_Mutex* present_queue_lock = nullptr;
+
     /** Convenience function to call SDL_LockMutex() on each queue lock */
     void lock_all_queues();
 
@@ -178,8 +186,6 @@ struct device_t
 
     device_t(SDL_Window* sdl_window);
     ~device_t();
-
-    window_t window {};
 
     VolkDeviceTable funcs;
 
