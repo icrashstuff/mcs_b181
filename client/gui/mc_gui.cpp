@@ -169,6 +169,8 @@ void mc_gui::mc_gui_ctx::load_font_ascii(ImFontAtlas* font_atlas)
     int tex_width, tex_height;
     font_atlas->GetTexDataAsRGBA32(&tex_pixels, &tex_width, &tex_height);
 
+    SDL_assert_always(0 && "Migrate to ImGui 1.92.0");
+#if 0
     for (int rect_n = 0; rect_n < IM_ARRAYSIZE(glyph_map); rect_n++)
     {
         const mc_glyph& glyph = glyph_map[rect_n];
@@ -190,6 +192,7 @@ void mc_gui::mc_gui_ctx::load_font_ascii(ImFontAtlas* font_atlas)
     font->Scale = 1.0f / float(font_scale);
     font->Ascent = font_scale * 7;
     font->Descent = -font_scale;
+#endif
 
     stbi_image_free(tex_data);
 }

@@ -1545,6 +1545,8 @@ namespace mc_gui
 /* Mostly copy pasted from imgui_impl_sdlgpu3.cpp */
 static void init_mc_gui_shaders()
 {
+    SDL_assert_always(0 && "Update to Vulkan way of doing things");
+#if 0
     ImGui_ImplSDLGPU3_Data* bd = (ImGui_ImplSDLGPU3_Data*)ImGui::GetIO().BackendRendererUserData;
     ImGui_ImplSDLGPU3_InitInfo* v = &bd->InitInfo;
 
@@ -1626,6 +1628,7 @@ static void init_mc_gui_shaders()
     color_target_desc[0].blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_COLOR;
 
     pipeline_imgui_crosshair = SDL_CreateGPUGraphicsPipeline(state::gpu_device, &pipeline_info);
+#endif
 }
 
 static void destroy_mc_gui_shaders()

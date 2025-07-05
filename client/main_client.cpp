@@ -1127,12 +1127,15 @@ static void loop_stage_prerender(glm::ivec2 win_size, bool& render_world, bool& 
             const ImVec2 pos1(center + ImVec2(8.0f, 8.0f) * scale);
             const ImVec2 uv0(240.0f / 256.0f, 0.0f);
             const ImVec2 uv1(1.0f, 16.0f / 256.0f);
+            SDL_assert_always(0 && "Update to Vulkan way of doing things");
+#if 0
             bg_draw_list->AddCallback(ImDrawCallback_ChangePipeline, pipeline_imgui_crosshair);
             if (cvr_r_crosshair_widgets.get())
                 bg_draw_list->AddImage(mc_gui::global_ctx->tex_id_widgets, pos0, pos1, uv0, uv1);
             else
                 bg_draw_list->AddImage(mc_gui::global_ctx->tex_id_crosshair, pos0, pos1);
             bg_draw_list->AddCallback(ImDrawCallback_ChangePipeline, nullptr);
+#endif
         }
     }
 
@@ -1178,7 +1181,7 @@ static void loop_stage_render(
 
     ImGui::SetCurrentContext(imgui_ctx_main_menu);
     SDL_PushGPUDebugGroup(gpu_command_buffer, "[mc_gui]: Copy pass");
-    Imgui_ImplSDLGPU3_PrepareDrawData(draw_data, gpu_command_buffer);
+    ImGui_ImplSDLGPU3_PrepareDrawData(draw_data, gpu_command_buffer);
     SDL_PopGPUDebugGroup(gpu_command_buffer);
     ImGui::SetCurrentContext(last_ctx);
 
