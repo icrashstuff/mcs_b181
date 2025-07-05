@@ -494,7 +494,7 @@ void tetra::end_frame(SDL_GPUCommandBuffer* const command_buffer, SDL_GPUTexture
     {
         SDL_PushGPUDebugGroup(command_buffer, "[tetra]: Render ImGui");
         ImGui::SetCurrentContext(im_ctx_main);
-        Imgui_ImplSDLGPU3_PrepareDrawData(draw_data, command_buffer);
+        ImGui_ImplSDLGPU3_PrepareDrawData(draw_data, command_buffer);
 
         SDL_GPURenderPass* render_pass = SDL_BeginGPURenderPass(command_buffer, &target_info, 1, nullptr);
         if (render_pass)
