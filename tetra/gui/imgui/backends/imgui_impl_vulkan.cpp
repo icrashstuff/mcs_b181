@@ -1367,7 +1367,7 @@ void ImGui_ImplVulkan_SetPipelineRenderingCreateInfo(const VkPipelineRenderingCr
     }
 
     // Recreate pipeline
-    ImGui_ImplVulkan_CreateDeviceObjects();
+    ImGui_ImplVulkan_CreatePipeline(v->Device, v->Allocator, v->PipelineCache, v->RenderPass, v->MSAASamples, &bd->Pipeline, v->Subpass);
 }
 #endif
 
