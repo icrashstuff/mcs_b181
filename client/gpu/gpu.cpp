@@ -793,12 +793,12 @@ void gpu::simple_test_app()
     cinfo_imgui.QueueLockFn = [](void* m) { SDL_LockMutex(static_cast<SDL_Mutex*>(m)); };
     cinfo_imgui.QueueUnlockFn = [](void* m) { SDL_UnlockMutex(static_cast<SDL_Mutex*>(m)); };
 
-    /* FIXME!: Get this format from the swapchain, and re-init the Vulkan backend when this changes, or just re-init the pipeline */
-    VkFormat color_atachements_format[] = { VK_FORMAT_B8G8R8A8_UNORM };
+    /* We set the initial format to one that probably won't be supported by the swapchain to force testing of `window_t::format_callback` */
+    device_new->window.format.format = VK_FORMAT_R8G8B8A8_UNORM;
     cinfo_imgui.PipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
     cinfo_imgui.PipelineRenderingCreateInfo.viewMask = 0;
     cinfo_imgui.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
-    cinfo_imgui.PipelineRenderingCreateInfo.pColorAttachmentFormats = color_atachements_format;
+    cinfo_imgui.PipelineRenderingCreateInfo.pColorAttachmentFormats = &device_new->window.format.format;
     cinfo_imgui.PipelineRenderingCreateInfo.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
     cinfo_imgui.PipelineRenderingCreateInfo.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
@@ -821,6 +821,37 @@ void gpu::simple_test_app()
         VK_DIE(vkCreateFence(device_new->logical, &cinfo_fence, nullptr, &acquire_fence));
     }
 
+    device_new->window.num_images_callback = [](Uint32 image_count, void* userdata) {
+        IM_UNUSED(userdata);
+
+        dc_log("Swapchain image count changed");
+
+        /* Tetra's ImGui Vulkan Backend has queue locking and does not requires external synchronization */
+        ImGui_ImplVulkan_SetMinImageCount(image_count);
+    };
+
+    device_new->window.format_callback = [](const bool format_changed, const bool colorspace_changed, void* userdata) {
+        IM_UNUSED(colorspace_changed);
+        IM_UNUSED(userdata);
+        VkPipelineRenderingCreateInfoKHR rendering_info {};
+        rendering_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
+        rendering_info.viewMask = 0;
+        rendering_info.colorAttachmentCount = 1;
+        rendering_info.pColorAttachmentFormats = &device_new->window.format.format;
+        rendering_info.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
+        rendering_info.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+
+        if (format_changed)
+            dc_log("Swapchain format changed");
+
+        if (colorspace_changed)
+            dc_log("Swapchain colorspace changed");
+
+        /* Tetra's ImGui Vulkan Backend has queue locking and does not requires external synchronization */
+        if (format_changed)
+            ImGui_ImplVulkan_SetPipelineRenderingCreateInfo(&rendering_info);
+    };
+
     bool done = 0;
     bool swapchain_rebuild_needed = 1;
     while (!done)
@@ -840,9 +871,12 @@ void gpu::simple_test_app()
             }
         }
 
+        VkSurfaceFormatKHR swapchain_old_format = device_new->window.format;
+        Uint32 swapchain_old_num_images = frames.size();
         if (swapchain_rebuild_needed || device_new->window.sdl_swapchain == VK_NULL_HANDLE)
         {
             TRACE("Rebuilding swapchain");
+
             device_new->window.sdl_swapchain = create_swapchain(device_info, device_new->logical, window, device_new->window.sdl_surface,
                 device_new->window.sdl_swapchain, device_new->window.format, device_new->window.extent);
 
@@ -899,15 +933,21 @@ void gpu::simple_test_app()
                 VK_DIE(vkAllocateCommandBuffers(device_new->logical, &ainfo_command_buffer, &frames[i].cmd_graphics));
             }
 
-            /* ImGui_ImplVulkan_SetMinImageCount() calls vkDeviceWaitIdle() which requires external synchronization */
-            gpu::device_new->lock_all_queues();
-            ImGui_ImplVulkan_SetMinImageCount(image_count);
-            gpu::device_new->unlock_all_queues();
+            bool format_changed = swapchain_old_format.format != device_new->window.format.format;
+            bool colorspace_changed = swapchain_old_format.colorSpace != device_new->window.format.colorSpace;
+            if (device_new->window.format_callback != nullptr && (format_changed || colorspace_changed))
+                device_new->window.format_callback(format_changed, colorspace_changed, device_new->window.format_callback_userdata);
+
+            if (device_new->window.num_images_callback != nullptr && (swapchain_old_num_images != image_count))
+                device_new->window.num_images_callback(image_count, device_new->window.num_images_callback_userdata);
 
             TRACE("Swapchain has %u images", image_count);
 
             swapchain_rebuild_needed = 0;
         }
+
+        if (device_new->window.sdl_swapchain == VK_NULL_HANDLE)
+            continue;
 
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplSDL3_NewFrame();

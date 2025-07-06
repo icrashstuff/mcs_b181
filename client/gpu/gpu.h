@@ -124,7 +124,7 @@ struct window_t
      *
      * The intended usage is for informing things like Dear ImGui's Vulkan backend that the number of images changed
      *
-     * When this callback is fired, `window_t::frames.size()` will contain the new number of frames
+     * When this callback is fired, `window_t::frames` will contain the new frames
      *
      * @param num_images Contains the new number of frames
      * @param userdata Set to the value of `window_t::num_images_callback_userdata`
