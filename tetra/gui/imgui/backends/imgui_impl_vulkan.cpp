@@ -1316,6 +1316,61 @@ void ImGui_ImplVulkan_SetMinImageCount(uint32_t min_image_count)
     bd->VulkanInitInfo.MinImageCount = min_image_count;
 }
 
+// [tetra]: To change dynamic rendering info after initialization (e.g. if swap chain is recreated)
+#ifdef IMGUI_IMPL_VULKAN_HAS_DYNAMIC_RENDERING
+void ImGui_ImplVulkan_SetPipelineRenderingCreateInfo(const VkPipelineRenderingCreateInfoKHR* rendering_info)
+{
+    ImGui_ImplVulkan_Data* bd = ImGui_ImplVulkan_GetBackendData();
+    ImGui_ImplVulkan_InitInfo* v = &bd->VulkanInitInfo;
+    IM_ASSERT(rendering_info != nullptr);
+    IM_ASSERT(rendering_info->sType == VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR && "PipelineRenderingCreateInfo sType must be VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR");
+    IM_ASSERT(rendering_info->pNext == nullptr && "PipelineRenderingCreateInfo pNext must be nullptr");
+
+    // Check that rendering_info is not equivalent to v->PipelineRenderingCreateInfo
+    if (rendering_info->viewMask == v->PipelineRenderingCreateInfo.viewMask &&
+        rendering_info->colorAttachmentCount == v->PipelineRenderingCreateInfo.colorAttachmentCount &&
+        memcmp(rendering_info->pColorAttachmentFormats, v->PipelineRenderingCreateInfo.pColorAttachmentFormats, sizeof(VkFormat) * rendering_info->colorAttachmentCount) == 0 &&
+        rendering_info->depthAttachmentFormat == v->PipelineRenderingCreateInfo.depthAttachmentFormat &&
+        rendering_info->stencilAttachmentFormat == v->PipelineRenderingCreateInfo.stencilAttachmentFormat
+    )
+        return;
+
+    // Ensure bd->Pipeline is no longer in use
+    {
+        ImGui_ImplVulkan_LockQueue();
+        VkResult err = vkQueueWaitIdle(v->Queue);
+        ImGui_ImplVulkan_UnlockQueue();
+        check_vk_result(err);
+    }
+
+    // Free resources
+    {
+        if (bd->Pipeline)
+        {
+            vkDestroyPipeline(v->Device, bd->Pipeline, v->Allocator);
+            bd->Pipeline = VK_NULL_HANDLE;
+        }
+        // Delete deep copy buffer to reduce error-rate for end user (#8282)
+        IM_FREE((void*)const_cast<VkFormat*>(v->PipelineRenderingCreateInfo.pColorAttachmentFormats));
+    }
+
+    // Copy over new rendering info
+    {
+        v->PipelineRenderingCreateInfo = *rendering_info;
+        if (v->PipelineRenderingCreateInfo.pColorAttachmentFormats != NULL)
+        {
+            // Deep copy buffer to reduce error-rate for end user (#8282)
+            VkFormat* formats_copy = (VkFormat*)IM_ALLOC(sizeof(VkFormat) * v->PipelineRenderingCreateInfo.colorAttachmentCount);
+            memcpy(formats_copy, v->PipelineRenderingCreateInfo.pColorAttachmentFormats, sizeof(VkFormat) * v->PipelineRenderingCreateInfo.colorAttachmentCount);
+            v->PipelineRenderingCreateInfo.pColorAttachmentFormats = formats_copy;
+        }
+    }
+
+    // Recreate pipeline
+    ImGui_ImplVulkan_CreateDeviceObjects();
+}
+#endif
+
 // Register a texture by creating a descriptor
 // FIXME: This is experimental in the sense that we are unsure how to best design/tackle this problem, please post to https://github.com/ocornut/imgui/pull/914 if you have suggestions.
 VkDescriptorSet ImGui_ImplVulkan_AddTexture(VkSampler sampler, VkImageView image_view, VkImageLayout image_layout)

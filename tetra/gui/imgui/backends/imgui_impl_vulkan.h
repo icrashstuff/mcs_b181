@@ -118,6 +118,9 @@ IMGUI_IMPL_API void             ImGui_ImplVulkan_Shutdown();
 IMGUI_IMPL_API void             ImGui_ImplVulkan_NewFrame();
 IMGUI_IMPL_API void             ImGui_ImplVulkan_RenderDrawData(ImDrawData* draw_data, VkCommandBuffer command_buffer, VkPipeline pipeline = VK_NULL_HANDLE);
 IMGUI_IMPL_API void             ImGui_ImplVulkan_SetMinImageCount(uint32_t min_image_count); // To override MinImageCount after initialization (e.g. if swap chain is recreated)
+#ifdef IMGUI_IMPL_VULKAN_HAS_DYNAMIC_RENDERING
+IMGUI_IMPL_API void             ImGui_ImplVulkan_SetPipelineRenderingCreateInfo(const VkPipelineRenderingCreateInfoKHR* rendering_info); // [tetra]: To change dynamic rendering info after initialization (e.g. if swap chain is recreated)
+#endif
 
 // (Advanced) Use e.g. if you need to precisely control the timing of texture updates (e.g. for staged rendering), by setting ImDrawData::Textures = NULL to handle this manually.
 IMGUI_IMPL_API void             ImGui_ImplVulkan_UpdateTexture(ImTextureData* tex);
