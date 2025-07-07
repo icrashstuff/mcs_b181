@@ -66,6 +66,9 @@ struct frame_t
 {
     device_t* device = nullptr;
 
+    Uint32 image_idx = ~0;
+
+    /** Target image */
     VkImage image = VK_NULL_HANDLE;
     VkImageView image_view = VK_NULL_HANDLE;
 
@@ -77,8 +80,15 @@ struct frame_t
     VkCommandBuffer cmd_transfer = VK_NULL_HANDLE;
     bool used_transfer = 0;
 
+    /** Fence to be associated with command buffer submission */
     VkFence done = VK_NULL_HANDLE;
 
+    /**
+     * Acquire a semaphore from the internal buffer
+     *
+     * NOTE: You should not reference a semaphore outside of the command buffers
+     *       provided by this object, as the semaphores may be destroyed/reused at any time
+     */
     VkSemaphore acquire_semaphore();
 
     void reset();
@@ -97,7 +107,10 @@ struct window_t
     SDL_Window* sdl_window = nullptr;
     VkSurfaceKHR sdl_surface = VK_NULL_HANDLE;
     VkSwapchainKHR sdl_swapchain = VK_NULL_HANDLE;
+    VkFence acquire_fence = VK_NULL_HANDLE;
+    bool frame_is_pending = 0;
 
+    bool swapchain_rebuild_required = 0;
     VkExtent2D extent {};
     VkSurfaceFormatKHR format {};
     VkPresentModeKHR present_mode {};
@@ -148,7 +161,9 @@ struct device_t
     /**
      * Acquire a frame for rendering
      *
-     * WARNING: This may resize/reconfigure the swapchain
+     * NOTE: This may resize/reconfigure the swapchain
+     *
+     * @returns A frame object on success, or NULL on failure/unavailability of a new frame
      */
     frame_t* acquire_next_frame(window_t* const window, const Uint64 timeout);
 

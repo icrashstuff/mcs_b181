@@ -814,13 +814,6 @@ void gpu::simple_test_app()
     SDL_ShowWindow(window);
     SDL_SetWindowResizable(window, 1);
 
-    VkFence acquire_fence = VK_NULL_HANDLE;
-    {
-        VkFenceCreateInfo cinfo_fence {};
-        cinfo_fence.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-        VK_DIE(vkCreateFence(device_new->logical, &cinfo_fence, nullptr, &acquire_fence));
-    }
-
     device_new->window.num_images_callback = [](Uint32 image_count, void* userdata) {
         IM_UNUSED(userdata);
 
@@ -853,7 +846,6 @@ void gpu::simple_test_app()
     };
 
     bool done = 0;
-    bool swapchain_rebuild_needed = 1;
     while (!done)
     {
         SDL_Event event;
@@ -862,91 +854,14 @@ void gpu::simple_test_app()
             ImGui_ImplSDL3_ProcessEvent(&event);
             switch (event.type)
             {
-            case SDL_EVENT_WINDOW_RESIZED:
-                swapchain_rebuild_needed = 1;
-                break;
             case SDL_EVENT_QUIT:
                 done = 1;
                 break;
             }
         }
 
-        VkSurfaceFormatKHR swapchain_old_format = device_new->window.format;
-        Uint32 swapchain_old_num_images = frames.size();
-        if (swapchain_rebuild_needed || device_new->window.sdl_swapchain == VK_NULL_HANDLE)
-        {
-            TRACE("Rebuilding swapchain");
-
-            device_new->window.sdl_swapchain = create_swapchain(device_info, device_new->logical, window, device_new->window.sdl_surface,
-                device_new->window.sdl_swapchain, device_new->window.format, device_new->window.extent);
-
-            for (frame_t f : frames)
-            {
-                vkFreeCommandBuffers(gpu::device_new->logical, device_new->window.graphics_pool, 1, &f.cmd_graphics);
-                f.free();
-            }
-            frames.resize(0);
-        }
-
-        if (swapchain_rebuild_needed && device_new->window.sdl_swapchain != VK_NULL_HANDLE)
-        {
-            Uint32 image_count = 0;
-            VK_DIE(vkGetSwapchainImagesKHR(gpu::device_new->logical, device_new->window.sdl_swapchain, &image_count, nullptr));
-            std::vector<VkImage> swapchain_images(image_count);
-            VK_DIE(vkGetSwapchainImagesKHR(gpu::device_new->logical, device_new->window.sdl_swapchain, &image_count, swapchain_images.data()));
-            swapchain_images.resize(image_count);
-
-            frames.resize(image_count);
-            for (size_t i = 0; i < image_count; i++)
-            {
-                frames[i].device = device_new;
-
-                frames[i].image = swapchain_images[i];
-
-                VkImageViewCreateInfo cinfo_image_view {};
-                cinfo_image_view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
-                cinfo_image_view.image = swapchain_images[i];
-                cinfo_image_view.viewType = VK_IMAGE_VIEW_TYPE_2D;
-                cinfo_image_view.format = device_new->window.format.format;
-                cinfo_image_view.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
-                cinfo_image_view.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
-                cinfo_image_view.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
-                cinfo_image_view.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
-                cinfo_image_view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
-                cinfo_image_view.subresourceRange.baseMipLevel = 0;
-                cinfo_image_view.subresourceRange.levelCount = 1;
-                cinfo_image_view.subresourceRange.baseArrayLayer = 0;
-                cinfo_image_view.subresourceRange.layerCount = 1;
-                VK_DIE(vkCreateImageView(gpu::device_new->logical, &cinfo_image_view, nullptr, &frames[i].image_view));
-
-                VkFenceCreateInfo cinfo_fence {};
-                cinfo_fence.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-                cinfo_fence.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-                VK_DIE(vkCreateFence(device_new->logical, &cinfo_fence, nullptr, &frames[i].done));
-
-                VkCommandBufferAllocateInfo ainfo_command_buffer {};
-                ainfo_command_buffer.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-                ainfo_command_buffer.commandPool = device_new->window.graphics_pool;
-                ainfo_command_buffer.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-                ainfo_command_buffer.commandBufferCount = 1;
-
-                VK_DIE(vkAllocateCommandBuffers(device_new->logical, &ainfo_command_buffer, &frames[i].cmd_graphics));
-            }
-
-            bool format_changed = swapchain_old_format.format != device_new->window.format.format;
-            bool colorspace_changed = swapchain_old_format.colorSpace != device_new->window.format.colorSpace;
-            if (device_new->window.format_callback != nullptr && (format_changed || colorspace_changed))
-                device_new->window.format_callback(format_changed, colorspace_changed, device_new->window.format_callback_userdata);
-
-            if (device_new->window.num_images_callback != nullptr && (swapchain_old_num_images != image_count))
-                device_new->window.num_images_callback(image_count, device_new->window.num_images_callback_userdata);
-
-            TRACE("Swapchain has %u images", image_count);
-
-            swapchain_rebuild_needed = 0;
-        }
-
-        if (device_new->window.sdl_swapchain == VK_NULL_HANDLE)
+        frame_t* frame = gpu::device_new->acquire_next_frame(&gpu::device_new->window, UINT64_MAX);
+        if (!frame)
             continue;
 
         ImGui_ImplVulkan_NewFrame();
@@ -957,100 +872,40 @@ void gpu::simple_test_app()
 
         ImGui::Render();
         ImDrawData* draw_data = ImGui::GetDrawData();
-        const bool is_minimized = (draw_data->DisplaySize.x <= 0.0f || draw_data->DisplaySize.y <= 0.0f);
-        Uint32 image_idx = 0;
 
-        bool should_render = (!is_minimized && frames.size());
+        VkCommandBufferBeginInfo binfo_command_buffer {};
+        binfo_command_buffer.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        binfo_command_buffer.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
 
-        if (should_render)
-        {
-            /* A semaphore might be a better way to delay this, but this is easier */
-            VK_DIE(vkResetFences(gpu::device_new->logical, 1, &acquire_fence));
-            VkResult result
-                = vkAcquireNextImageKHR(gpu::device_new->logical, device_new->window.sdl_swapchain, UINT64_MAX, VK_NULL_HANDLE, acquire_fence, &image_idx);
-            if (result == VK_SUBOPTIMAL_KHR)
-                swapchain_rebuild_needed = 1;
-            else if (result == VK_TIMEOUT || result == VK_NOT_READY)
-                should_render = 0;
-            else if (is_swapchain_result_non_fatal(result))
-            {
-                swapchain_rebuild_needed = 1;
-                should_render = 0;
-            }
-            else
-                VK_DIE(result; (void)"vkAcquireNextImageKHR");
-        }
+        frame->used_graphics = 1;
 
-        if (should_render)
-        {
-            /* A semaphore might be a better way to delay this, but this is easier */
-            VK_DIE(vkWaitForFences(gpu::device_new->logical, 1, &acquire_fence, 1, UINT64_MAX));
-            frame_t& frame = frames[image_idx];
-            frame.reset();
+        VK_DIE(vkBeginCommandBuffer(frame->cmd_graphics, &binfo_command_buffer));
 
-            VkCommandBufferBeginInfo binfo_command_buffer {};
-            binfo_command_buffer.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-            binfo_command_buffer.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+        VkRenderingAttachmentInfo color_attachment {};
+        color_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
+        color_attachment.imageView = frame->image_view;
+        color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
+        color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
+        color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
 
-            VK_DIE(vkBeginCommandBuffer(frame.cmd_graphics, &binfo_command_buffer));
+        VkRenderingInfoKHR binfo_rendering {};
+        binfo_rendering.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
+        binfo_rendering.renderArea.extent = device_new->window.extent;
+        binfo_rendering.layerCount = 1;
+        binfo_rendering.colorAttachmentCount = 1;
+        binfo_rendering.pColorAttachments = &color_attachment;
 
-            VkRenderingAttachmentInfo color_attachment {};
-            color_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
-            color_attachment.imageView = frame.image_view;
-            color_attachment.imageLayout = VK_IMAGE_LAYOUT_COLOR_ATTACHMENT_OPTIMAL;
-            color_attachment.loadOp = VK_ATTACHMENT_LOAD_OP_CLEAR;
-            color_attachment.storeOp = VK_ATTACHMENT_STORE_OP_STORE;
+        transition_image(frame->cmd_graphics, frame->image, VK_IMAGE_LAYOUT_UNDEFINED, color_attachment.imageLayout);
+        vkCmdBeginRenderingKHR(frame->cmd_graphics, &binfo_rendering);
 
-            VkRenderingInfoKHR binfo_rendering {};
-            binfo_rendering.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
-            binfo_rendering.renderArea.extent = device_new->window.extent;
-            binfo_rendering.layerCount = 1;
-            binfo_rendering.colorAttachmentCount = 1;
-            binfo_rendering.pColorAttachments = &color_attachment;
+        ImGui_ImplVulkan_RenderDrawData(draw_data, frame->cmd_graphics, VK_NULL_HANDLE);
 
-            transition_image(frame.cmd_graphics, frame.image, VK_IMAGE_LAYOUT_UNDEFINED, color_attachment.imageLayout);
+        vkCmdEndRenderingKHR(frame->cmd_graphics);
+        transition_image(frame->cmd_graphics, frame->image, color_attachment.imageLayout, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
-            vkCmdBeginRenderingKHR(frame.cmd_graphics, &binfo_rendering);
+        vkEndCommandBuffer(frame->cmd_graphics);
 
-            ImGui_ImplVulkan_RenderDrawData(draw_data, frame.cmd_graphics, VK_NULL_HANDLE);
-
-            vkCmdEndRenderingKHR(frame.cmd_graphics);
-
-            transition_image(frame.cmd_graphics, frame.image, color_attachment.imageLayout, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
-
-            vkEndCommandBuffer(frame.cmd_graphics);
-
-            VkSemaphore present_semaphore = frame.acquire_semaphore();
-
-            VkSubmitInfo sinfo {};
-            sinfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-            sinfo.commandBufferCount = 1;
-            sinfo.pCommandBuffers = &frame.cmd_graphics;
-            sinfo.signalSemaphoreCount = 1;
-            sinfo.pSignalSemaphores = &present_semaphore;
-
-            VkPresentInfoKHR pinfo {};
-            pinfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
-            pinfo.waitSemaphoreCount = 1;
-            pinfo.pWaitSemaphores = &present_semaphore;
-            pinfo.swapchainCount = 1;
-            pinfo.pSwapchains = &gpu::device_new->window.sdl_swapchain;
-            pinfo.pImageIndices = &image_idx;
-
-            SDL_LockMutex(gpu::graphics_queue_lock);
-            SDL_LockMutex(gpu::present_queue_lock);
-            VK_DIE(vkQueueSubmit(gpu::graphics_queue, 1, &sinfo, frame.done));
-            {
-                /* TODO: Handle VK_ERROR_OUT_OF_DATE_KHR? */
-                VkResult result = vkQueuePresentKHR(gpu::present_queue, &pinfo);
-                if (is_swapchain_result_non_fatal(result))
-                    swapchain_rebuild_needed = 1;
-                else
-                    VK_DIE(result; (void)"vkQueuePresentKHR");
-            }
-            SDL_UnlockMutex(gpu::present_queue_lock);
-            SDL_UnlockMutex(gpu::graphics_queue_lock);
-        }
+        device_new->submit_frame(&device_new->window, frame);
 
         static tetra::iteration_limiter_t fps_cap(1);
         fps_cap.wait();
@@ -1064,8 +919,6 @@ void gpu::simple_test_app()
         f.free();
     }
     frames.resize(0);
-
-    vkDestroyFence(gpu::device_new->logical, acquire_fence, nullptr);
 
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplSDL3_Shutdown();
@@ -1089,16 +942,18 @@ VkSemaphore gpu::frame_t::acquire_semaphore()
 
 void gpu::frame_t::reset()
 {
-    VK_DIE(device->funcs.vkResetFences(gpu::device_new->logical, 1, &done));
+    VK_DIE(device->funcs.vkResetFences(device->logical, 1, &done));
     next_semaphore_idx = 0;
+    used_graphics = 0;
+    used_transfer = 0;
 }
 
 void gpu::frame_t::free()
 {
-    device->funcs.vkDestroyImageView(gpu::device_new->logical, image_view, nullptr);
-    device->funcs.vkDestroyFence(gpu::device_new->logical, done, nullptr);
+    device->funcs.vkDestroyImageView(device->logical, image_view, nullptr);
+    device->funcs.vkDestroyFence(device->logical, done, nullptr);
     for (VkSemaphore s : semaphores)
-        device->funcs.vkDestroySemaphore(gpu::device_new->logical, s, nullptr);
+        device->funcs.vkDestroySemaphore(device->logical, s, nullptr);
 }
 
 gpu::device_t::device_t(SDL_Window* sdl_window)
@@ -1152,6 +1007,205 @@ gpu::device_t::device_t(SDL_Window* sdl_window)
         cinfo_command_pool.queueFamilyIndex = gpu::device_info.transfer_queue_idx;
         VK_DIE(funcs.vkCreateCommandPool(logical, &cinfo_command_pool, nullptr, &window.transfer_pool));
     }
+
+    VkFenceCreateInfo cinfo_fence {};
+    cinfo_fence.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    VK_DIE(funcs.vkCreateFence(logical, &cinfo_fence, nullptr, &window.acquire_fence));
+}
+
+gpu::frame_t* gpu::device_t::acquire_next_frame(window_t* const window, const Uint64 timeout)
+{
+    if (window->frame_is_pending)
+    {
+        dc_log_error("Window %p already has a pending frame");
+        return nullptr;
+    }
+
+    VkSurfaceFormatKHR swapchain_old_format = window->format;
+    Uint32 swapchain_old_num_images = frames.size();
+
+    if (window->sdl_swapchain == VK_NULL_HANDLE)
+        window->swapchain_rebuild_required = 1;
+
+    int win_size_x = 0, win_size_y = 0;
+    SDL_GetWindowSize(window->sdl_window, &win_size_x, &win_size_y);
+
+    if (win_size_x <= 0 || win_size_y <= 0)
+        return nullptr;
+
+    if (Uint32(win_size_x) != window->extent.width || Uint32(win_size_y) != window->extent.height)
+        window->swapchain_rebuild_required = 1;
+
+    if (window->swapchain_rebuild_required)
+    {
+        TRACE("Rebuilding swapchain");
+
+        window->sdl_swapchain
+            = create_swapchain(device_info, logical, window->sdl_window, window->sdl_surface, window->sdl_swapchain, window->format, window->extent);
+
+        for (frame_t f : frames)
+        {
+            funcs.vkFreeCommandBuffers(logical, window->graphics_pool, 1, &f.cmd_graphics);
+            f.free();
+        }
+        frames.resize(0);
+    }
+
+    if (window->swapchain_rebuild_required && window->sdl_swapchain != VK_NULL_HANDLE)
+    {
+        Uint32 image_count = 0;
+        VK_DIE(funcs.vkGetSwapchainImagesKHR(logical, window->sdl_swapchain, &image_count, nullptr));
+        std::vector<VkImage> swapchain_images(image_count);
+        VK_DIE(funcs.vkGetSwapchainImagesKHR(logical, window->sdl_swapchain, &image_count, swapchain_images.data()));
+        swapchain_images.resize(image_count);
+
+        frames.resize(image_count);
+        for (size_t i = 0; i < image_count; i++)
+        {
+            frames[i].device = this;
+
+            frames[i].image = swapchain_images[i];
+
+            frames[i].image_idx = i;
+
+            VkImageViewCreateInfo cinfo_image_view {};
+            cinfo_image_view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+            cinfo_image_view.image = swapchain_images[i];
+            cinfo_image_view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+            cinfo_image_view.format = window->format.format;
+            cinfo_image_view.components.r = VK_COMPONENT_SWIZZLE_IDENTITY;
+            cinfo_image_view.components.g = VK_COMPONENT_SWIZZLE_IDENTITY;
+            cinfo_image_view.components.b = VK_COMPONENT_SWIZZLE_IDENTITY;
+            cinfo_image_view.components.a = VK_COMPONENT_SWIZZLE_IDENTITY;
+            cinfo_image_view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+            cinfo_image_view.subresourceRange.baseMipLevel = 0;
+            cinfo_image_view.subresourceRange.levelCount = 1;
+            cinfo_image_view.subresourceRange.baseArrayLayer = 0;
+            cinfo_image_view.subresourceRange.layerCount = 1;
+            VK_DIE(funcs.vkCreateImageView(logical, &cinfo_image_view, nullptr, &frames[i].image_view));
+
+            VkFenceCreateInfo cinfo_fence {};
+            cinfo_fence.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+            cinfo_fence.flags = VK_FENCE_CREATE_SIGNALED_BIT;
+            VK_DIE(funcs.vkCreateFence(logical, &cinfo_fence, nullptr, &frames[i].done));
+
+            VkCommandBufferAllocateInfo ainfo_command_buffer {};
+            ainfo_command_buffer.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+            ainfo_command_buffer.commandPool = window->graphics_pool;
+            ainfo_command_buffer.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+            ainfo_command_buffer.commandBufferCount = 1;
+
+            VK_DIE(funcs.vkAllocateCommandBuffers(logical, &ainfo_command_buffer, &frames[i].cmd_graphics));
+        }
+
+        bool format_changed = swapchain_old_format.format != window->format.format;
+        bool colorspace_changed = swapchain_old_format.colorSpace != window->format.colorSpace;
+        if (window->format_callback != nullptr && (format_changed || colorspace_changed))
+            window->format_callback(format_changed, colorspace_changed, window->format_callback_userdata);
+
+        if (window->num_images_callback != nullptr && (swapchain_old_num_images != image_count))
+            window->num_images_callback(image_count, window->num_images_callback_userdata);
+
+        TRACE("Swapchain has %u images", image_count);
+
+        window->swapchain_rebuild_required = 0;
+    }
+
+    if (window->sdl_swapchain == VK_NULL_HANDLE)
+        return nullptr;
+
+    Uint32 image_idx = 0;
+
+    VK_DIE(funcs.vkResetFences(logical, 1, &window->acquire_fence));
+    VkResult result = funcs.vkAcquireNextImageKHR(logical, window->sdl_swapchain, timeout, VK_NULL_HANDLE, window->acquire_fence, &image_idx);
+    if (result == VK_SUBOPTIMAL_KHR)
+        window->swapchain_rebuild_required = 1;
+    else if (result == VK_TIMEOUT || result == VK_NOT_READY)
+        return nullptr;
+    else if (is_swapchain_result_non_fatal(result))
+    {
+        window->swapchain_rebuild_required = 1;
+        return nullptr;
+    }
+    else
+        VK_DIE(result; (void)"vkAcquireNextImageKHR");
+
+    window->frame_is_pending = 1;
+
+    /* A semaphore might be a better way to delay this, but this is easier */
+    frame_t& frame = frames[image_idx];
+    VK_DIE(funcs.vkWaitForFences(logical, 1, &window->acquire_fence, 1, UINT64_MAX));
+    frame.reset();
+
+    return &frame;
+}
+
+void gpu::device_t::submit_frame(window_t* const window, frame_t* frame)
+{
+    if (!window || !frame)
+        return;
+    window->frame_is_pending = 0;
+
+    VkSemaphore present_semaphore = frame->acquire_semaphore();
+
+    VkCommandBuffer command_buffers[2] = {};
+
+    VkSubmitInfo sinfo {};
+    sinfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    sinfo.commandBufferCount = 0;
+    sinfo.pCommandBuffers = command_buffers;
+    sinfo.signalSemaphoreCount = 1;
+    sinfo.pSignalSemaphores = &present_semaphore;
+
+    if (frame->used_graphics)
+        command_buffers[sinfo.commandBufferCount++] = frame->cmd_graphics;
+
+    if (frame->used_transfer)
+        command_buffers[sinfo.commandBufferCount++] = frame->cmd_transfer;
+
+    /* Ensure image layout is properly transitioned, even if it hasn't been used */
+    if (sinfo.commandBufferCount == 0)
+    {
+        VkCommandBufferBeginInfo binfo_command_buffer {};
+        binfo_command_buffer.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+        binfo_command_buffer.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+
+        VK_DIE(funcs.vkBeginCommandBuffer(frame->cmd_graphics, &binfo_command_buffer));
+
+        transition_image(frame->cmd_graphics, frame->image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+
+        VK_DIE(funcs.vkEndCommandBuffer(frame->cmd_graphics));
+
+        command_buffers[sinfo.commandBufferCount++] = frame->cmd_graphics;
+    }
+
+    VkPresentInfoKHR pinfo {};
+    pinfo.sType = VK_STRUCTURE_TYPE_PRESENT_INFO_KHR;
+    pinfo.waitSemaphoreCount = 1;
+    pinfo.pWaitSemaphores = &present_semaphore;
+    pinfo.swapchainCount = 1;
+    pinfo.pSwapchains = &gpu::device_new->window.sdl_swapchain;
+    pinfo.pImageIndices = &frame->image_idx;
+
+    if (frame->used_graphics)
+        SDL_LockMutex(graphics_queue_lock);
+    if (frame->used_transfer)
+        SDL_LockMutex(transfer_queue_lock);
+    SDL_LockMutex(present_queue_lock);
+    VK_DIE(funcs.vkQueueSubmit(gpu::graphics_queue, 1, &sinfo, frame->done));
+    {
+        /* TODO: Handle VK_ERROR_OUT_OF_DATE_KHR? */
+        VkResult result = funcs.vkQueuePresentKHR(gpu::present_queue, &pinfo);
+        if (is_swapchain_result_non_fatal(result))
+            window->swapchain_rebuild_required = 1;
+        else
+            VK_DIE(result; (void)"vkQueuePresentKHR");
+    }
+    SDL_UnlockMutex(present_queue_lock);
+    if (frame->used_transfer)
+        SDL_UnlockMutex(transfer_queue_lock);
+    if (frame->used_graphics)
+        SDL_UnlockMutex(graphics_queue_lock);
 }
 
 void gpu::device_t::lock_all_queues()
@@ -1181,6 +1235,7 @@ gpu::device_t::~device_t()
     funcs.vkDestroySwapchainKHR(logical, window.sdl_swapchain, nullptr);
     funcs.vkDestroyCommandPool(logical, window.graphics_pool, nullptr);
     funcs.vkDestroyCommandPool(logical, window.transfer_pool, nullptr);
+    funcs.vkDestroyFence(logical, window.acquire_fence, nullptr);
     SDL_Vulkan_DestroySurface(instance, window.sdl_surface, nullptr);
     for (SDL_Mutex* m : std::set<SDL_Mutex*> { graphics_queue_lock, transfer_queue_lock, present_queue_lock })
         SDL_DestroyMutex(m);
