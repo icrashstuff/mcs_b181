@@ -363,12 +363,6 @@ int tetra::start_frame(bool event_loop)
     while (event_loop && !done && SDL_PollEvent(&event))
         done = process_event(event);
 
-    // Start the Dear ImGui frame
-    ImGui::SetCurrentContext(im_ctx_overlay);
-    ImGui_ImplOpenGL3_NewFrame();
-    ImGui_ImplSDL3_NewFrame();
-    ImGui::NewFrame();
-
     ImGui::SetCurrentContext(im_ctx_main);
 
     bool show_main = (im_ctx_shown_main || dev_console::shown);
@@ -393,6 +387,14 @@ int tetra::start_frame(bool event_loop)
     ImGui_ImplOpenGL3_NewFrame();
     ImGui_ImplSDL3_NewFrame();
     ImGui::NewFrame();
+
+    // Start the Dear ImGui frame
+    ImGui::SetCurrentContext(im_ctx_overlay);
+    ImGui_ImplOpenGL3_NewFrame();
+    ImGui_ImplSDL3_NewFrame();
+    ImGui::NewFrame();
+
+    ImGui::SetCurrentContext(im_ctx_main);
 
     return !done;
 }
