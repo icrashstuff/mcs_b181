@@ -913,13 +913,6 @@ void gpu::simple_test_app()
 
     device_new->wait_for_device_idle();
 
-    for (frame_t f : frames)
-    {
-        vkFreeCommandBuffers(gpu::device_new->logical, device_new->window.graphics_pool, 1, &f.cmd_graphics);
-        f.free();
-    }
-    frames.resize(0);
-
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplSDL3_Shutdown();
     ImGui::DestroyContext(ImGui::GetCurrentContext());
@@ -950,6 +943,8 @@ void gpu::frame_t::reset()
 
 void gpu::frame_t::free()
 {
+    device->funcs.vkFreeCommandBuffers(device->logical, device->window.graphics_pool, 1, &cmd_graphics);
+    device->funcs.vkFreeCommandBuffers(device->logical, device->window.transfer_pool, 1, &cmd_transfer);
     device->funcs.vkDestroyImageView(device->logical, image_view, nullptr);
     device->funcs.vkDestroyFence(device->logical, done, nullptr);
     for (VkSemaphore s : semaphores)
@@ -997,7 +992,7 @@ gpu::device_t::device_t(SDL_Window* sdl_window)
 
     /* Init command pools */
     {
-        VkCommandPoolCreateInfo cinfo_command_pool {};
+        VkCommandPoolCreateInfo cinfo_command_pool = {};
         cinfo_command_pool.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         cinfo_command_pool.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
@@ -1044,10 +1039,7 @@ gpu::frame_t* gpu::device_t::acquire_next_frame(window_t* const window, const Ui
             = create_swapchain(device_info, logical, window->sdl_window, window->sdl_surface, window->sdl_swapchain, window->format, window->extent);
 
         for (frame_t f : frames)
-        {
-            funcs.vkFreeCommandBuffers(logical, window->graphics_pool, 1, &f.cmd_graphics);
             f.free();
-        }
         frames.resize(0);
     }
 
@@ -1091,11 +1083,14 @@ gpu::frame_t* gpu::device_t::acquire_next_frame(window_t* const window, const Ui
 
             VkCommandBufferAllocateInfo ainfo_command_buffer {};
             ainfo_command_buffer.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-            ainfo_command_buffer.commandPool = window->graphics_pool;
             ainfo_command_buffer.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
             ainfo_command_buffer.commandBufferCount = 1;
 
+            ainfo_command_buffer.commandPool = window->graphics_pool;
             VK_DIE(funcs.vkAllocateCommandBuffers(logical, &ainfo_command_buffer, &frames[i].cmd_graphics));
+
+            ainfo_command_buffer.commandPool = window->transfer_pool;
+            VK_DIE(funcs.vkAllocateCommandBuffers(logical, &ainfo_command_buffer, &frames[i].cmd_transfer));
         }
 
         bool format_changed = swapchain_old_format.format != window->format.format;
@@ -1232,12 +1227,19 @@ void gpu::device_t::wait_for_device_idle()
 gpu::device_t::~device_t()
 {
     wait_for_device_idle();
+
+    for (frame_t f : frames)
+        f.free();
+    frames.resize(0);
+
     funcs.vkDestroySwapchainKHR(logical, window.sdl_swapchain, nullptr);
     funcs.vkDestroyCommandPool(logical, window.graphics_pool, nullptr);
     funcs.vkDestroyCommandPool(logical, window.transfer_pool, nullptr);
     funcs.vkDestroyFence(logical, window.acquire_fence, nullptr);
+
     SDL_Vulkan_DestroySurface(instance, window.sdl_surface, nullptr);
     for (SDL_Mutex* m : std::set<SDL_Mutex*> { graphics_queue_lock, transfer_queue_lock, present_queue_lock })
         SDL_DestroyMutex(m);
+
     funcs.vkDestroyDevice(logical, nullptr);
 }
