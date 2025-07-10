@@ -972,6 +972,8 @@ gpu::device_t::device_t(SDL_Window* sdl_window)
     volkLoadDevice(logical);
     volkLoadDeviceTable(&funcs, logical);
 
+    set_object_name(window.sdl_surface, VK_OBJECT_TYPE_SURFACE_KHR, "(Window %u): Surface", SDL_GetWindowID(window.sdl_window));
+
     funcs.vkGetDeviceQueue(logical, device_info.graphics_queue_idx, 0, &graphics_queue);
     funcs.vkGetDeviceQueue(logical, device_info.transfer_queue_idx, 0, &transfer_queue);
     funcs.vkGetDeviceQueue(logical, device_info.present_queue_idx, 0, &present_queue);
@@ -998,21 +1000,24 @@ gpu::device_t::device_t(SDL_Window* sdl_window)
 
         cinfo_command_pool.queueFamilyIndex = gpu::device_info.graphics_queue_idx;
         VK_DIE(funcs.vkCreateCommandPool(logical, &cinfo_command_pool, nullptr, &window.graphics_pool));
+        set_object_name(window.graphics_pool, VK_OBJECT_TYPE_COMMAND_POOL, "Graphics pool");
 
         cinfo_command_pool.queueFamilyIndex = gpu::device_info.transfer_queue_idx;
         VK_DIE(funcs.vkCreateCommandPool(logical, &cinfo_command_pool, nullptr, &window.transfer_pool));
+        set_object_name(window.transfer_pool, VK_OBJECT_TYPE_COMMAND_POOL, "Transfer pool");
     }
 
     VkFenceCreateInfo cinfo_fence {};
     cinfo_fence.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     VK_DIE(funcs.vkCreateFence(logical, &cinfo_fence, nullptr, &window.acquire_fence));
+    set_object_name(window.acquire_fence, VK_OBJECT_TYPE_FENCE, "(Window %u): Swapchain acquire fence", SDL_GetWindowID(window.sdl_window));
 }
 
 gpu::frame_t* gpu::device_t::acquire_next_frame(window_t* const window, const Uint64 timeout)
 {
     if (window->frame_is_pending)
     {
-        dc_log_error("Window %p already has a pending frame");
+        dc_log_error("Window %u already has a pending frame", SDL_GetWindowID(window->sdl_window));
         return nullptr;
     }
 
@@ -1024,6 +1029,8 @@ gpu::frame_t* gpu::device_t::acquire_next_frame(window_t* const window, const Ui
 
     int win_size_x = 0, win_size_y = 0;
     SDL_GetWindowSize(window->sdl_window, &win_size_x, &win_size_y);
+
+    const SDL_WindowID window_id = SDL_GetWindowID(window->sdl_window);
 
     if (win_size_x <= 0 || win_size_y <= 0)
         return nullptr;
@@ -1037,6 +1044,7 @@ gpu::frame_t* gpu::device_t::acquire_next_frame(window_t* const window, const Ui
 
         window->sdl_swapchain
             = create_swapchain(device_info, logical, window->sdl_window, window->sdl_surface, window->sdl_swapchain, window->format, window->extent);
+        set_object_name(window->sdl_swapchain, VK_OBJECT_TYPE_SWAPCHAIN_KHR, "(Window %u): Swapchain", window_id);
 
         for (frame_t f : frames)
             f.free();
@@ -1056,9 +1064,10 @@ gpu::frame_t* gpu::device_t::acquire_next_frame(window_t* const window, const Ui
         {
             frames[i].device = this;
 
-            frames[i].image = swapchain_images[i];
-
             frames[i].image_idx = i;
+
+            frames[i].image = swapchain_images[i];
+            set_object_name(frames[i].image, VK_OBJECT_TYPE_IMAGE, "(Window %u)(Frame %zu): Swapchain image", window_id, i);
 
             VkImageViewCreateInfo cinfo_image_view {};
             cinfo_image_view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
@@ -1075,11 +1084,13 @@ gpu::frame_t* gpu::device_t::acquire_next_frame(window_t* const window, const Ui
             cinfo_image_view.subresourceRange.baseArrayLayer = 0;
             cinfo_image_view.subresourceRange.layerCount = 1;
             VK_DIE(funcs.vkCreateImageView(logical, &cinfo_image_view, nullptr, &frames[i].image_view));
+            set_object_name(frames[i].image_view, VK_OBJECT_TYPE_IMAGE_VIEW, "(Window %u)(Frame %zu): Swapchain image View", window_id, i);
 
             VkFenceCreateInfo cinfo_fence {};
             cinfo_fence.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
             cinfo_fence.flags = VK_FENCE_CREATE_SIGNALED_BIT;
             VK_DIE(funcs.vkCreateFence(logical, &cinfo_fence, nullptr, &frames[i].done));
+            set_object_name(frames[i].done, VK_OBJECT_TYPE_FENCE, "(Window %u)(Frame %zu): Done fence", window_id, i);
 
             VkCommandBufferAllocateInfo ainfo_command_buffer {};
             ainfo_command_buffer.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -1088,9 +1099,11 @@ gpu::frame_t* gpu::device_t::acquire_next_frame(window_t* const window, const Ui
 
             ainfo_command_buffer.commandPool = window->graphics_pool;
             VK_DIE(funcs.vkAllocateCommandBuffers(logical, &ainfo_command_buffer, &frames[i].cmd_graphics));
+            set_object_name(frames[i].cmd_graphics, VK_OBJECT_TYPE_COMMAND_BUFFER, "(Window %u)(Frame %zu): cmd_graphics", window_id, i);
 
             ainfo_command_buffer.commandPool = window->transfer_pool;
             VK_DIE(funcs.vkAllocateCommandBuffers(logical, &ainfo_command_buffer, &frames[i].cmd_transfer));
+            set_object_name(frames[i].cmd_transfer, VK_OBJECT_TYPE_COMMAND_BUFFER, "(Window %u)(Frame %zu): cmd_transfer", window_id, i);
         }
 
         bool format_changed = swapchain_old_format.format != window->format.format;
@@ -1242,4 +1255,21 @@ gpu::device_t::~device_t()
         SDL_DestroyMutex(m);
 
     funcs.vkDestroyDevice(logical, nullptr);
+}
+
+void gpu::device_t::set_object_name_real(Uint64 object_handle, VkObjectType object_type, const char* fmt, va_list args)
+{
+    if (!vkSetDebugUtilsObjectNameEXT)
+        return;
+    char name[1024] = "";
+
+    stbsp_vsnprintf(name, SDL_arraysize(name), fmt, args);
+
+    VkDebugUtilsObjectNameInfoEXT ninfo = {};
+    ninfo.sType = VK_STRUCTURE_TYPE_DEBUG_UTILS_OBJECT_NAME_INFO_EXT;
+    ninfo.objectType = object_type;
+    ninfo.objectHandle = object_handle;
+    ninfo.pObjectName = name;
+
+    vkSetDebugUtilsObjectNameEXT(logical, &ninfo);
 }

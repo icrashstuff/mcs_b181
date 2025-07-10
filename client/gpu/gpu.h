@@ -204,6 +204,24 @@ struct device_t
 
     VolkDeviceTable funcs;
 
+private:
+    void set_object_name_real(Uint64 object_handle, VkObjectType object_type, const char* fmt, va_list args);
+
+public:
+    /**
+     * Wrapper around vkSetDebugUtilsObjectNameEXT(3)
+     *
+     * If vkSetDebugUtilsObjectNameEXT(3) is not available, this is a no-op
+     */
+    template <typename T>
+    void set_object_name(T object_handle, VkObjectType object_type, SDL_PRINTF_FORMAT_STRING const char* fmt, ...) SDL_PRINTF_VARARG_FUNC(4)
+    {
+        va_list args;
+        va_start(args, fmt);
+        set_object_name_real(reinterpret_cast<Uint64>(object_handle), object_type, fmt, args);
+        va_end(args);
+    }
+
     friend struct frame_t;
 };
 
