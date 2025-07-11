@@ -2035,6 +2035,15 @@ void setup_static_gpu_state()
 
 static task_timer_t timer_frametimes("Frametimes");
 
+static convar_int_t cvr_r_gpu_test_app {
+    "r_gpu_test_app",
+    false,
+    false,
+    true,
+    "Launch GPU API test application",
+    CONVAR_FLAG_INT_IS_BOOL,
+};
+
 #include <SDL3/SDL_main.h>
 int main(int argc, char* argv[])
 {
@@ -2058,11 +2067,16 @@ int main(int argc, char* argv[])
     SDL_SetHint(SDL_HINT_IOS_HIDE_HOME_INDICATOR, "2");
 
     tetra::init("icrashstuff", "mcs_b181", "mcs_b181_client", argc, (const char**)argv, false);
+
     gpu::init();
-    gpu::simple_test_app();
-    gpu::quit();
-    tetra::deinit();
-    return 0;
+
+    if (cvr_r_gpu_test_app.get())
+    {
+        gpu::simple_test_app();
+        gpu::quit();
+        tetra::deinit();
+        return 0;
+    }
 
     SDL_InitSubSystem(SDL_INIT_AUDIO);
 
