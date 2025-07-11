@@ -46,14 +46,6 @@ void simple_test_app();
 
 void quit();
 
-extern SDL_Mutex* graphics_queue_lock;
-extern SDL_Mutex* transfer_queue_lock;
-extern SDL_Mutex* present_queue_lock;
-
-extern VkQueue graphics_queue;
-extern VkQueue transfer_queue;
-extern VkQueue present_queue;
-
 extern SDL_Window* window;
 
 extern VkInstance instance;
@@ -226,43 +218,4 @@ public:
 };
 
 extern device_t* device_new;
-
-struct swapchain_info_t
-{
-    std::vector<VkSurfaceFormatKHR> formats;
-
-    std::vector<VkPresentModeKHR> present_modes;
-
-    VkSurfaceCapabilitiesKHR capabilities = {};
-};
-
-struct physical_device_info_t
-{
-    VkPhysicalDevice device = VK_NULL_HANDLE;
-    VkPhysicalDeviceProperties2 props_10 = {};
-    VkPhysicalDeviceVulkan11Properties props_11 = {};
-    VkPhysicalDeviceVulkan12Properties props_12 = {};
-
-    VkPhysicalDeviceFeatures2 features_10 = {};
-    VkPhysicalDeviceVulkan11Features features_11 = {};
-    VkPhysicalDeviceVulkan12Features features_12 = {};
-
-    std::vector<VkExtensionProperties> extensions;
-
-    /** Queue families available the the physical device */
-    std::vector<VkQueueFamilyProperties> queue_families;
-
-    bool has_graphics_queue = 0;
-    bool has_transfer_queue = 0;
-    bool has_present_queue = 0;
-
-    Uint32 graphics_queue_idx = 0;
-    Uint32 transfer_queue_idx = 0;
-    Uint32 present_queue_idx = 0;
-
-    physical_device_info_t();
-};
-
-/**  Device info associated with gpu::device */
-extern physical_device_info_t device_info;
 }

@@ -45,17 +45,46 @@ static convar_int_t r_debug_vulkan {
     CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_DEV_ONLY,
 };
 
-gpu::physical_device_info_t gpu::device_info = {};
-
 VkInstance gpu::instance = VK_NULL_HANDLE;
 
-VkQueue gpu::graphics_queue = VK_NULL_HANDLE;
-VkQueue gpu::transfer_queue = VK_NULL_HANDLE;
-VkQueue gpu::present_queue = VK_NULL_HANDLE;
+namespace gpu
+{
+struct swapchain_info_t
+{
+    std::vector<VkSurfaceFormatKHR> formats;
 
-SDL_Mutex* gpu::graphics_queue_lock = nullptr;
-SDL_Mutex* gpu::transfer_queue_lock = nullptr;
-SDL_Mutex* gpu::present_queue_lock = nullptr;
+    std::vector<VkPresentModeKHR> present_modes;
+
+    VkSurfaceCapabilitiesKHR capabilities = {};
+};
+
+struct physical_device_info_t
+{
+    VkPhysicalDevice device = VK_NULL_HANDLE;
+    VkPhysicalDeviceProperties2 props_10 = {};
+    VkPhysicalDeviceVulkan11Properties props_11 = {};
+    VkPhysicalDeviceVulkan12Properties props_12 = {};
+
+    VkPhysicalDeviceFeatures2 features_10 = {};
+    VkPhysicalDeviceVulkan11Features features_11 = {};
+    VkPhysicalDeviceVulkan12Features features_12 = {};
+
+    std::vector<VkExtensionProperties> extensions;
+
+    /** Queue families available the the physical device */
+    std::vector<VkQueueFamilyProperties> queue_families;
+
+    bool has_graphics_queue = 0;
+    bool has_transfer_queue = 0;
+    bool has_present_queue = 0;
+
+    Uint32 graphics_queue_idx = 0;
+    Uint32 transfer_queue_idx = 0;
+    Uint32 present_queue_idx = 0;
+
+    physical_device_info_t();
+};
+}
 
 /** Die on an error from a function returning VkResult */
 #define VK_DIE(_CALL)                                                                              \
@@ -581,8 +610,7 @@ static VkPresentModeKHR get_present_mode(const gpu::swapchain_info_t& info) { re
  *
  * NOTE: This function calls gpu::wait_for_device_idle()
  *
- * @param device_info Physical device info related to the device parameter
- * @param device Logical device associated with swapchain
+ * @param device Device associated with swapchain
  * @param window Window associated with surface
  * @param surface Surface associated with the swapchain
  * @param old_swapchain Pre-existing swapchain to retire and *destroy*
@@ -591,12 +619,12 @@ static VkPresentModeKHR get_present_mode(const gpu::swapchain_info_t& info) { re
  *
  * @returns A new swapchain on success, VK_NULL_HANDLE on error
  */
-static VkSwapchainKHR create_swapchain(const gpu::physical_device_info_t& device_info, VkDevice device, SDL_Window* window, VkSurfaceKHR surface,
-    VkSwapchainKHR old_swapchain, VkSurfaceFormatKHR& format, VkExtent2D& size)
+static VkSwapchainKHR create_swapchain(
+    gpu::device_t* const device, SDL_Window* const window, VkSurfaceKHR surface, VkSwapchainKHR old_swapchain, VkSurfaceFormatKHR& format, VkExtent2D& size)
 {
-    gpu::device_new->wait_for_device_idle();
+    device->wait_for_device_idle();
 
-    gpu::swapchain_info_t swapchain_info = get_current_swapchain_info(device_info.device, surface);
+    gpu::swapchain_info_t swapchain_info = get_current_swapchain_info(device->physical, surface);
 
     VkSwapchainCreateInfoKHR cinfo {};
     cinfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
@@ -632,9 +660,9 @@ static VkSwapchainKHR create_swapchain(const gpu::physical_device_info_t& device
     std::vector<Uint32> queue_families;
     {
         std::set<Uint32> queue_families_set = {
-            device_info.graphics_queue_idx,
-            device_info.present_queue_idx,
-            device_info.transfer_queue_idx,
+            device->graphics_queue_idx,
+            device->present_queue_idx,
+            device->transfer_queue_idx,
         };
         for (Uint32 it : queue_families_set)
             queue_families.push_back(it);
@@ -657,10 +685,10 @@ static VkSwapchainKHR create_swapchain(const gpu::physical_device_info_t& device
     VkSwapchainKHR swapchain = VK_NULL_HANDLE;
 
     VkResult result;
-    VK_TRY_STORE(result, vkCreateSwapchainKHR(device, &cinfo, nullptr, &swapchain));
+    VK_TRY_STORE(result, vkCreateSwapchainKHR(device->logical, &cinfo, nullptr, &swapchain));
 
     if (old_swapchain)
-        vkDestroySwapchainKHR(device, old_swapchain, nullptr);
+        vkDestroySwapchainKHR(device->logical, old_swapchain, nullptr);
 
     if (result != VK_SUCCESS)
         return VK_NULL_HANDLE;
@@ -697,13 +725,6 @@ void gpu::init()
     volkLoadInstanceOnly(gpu::instance);
 
     device_new = new device_t(gpu::window);
-
-    graphics_queue = device_new->graphics_queue;
-    transfer_queue = device_new->transfer_queue;
-    present_queue = device_new->present_queue;
-    graphics_queue_lock = device_new->graphics_queue_lock;
-    transfer_queue_lock = device_new->transfer_queue_lock;
-    present_queue_lock = device_new->present_queue_lock;
 
     /* Load ImGui functions */
     ImGui_ImplVulkan_LoadFunctions(
@@ -780,10 +801,10 @@ void gpu::simple_test_app()
     ImGui_ImplVulkan_InitInfo cinfo_imgui {};
     cinfo_imgui.ApiVersion = gpu::instance_api_version;
     cinfo_imgui.Instance = gpu::instance;
-    cinfo_imgui.PhysicalDevice = gpu::device_info.device;
+    cinfo_imgui.PhysicalDevice = gpu::device_new->physical;
     cinfo_imgui.Device = gpu::device_new->logical;
 
-    cinfo_imgui.Queue = gpu::graphics_queue;
+    cinfo_imgui.Queue = gpu::device_new->graphics_queue;
     cinfo_imgui.ImageCount = cinfo_imgui.MinImageCount = 2;
 
     cinfo_imgui.DescriptorPoolSize = IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE + 1;
@@ -964,9 +985,16 @@ gpu::device_t::device_t(SDL_Window* sdl_window)
         VK_KHR_SWAPCHAIN_EXTENSION_NAME,
     };
 
+    gpu::physical_device_info_t device_info = {};
+
     if (!select_physical_device(instance, window.sdl_surface, required_device_extensions, device_info))
         util::die("Unable to find suitable Vulkan Device!\n"
                   "Try updating your Operating System and/or Graphics drivers");
+
+    graphics_queue_idx = device_info.graphics_queue_idx;
+    transfer_queue_idx = device_info.transfer_queue_idx;
+    present_queue_idx = device_info.present_queue_idx;
+    physical = device_info.device;
 
     logical = init_device(instance, device_info, required_device_extensions);
     volkLoadDevice(logical);
@@ -974,21 +1002,21 @@ gpu::device_t::device_t(SDL_Window* sdl_window)
 
     set_object_name(window.sdl_surface, VK_OBJECT_TYPE_SURFACE_KHR, "(Window %u): Surface", SDL_GetWindowID(window.sdl_window));
 
-    funcs.vkGetDeviceQueue(logical, device_info.graphics_queue_idx, 0, &graphics_queue);
-    funcs.vkGetDeviceQueue(logical, device_info.transfer_queue_idx, 0, &transfer_queue);
-    funcs.vkGetDeviceQueue(logical, device_info.present_queue_idx, 0, &present_queue);
+    funcs.vkGetDeviceQueue(logical, graphics_queue_idx, 0, &graphics_queue);
+    funcs.vkGetDeviceQueue(logical, transfer_queue_idx, 0, &transfer_queue);
+    funcs.vkGetDeviceQueue(logical, present_queue_idx, 0, &present_queue);
 
     /* Setup queue locks */
-    std::set<Uint32> queue_families = { device_info.graphics_queue_idx, device_info.present_queue_idx, device_info.transfer_queue_idx };
+    std::set<Uint32> queue_families = { graphics_queue_idx, present_queue_idx, transfer_queue_idx };
     for (const Uint32 family_idx : queue_families)
     {
         SDL_Mutex* const lock = SDL_CreateMutex();
         queue_locks.push_back(lock);
-        if (device_info.graphics_queue_idx == family_idx)
+        if (graphics_queue_idx == family_idx)
             graphics_queue_lock = lock;
-        if (device_info.transfer_queue_idx == family_idx)
+        if (transfer_queue_idx == family_idx)
             transfer_queue_lock = lock;
-        if (device_info.present_queue_idx == family_idx)
+        if (present_queue_idx == family_idx)
             present_queue_lock = lock;
     }
 
@@ -998,11 +1026,11 @@ gpu::device_t::device_t(SDL_Window* sdl_window)
         cinfo_command_pool.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         cinfo_command_pool.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-        cinfo_command_pool.queueFamilyIndex = gpu::device_info.graphics_queue_idx;
+        cinfo_command_pool.queueFamilyIndex = graphics_queue_idx;
         VK_DIE(funcs.vkCreateCommandPool(logical, &cinfo_command_pool, nullptr, &window.graphics_pool));
         set_object_name(window.graphics_pool, VK_OBJECT_TYPE_COMMAND_POOL, "Graphics pool");
 
-        cinfo_command_pool.queueFamilyIndex = gpu::device_info.transfer_queue_idx;
+        cinfo_command_pool.queueFamilyIndex = transfer_queue_idx;
         VK_DIE(funcs.vkCreateCommandPool(logical, &cinfo_command_pool, nullptr, &window.transfer_pool));
         set_object_name(window.transfer_pool, VK_OBJECT_TYPE_COMMAND_POOL, "Transfer pool");
     }
@@ -1043,7 +1071,7 @@ gpu::frame_t* gpu::device_t::acquire_next_frame(window_t* const window, const Ui
         TRACE("Rebuilding swapchain");
 
         window->sdl_swapchain
-            = create_swapchain(device_info, logical, window->sdl_window, window->sdl_surface, window->sdl_swapchain, window->format, window->extent);
+            = create_swapchain(gpu::device_new, window->sdl_window, window->sdl_surface, window->sdl_swapchain, window->format, window->extent);
         set_object_name(window->sdl_swapchain, VK_OBJECT_TYPE_SWAPCHAIN_KHR, "(Window %u): Swapchain", window_id);
 
         for (frame_t f : frames)
@@ -1200,10 +1228,10 @@ void gpu::device_t::submit_frame(window_t* const window, frame_t* frame)
     if (frame->used_transfer)
         SDL_LockMutex(transfer_queue_lock);
     SDL_LockMutex(present_queue_lock);
-    VK_DIE(funcs.vkQueueSubmit(gpu::graphics_queue, 1, &sinfo, frame->done));
+    VK_DIE(funcs.vkQueueSubmit(graphics_queue, 1, &sinfo, frame->done));
     {
         /* TODO: Handle VK_ERROR_OUT_OF_DATE_KHR? */
-        VkResult result = funcs.vkQueuePresentKHR(gpu::present_queue, &pinfo);
+        VkResult result = funcs.vkQueuePresentKHR(present_queue, &pinfo);
         if (is_swapchain_result_non_fatal(result))
             window->swapchain_rebuild_required = 1;
         else
