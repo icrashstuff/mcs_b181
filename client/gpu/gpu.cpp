@@ -1113,7 +1113,7 @@ gpu::device_t::~device_t()
 
 void gpu::device_t::set_object_name_real(Uint64 object_handle, VkObjectType object_type, const char* fmt, va_list args)
 {
-    if (!vkSetDebugUtilsObjectNameEXT)
+    if (!vkSetDebugUtilsObjectNameEXT || object_handle == (Uint64)VK_NULL_HANDLE)
         return;
     char name[1024] = "";
 

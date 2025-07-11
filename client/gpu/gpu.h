@@ -232,7 +232,11 @@ public:
     /**
      * Wrapper around vkSetDebugUtilsObjectNameEXT(3)
      *
-     * If vkSetDebugUtilsObjectNameEXT(3) is not available, this is a no-op
+     * If vkSetDebugUtilsObjectNameEXT(3) is not available, this function is a safe a no-op
+     *
+     * @param object_handle Object handle (If object_handle == VK_NULL_HANDLE, this function is a safe a no-op)
+     * @param object_type Object type
+     * @param fmt stb_sprintf format string
      */
     template <typename T>
     void set_object_name(T object_handle, VkObjectType object_type, SDL_PRINTF_FORMAT_STRING const char* fmt, ...) SDL_PRINTF_VARARG_FUNC(4)
