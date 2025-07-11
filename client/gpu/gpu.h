@@ -30,6 +30,33 @@
 
 #include "volk/volk.h"
 
+/** Die on an error from a function returning VkResult */
+#define VK_DIE(_CALL)                                                                              \
+    do                                                                                             \
+    {                                                                                              \
+        VkResult result__ = _CALL;                                                                 \
+        if (result__ != VK_SUCCESS)                                                                \
+            util::die("%s failed with code: %d: %s", #_CALL, result__, string_VkResult(result__)); \
+    } while (0)
+
+/** Log an error from a function returning VkResult */
+#define VK_TRY(_CALL)                                                                                 \
+    do                                                                                                \
+    {                                                                                                 \
+        VkResult result__ = _CALL;                                                                    \
+        if (result__ != VK_SUCCESS)                                                                   \
+            dc_log_error("%s failed with code: %d: %s", #_CALL, result__, string_VkResult(result__)); \
+    } while (0)
+
+/** Log an error from a function returning VkResult, and save the result */
+#define VK_TRY_STORE(RESULT, _CALL)                                                               \
+    do                                                                                            \
+    {                                                                                             \
+        RESULT = _CALL;                                                                           \
+        if (RESULT != VK_SUCCESS)                                                                 \
+            dc_log_error("%s failed with code: %d: %s", #_CALL, RESULT, string_VkResult(RESULT)); \
+    } while (0)
+
 namespace gpu
 {
 /**
@@ -41,6 +68,8 @@ void init();
 
 /**
  * Run a little test app to verify some things are working
+ *
+ * `gpu::init()` must be called before calling this function
  */
 void simple_test_app();
 
@@ -218,4 +247,7 @@ public:
 };
 
 extern device_t* device_new;
+
+/** Convenience function to insert an image layout transition pipeline barrier */
+void transition_image(VkCommandBuffer const command_buffer, VkImage const image, const VkImageLayout layout_old, const VkImageLayout layout_new);
 }

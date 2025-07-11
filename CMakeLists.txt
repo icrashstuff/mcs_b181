@@ -113,6 +113,7 @@ set(mcs_b181_client_SRC
     client/textures.cpp
 
     client/gpu/gpu.cpp
+    client/gpu/test.cpp
     client/gpu/buffer.cpp
     client/gpu/texture.cpp
     client/gpu/sampler.cpp
