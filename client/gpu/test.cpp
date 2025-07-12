@@ -46,6 +46,8 @@ void gpu::simple_test_app()
     cinfo_imgui.DescriptorPoolSize = IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE + 1;
     cinfo_imgui.UseDynamicRendering = true;
 
+    cinfo_imgui.PipelineCache = gpu::device_new->pipeline_cache;
+
     cinfo_imgui.QueueLockData = gpu::device_new->graphics_queue_lock;
     cinfo_imgui.QueueLockFn = [](void* m) { SDL_LockMutex(static_cast<SDL_Mutex*>(m)); };
     cinfo_imgui.QueueUnlockFn = [](void* m) { SDL_UnlockMutex(static_cast<SDL_Mutex*>(m)); };

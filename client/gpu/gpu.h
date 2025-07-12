@@ -173,6 +173,7 @@ struct device_t
 {
     VkPhysicalDevice physical = VK_NULL_HANDLE;
     VkDevice logical = VK_NULL_HANDLE;
+    VkPipelineCache pipeline_cache = VK_NULL_HANDLE;
 
     /* ======================================================== */
     /* ================ Window/Swapchain stuff ================ */

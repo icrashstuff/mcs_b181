@@ -24,16 +24,34 @@
 
 #include "internal.h"
 
+#include "pipeline_cache.h"
 #include "shared/misc.h"
 #include "tetra/gui/imgui/backends/imgui_impl_vulkan.h"
 #include "tetra/tetra_core.h"
 #include "tetra/util/convar.h"
 #include "tetra/util/misc.h"
+#include "tetra/util/physfs/physfs.h"
 #include <SDL3/SDL_vulkan.h>
 #include <algorithm>
 #include <set>
 
 SDL_Window* gpu::window = nullptr;
+
+static convar_int_t r_pipeline_cache {
+    "r_pipeline_cache",
+    true,
+    false,
+    true,
+    "Enable Vulkan pipeline cache",
+    CONVAR_FLAG_INT_IS_BOOL,
+};
+
+static convar_string_t r_pipeline_cache_path {
+    "r_pipeline_cache_path",
+    "/mcs_b181.vk_pipeline_cache",
+    "PHYSFS Path for vulkan pipeline cache",
+    CONVAR_FLAG_SAVE,
+};
 
 static convar_int_t r_debug_vulkan {
     "r_debug_vulkan",
@@ -799,8 +817,73 @@ void gpu::frame_t::free()
         device->funcs.vkDestroySemaphore(device->logical, s, nullptr);
 }
 
+static int thread_func_read_pipeline_cache(void* userdata)
+{
+    std::vector<Uint8>* pipeline_cache_data = reinterpret_cast<std::vector<Uint8>*>(userdata);
+
+    PHYSFS_File* fd = PHYSFS_openRead(r_pipeline_cache_path.get().c_str());
+
+    if (!fd)
+        return 0;
+
+    Sint64 file_length = PHYSFS_fileLength(fd);
+
+    if (file_length > 0)
+    {
+        pipeline_cache_data->resize(file_length);
+
+        /* If the file length changed then it was probably modified, so out of laziness and paranoia: invalidate the data */
+        if (PHYSFS_readBytes(fd, pipeline_cache_data->data(), file_length) != file_length)
+        {
+            dc_log_error("Error while reading pipeline cache");
+            pipeline_cache_data->resize(0);
+        }
+        else
+            dc_log("Pipeline cache read into memory");
+    }
+
+    PHYSFS_close(fd);
+
+    return 0;
+}
+
+static int thread_func_write_pipeline_cache(void* userdata)
+{
+    std::vector<Uint8>* pipeline_cache_data = reinterpret_cast<std::vector<Uint8>*>(userdata);
+
+    /* Unfortunately PHYSFS does not support file renaming, so */
+    std::string temp_path = r_pipeline_cache_path.get();
+
+    PHYSFS_File* fd = PHYSFS_openWrite(temp_path.c_str());
+
+    if (!fd)
+        return 0;
+
+    if (PHYSFS_writeBytes(fd, pipeline_cache_data->data(), pipeline_cache_data->size()) != Sint64(pipeline_cache_data->size()))
+    {
+        dc_log_error("Failed to save pipeline cache %s", PHYSFS_getErrorByCode(PHYSFS_getLastErrorCode()));
+        PHYSFS_close(fd);
+        PHYSFS_delete(temp_path.c_str());
+        return 0;
+    }
+
+    /* Calling flush multiple times probably won't do anything, but it doesn't hurt too much to do it anyone */
+    for (int i = 0; i < 32; i++)
+        PHYSFS_flush(fd);
+    PHYSFS_close(fd);
+
+    dc_log("Saved pipeline cache");
+
+    return 0;
+}
+
 gpu::device_t::device_t(SDL_Window* sdl_window)
 {
+    SDL_Thread* pipeline_cache_load_thread = nullptr;
+    std::vector<Uint8> pipeline_cache_data;
+    if (r_pipeline_cache.get())
+        pipeline_cache_load_thread = SDL_CreateThread(thread_func_read_pipeline_cache, "Pipeline Cache file load task", &pipeline_cache_data);
+
     window.sdl_window = sdl_window;
 
     if (!SDL_Vulkan_CreateSurface(window.sdl_window, instance, nullptr, &window.sdl_surface))
@@ -824,6 +907,7 @@ gpu::device_t::device_t(SDL_Window* sdl_window)
     physical = device_info.device;
 
     logical = init_device(instance, device_info, required_device_extensions);
+    set_object_name(logical, VK_OBJECT_TYPE_DEVICE, "gpu::device_t::logical");
     volkLoadDevice(logical);
     volkLoadDeviceTable(&funcs, logical);
 
@@ -866,6 +950,64 @@ gpu::device_t::device_t(SDL_Window* sdl_window)
     cinfo_fence.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     VK_DIE(funcs.vkCreateFence(logical, &cinfo_fence, nullptr, &window.acquire_fence));
     set_object_name(window.acquire_fence, VK_OBJECT_TYPE_FENCE, "(Window %u): Swapchain acquire fence", SDL_GetWindowID(window.sdl_window));
+
+    if (r_pipeline_cache.get())
+    {
+        if (pipeline_cache_load_thread == nullptr)
+            thread_func_read_pipeline_cache(&pipeline_cache_data);
+        else
+            SDL_WaitThread(pipeline_cache_load_thread, nullptr);
+
+        if (create_pipeline_cache(physical, logical, pipeline_cache, pipeline_cache_data))
+            dc_log("Created pipeline cache");
+        else
+            dc_log_error("Failed to create pipeline cache");
+
+        set_object_name(pipeline_cache, VK_OBJECT_TYPE_PIPELINE_CACHE, "gpu::device_t::pipeline_cache");
+    }
+}
+
+gpu::device_t::~device_t()
+{
+    wait_for_device_idle();
+
+    SDL_Thread* pipeline_cache_save_thread = nullptr;
+    std::vector<Uint8> pipeline_cache_data;
+    if (r_pipeline_cache.get())
+    {
+        if (save_pipeline_cache(physical, logical, pipeline_cache, pipeline_cache_data))
+        {
+            dc_log("Prepared pipeline cache file");
+            pipeline_cache_save_thread = SDL_CreateThread(thread_func_write_pipeline_cache, "Pipeline Cache file save task", &pipeline_cache_data);
+        }
+        else
+            dc_log_error("Failed to prepare pipeline cache file");
+    }
+
+    funcs.vkDestroyPipelineCache(logical, pipeline_cache, nullptr);
+
+    for (frame_t f : window.frames)
+        f.free();
+    window.frames.resize(0);
+
+    funcs.vkDestroySwapchainKHR(logical, window.sdl_swapchain, nullptr);
+    funcs.vkDestroyCommandPool(logical, window.graphics_pool, nullptr);
+    funcs.vkDestroyCommandPool(logical, window.transfer_pool, nullptr);
+    funcs.vkDestroyFence(logical, window.acquire_fence, nullptr);
+
+    SDL_Vulkan_DestroySurface(instance, window.sdl_surface, nullptr);
+    for (SDL_Mutex* m : std::set<SDL_Mutex*> { graphics_queue_lock, transfer_queue_lock, present_queue_lock })
+        SDL_DestroyMutex(m);
+
+    funcs.vkDestroyDevice(logical, nullptr);
+
+    if (r_pipeline_cache.get())
+    {
+        if (pipeline_cache_save_thread == nullptr)
+            thread_func_write_pipeline_cache(&pipeline_cache_data);
+        else
+            SDL_WaitThread(pipeline_cache_save_thread, nullptr);
+    }
 }
 
 gpu::frame_t* gpu::device_t::acquire_next_frame(window_t* const window, const Uint64 timeout)
@@ -1056,7 +1198,6 @@ void gpu::device_t::submit_frame(window_t* const window, frame_t* frame)
     SDL_LockMutex(present_queue_lock);
     VK_DIE(funcs.vkQueueSubmit(graphics_queue, 1, &sinfo, frame->done));
     {
-        /* TODO: Handle VK_ERROR_OUT_OF_DATE_KHR? */
         VkResult result = funcs.vkQueuePresentKHR(present_queue, &pinfo);
         if (is_swapchain_result_non_fatal(result))
             window->swapchain_rebuild_required = 1;
@@ -1089,26 +1230,6 @@ void gpu::device_t::wait_for_device_idle()
     lock_all_queues();
     funcs.vkDeviceWaitIdle(logical);
     unlock_all_queues();
-}
-
-gpu::device_t::~device_t()
-{
-    wait_for_device_idle();
-
-    for (frame_t f : window.frames)
-        f.free();
-    window.frames.resize(0);
-
-    funcs.vkDestroySwapchainKHR(logical, window.sdl_swapchain, nullptr);
-    funcs.vkDestroyCommandPool(logical, window.graphics_pool, nullptr);
-    funcs.vkDestroyCommandPool(logical, window.transfer_pool, nullptr);
-    funcs.vkDestroyFence(logical, window.acquire_fence, nullptr);
-
-    SDL_Vulkan_DestroySurface(instance, window.sdl_surface, nullptr);
-    for (SDL_Mutex* m : std::set<SDL_Mutex*> { graphics_queue_lock, transfer_queue_lock, present_queue_lock })
-        SDL_DestroyMutex(m);
-
-    funcs.vkDestroyDevice(logical, nullptr);
 }
 
 void gpu::device_t::set_object_name_real(Uint64 object_handle, VkObjectType object_type, const char* fmt, va_list args)
