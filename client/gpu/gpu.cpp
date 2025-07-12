@@ -137,7 +137,10 @@ static VkInstance init_instance(std::vector<const char*> required_instance_exten
         Uint32 sdl_ext_count = 0;
         const char* const* sdl_ext = SDL_Vulkan_GetInstanceExtensions(&sdl_ext_count);
         for (Uint32 i = 0; i < sdl_ext_count; ++i)
+        {
+            dc_log("SDL requires instance extension: %s", sdl_ext[i]);
             required_instance_extensions.push_back(sdl_ext[i]);
+        }
     }
 
     if (r_debug_vulkan.get())
@@ -169,10 +172,10 @@ static VkInstance init_instance(std::vector<const char*> required_instance_exten
         bool found = 0;
         for (Uint32 i = 0; i < props_ext_num && !found; ++i)
             found = (strcmp(it, props_ext[i].extensionName) == 0);
-        if (!found)
-            dc_log_error("Required instance extension %s not found", it);
+        if (found)
+            dc_log("Found required instance extension: %s", it);
         else
-            dc_log("Required instance extension %s found", it);
+            dc_log_error("Did not find required instance extension: %s", it);
     }
 
     /* Check that all required instances layers are present */
@@ -181,8 +184,10 @@ static VkInstance init_instance(std::vector<const char*> required_instance_exten
         bool found = 0;
         for (Uint32 i = 0; i < props_lay_num && !found; ++i)
             found = (strcmp(it, props_lay[i].layerName) == 0);
-        if (!found)
-            dc_log("Required instance layer %s found", it);
+        if (found)
+            dc_log("Found required instance layer: %s", it);
+        else
+            dc_log_error("Did not find required instance layer: %s", it);
     }
 
     VkInstanceCreateInfo cinfo_instance = {};
@@ -193,7 +198,7 @@ static VkInstance init_instance(std::vector<const char*> required_instance_exten
     {
         if (strcmp(it.extensionName, VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME) == 0)
         {
-            dc_log("Enabling instance extension: %s", VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
+            dc_log("Found optional instance extension: %s", VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
             required_instance_extensions.push_back(VK_KHR_PORTABILITY_ENUMERATION_EXTENSION_NAME);
             cinfo_instance.flags |= VK_INSTANCE_CREATE_ENUMERATE_PORTABILITY_BIT_KHR;
         }
@@ -592,8 +597,57 @@ static bool pick_swapchain_format(const gpu::swapchain_info_t& info, VkFormat& o
 #undef SWAPCHAIN_FORMAT_IF
 }
 
-/* TODO: VK_PRESENT_MODE_MAILBOX_KHR, and others */
-static VkPresentModeKHR get_present_mode(const gpu::swapchain_info_t& info) { return VK_PRESENT_MODE_FIFO_KHR; }
+enum present_mode_t
+{
+    PRESENT_MODE_IMMEDIATE,
+    PRESENT_MODE_VSYNC,
+    PRESENT_MODE_MOST_RECENT,
+};
+
+/**
+ * Try to pick an appropriate present mode for a swapchain
+ *
+ * @param info Swapchain info
+ * @param present_mode The GPU API present mode
+ * @param out The create info to write to
+ *
+ * @returns true if a Vulkan present mode matching the gpu present mode is found, false if the FIFO fallback is used
+ */
+static bool pick_present_mode_and_image_count(const gpu::swapchain_info_t& info, const present_mode_t present_mode, VkSwapchainCreateInfoKHR& out)
+{
+#define RET_IF_CONTAINS(mode, num_images)                                                                      \
+    do                                                                                                         \
+    {                                                                                                          \
+        if (std::find(info.present_modes.begin(), info.present_modes.end(), mode) != info.present_modes.end()) \
+        {                                                                                                      \
+            out.presentMode = mode;                                                                            \
+            /* We add 1 to num_images, to give the presentation engine some leeway for internal operations */  \
+            out.minImageCount = SDL_max(out.minImageCount, num_images + 1);                                    \
+            return true;                                                                                       \
+        }                                                                                                      \
+    } while (0)
+
+    if (present_mode == PRESENT_MODE_IMMEDIATE)
+        RET_IF_CONTAINS(VK_PRESENT_MODE_IMMEDIATE_KHR, 1);
+
+    if (present_mode == PRESENT_MODE_VSYNC)
+    {
+        RET_IF_CONTAINS(VK_PRESENT_MODE_FIFO_RELAXED_KHR, 2);
+        RET_IF_CONTAINS(VK_PRESENT_MODE_FIFO_KHR, 2);
+    }
+
+    if (present_mode == PRESENT_MODE_MOST_RECENT)
+    {
+        RET_IF_CONTAINS(VK_PRESENT_MODE_MAILBOX_KHR, 3);
+        RET_IF_CONTAINS(VK_PRESENT_MODE_FIFO_LATEST_READY_KHR, 3);
+    }
+
+    dc_log_warn("Falling back to vsync");
+    out.presentMode = VK_PRESENT_MODE_FIFO_KHR;
+    out.minImageCount = SDL_max(out.minImageCount, 2 + 1);
+    return false;
+#undef RET_IF_CONTAINS
+}
 
 /**
  * Create (or recreate) a swapchain
@@ -620,8 +674,8 @@ static VkSwapchainKHR create_swapchain(
     cinfo.sType = VK_STRUCTURE_TYPE_SWAPCHAIN_CREATE_INFO_KHR;
     cinfo.surface = surface;
 
-    /* TODO: Vary this depending on the present mode */
-    cinfo.minImageCount = swapchain_info.capabilities.minImageCount + 1;
+    pick_present_mode_and_image_count(swapchain_info, PRESENT_MODE_VSYNC, cinfo);
+    cinfo.minImageCount = SDL_max(cinfo.minImageCount, swapchain_info.capabilities.minImageCount + 1);
 
     if (swapchain_info.capabilities.maxImageCount) /* If non-zero then enforce the maximum image count */
         cinfo.minImageCount = SDL_min(cinfo.minImageCount, swapchain_info.capabilities.maxImageCount);
@@ -668,7 +722,6 @@ static VkSwapchainKHR create_swapchain(
 
     cinfo.preTransform = swapchain_info.capabilities.currentTransform;
     cinfo.compositeAlpha = VK_COMPOSITE_ALPHA_OPAQUE_BIT_KHR;
-    cinfo.presentMode = get_present_mode(swapchain_info);
     cinfo.clipped = VK_TRUE;
     cinfo.oldSwapchain = old_swapchain;
 
