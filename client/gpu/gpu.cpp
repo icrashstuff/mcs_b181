@@ -744,8 +744,6 @@ static VkSwapchainKHR create_swapchain(
     return swapchain;
 }
 
-static std::vector<SDL_Mutex*> queue_locks;
-
 gpu::device_t* gpu::device_new = nullptr;
 
 void gpu::init()
@@ -971,11 +969,9 @@ gpu::device_t::device_t(SDL_Window* sdl_window)
     funcs.vkGetDeviceQueue(logical, present_queue_idx, 0, &present_queue);
 
     /* Setup queue locks */
-    std::set<Uint32> queue_families = { graphics_queue_idx, present_queue_idx, transfer_queue_idx };
-    for (const Uint32 family_idx : queue_families)
+    for (const Uint32 family_idx : std::set<Uint32> { graphics_queue_idx, present_queue_idx, transfer_queue_idx })
     {
         SDL_Mutex* const lock = SDL_CreateMutex();
-        queue_locks.push_back(lock);
         if (graphics_queue_idx == family_idx)
             graphics_queue_lock = lock;
         if (transfer_queue_idx == family_idx)
