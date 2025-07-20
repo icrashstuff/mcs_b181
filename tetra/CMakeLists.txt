@@ -107,8 +107,36 @@ set(tetra_sdl_gpu_SRC
     ${IMGUI_DIR}/backends/imgui_impl_sdlgpu3.cpp
 )
 
+include(CheckCompilerFlag)
+
+function(tetra_add_compile_option_for_lang target_name scope lang flag)
+    get_property(languages GLOBAL PROPERTY ENABLED_LANGUAGES)
+
+    if(NOT "${lang}" IN_LIST languages)
+        return()
+    endif()
+
+    check_compiler_flag(${lang} ${flag} FLAG_SUPPORTED)
+    if(FLAG_SUPPORTED)
+        message(STATUS "Flag \"${flag}\" supported for ${lang}")
+        target_compile_options(${target_name} ${scope} $<$<COMPILE_LANGUAGE:${lang}>:${flag}>)
+    else()
+        message(STATUS "Flag \"${flag}\" not supported for ${lang}")
+    endif()
+endfunction()
+
+function(tetra_add_compile_option target_name scope flag)
+    tetra_add_compile_option_for_lang(${target_name} ${scope} C ${flag})
+    tetra_add_compile_option_for_lang(${target_name} ${scope} CXX ${flag})
+    tetra_add_compile_option_for_lang(${target_name} ${scope} OBJC ${flag})
+    tetra_add_compile_option_for_lang(${target_name} ${scope} OBJCXX ${flag})
+endfunction()
+
 function(tetra_common_compile_options target_name)
-    target_compile_options(${target_name} PUBLIC -Wall -Wextra -Wdocumentation -DSDL_DISABLE_OLD_NAMES=1)
+    target_compile_definitions(${target_name} PUBLIC SDL_DISABLE_OLD_NAMES=1)
+    tetra_add_compile_option(${target_name} PUBLIC -Wall)
+    tetra_add_compile_option(${target_name} PUBLIC -Wextra)
+    tetra_add_compile_option(${target_name} PUBLIC -Wdocumentation)
 
     # -WShadow spits out a warning for code like:
     # int i = 0;
@@ -117,15 +145,16 @@ function(tetra_common_compile_options target_name)
     #
     # If you ever need to find a flag to warn for specific behavior:
     # the clang flag -Weverything is useful for finding them
-    target_compile_options(${target_name} PUBLIC -Wshadow)
+    tetra_add_compile_option(${target_name} PUBLIC -Wshadow)
 
     if(TETRA_ENABLE_NATIVE_OPTIMIZATION AND NOT MSVC)
-        target_compile_options(${target_name} PRIVATE -march=native -mtune=native)
+        tetra_add_compile_option(${target_name} PRIVATE -march=native)
+        tetra_add_compile_option(${target_name} PRIVATE -mtune=native)
     endif()
 
     if(TETRA_DISABLE_STACK_PROTECTOR AND "${CMAKE_BUILD_TYPE}" STREQUAL "Debug" AND NOT MSVC)
         message(WARNING "Disabling stack protector")
-        target_compile_options(${target_name} PUBLIC -fno-stack-protector)
+        tetra_add_compile_option(${target_name} PUBLIC -fno-stack-protector)
     endif()
 endfunction()
 
