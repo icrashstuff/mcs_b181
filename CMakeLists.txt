@@ -225,8 +225,6 @@ function(add_bin_common name)
 
     tetra_common_compile_options(${name})
 
-    target_compile_options(${name} PUBLIC -Wall -Wextra -DSDL_DISABLE_OLD_NAMES=1)
-
     target_link_libraries(${name} glm::glm)
     target_link_libraries(${name} tetra::core)
     target_link_libraries(${name} ZLIB::ZLIB)
