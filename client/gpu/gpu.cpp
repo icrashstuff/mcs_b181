@@ -1005,11 +1005,11 @@ gpu::device_t::device_t(SDL_Window* sdl_window)
 
         cinfo_command_pool.queueFamilyIndex = graphics_queue_idx;
         VK_DIE(funcs.vkCreateCommandPool(logical, &cinfo_command_pool, nullptr, &window.graphics_pool));
-        set_object_name(window.graphics_pool, VK_OBJECT_TYPE_COMMAND_POOL, "Graphics pool");
+        set_object_name(window.graphics_pool, VK_OBJECT_TYPE_COMMAND_POOL, "(Window %u): Graphics pool", SDL_GetWindowID(window.sdl_window));
 
         cinfo_command_pool.queueFamilyIndex = transfer_queue_idx;
         VK_DIE(funcs.vkCreateCommandPool(logical, &cinfo_command_pool, nullptr, &window.transfer_pool));
-        set_object_name(window.transfer_pool, VK_OBJECT_TYPE_COMMAND_POOL, "Transfer pool");
+        set_object_name(window.transfer_pool, VK_OBJECT_TYPE_COMMAND_POOL, "(Window %u): Transfer pool", SDL_GetWindowID(window.sdl_window));
     }
 
     VkFenceCreateInfo cinfo_fence {};
