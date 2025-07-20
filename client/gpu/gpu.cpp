@@ -968,6 +968,23 @@ gpu::device_t::device_t(SDL_Window* sdl_window)
     funcs.vkGetDeviceQueue(logical, transfer_queue_idx, 0, &transfer_queue);
     funcs.vkGetDeviceQueue(logical, present_queue_idx, 0, &present_queue);
 
+    /* Name queues */
+    for (const Uint32 family_idx : std::set<Uint32> { graphics_queue_idx, present_queue_idx, transfer_queue_idx })
+    {
+        std::string families;
+        if (graphics_queue_idx == family_idx)
+            families += "Graphics|";
+        if (transfer_queue_idx == family_idx)
+            families += "Transfer|";
+        if (present_queue_idx == family_idx)
+            families += "Present|";
+        if (families.length())
+            families.pop_back();
+        VkQueue queue = VK_NULL_HANDLE;
+        funcs.vkGetDeviceQueue(logical, family_idx, 0, &queue);
+        set_object_name(queue, VK_OBJECT_TYPE_QUEUE, "Queue: (%s)", families.c_str());
+    }
+
     /* Setup queue locks */
     for (const Uint32 family_idx : std::set<Uint32> { graphics_queue_idx, present_queue_idx, transfer_queue_idx })
     {
