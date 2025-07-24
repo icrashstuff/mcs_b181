@@ -30,6 +30,8 @@
 
 #include "volk/volk.h"
 
+#include "vk_mem_alloc.h"
+
 /** Die on an error from a function returning VkResult */
 #define VK_DIE(_CALL)                                                                              \
     do                                                                                             \
@@ -174,6 +176,7 @@ struct device_t
     VkPhysicalDevice physical = VK_NULL_HANDLE;
     VkDevice logical = VK_NULL_HANDLE;
     VkPipelineCache pipeline_cache = VK_NULL_HANDLE;
+    VmaAllocator allocator = VK_NULL_HANDLE;
 
     /* ======================================================== */
     /* ================ Window/Swapchain stuff ================ */

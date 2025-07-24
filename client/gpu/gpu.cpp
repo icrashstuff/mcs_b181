@@ -964,6 +964,19 @@ gpu::device_t::device_t(SDL_Window* sdl_window)
 
     set_object_name(window.sdl_surface, VK_OBJECT_TYPE_SURFACE_KHR, "(Window %u): Surface", SDL_GetWindowID(window.sdl_window));
 
+    VmaVulkanFunctions vma_vulkan_functions = {};
+    vma_vulkan_functions.vkGetInstanceProcAddr = vkGetInstanceProcAddr;
+    vma_vulkan_functions.vkGetDeviceProcAddr = vkGetDeviceProcAddr;
+
+    VmaAllocatorCreateInfo vma_cinfo = {};
+    vma_cinfo.vulkanApiVersion = instance_api_version;
+    vma_cinfo.physicalDevice = physical;
+    vma_cinfo.device = logical;
+    vma_cinfo.instance = instance;
+    vma_cinfo.pVulkanFunctions = &vma_vulkan_functions;
+
+    vmaCreateAllocator(&vma_cinfo, &allocator);
+
     funcs.vkGetDeviceQueue(logical, graphics_queue_idx, 0, &graphics_queue);
     funcs.vkGetDeviceQueue(logical, transfer_queue_idx, 0, &transfer_queue);
     funcs.vkGetDeviceQueue(logical, present_queue_idx, 0, &present_queue);
@@ -1064,6 +1077,8 @@ gpu::device_t::~device_t()
     SDL_Vulkan_DestroySurface(instance, window.sdl_surface, nullptr);
     for (SDL_Mutex* m : std::set<SDL_Mutex*> { graphics_queue_lock, transfer_queue_lock, present_queue_lock })
         SDL_DestroyMutex(m);
+
+    vmaDestroyAllocator(allocator);
 
     funcs.vkDestroyDevice(logical, nullptr);
 

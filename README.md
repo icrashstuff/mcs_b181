@@ -34,6 +34,7 @@ This project vendors and makes use of the following external software components
 | Simplex Noise        | Copyright (c) 2012-2018 Sebastien Rombauts              | MIT license (full text under shared/simplex_noise/)                            |
 | Volk                 | Copyright (c) 2018-2025 Arseny Kapoulkine               | MIT License (full text under client/gpu/volk/LICENSE.md)                       |
 | SDL3 Net             | Copyright (C) 1997-2024 Sam Lantinga, and others        | zlib license (full text under sdl_net/)                                        |
+| Vulkan Memory Allocator | Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All rights reserved. | MIT License (full text under client/gpu/vk_mem_alloc.h)   |
 
 The files docs/wiki_vg_protocol_v17.html and docs/wiki_vg_protocol_v17.mediawiki were extracted from a wiki.vg backup and are licensed under the CC-BY-SA 3.0
   - Author(s): wiki.vg contributors
