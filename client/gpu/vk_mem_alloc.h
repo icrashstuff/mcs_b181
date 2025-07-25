@@ -1,6 +1,7 @@
 /* clang-format off */
 /* [mcs_b181]: Split into source and header */
 /* [mcs_b181]: Add VMA compile flags at the top of the file */
+/* [mcs_b181]: Suppress -Wdocumentation */
 //
 // Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All rights reserved.
 //
@@ -22,6 +23,12 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN
 // THE SOFTWARE.
 //
+
+/* [mcs_b181]: Suppress -Wdocumentation */
+#ifdef __clang__
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wdocumentation"
+#endif
 
 #ifndef AMD_VULKAN_MEMORY_ALLOCATOR_H
 #define AMD_VULKAN_MEMORY_ALLOCATOR_H
@@ -5549,3 +5556,8 @@ Features deliberately excluded from the scope of this library:
 -# This is a C++ library with C interface. **Bindings or ports to any other programming languages** are welcome as external projects but
    are not going to be included into this repository.
 */
+
+/* [mcs_b181]: Suppress -Wdocumentation */
+#ifdef __clang__
+#pragma clang diagnostic pop
+#endif
