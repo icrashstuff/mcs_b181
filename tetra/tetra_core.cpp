@@ -90,7 +90,6 @@ void tetra::init(const char* organization, const char* appname, const char* cfg_
         /* Set dev before any other variables in case their callbacks require dev */
         if (cli_parser::get_value(dev->get_name()))
             dev->set(1);
-        dev->set_pre_callback([=](int, int) -> bool { return false; });
     }
 
     if (convar_t::dev())
@@ -143,6 +142,9 @@ void tetra::init(const char* organization, const char* appname, const char* cfg_
 
     /* Set convars from command line */
     cli_parser::apply();
+
+    /* Lock out changes to convars with CONVAR_FLAG_CLI_ONLY */
+    convar_t::cli_lockout_init();
 
     if (cli_parser::get_value("-help") || cli_parser::get_value("help") || cli_parser::get_value("h"))
     {

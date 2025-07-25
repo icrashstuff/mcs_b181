@@ -20,8 +20,8 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#ifndef MPH_TETRA_UTILS_CONVAR_H
-#define MPH_TETRA_UTILS_CONVAR_H
+#ifndef TETRA__UTILS__CONVAR_H
+#define TETRA__UTILS__CONVAR_H
 
 #include <SDL3/SDL.h>
 #include <functional>
@@ -60,6 +60,15 @@ enum CONVAR_FLAGS_ : Uint32
      * If the dev convar is not set then this acts like CONVAR_FLAG_HIDDEN
      */
     CONVAR_FLAG_DEV_ONLY = (1 << 3),
+
+    /**
+     * Applies to all convars
+     *
+     * If set then the convar can only be changed by an environment variable or command line flag
+     *
+     * Disables CONVAR_FLAG_SAVE
+     */
+    CONVAR_FLAG_CLI_ONLY = (1 << 4),
 };
 
 /**
@@ -118,7 +127,7 @@ public:
     virtual std::string get_convar_command() = 0;
 
     /**
-     * Sets _atexit to true, allows convars to be deleted without creating a bunch of error messages
+     * Sets _atexit to true, allows convar_t::~convar_t() to be called with causing an abort(3) call
      */
     static void atexit_callback();
 
@@ -127,8 +136,14 @@ public:
      */
     static void atexit_init();
 
+    /**
+     * Sets _cli_lockout to true, put this right after CLI/Environment variable parsing
+     */
+    static void cli_lockout_init();
+
 protected:
     static bool _atexit;
+    static bool _cli_lockout;
 
     CONVAR_TYPE _type;
     CONVAR_FLAGS _flags;

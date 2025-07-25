@@ -34,7 +34,14 @@
 
 #include <limits.h>
 
-static convar_int_t dev_cvr("dev", 0, 0, 1, "Enables developer focused features", CONVAR_FLAG_HIDDEN | CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_DEV_ONLY);
+static convar_int_t dev_cvr {
+    "dev",
+    0,
+    0,
+    1,
+    "Enables developer mode",
+    CONVAR_FLAG_HIDDEN | CONVAR_FLAG_INT_IS_BOOL | CONVAR_FLAG_DEV_ONLY | CONVAR_FLAG_CLI_ONLY,
+};
 
 bool convar_t::dev() { return dev_cvr.get(); }
 
@@ -61,9 +68,13 @@ convar_t* convar_t::get_convar(const char* name)
 
 bool convar_t::_atexit = true;
 
+bool convar_t::_cli_lockout = false;
+
 void convar_t::atexit_callback() { _atexit = true; }
 
 void convar_t::atexit_init() { _atexit = false; }
+
+void convar_t::cli_lockout_init() { _cli_lockout = true; }
 
 convar_t::~convar_t()
 {
@@ -100,6 +111,8 @@ convar_int_t::convar_int_t(const char* name, int default_value, int min, int max
     _name = name;
     _help_string = help_string;
     _flags = flags;
+    if (_flags & CONVAR_FLAG_CLI_ONLY)
+        _flags &= ~CONVAR_FLAG_SAVE;
     _type = CONVAR_TYPE::CONVAR_TYPE_INT;
     check_if_convar_exists(_name);
     convar_t::get_convar_list()->push_back(this);
@@ -121,6 +134,8 @@ convar_float_t::convar_float_t(
     _name = name;
     _help_string = help_string;
     _flags = flags;
+    if (_flags & CONVAR_FLAG_CLI_ONLY)
+        _flags &= ~CONVAR_FLAG_SAVE;
     _type = CONVAR_TYPE::CONVAR_TYPE_FLOAT;
     check_if_convar_exists(_name);
     convar_t::get_convar_list()->push_back(this);
@@ -135,30 +150,36 @@ convar_string_t::convar_string_t(const char* name, std::string default_value, co
     _name = name;
     _help_string = help_string;
     _flags = flags;
+    if (_flags & CONVAR_FLAG_CLI_ONLY)
+        _flags &= ~CONVAR_FLAG_SAVE;
     _type = CONVAR_TYPE::CONVAR_TYPE_STRING;
     check_if_convar_exists(_name);
     convar_t::get_convar_list()->push_back(this);
     cli_parser::apply_to(this);
 }
 
-#define CONVAR_SET_IMPL(type)                           \
-    bool convar_##type##_t::set(type i)                 \
-    {                                                   \
-        if (_bounded && (i < _min || i > _max))         \
-            return false;                               \
-        if (_pre_callback && !_pre_callback(_value, i)) \
-            return false;                               \
-        _value = i;                                     \
-        if (_callback)                                  \
-            _callback();                                \
-        return true;                                    \
-    }                                                   \
-    bool convar_##type##_t::set_default(type i)         \
-    {                                                   \
-        if (_bounded && (i < _min || i > _max))         \
-            return false;                               \
-        _default = i;                                   \
-        return true;                                    \
+#define CONVAR_SET_IMPL(type)                                \
+    bool convar_##type##_t::set(type i)                      \
+    {                                                        \
+        if (_cli_lockout && (_flags & CONVAR_FLAG_CLI_ONLY)) \
+            return false;                                    \
+        if (_bounded && (i < _min || i > _max))              \
+            return false;                                    \
+        if (_pre_callback && !_pre_callback(_value, i))      \
+            return false;                                    \
+        _value = i;                                          \
+        if (_callback)                                       \
+            _callback();                                     \
+        return true;                                         \
+    }                                                        \
+    bool convar_##type##_t::set_default(type i)              \
+    {                                                        \
+        if (_cli_lockout && (_flags & CONVAR_FLAG_CLI_ONLY)) \
+            return false;                                    \
+        if (_bounded && (i < _min || i > _max))              \
+            return false;                                    \
+        _default = i;                                        \
+        return true;                                         \
     }
 
 CONVAR_SET_IMPL(int);
