@@ -81,6 +81,7 @@ set(tetra_core_SRC
     ${TETRA_DIR}util/convar.cpp
     ${TETRA_DIR}util/cli_parser.cpp
     ${TETRA_DIR}util/convar_file.cpp
+    ${TETRA_DIR}util/environ_parser.cpp
 
     ${TETRA_DIR}util/stb/stbi.c
     ${TETRA_DIR}util/stb/stb_sprintf.c

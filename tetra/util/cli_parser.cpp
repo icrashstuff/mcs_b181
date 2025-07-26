@@ -128,6 +128,7 @@ bool cli_parser::apply_to(convar_t* cvr)
 
 void cli_parser::apply()
 {
+    dc_log("CLI Begin applying flags");
     const std::map<std::string, const char*>* const arg_map = get_arg_map();
     std::map<std::string, const char*> ignored_arg_map = *arg_map;
     std::vector<const char*> failed_args;

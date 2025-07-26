@@ -1,6 +1,6 @@
 /* SPDX-License-Identifier: MIT
  *
- * SPDX-FileCopyrightText: Copyright (c) 2024 Ian Hangartner <icrashstuff at outlook dot com>
+ * SPDX-FileCopyrightText: Copyright (c) 2025 Ian Hangartner <icrashstuff at outlook dot com>
  *
  * Permission is hereby granted, free of charge, to any person obtaining a
  * copy of this software and associated documentation files (the "Software"),
@@ -20,44 +20,36 @@
  * FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER
  * DEALINGS IN THE SOFTWARE.
  */
-#ifndef TETRA__UTIL__CLI_PARSER_H
-#define TETRA__UTIL__CLI_PARSER_H
+#ifndef TETRA__UTIL__ENVIRON_PARSER_H
+#define TETRA__UTIL__ENVIRON_PARSER_H
 
 #include "convar.h"
 
+#include <SDL3/SDL_stdinc.h> /* SDL_Environment */
+
 /**
- * Very crude command line parser
+ * Very crude environment variable parser
  */
-struct cli_parser
+struct environ_parser
 {
     /**
-     * Parses command line
+     * Iterate over convar array and apply values from an environment
      *
-     * Example
-     * Input: argv0 -convar "val1" -convar2 -convar "val3" -convar4
-     * Output: convar="val3", convar2="", convar4="", convar5=NULL
+     * @param prefix Prefix for variable names (ex. A prefix of "CVR_" would mean the environment variable "CVR_dev" would map to the convar "dev")
+     * @param environment Environment to pull from
+     */
+    static void apply(const char* prefix, SDL_Environment* const environment);
+
+    /**
+     * Find matching environ value and apply to convar
      *
-     * @param argv NOTE: This array must stay valid for the lifetime of the application, not sure why it wouldn't, but just saying
-     */
-    static void parse(const int argc, const char** argv);
-
-    /**
-     * Returns the argv parameter immediately following a convar or "" if there was none
-     * Returns NULL if the convar was not present
-     */
-    static const char* get_value(const char* name);
-
-    /**
-     * Iterate over convar array and apply values
-     */
-    static void apply();
-
-    /**
-     * Find matching cli value and apply to convar
+     * @param prefix Prefix for variable names (ex. A prefix of "CVR_" would mean the environment variable "CVR_dev" would map to the convar "dev")
+     * @param environment Environment to pull from
+     * @param cvr Reference to Convar to apply to
      *
      * @returns true if a match was found, false if not
      */
-    static bool apply_to(convar_t* cvr);
+    static bool apply_to(const char* prefix, SDL_Environment* const environment, convar_t* cvr);
 };
 
 #endif

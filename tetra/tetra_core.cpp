@@ -38,6 +38,7 @@
 #include "tetra/util/cli_parser.h"
 #include "tetra/util/convar.h"
 #include "tetra/util/convar_file.h"
+#include "tetra/util/environ_parser.h"
 #include "tetra/util/misc.h"
 #include "tetra/util/physfs/physfs.h"
 #include "tetra_core.h"
@@ -88,6 +89,7 @@ void tetra::init(const char* organization, const char* appname, const char* cfg_
         convar_int_t* dev = (convar_int_t*)convar_t::get_convar("dev");
 
         /* Set dev before any other variables in case their callbacks require dev */
+        environ_parser::apply_to("CVR_", SDL_GetEnvironment(), dev);
         if (cli_parser::get_value(dev->get_name()))
             dev->set(1);
     }
@@ -107,6 +109,10 @@ void tetra::init(const char* organization, const char* appname, const char* cfg_
             console_overlay->set(3);
     }
 
+    /* Parse and apply environment variables */
+    environ_parser::apply("CVR_", SDL_GetEnvironment());
+
+    /* Setup PHYSFS */
     PHYSFS_init(argv[0]);
 #ifdef SDL_PLATFORM_IOS
     bool on_ios = 1;
