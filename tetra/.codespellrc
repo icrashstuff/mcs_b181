@@ -1,0 +1,9 @@
+[codespell]
+skip = './build,
+    ./gui/imgui,
+    ./gui/proggy_tiny.cpp,
+    ./util/physfs,
+    ./util/stb,
+    ./util/stb_*.h,
+count =
+quiet-level = 3
