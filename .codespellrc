@@ -1,10 +1,6 @@
 [codespell]
 skip = './build,
-    ./tetra/gui/imgui,
-    ./tetra/gui/proggy_tiny.cpp,
-    ./tetra/util/physfs,
-    ./tetra/util/stb,
-    ./tetra/util/stb_*.h,
+    ./tetra,
     ./sdl_net,
     ./client/entt,
     ./client/jzon,
