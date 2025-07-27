@@ -1,6 +1,12 @@
 # ImGui gitignore + mcs_b181 extras
 ideas*.txt
 
+## Dolphin folder settings
+.directory
+
+## VS Code
+.vscode
+
 ## OSX artifacts
 .DS_Store
 ._*
