@@ -1,0 +1,4 @@
+tetra/** linguist-vendored
+sdl_net/** linguist-vendored
+shared/cubiomes/** linguist-vendored
+shared/simplex_noise/** linguist-vendored
