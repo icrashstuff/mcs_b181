@@ -2,3 +2,16 @@ tetra/** linguist-vendored
 sdl_net/** linguist-vendored
 shared/cubiomes/** linguist-vendored
 shared/simplex_noise/** linguist-vendored
+
+client/gpu/smol-v/** linguist-vendored
+client/gpu/volk/** linguist-vendored
+client/gpu/vk_mem_alloc.* linguist-vendored
+client/jzon/** linguist-vendored
+
+client/shaders/compiled/** linguist-generated
+
+client/sound/miniaudio_impl.c linguist-vendored
+client/sound/miniaudio_unifdef.h linguist-vendored
+client/sound/stb_vorbis.* linguist-vendored
+
+docs/wiki_vg_* linguist-vendored
