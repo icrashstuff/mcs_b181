@@ -25,7 +25,7 @@
 #
 # This is not a well written script, but it fits my workflow
 #
-# - This script is meant to be run from the parent repository's working directory
+# - This script is NOT meant to be added to $PATH
 # - Where $SUBDIR is the working directory of tetra
 # - And tetra's .git folder is located at ../tetra_git/.git/ relative to the
 #   parent repository's working directory
@@ -34,6 +34,11 @@ set -eu
 
 # Display all commands
 # set -x
+
+# Relocate to parent repository
+SCRIPT_PATH="$(readlink -f $0)"
+cd "$(dirname $SCRIPT_PATH)"
+cd "$(dirname $PWD)"
 
 SUBDIR=tetra/
 
