@@ -25,8 +25,8 @@
 #define ENABLE_TRACE
 #endif
 
+#include "shared/sdl_net/include/SDL3_net/SDL_net.h"
 #include <SDL3/SDL.h>
-#include <SDL3_net/SDL_net.h>
 
 #include <assert.h>
 #include <stdio.h>

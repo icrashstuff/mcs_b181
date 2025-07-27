@@ -49,7 +49,7 @@
 #include "shared/misc.h"
 #include "shared/packet.h"
 
-#include "sdl_net/include/SDL3_net/SDL_net.h"
+#include "shared/sdl_net/include/SDL3_net/SDL_net.h"
 
 #include "connection.h"
 #include "level.h"

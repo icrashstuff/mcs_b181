@@ -25,8 +25,8 @@
 
 #include "level.h"
 
-#include "sdl_net/include/SDL3_net/SDL_net.h"
 #include "shared/packet.h"
+#include "shared/sdl_net/include/SDL3_net/SDL_net.h"
 
 #include <SDL3/SDL.h>
 #include <string.h>

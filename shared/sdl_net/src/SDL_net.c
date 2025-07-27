@@ -160,7 +160,7 @@ static char *CreateSocketErrorString(int rc)
         MAKELANGID(LANG_NEUTRAL, SUBLANG_DEFAULT), /* Default language */
         msgbuf,
         SDL_arraysize(msgbuf),
-        NULL 
+        NULL
     );
     if (bw == 0) {
         return SDL_strdup("Unknown error");
@@ -279,7 +279,7 @@ static int SDLCALL ResolverThread(void *data)
 
         int outcome;
         if (!simulated_loss || (RandomNumberBetween(0, 100) > simulated_loss)) {
-            outcome = ResolveAddress(addr);            
+            outcome = ResolveAddress(addr);
         } else {
             outcome = -1;
             addr->errstr = SDL_strdup("simulated failure");

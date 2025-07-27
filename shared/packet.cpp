@@ -25,8 +25,8 @@
 #define ENABLE_TRACE
 #endif
 
+#include "shared/sdl_net/include/SDL3_net/SDL_net.h"
 #include <SDL3/SDL_endian.h>
-#include <SDL3_net/SDL_net.h>
 
 #include "java_strings.h"
 #include "misc.h"

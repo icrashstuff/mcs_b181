@@ -1266,4 +1266,3 @@ extern SDL_DECLSPEC int SDLCALL SDLNet_WaitUntilInputAvailable(void **vsockets, 
 #include <SDL3/SDL_close_code.h>
 
 #endif /* SDL_NET_H_ */
-

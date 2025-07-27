@@ -1,7 +1,7 @@
 [codespell]
 skip = './build,
     ./tetra,
-    ./sdl_net,
+    ./shared/sdl_net,
     ./client/entt,
     ./client/jzon,
     ./shared/simplex_noise,

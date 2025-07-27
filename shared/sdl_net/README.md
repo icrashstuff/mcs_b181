@@ -20,4 +20,3 @@ This library supports most platforms that offer both SDL3 and networking.
 This is a work in progress!
 
 Enjoy!
-

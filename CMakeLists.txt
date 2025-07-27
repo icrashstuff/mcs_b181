@@ -179,7 +179,7 @@ SET_SOURCE_FILES_PROPERTIES(client/level_mesh.cpp PROPERTIES COMPILE_FLAGS "${CM
 # SET_SOURCE_FILES_PROPERTIES(client/chunk_cubic.cpp PROPERTIES COMPILE_OPTIONS "-fopt-info-vec-all")
 
 set(BUILD_SHARED_LIBS OFF)
-add_subdirectory(sdl_net/)
+add_subdirectory(shared/sdl_net/)
 
 set(TETRA_BUILD_SDL_GPU_COMPONENT ON)
 add_subdirectory(tetra/)
