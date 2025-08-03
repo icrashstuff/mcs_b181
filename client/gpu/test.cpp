@@ -25,9 +25,27 @@
 #include "shared/misc.h"
 #include "tetra/gui/imgui/backends/imgui_impl_sdl3.h"
 #include "tetra/gui/imgui/backends/imgui_impl_vulkan.h"
+#include "tetra/licenses.h"
 #include "tetra/tetra_core.h"
 #include "tetra/util/convar.h"
 #include "tetra/util/misc.h"
+
+static tetra::project_t mcs_b181_projects[] = {
+    { "mcs_b181", "Copyright (c) 2024-2025 Ian Hangartner", tetra::PROJECT_VENDORED, { tetra::license_MIT } },
+
+    // { "SDL3", "Copyright (C) 1997-2025 Sam Lantinga, and others", tetra::PROJECT_VENDORED, { tetra::license_Zlib } },
+    { "Zlib", "Copyright (C) 1995-2024 Jean-loup Gailly and Mark Adler", tetra::PROJECT_VENDORED, { tetra::license_Zlib } },
+
+    { "EnTT", "Copyright (c) 2017-2024 Michele Caini, and others", tetra::PROJECT_VENDORED, { tetra::license_MIT } },
+    { "Cubiomes", "Copyright (c) 2020-2024 Cubitect, and others", tetra::PROJECT_VENDORED, { tetra::license_MIT } },
+    { "stb_vorbis", "Copyright (c) 2007-2024 Sean Barrett, and others", tetra::PROJECT_VENDORED, { tetra::license_MIT } },
+    { "SMOL-V", "Copyright (c) 2016-2024 Aras Pranckevicius", tetra::PROJECT_VENDORED, { tetra::license_MIT } },
+    { "Jzon", "Copyright (c) 2015 Johannes Häggqvist", tetra::PROJECT_VENDORED, { tetra::license_MIT } },
+    { "Simplex Noise", "Copyright (c) 2012-2018 Sebastien Rombauts", tetra::PROJECT_VENDORED, { tetra::license_MIT } },
+    { "Volk", "Copyright (c) 2018-2025 Arseny Kapoulkine", tetra::PROJECT_VENDORED, { tetra::license_MIT } },
+    { "SDL3 Net", "Copyright (C) 1997-2024 Sam Lantinga, and others", tetra::PROJECT_VENDORED, { tetra::license_Zlib } },
+    { "Vulkan Memory Allocator", "Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All rights reserved.", tetra::PROJECT_VENDORED, { tetra::license_MIT } },
+};
 
 void gpu::simple_test_app()
 {
@@ -64,6 +82,9 @@ void gpu::simple_test_app()
     cinfo_imgui.MinAllocationSize = 256 * 1024;
 
     ImGui::CreateContext();
+
+    ImGui::GetIO().IniFilename = nullptr;
+
     ImGui::StyleColorsDark();
     if (!ImGui_ImplSDL3_InitForVulkan(gpu::window))
         util::die("Failed to initialize Dear ImGui SDL3 backend");
@@ -128,6 +149,18 @@ void gpu::simple_test_app()
         ImGui::NewFrame();
 
         ImGui::ShowDemoWindow(nullptr);
+
+        ImGui::SetNextWindowSize(ImGui::CalcTextSize("x") * ImVec2(80, 30), ImGuiCond_FirstUseEver);
+        ImGui::Begin("Licenses");
+
+        tetra::projects_widgets(mcs_b181_projects, SDL_arraysize(mcs_b181_projects));
+
+        tetra::projects_widgets(&tetra::project_tetra, 1);
+
+        Uint32 num_projects = 0;
+        tetra::projects_widgets(tetra::get_projects(num_projects), num_projects);
+
+        ImGui::End();
 
         ImGui::Render();
         ImDrawData* draw_data = ImGui::GetDrawData();

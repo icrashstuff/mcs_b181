@@ -12,7 +12,7 @@ This project "mcs_b181" is licensed under the MIT license, with various componen
 
 The MIT License (SPDX-License-Identifier: MIT)
 
-Copyright (c) 2022, 2024 - 2025 Ian Hangartner <icrashstuff at outlook dot com>
+Copyright (c) 2024 - 2025 Ian Hangartner <icrashstuff at outlook dot com>
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
