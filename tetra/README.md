@@ -51,6 +51,7 @@ This project vendors and makes use of the following external software components
 |        Project       |                        Copyright                        |                                 License                                  |
 |----------------------|---------------------------------------------------------|--------------------------------------------------------------------------|
 | Dear ImGui           | Copyright (c) 2014-2025 Omar Cornut, and others         | MIT License (full text under gui/imgui/)                                 |
+| Proggy Fonts         | Copyright (c) 2004,2005 Tristan Grimmer                 | MIT License (full text under gui/imgui/)                                 |
 | PhysicsFS (physfs)   | Copyright (c) 2001-2024 Ryan C. Gordon, and others      | Zlib License (full text under util/physfs/physfs/)                       |
 | stb_image            | Copyright (c) 2006 - 2024 Sean Barrett, and others      | MIT License or Unlicense (full text under util/stb/stb_image.h)          |
 | stb_image_write      | Copyright (c) 2010 - 2024 Sean Barrett, and others      | MIT License or Unlicense (full text under util/stb/stb_image_write.h)    |
