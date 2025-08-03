@@ -27,10 +27,12 @@
 
 namespace tetra
 {
+const project_t project_tetra = { "Tetra", "Copyright (c) 2022, 2024 - 2025 Ian Hangartner", 0, { license_MIT } };
+
 static project_t tetra_projects[] = {
-    { "Tetra", "Copyright (c) 2022, 2024 - 2025 Ian Hangartner", 0, { license_MIT } },
     { "SDL3", "Copyright (c) 1997 - 2025 Sam Lantinga, and others", 0, { license_Zlib } },
     { "Dear ImGui", "Copyright (c) 2014 - 2025 Omar Cornut, and others", PROJECT_VENDORED, { license_MIT } },
+    { "Proggy Fonts", "Copyright (c) 2004, 2005 Tristan Grimmer", PROJECT_VENDORED, { license_MIT } },
     { "PhysicsFS (physfs)", "Copyright (c) 2001 - 2024 Ryan C. Gordon, and others", PROJECT_VENDORED, { license_Zlib } },
     { "stb_image", "Copyright (c) 2006 - 2024 Sean Barrett, and others", PROJECT_VENDORED, { license_MIT, license_Unlicense } },
     { "stb_image_write", "Copyright (c) 2010 - 2024 Sean Barrett, and others", PROJECT_VENDORED, { license_MIT, license_Unlicense } },

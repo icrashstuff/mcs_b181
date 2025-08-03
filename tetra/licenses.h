@@ -55,12 +55,17 @@ struct project_t
     std::vector<license_t> licenses;
 };
 
-extern license_t license_MIT;
-extern license_t license_Zlib;
-extern license_t license_Unlicense;
+extern const license_t license_MIT;
+extern const license_t license_Zlib;
+extern const license_t license_Unlicense;
 
 /**
- * Get projects used by Tetra and Tetra itself
+ * Tetra's project_t object
+ */
+extern const project_t project_tetra;
+
+/**
+ * Get projects used by Tetra
  */
 const project_t* get_projects(Uint32& num_projects);
 

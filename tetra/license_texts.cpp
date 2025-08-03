@@ -1,7 +1,7 @@
 /* Since this file is just license texts, I have not added the typical license header */
 #include "licenses.h"
 
-#define ADD_LICENSE(ID, COPYRIGHT_LINE_REQUIRED, TEXT) tetra::license_t tetra::license_##ID = { COPYRIGHT_LINE_REQUIRED, #ID, TEXT };
+#define ADD_LICENSE(ID, COPYRIGHT_LINE_REQUIRED, TEXT) const tetra::license_t tetra::license_##ID = { COPYRIGHT_LINE_REQUIRED, #ID, TEXT };
 
 ADD_LICENSE(MIT, true,
     R"(Permission is hereby granted, free of charge, to any person obtaining a
