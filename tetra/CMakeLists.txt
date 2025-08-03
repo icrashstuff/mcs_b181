@@ -91,6 +91,9 @@ set(tetra_core_SRC
 
     ${TETRA_DIR}tetra_core.cpp
 
+    ${TETRA_DIR}licenses.cpp
+    ${TETRA_DIR}license_texts.cpp
+
     ${imgui_SRC}
 )
 
