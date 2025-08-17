@@ -998,6 +998,21 @@ gpu::device_t::device_t(SDL_Window* sdl_window)
         set_object_name(queue, VK_OBJECT_TYPE_QUEUE, "Queue: (%s)", families.c_str());
     }
 
+    /* Setup queue sharing info */
+    {
+        std::set<Uint32> queues { graphics_queue_idx, present_queue_idx, transfer_queue_idx };
+        queue_sharing.queueFamilyIndexCount = queues.size();
+        if (queue_sharing.queueFamilyIndexCount == 1)
+            queue_sharing.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        else
+            queue_sharing.sharingMode = VK_SHARING_MODE_CONCURRENT;
+
+        Uint32* data = new uint32_t[queue_sharing.queueFamilyIndexCount];
+        queue_sharing.pQueueFamilyIndices = data;
+        for (const Uint32 family_idx : queues)
+            *(data++) = family_idx;
+    }
+
     /* Setup queue locks */
     for (const Uint32 family_idx : std::set<Uint32> { graphics_queue_idx, present_queue_idx, transfer_queue_idx })
     {
@@ -1081,6 +1096,8 @@ gpu::device_t::~device_t()
     vmaDestroyAllocator(allocator);
 
     funcs.vkDestroyDevice(logical, nullptr);
+
+    free(const_cast<uint32_t*>(queue_sharing.pQueueFamilyIndices));
 
     if (r_pipeline_cache.get())
     {

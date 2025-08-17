@@ -207,6 +207,20 @@ struct device_t
     Uint32 transfer_queue_idx = ~0;
     Uint32 present_queue_idx = ~0;
 
+    struct
+    {
+        VkSharingMode sharingMode;
+        uint32_t queueFamilyIndexCount;
+        const uint32_t* pQueueFamilyIndices;
+
+        template <typename T> void apply(T& dest) const
+        {
+            dest.sharingMode = sharingMode;
+            dest.queueFamilyIndexCount = queueFamilyIndexCount;
+            dest.pQueueFamilyIndices = pQueueFamilyIndices;
+        }
+    } queue_sharing;
+
     VkQueue graphics_queue = VK_NULL_HANDLE;
     VkQueue transfer_queue = VK_NULL_HANDLE;
     VkQueue present_queue = VK_NULL_HANDLE;

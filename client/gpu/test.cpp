@@ -77,9 +77,7 @@ static test_image_data_t* create_test_image(gpu::device_t* device)
         cinfo_image.tiling = VK_IMAGE_TILING_OPTIMAL;
         cinfo_image.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
 
-        cinfo_image.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
-        cinfo_image.queueFamilyIndexCount = 1;
-        cinfo_image.pQueueFamilyIndices = &device->transfer_queue_idx;
+        device->queue_sharing.apply(cinfo_image);
         cinfo_image.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
 
         VmaAllocationCreateInfo cinfo_image_alloc = {};
