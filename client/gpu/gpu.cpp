@@ -793,7 +793,7 @@ void gpu::quit()
     window = nullptr;
 }
 
-void gpu::transition_image(VkCommandBuffer const command_buffer, VkImage const image, const VkImageLayout layout_old, const VkImageLayout layout_new)
+void gpu::device_t::transition_image(VkCommandBuffer const command_buffer, VkImage const image, const VkImageLayout layout_old, const VkImageLayout layout_new)
 {
     VkImageMemoryBarrier2 barrier {};
     barrier.sType = VK_STRUCTURE_TYPE_IMAGE_MEMORY_BARRIER_2;
@@ -818,7 +818,7 @@ void gpu::transition_image(VkCommandBuffer const command_buffer, VkImage const i
     dinfo_image_layout.imageMemoryBarrierCount = 1;
     dinfo_image_layout.pImageMemoryBarriers = &barrier;
 
-    vkCmdPipelineBarrier2KHR(command_buffer, &dinfo_image_layout);
+    funcs.vkCmdPipelineBarrier2KHR(command_buffer, &dinfo_image_layout);
 }
 
 static bool is_swapchain_result_non_fatal(const VkResult result)

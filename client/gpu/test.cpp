@@ -170,7 +170,7 @@ static test_image_data_t* create_test_image(gpu::device_t* device)
 
     /* Upload image */
     {
-        gpu::transition_image(cmd_upload, data->image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        device->transition_image(cmd_upload, data->image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
         VkBufferImageCopy region = {};
         region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -181,7 +181,7 @@ static test_image_data_t* create_test_image(gpu::device_t* device)
 
         vkCmdCopyBufferToImage(cmd_upload, staging_buffer, data->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
-        gpu::transition_image(cmd_upload, data->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        device->transition_image(cmd_upload, data->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
 
     VK_DIE(device->funcs.vkEndCommandBuffer(cmd_upload));
@@ -380,13 +380,13 @@ void gpu::simple_test_app()
         binfo_rendering.colorAttachmentCount = 1;
         binfo_rendering.pColorAttachments = &color_attachment;
 
-        transition_image(frame->cmd_graphics, frame->image, VK_IMAGE_LAYOUT_UNDEFINED, color_attachment.imageLayout);
+        device_new->transition_image(frame->cmd_graphics, frame->image, VK_IMAGE_LAYOUT_UNDEFINED, color_attachment.imageLayout);
         vkCmdBeginRenderingKHR(frame->cmd_graphics, &binfo_rendering);
 
         ImGui_ImplVulkan_RenderDrawData(draw_data, frame->cmd_graphics, VK_NULL_HANDLE);
 
         vkCmdEndRenderingKHR(frame->cmd_graphics);
-        transition_image(frame->cmd_graphics, frame->image, color_attachment.imageLayout, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+        device_new->transition_image(frame->cmd_graphics, frame->image, color_attachment.imageLayout, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
         vkEndCommandBuffer(frame->cmd_graphics);
 

@@ -229,6 +229,9 @@ struct device_t
 
     VolkDeviceTable funcs;
 
+    /** Convenience function to insert an image layout transition pipeline barrier */
+    void transition_image(VkCommandBuffer const command_buffer, VkImage const image, const VkImageLayout layout_old, const VkImageLayout layout_new);
+
 private:
     void set_object_name_real(Uint64 object_handle, VkObjectType object_type, const char* fmt, va_list args);
 
@@ -255,7 +258,4 @@ public:
 };
 
 extern device_t* device_new;
-
-/** Convenience function to insert an image layout transition pipeline barrier */
-void transition_image(VkCommandBuffer const command_buffer, VkImage const image, const VkImageLayout layout_old, const VkImageLayout layout_new);
 }
