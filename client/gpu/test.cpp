@@ -47,6 +47,188 @@ static tetra::project_t mcs_b181_projects[] = {
     { "Vulkan Memory Allocator", "Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All rights reserved.", tetra::PROJECT_VENDORED, { tetra::license_MIT } },
 };
 
+struct test_image_data_t
+{
+    VkImage image = VK_NULL_HANDLE;
+    VkSampler sampler = VK_NULL_HANDLE;
+    VkImageView view = VK_NULL_HANDLE;
+    VmaAllocation alloc = VK_NULL_HANDLE;
+    VkDescriptorSet imgui_descriptor = VK_NULL_HANDLE;
+};
+
+static test_image_data_t* create_test_image(gpu::device_t* device)
+{
+    test_image_data_t* data = new test_image_data_t;
+
+    VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
+    VkExtent2D size = { 256, 256 };
+
+    /* Create image */
+    {
+        VkImageCreateInfo cinfo_image = {};
+        cinfo_image.sType = VK_STRUCTURE_TYPE_IMAGE_CREATE_INFO;
+        cinfo_image.imageType = VK_IMAGE_TYPE_2D;
+        cinfo_image.format = format;
+        cinfo_image.extent = { size.width, size.height, 1 };
+        cinfo_image.mipLevels = 1;
+        cinfo_image.arrayLayers = 1;
+        cinfo_image.samples = VK_SAMPLE_COUNT_1_BIT;
+
+        cinfo_image.tiling = VK_IMAGE_TILING_OPTIMAL;
+        cinfo_image.usage = VK_IMAGE_USAGE_SAMPLED_BIT | VK_IMAGE_USAGE_TRANSFER_DST_BIT;
+
+        cinfo_image.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+        cinfo_image.queueFamilyIndexCount = 1;
+        cinfo_image.pQueueFamilyIndices = &device->transfer_queue_idx;
+        cinfo_image.initialLayout = VK_IMAGE_LAYOUT_UNDEFINED;
+
+        VmaAllocationCreateInfo cinfo_image_alloc = {};
+        cinfo_image_alloc.usage = VMA_MEMORY_USAGE_AUTO;
+
+        VK_DIE(vmaCreateImage(device->allocator, &cinfo_image, &cinfo_image_alloc, &data->image, &data->alloc, nullptr));
+    }
+
+    /* Create Image View */
+    {
+        VkImageViewCreateInfo cinfo_image_view = {};
+        cinfo_image_view.sType = VK_STRUCTURE_TYPE_IMAGE_VIEW_CREATE_INFO;
+        cinfo_image_view.image = data->image;
+        cinfo_image_view.viewType = VK_IMAGE_VIEW_TYPE_2D;
+        cinfo_image_view.format = format;
+        cinfo_image_view.subresourceRange.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        cinfo_image_view.subresourceRange.baseMipLevel = 0;
+        cinfo_image_view.subresourceRange.levelCount = 1;
+        cinfo_image_view.subresourceRange.baseArrayLayer = 0;
+        cinfo_image_view.subresourceRange.layerCount = 1;
+
+        VK_DIE(device->funcs.vkCreateImageView(device->logical, &cinfo_image_view, nullptr, &data->view));
+    }
+
+    /* Create Sampler */
+    {
+        VkSamplerCreateInfo cinfo_sampler = {};
+        cinfo_sampler.sType = VK_STRUCTURE_TYPE_SAMPLER_CREATE_INFO;
+        cinfo_sampler.magFilter = VK_FILTER_NEAREST;
+        cinfo_sampler.minFilter = VK_FILTER_LINEAR;
+        cinfo_sampler.addressModeU = cinfo_sampler.addressModeV = cinfo_sampler.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
+
+        VK_DIE(device->funcs.vkCreateSampler(device->logical, &cinfo_sampler, nullptr, &data->sampler));
+    }
+
+    /* Create command pool */
+    VkCommandPoolCreateInfo cinfo_cmd_pool = {};
+    cinfo_cmd_pool.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
+    cinfo_cmd_pool.queueFamilyIndex = device->transfer_queue_idx;
+    VkCommandPool cmd_pool = VK_NULL_HANDLE;
+    VK_DIE(device->funcs.vkCreateCommandPool(device->logical, &cinfo_cmd_pool, nullptr, &cmd_pool));
+
+    /* Allocate command buffer */
+    VkCommandBufferAllocateInfo ainfo_cmd_upload = {};
+    ainfo_cmd_upload.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
+    ainfo_cmd_upload.commandPool = cmd_pool;
+    ainfo_cmd_upload.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
+    ainfo_cmd_upload.commandBufferCount = 1;
+    VkCommandBuffer cmd_upload = VK_NULL_HANDLE;
+    VK_DIE(device->funcs.vkAllocateCommandBuffers(device->logical, &ainfo_cmd_upload, &cmd_upload));
+
+    /* Begin Command Buffer */
+    VkCommandBufferBeginInfo binfo_cmd_upload = {};
+    binfo_cmd_upload.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
+    binfo_cmd_upload.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
+    VK_DIE(device->funcs.vkBeginCommandBuffer(cmd_upload, &binfo_cmd_upload));
+
+    /* Create staging buffer */
+    VkBufferCreateInfo cinfo_buffer = {};
+    cinfo_buffer.sType = VK_STRUCTURE_TYPE_BUFFER_CREATE_INFO;
+    cinfo_buffer.size = size.height * size.width * 4;
+    cinfo_buffer.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
+    cinfo_buffer.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
+    cinfo_buffer.queueFamilyIndexCount = 1;
+    cinfo_buffer.pQueueFamilyIndices = &device->transfer_queue_idx;
+
+    VmaAllocationCreateInfo cinfo_buffer_vma = {};
+    cinfo_buffer_vma.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
+    // cinfo_buffer_vma.requiredFlags = VK_MEMORY_PROPERTY_HOST_VISIBLE_BIT;
+    // cinfo_buffer_vma.preferredFlags = VK_MEMORY_PROPERTY_DEVICE_LOCAL_BIT;
+
+    VkBuffer staging_buffer = VK_NULL_HANDLE;
+    VmaAllocation staging_buffer_allocation = VK_NULL_HANDLE;
+
+    VK_DIE(vmaCreateBuffer(device->allocator, &cinfo_buffer, &cinfo_buffer_vma, &staging_buffer, &staging_buffer_allocation, nullptr));
+
+    /* Fill staging buffer */
+    {
+        Uint8* buffer_data = nullptr;
+        VK_DIE(vmaMapMemory(device->allocator, staging_buffer_allocation, (void**)&buffer_data));
+
+        Uint64 r_seed = 0xf2776747714404b2;
+        for (VkDeviceSize i = 0; i < cinfo_buffer.size; i++)
+            buffer_data[i] = SDL_rand_r(&r_seed, 256);
+
+        vmaUnmapMemory(device->allocator, staging_buffer_allocation);
+    }
+
+    /* Upload image */
+    {
+        gpu::transition_image(cmd_upload, data->image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+
+        VkBufferImageCopy region = {};
+        region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
+        region.imageSubresource.mipLevel = 0;
+        region.imageSubresource.baseArrayLayer = 0;
+        region.imageSubresource.layerCount = 1;
+        region.imageExtent = { size.height, size.width, 1 };
+
+        vkCmdCopyBufferToImage(cmd_upload, staging_buffer, data->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+
+        gpu::transition_image(cmd_upload, data->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+    }
+
+    VK_DIE(device->funcs.vkEndCommandBuffer(cmd_upload));
+
+    /* Create fence for waiting on submit operation */
+    VkFenceCreateInfo cinfo_wait_fence = {};
+    cinfo_wait_fence.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
+    VkFence wait_fence = VK_NULL_HANDLE;
+    VK_DIE(device->funcs.vkCreateFence(device->logical, &cinfo_wait_fence, nullptr, &wait_fence));
+
+    /* Submit command buffer */
+    VkSubmitInfo sinfo_cmd_upload = {};
+    sinfo_cmd_upload.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    sinfo_cmd_upload.commandBufferCount = 1;
+    sinfo_cmd_upload.pCommandBuffers = &cmd_upload;
+
+    SDL_LockMutex(device->transfer_queue_lock);
+    VK_DIE(device->funcs.vkQueueSubmit(device->transfer_queue, 1, &sinfo_cmd_upload, wait_fence));
+    SDL_UnlockMutex(device->transfer_queue_lock);
+
+    /* Wait for command buffer to complete submission */
+    VK_DIE(device->funcs.vkWaitForFences(device->logical, 1, &wait_fence, 1, UINT64_MAX));
+
+    /* Now that the image is prepared we can set up a descriptor through ImGui */
+    data->imgui_descriptor = ImGui_ImplVulkan_AddTexture(data->sampler, data->view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+
+    /* Cleanup */
+    device->funcs.vkDestroyFence(device->logical, wait_fence, nullptr);
+    device->funcs.vkDestroyCommandPool(device->logical, cmd_pool, nullptr);
+    vmaDestroyBuffer(device->allocator, staging_buffer, staging_buffer_allocation);
+
+    return data;
+}
+
+static void destroy_test_image(gpu::device_t* device, test_image_data_t* data)
+{
+    if (data == nullptr)
+        return;
+
+    ImGui_ImplVulkan_RemoveTexture(data->imgui_descriptor);
+    device->funcs.vkDestroySampler(device->logical, data->sampler, nullptr);
+    device->funcs.vkDestroyImageView(device->logical, data->view, nullptr);
+    vmaDestroyImage(device->allocator, data->image, data->alloc);
+
+    delete data;
+}
+
 void gpu::simple_test_app()
 {
     if (!device_new)
@@ -125,6 +307,8 @@ void gpu::simple_test_app()
             ImGui_ImplVulkan_SetPipelineRenderingCreateInfo(&rendering_info);
     };
 
+    test_image_data_t* test_image_data = create_test_image(device_new);
+
     bool done = 0;
     while (!done)
     {
@@ -148,17 +332,26 @@ void gpu::simple_test_app()
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
 
-        ImGui::ShowDemoWindow(nullptr);
+        /* ImGui contents */
+        {
+            bool should_close = !done;
 
-        ImGui::SetNextWindowSize(ImGui::CalcTextSize("x") * ImVec2(80, 30), ImGuiCond_FirstUseEver);
-        ImGui::Begin("Licenses");
+            ImGui::ShowDemoWindow(&should_close);
 
-        tetra::projects_widgets(mcs_b181_projects, SDL_arraysize(mcs_b181_projects));
+            ImGui::GetBackgroundDrawList()->AddImage(test_image_data->imgui_descriptor, ImVec2(0, 0), ImGui::GetMainViewport()->Size);
 
-        tetra::projects_widgets(&tetra::project_tetra, 1);
+            ImGui::SetNextWindowSize(ImGui::CalcTextSize("x") * ImVec2(80, 30), ImGuiCond_FirstUseEver);
+            ImGui::Begin("Licenses");
 
-        Uint32 num_projects = 0;
-        tetra::projects_widgets(tetra::get_projects(num_projects), num_projects);
+            tetra::projects_widgets(mcs_b181_projects, SDL_arraysize(mcs_b181_projects));
+
+            tetra::projects_widgets(&tetra::project_tetra, 1);
+
+            Uint32 num_projects = 0;
+            tetra::projects_widgets(tetra::get_projects(num_projects), num_projects);
+
+            done = !should_close;
+        }
 
         ImGui::End();
 
@@ -204,6 +397,8 @@ void gpu::simple_test_app()
     }
 
     device_new->wait_for_device_idle();
+
+    destroy_test_image(device_new, test_image_data);
 
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplSDL3_Shutdown();
