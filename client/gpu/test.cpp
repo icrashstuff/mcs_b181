@@ -30,22 +30,7 @@
 #include "tetra/util/convar.h"
 #include "tetra/util/misc.h"
 
-static tetra::project_t mcs_b181_projects[] = {
-    { "mcs_b181", "Copyright (c) 2024-2025 Ian Hangartner", tetra::PROJECT_VENDORED, { tetra::license_MIT } },
-
-    // { "SDL3", "Copyright (C) 1997-2025 Sam Lantinga, and others", tetra::PROJECT_VENDORED, { tetra::license_Zlib } },
-    { "Zlib", "Copyright (C) 1995-2024 Jean-loup Gailly and Mark Adler", tetra::PROJECT_VENDORED, { tetra::license_Zlib } },
-
-    { "EnTT", "Copyright (c) 2017-2024 Michele Caini, and others", tetra::PROJECT_VENDORED, { tetra::license_MIT } },
-    { "Cubiomes", "Copyright (c) 2020-2024 Cubitect, and others", tetra::PROJECT_VENDORED, { tetra::license_MIT } },
-    { "stb_vorbis", "Copyright (c) 2007-2024 Sean Barrett, and others", tetra::PROJECT_VENDORED, { tetra::license_MIT } },
-    { "SMOL-V", "Copyright (c) 2016-2024 Aras Pranckevicius", tetra::PROJECT_VENDORED, { tetra::license_MIT } },
-    { "Jzon", "Copyright (c) 2015 Johannes Häggqvist", tetra::PROJECT_VENDORED, { tetra::license_MIT } },
-    { "Simplex Noise", "Copyright (c) 2012-2018 Sebastien Rombauts", tetra::PROJECT_VENDORED, { tetra::license_MIT } },
-    { "Volk", "Copyright (c) 2018-2025 Arseny Kapoulkine", tetra::PROJECT_VENDORED, { tetra::license_MIT } },
-    { "SDL3 Net", "Copyright (C) 1997-2024 Sam Lantinga, and others", tetra::PROJECT_VENDORED, { tetra::license_Zlib } },
-    { "Vulkan Memory Allocator", "Copyright (c) 2017-2025 Advanced Micro Devices, Inc. All rights reserved.", tetra::PROJECT_VENDORED, { tetra::license_MIT } },
-};
+#include "shared/mcs_b181_projects.h"
 
 struct test_image_data_t
 {

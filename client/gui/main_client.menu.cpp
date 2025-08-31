@@ -1277,6 +1277,9 @@ static client_menu_return_t do_menu_options(mc_gui::mc_gui_ctx* ctx)
     ImGui::SetNextWindowPos(get_viewport_centered_title_bar(), ImGuiCond_Always, ImVec2(0.5, 0.0));
     ImGui::Begin("menu.options", NULL, ctx->default_win_flags);
 
+    if (mc_gui::button_big("About"))
+        ret.name_to_open = "menu.options.about";
+
     if (mc_gui::button_big("options.video"))
         ret.name_to_open = "menu.options.video";
 
@@ -1372,6 +1375,51 @@ static void cvr_button_boolean(mc_gui::widget_size_t size, const char* cvr_name,
     static std::vector<std::pair<int, const char*>> ids = { { 0, "options.off" }, { 1, "options.on" } };
 
     return cvr_button_multi(size, cvr_name, translation_id, ids);
+}
+
+#include "shared/mcs_b181_projects.h"
+
+static client_menu_return_t do_menu_options_about(mc_gui::mc_gui_ctx* ctx)
+{
+    client_menu_return_t ret;
+
+    ImGuiViewport* viewport = ImGui::GetMainViewport();
+
+    /* Title */
+    ImGui::SetNextWindowPos(ImVec2(viewport->Size.x / 2.0f, 0), ImGuiCond_Always, ImVec2(0.5, 0.0));
+    ImGui::Begin("menu_title", NULL, ctx->default_win_flags);
+    mc_gui::text_translated("About");
+    ImGui::End();
+
+    /* Contents */
+    ImVec2 size_min(0, viewport->Size.y - ctx->menu_scale * 25.0f * 2.5f);
+    ImVec2 size_max(viewport->Size.x * 0.9f, size_min.y);
+    ImGui::SetNextWindowSizeConstraints(size_max, size_max);
+    ImGui::SetNextWindowPos(ImVec2(viewport->GetWorkCenter().x, ctx->menu_scale * 25.0f), ImGuiCond_Always, ImVec2(0.5f, 0.0f));
+    ImGui::SetNextWindowBgAlpha(0.0f);
+    ImGui::PushStyleVar(ImGuiStyleVar_WindowBorderSize, ctx->menu_scale);
+    ImGui::Begin("menu.options.about", NULL, ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoTitleBar | ImGuiWindowFlags_HorizontalScrollbar);
+
+    tetra::projects_widgets(mcs_b181_projects, SDL_arraysize(mcs_b181_projects));
+
+    tetra::projects_widgets(&tetra::project_tetra, 1);
+
+    Uint32 num_projects = 0;
+    tetra::projects_widgets(tetra::get_projects(num_projects), num_projects);
+
+    ImGui::End();
+    ImGui::PopStyleVar();
+
+    /* Done button */
+    ImGui::SetNextWindowPos(ImVec2(viewport->Size.x / 2.0f, viewport->Size.y), ImGuiCond_Always, ImVec2(0.5f, 1.0f));
+    ImGui::Begin("menu.gui.done", NULL, ctx->default_win_flags);
+
+    if (mc_gui::button_big("gui.done"))
+        ret.close = 1;
+
+    ImGui::End();
+
+    return ret;
 }
 
 static client_menu_return_t do_menu_options_video(mc_gui::mc_gui_ctx* ctx)
@@ -1697,6 +1745,7 @@ static void init()
     client_menu_manager.add_menu("menu.title", do_main_menu);
     client_menu_manager.add_menu("menu.convars", do_menu_convars);
     client_menu_manager.add_menu("menu.options", do_menu_options);
+    client_menu_manager.add_menu("menu.options.about", do_menu_options_about);
     client_menu_manager.add_menu("menu.options.video", do_menu_options_video);
     client_menu_manager.add_menu("menu.options.sound", do_menu_options_sound);
     client_menu_manager.add_menu("menu.options.controls", do_menu_options_controls);
