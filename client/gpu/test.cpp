@@ -56,12 +56,14 @@ struct test_image_data_t
     VkDescriptorSet imgui_descriptor = VK_NULL_HANDLE;
 };
 
+#define TEST_IMAGE_SIZE 32
+
 static test_image_data_t* create_test_image(gpu::device_t* device)
 {
     test_image_data_t* data = new test_image_data_t;
 
     VkFormat format = VK_FORMAT_R8G8B8A8_UNORM;
-    VkExtent2D size = { 256, 256 };
+    VkExtent2D size = { TEST_IMAGE_SIZE, TEST_IMAGE_SIZE };
 
     /* Create image */
     {
@@ -336,7 +338,8 @@ void gpu::simple_test_app()
 
             ImGui::ShowDemoWindow(&should_close);
 
-            ImGui::GetBackgroundDrawList()->AddImage(test_image_data->imgui_descriptor, ImVec2(0, 0), ImGui::GetMainViewport()->Size);
+            ImGui::GetBackgroundDrawList()->AddImage(test_image_data->imgui_descriptor, ImVec2(0, 0), ImGui::GetMainViewport()->Size, ImVec2(0, 0),
+                ImGui::GetMainViewport()->Size / ImVec2(TEST_IMAGE_SIZE * 8, TEST_IMAGE_SIZE * 8));
 
             ImGui::SetNextWindowSize(ImGui::CalcTextSize("x") * ImVec2(80, 30), ImGuiCond_FirstUseEver);
             ImGui::Begin("Licenses");
