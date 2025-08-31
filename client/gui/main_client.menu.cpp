@@ -1645,7 +1645,10 @@ static void init()
     {
         ImGui::SetCurrentContext(imgui_ctx_main_menu);
         ImGui::GetIO().IniFilename = NULL;
-        global_ctx->load_font_ascii(ImGui::GetIO().Fonts);
+
+        dc_log_warn("Skipping ascii.png");
+        // global_ctx->load_font_ascii(ImGui::GetIO().Fonts);
+
         if (!ImGui_ImplSDL3_InitForSDLGPU(state::window))
             util::die("Failed to initialize Dear Imgui SDL3 backend\n");
         ImGui_ImplSDLGPU3_InitInfo init_info = {};
