@@ -86,7 +86,7 @@ static test_image_data_t* create_test_image(gpu::device_t* device)
         cinfo_image_view.subresourceRange.baseArrayLayer = 0;
         cinfo_image_view.subresourceRange.layerCount = 1;
 
-        VK_DIE(device->funcs.vkCreateImageView(device->logical, &cinfo_image_view, nullptr, &data->view));
+        VK_DIE(device->vkCreateImageView(&cinfo_image_view, &data->view));
     }
 
     /* Create Sampler */
@@ -97,7 +97,7 @@ static test_image_data_t* create_test_image(gpu::device_t* device)
         cinfo_sampler.minFilter = VK_FILTER_LINEAR;
         cinfo_sampler.addressModeU = cinfo_sampler.addressModeV = cinfo_sampler.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 
-        VK_DIE(device->funcs.vkCreateSampler(device->logical, &cinfo_sampler, nullptr, &data->sampler));
+        VK_DIE(device->vkCreateSampler(&cinfo_sampler, &data->sampler));
     }
 
     /* Create command pool */
@@ -105,7 +105,7 @@ static test_image_data_t* create_test_image(gpu::device_t* device)
     cinfo_cmd_pool.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
     cinfo_cmd_pool.queueFamilyIndex = device->transfer_queue_idx;
     VkCommandPool cmd_pool = VK_NULL_HANDLE;
-    VK_DIE(device->funcs.vkCreateCommandPool(device->logical, &cinfo_cmd_pool, nullptr, &cmd_pool));
+    VK_DIE(device->vkCreateCommandPool(&cinfo_cmd_pool, &cmd_pool));
 
     /* Allocate command buffer */
     VkCommandBufferAllocateInfo ainfo_cmd_upload = {};
@@ -114,13 +114,13 @@ static test_image_data_t* create_test_image(gpu::device_t* device)
     ainfo_cmd_upload.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
     ainfo_cmd_upload.commandBufferCount = 1;
     VkCommandBuffer cmd_upload = VK_NULL_HANDLE;
-    VK_DIE(device->funcs.vkAllocateCommandBuffers(device->logical, &ainfo_cmd_upload, &cmd_upload));
+    VK_DIE(device->vkAllocateCommandBuffers(&ainfo_cmd_upload, &cmd_upload));
 
     /* Begin Command Buffer */
     VkCommandBufferBeginInfo binfo_cmd_upload = {};
     binfo_cmd_upload.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
     binfo_cmd_upload.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    VK_DIE(device->funcs.vkBeginCommandBuffer(cmd_upload, &binfo_cmd_upload));
+    VK_DIE(device->vkBeginCommandBuffer(cmd_upload, &binfo_cmd_upload));
 
     /* Create staging buffer */
     VkBufferCreateInfo cinfo_buffer = {};
@@ -169,13 +169,13 @@ static test_image_data_t* create_test_image(gpu::device_t* device)
         device->transition_image(cmd_upload, data->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
 
-    VK_DIE(device->funcs.vkEndCommandBuffer(cmd_upload));
+    VK_DIE(device->vkEndCommandBuffer(cmd_upload));
 
     /* Create fence for waiting on submit operation */
     VkFenceCreateInfo cinfo_wait_fence = {};
     cinfo_wait_fence.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
     VkFence wait_fence = VK_NULL_HANDLE;
-    VK_DIE(device->funcs.vkCreateFence(device->logical, &cinfo_wait_fence, nullptr, &wait_fence));
+    VK_DIE(device->vkCreateFence(&cinfo_wait_fence, &wait_fence));
 
     /* Submit command buffer */
     VkSubmitInfo sinfo_cmd_upload = {};
@@ -184,18 +184,18 @@ static test_image_data_t* create_test_image(gpu::device_t* device)
     sinfo_cmd_upload.pCommandBuffers = &cmd_upload;
 
     SDL_LockMutex(device->transfer_queue_lock);
-    VK_DIE(device->funcs.vkQueueSubmit(device->transfer_queue, 1, &sinfo_cmd_upload, wait_fence));
+    VK_DIE(device->vkQueueSubmit(device->transfer_queue, 1, &sinfo_cmd_upload, wait_fence));
     SDL_UnlockMutex(device->transfer_queue_lock);
 
     /* Wait for command buffer to complete submission */
-    VK_DIE(device->funcs.vkWaitForFences(device->logical, 1, &wait_fence, 1, UINT64_MAX));
+    VK_DIE(device->vkWaitForFences(1, &wait_fence, 1, UINT64_MAX));
 
     /* Now that the image is prepared we can set up a descriptor through ImGui */
     data->imgui_descriptor = ImGui_ImplVulkan_AddTexture(data->sampler, data->view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     /* Cleanup */
-    device->funcs.vkDestroyFence(device->logical, wait_fence, nullptr);
-    device->funcs.vkDestroyCommandPool(device->logical, cmd_pool, nullptr);
+    device->vkDestroyFence(wait_fence);
+    device->vkDestroyCommandPool(cmd_pool);
     vmaDestroyBuffer(device->allocator, staging_buffer, staging_buffer_allocation);
 
     return data;
@@ -207,8 +207,8 @@ static void destroy_test_image(gpu::device_t* device, test_image_data_t* data)
         return;
 
     ImGui_ImplVulkan_RemoveTexture(data->imgui_descriptor);
-    device->funcs.vkDestroySampler(device->logical, data->sampler, nullptr);
-    device->funcs.vkDestroyImageView(device->logical, data->view, nullptr);
+    device->vkDestroySampler(data->sampler);
+    device->vkDestroyImageView(data->view);
     vmaDestroyImage(device->allocator, data->image, data->alloc);
 
     delete data;
@@ -350,7 +350,7 @@ void gpu::simple_test_app()
 
         frame->used_graphics = 1;
 
-        VK_DIE(vkBeginCommandBuffer(frame->cmd_graphics, &binfo_command_buffer));
+        VK_DIE(device_new->vkBeginCommandBuffer(frame->cmd_graphics, &binfo_command_buffer));
 
         VkRenderingAttachmentInfo color_attachment {};
         color_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
@@ -367,14 +367,14 @@ void gpu::simple_test_app()
         binfo_rendering.pColorAttachments = &color_attachment;
 
         device_new->transition_image(frame->cmd_graphics, frame->image, VK_IMAGE_LAYOUT_UNDEFINED, color_attachment.imageLayout);
-        vkCmdBeginRenderingKHR(frame->cmd_graphics, &binfo_rendering);
+        device_new->vkCmdBeginRenderingKHR(frame->cmd_graphics, &binfo_rendering);
 
         ImGui_ImplVulkan_RenderDrawData(draw_data, frame->cmd_graphics, VK_NULL_HANDLE);
 
-        vkCmdEndRenderingKHR(frame->cmd_graphics);
+        device_new->vkCmdEndRenderingKHR(frame->cmd_graphics);
         device_new->transition_image(frame->cmd_graphics, frame->image, color_attachment.imageLayout, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
-        vkEndCommandBuffer(frame->cmd_graphics);
+        device_new->vkEndCommandBuffer(frame->cmd_graphics);
 
         device_new->submit_frame(&device_new->window, frame);
 
