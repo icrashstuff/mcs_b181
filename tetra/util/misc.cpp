@@ -22,21 +22,30 @@
  */
 #include "misc.h"
 #include <SDL3/SDL.h>
+#include <stdio.h>
 #include <stdlib.h>
 
 void util::die(const char* fmt, ...)
 {
-    char buffer[1024] = "A Fatal Error Occurred!\n\n";
+    fflush(stdout);
+    fputs("util::die(): >>>>>> Begin message <<<<<<\n", stdout);
+    fflush(stdout);
+
+    char buffer[4096] = "A Fatal Error Occurred!\n\n";
     size_t prefix_length = strlen(buffer);
     va_list args;
     va_start(args, fmt);
-    vsnprintf(buffer + prefix_length, IM_ARRAYSIZE(buffer) - prefix_length - 1, fmt, args);
+    stbsp_vsnprintf(buffer + prefix_length, SDL_arraysize(buffer) - prefix_length - 1, fmt, args);
     va_end(args);
 
     fputs(buffer, stdout);
-    fputs(buffer, stderr);
+    fputc('\n', stdout);
+    fflush(stdout);
 
     SDL_ShowSimpleMessageBox(SDL_MESSAGEBOX_ERROR, "Fatal Error", buffer, NULL);
+
+    fputs("util::die(): >>>>>> End message <<<<<<\n", stdout);
+    fflush(stdout);
 
     abort();
 }

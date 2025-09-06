@@ -23,7 +23,7 @@
 #ifndef MCS_B181_TETRA_UTIL_MISC_H
 #define MCS_B181_TETRA_UTIL_MISC_H
 
-#include "tetra/gui/imgui.h"
+#include "tetra/util/stb_sprintf.h"
 
 #include <SDL3/SDL_endian.h>
 
@@ -44,8 +44,8 @@
 namespace util
 {
 /**
- * Prints error message to stdout, stderr, and an SDL Message box titled "Fatal Error" and then calls abort()
+ * Prints error message to stdout and an SDL Message box titled "Fatal Error" and then calls abort()
  */
-[[noreturn]] void die(const char* fmt, ...) IM_FMTARGS(1);
+[[noreturn]] void die(const char* fmt, ...) STBSP__ATTRIBUTE_FORMAT(1, 2);
 }
 #endif
