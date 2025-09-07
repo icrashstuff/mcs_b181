@@ -2058,7 +2058,7 @@ int main(int argc, char* argv[])
 
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, "mcs_b181_client");
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING, build_info::ver_string::client().c_str());
-    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING, "io.github.icrashstuff.mcs_b181_client");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING, "net.icrashstuff.mcs_b181_client");
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_CREATOR_STRING, "Ian Hangartner (icrashstuff)");
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_COPYRIGHT_STRING, "Copyright (c) 2024-2025 Ian Hangartner (icrashstuff)");
     SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, "https://github.com/icrashstuff/mcs_b181");
