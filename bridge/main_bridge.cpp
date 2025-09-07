@@ -1421,7 +1421,15 @@ int main(int argc, const char** argv)
     setvbuf(stdout, NULL, _IONBF, 0);
     setvbuf(stderr, NULL, _IONBF, 0);
 
-    dc_log("mcs_b181_bridge (%s)-%s (%s)", build_info::ver_string::client().c_str(), build_info::build_mode, build_info::git::refspec);
+    dc_log("mcs_b181_bridge (%s)-%s (%s)", build_info::ver_string::bridge().c_str(), build_info::build_mode, build_info::git::refspec);
+
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_NAME_STRING, "mcs_b181_bridge");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_VERSION_STRING, build_info::ver_string::bridge().c_str());
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_IDENTIFIER_STRING, "net.icrashstuff.mcs_b181_bridge");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_CREATOR_STRING, "Ian Hangartner (icrashstuff)");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_COPYRIGHT_STRING, "Copyright (c) 2024-2025 Ian Hangartner (icrashstuff)");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_URL_STRING, "https://github.com/icrashstuff/mcs_b181");
+    SDL_SetAppMetadataProperty(SDL_PROP_APP_METADATA_TYPE_STRING, "game");
 
     tetra::init("icrashstuff", "mcs_b181", "mcs_b181_bridge", argc, argv);
     tetra::init_gui("mcs_b181_bridge");
