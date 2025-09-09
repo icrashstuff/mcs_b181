@@ -32,6 +32,8 @@
 
 #include "vk_mem_alloc.h"
 
+#include "tetra/util/misc.h" /* util::die() */
+
 /** Die on an error from a function returning VkResult */
 #define VK_DIE(_CALL)                                                                              \
     do                                                                                             \
