@@ -15,4 +15,4 @@ skip = './build,
     ./client/sound/miniaudio_unifdef.h,'
 count =
 quiet-level = 3
-ignore-words-list = Ore,ore
+ignore-words-list = Ore,ore,pEvents,pEvent
