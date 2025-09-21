@@ -289,7 +289,11 @@ void gpu::simple_test_app()
 
         /* Tetra's ImGui Vulkan Backend has queue locking and does not requires external synchronization */
         if (format_changed)
-            ImGui_ImplVulkan_SetPipelineRenderingCreateInfo(&rendering_info);
+        {
+            ImGui_ImplVulkan_MainPipelineCreateInfo cinfo = {};
+            cinfo.PipelineRenderingCreateInfo = rendering_info;
+            ImGui_ImplVulkan_CreateMainPipeline(cinfo);
+        }
     };
 
     test_image_data_t* test_image_data = create_test_image(device_new);
