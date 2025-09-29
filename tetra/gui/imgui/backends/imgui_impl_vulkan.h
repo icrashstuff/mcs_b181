@@ -88,9 +88,9 @@ struct ImGui_ImplVulkan_InitInfo
     VkPipelineCache                 PipelineCache;              // Optional
 
     // [tetra]: (Optional) Queue locking
-    void*                           QueueLockData;                      // Data passed to QueueLockFn()/QueueUnlockFn() callbacks, Probably a mutex
-    void                            (*QueueLockFn)(void* UserData);     // Called when access to the Queue field is required
-    void                            (*QueueUnlockFn)(void* UserData);   // Called after access to the Queue field is not required
+    void*                           QueueLockData;                      ///< Data passed to QueueLockFn() / QueueUnlockFn() callbacks, Probably a mutex
+    void                            (*QueueLockFn)(void* UserData);     ///< Called when access to the ::Queue field is required
+    void                            (*QueueUnlockFn)(void* UserData);   ///< Called when access to the ::Queue field is no longer required
 
     // Pipeline
     VkRenderPass                    RenderPass;                 // Ignored if using dynamic rendering
