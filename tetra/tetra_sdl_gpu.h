@@ -113,7 +113,7 @@ int start_frame(bool event_loop = true);
  *
  * Returns true if application should exit, false otherwise
  */
-bool process_event(SDL_Event event);
+bool process_event(const SDL_Event& event);
 
 /**
  * Change visibility of main imgui context

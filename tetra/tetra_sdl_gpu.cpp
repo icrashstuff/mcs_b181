@@ -330,7 +330,7 @@ int tetra::init_gui(const char* const window_title, const SDL_GPUShaderFormat sh
     return 0;
 }
 
-bool tetra::process_event(SDL_Event event)
+bool tetra::process_event(const SDL_Event& event)
 {
     if (!tetra::sdl_gpu::init_counter)
         return false;
