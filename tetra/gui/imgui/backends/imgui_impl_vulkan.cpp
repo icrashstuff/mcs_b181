@@ -1381,6 +1381,9 @@ void ImGui_ImplVulkan_SetMinImageCount(uint32_t min_image_count)
     check_vk_result(err);
     ImGui_ImplVulkan_DestroyWindowRenderBuffers(v->Device, &bd->MainWindowRenderBuffers, v->Allocator);
     bd->VulkanInitInfo.MinImageCount = min_image_count;
+
+    /* [tetra]: This makes this function actually have an effect, instead of just doing nothing meaningful */
+    bd->VulkanInitInfo.ImageCount = min_image_count;
 }
 
 // Register a texture by creating a descriptor
