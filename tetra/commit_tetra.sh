@@ -90,7 +90,7 @@ PARENT_GIT stash push -m "TEMP: For $0" "$SUBDIR" || DIE "$?"
 # Alternative to git am
 PARENT_GIT apply "$FILE_PARENT_PATCH" || DIE_AND_POP_PARENT "$?"
 PARENT_GIT add "$SUBDIR"
-PARENT_GIT commit --file "$FILE_PARENT_CMT_MSG" || DIE_AND_POP_PARENT "$?"
+PARENT_GIT commit  --no-verify --file "$FILE_PARENT_CMT_MSG" || DIE_AND_POP_PARENT "$?"
 
 # Restore parent
 PARENT_GIT stash pop || DIE "$?"
