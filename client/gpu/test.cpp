@@ -226,6 +226,7 @@ void gpu::simple_test_app()
     cinfo_imgui.Device = gpu::device_new->logical;
 
     cinfo_imgui.Queue = gpu::device_new->graphics_queue;
+    cinfo_imgui.QueueFamily = gpu::device_new->graphics_queue_idx;
     cinfo_imgui.ImageCount = cinfo_imgui.MinImageCount = 2;
 
     cinfo_imgui.DescriptorPoolSize = IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE + 1;
