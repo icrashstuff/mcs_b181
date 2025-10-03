@@ -39,24 +39,24 @@ bool gpu::upload_to_texture2d(SDL_GPUCopyPass* const copy_pass, SDL_GPUTexture* 
     cinfo_tbo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
     cinfo_tbo.size = buf_size;
 
-    SDL_GPUTransferBuffer* tbo = SDL_CreateGPUTransferBuffer(state::gpu_device, &cinfo_tbo);
+    SDL_GPUTransferBuffer* tbo = SDL_CreateGPUTransferBuffer(state::sdl_gpu_device, &cinfo_tbo);
     if (!tbo)
     {
         dc_log_error("Failed to create transfer buffer! SDL_CreateGPUTransferBuffer: %s", SDL_GetError());
         return false;
     }
     {
-        void* tbo_pointer = SDL_MapGPUTransferBuffer(state::gpu_device, tbo, 0);
+        void* tbo_pointer = SDL_MapGPUTransferBuffer(state::sdl_gpu_device, tbo, 0);
         if (!tbo_pointer)
         {
             dc_log_error("Failed to map transfer buffer! SDL_MapGPUTransferBuffer: %s", SDL_GetError());
-            SDL_ReleaseGPUTransferBuffer(state::gpu_device, tbo);
+            SDL_ReleaseGPUTransferBuffer(state::sdl_gpu_device, tbo);
             return false;
         }
 
         copy_callback(tbo_pointer, buf_size);
 
-        SDL_UnmapGPUTransferBuffer(state::gpu_device, tbo);
+        SDL_UnmapGPUTransferBuffer(state::sdl_gpu_device, tbo);
     }
 
     SDL_GPUTextureTransferInfo loc_tex = {};
@@ -74,7 +74,7 @@ bool gpu::upload_to_texture2d(SDL_GPUCopyPass* const copy_pass, SDL_GPUTexture* 
 
     SDL_UploadToGPUTexture(copy_pass, &loc_tex, &region_tex, cycle);
 
-    SDL_ReleaseGPUTransferBuffer(state::gpu_device, tbo);
+    SDL_ReleaseGPUTransferBuffer(state::sdl_gpu_device, tbo);
 
     return true;
 }

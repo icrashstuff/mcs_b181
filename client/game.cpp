@@ -42,7 +42,7 @@ SDL_GPUFence* game_resources_t::reload()
     destroy();
 
     terrain_atlas = new texture_terrain_t("/_resources/assets/minecraft/textures/");
-    SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(state::gpu_device);
+    SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(state::sdl_gpu_device);
     if (!command_buffer)
         dc_log_error("Unable to upload texture, state::LockedAcquireGPUCommandBuffer: %s", SDL_GetError());
     else

@@ -36,12 +36,16 @@
 
 /* Forward declaration(s) */
 struct game_resources_t;
+namespace gpu
+{
+struct device_t;
+}
 
 namespace state
 {
 extern game_resources_t* game_resources;
 extern SDL_Window* window;
-extern SDL_GPUDevice* gpu_device;
+extern SDL_GPUDevice* sdl_gpu_device;
 /** Guaranteed to exist */
 extern SDL_GPUTexture* gpu_debug_texture;
 /** Guaranteed to exist */

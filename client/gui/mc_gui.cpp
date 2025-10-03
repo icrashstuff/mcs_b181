@@ -249,7 +249,7 @@ SDL_GPUFence* mc_gui::mc_gui_ctx::load_resources()
 {
     unload_resources();
 
-    SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(state::gpu_device);
+    SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(state::sdl_gpu_device);
     SDL_GPUCopyPass* copy_pass = (command_buffer ? SDL_BeginGPUCopyPass(command_buffer) : nullptr);
 
     tex_id_widgets = load_gui_texture(copy_pass, "widgets.png");
@@ -330,9 +330,9 @@ static void DEL_TEX(ImTextureID& binding)
         return;
 
     if (_binding->texture != state::gpu_debug_texture)
-        SDL_ReleaseGPUTexture(state::gpu_device, _binding->texture);
+        SDL_ReleaseGPUTexture(state::sdl_gpu_device, _binding->texture);
     if (_binding->sampler != state::gpu_debug_sampler)
-        SDL_ReleaseGPUSampler(state::gpu_device, _binding->sampler);
+        SDL_ReleaseGPUSampler(state::sdl_gpu_device, _binding->sampler);
 
     delete _binding;
     _binding = nullptr;

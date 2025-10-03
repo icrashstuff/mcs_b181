@@ -98,7 +98,7 @@ void state::init_terrain_pipelines()
 
     cinfo_shader_frag_depth_peel_n.num_samplers++;
 
-    SDL_GPUShaderFormat formats = SDL_GetGPUShaderFormats(state::gpu_device);
+    SDL_GPUShaderFormat formats = SDL_GetGPUShaderFormats(state::sdl_gpu_device);
 
     SHADERS_DO_ACTION(ASSIGN_SHADER_CODE);
     SHADERS_DO_ACTION(COMPILE_SHADER_CODE);
@@ -134,7 +134,7 @@ void state::init_terrain_pipelines()
     depth_stencil_state.enable_stencil_test = 0;
 
     SDL_GPUColorTargetDescription color_target_desc[1] = {};
-    color_target_desc[0].format = SDL_GetGPUSwapchainTextureFormat(state::gpu_device, state::window);
+    color_target_desc[0].format = SDL_GetGPUSwapchainTextureFormat(state::sdl_gpu_device, state::window);
     color_target_desc[0].blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
     color_target_desc[0].blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
     color_target_desc[0].blend_state.color_blend_op = SDL_GPU_BLENDOP_ADD;

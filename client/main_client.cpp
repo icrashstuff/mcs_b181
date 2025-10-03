@@ -214,7 +214,7 @@ static bool initialize_resources()
 
     fences.push_back(state::game_resources->reload());
     fences.push_back(mc_gui::global_ctx->load_resources());
-    SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(state::gpu_device);
+    SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(state::sdl_gpu_device);
     SDL_GPUCopyPass* copy_pass = (command_buffer ? SDL_BeginGPUCopyPass(command_buffer) : nullptr);
     state::init_textures(copy_pass);
     SDL_EndGPUCopyPass(copy_pass);
@@ -233,7 +233,7 @@ static bool initialize_resources()
         if (g)
             g->reload_resources(state::game_resources);
 
-    wait_and_release_fences(state::gpu_device, fences);
+    wait_and_release_fences(state::sdl_gpu_device, fences);
 
     return true;
 }
@@ -1654,26 +1654,26 @@ static SDL_GPUTransferBuffer* screenshot_func_prepare(
     cinfo_tex.props = SDL_CreateProperties();
 
     SDL_SetStringProperty(cinfo_tex.props, SDL_PROP_GPU_TEXTURE_CREATE_NAME_STRING, "Intermediate screenshot texture (Swapchain format)");
-    cinfo_tex.format = SDL_GetGPUSwapchainTextureFormat(state::gpu_device, state::window);
+    cinfo_tex.format = SDL_GetGPUSwapchainTextureFormat(state::sdl_gpu_device, state::window);
     cinfo_tex.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER;
-    SDL_GPUTexture* tex_swapchain_fmt = SDL_CreateGPUTexture(state::gpu_device, &cinfo_tex);
+    SDL_GPUTexture* tex_swapchain_fmt = SDL_CreateGPUTexture(state::sdl_gpu_device, &cinfo_tex);
 
     SDL_SetStringProperty(cinfo_tex.props, SDL_PROP_GPU_TEXTURE_CREATE_NAME_STRING, "Intermediate screenshot texture (R8B8G8A8 format)");
     cinfo_tex.format = SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM;
     cinfo_tex.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;
-    SDL_GPUTexture* tex_screenshot_fmt = SDL_CreateGPUTexture(state::gpu_device, &cinfo_tex);
+    SDL_GPUTexture* tex_screenshot_fmt = SDL_CreateGPUTexture(state::sdl_gpu_device, &cinfo_tex);
 
     SDL_DestroyProperties(cinfo_tex.props);
-    BAIL_IF(!tex_swapchain_fmt || !tex_screenshot_fmt, nullptr, SDL_ReleaseGPUTexture(state::gpu_device, tex_swapchain_fmt);
-        SDL_ReleaseGPUTexture(state::gpu_device, tex_screenshot_fmt));
+    BAIL_IF(!tex_swapchain_fmt || !tex_screenshot_fmt, nullptr, SDL_ReleaseGPUTexture(state::sdl_gpu_device, tex_swapchain_fmt);
+        SDL_ReleaseGPUTexture(state::sdl_gpu_device, tex_screenshot_fmt));
 
     /* Create transfer buffer */
     SDL_GPUTransferBufferCreateInfo cinfo_tbo = {};
     cinfo_tbo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_DOWNLOAD;
     cinfo_tbo.size = SDL_CalculateGPUTextureFormatSize(SDL_GPU_TEXTUREFORMAT_R8G8B8A8_UNORM, tex_size.x, tex_size.y, 1);
 
-    SDL_GPUTransferBuffer* tbo = SDL_CreateGPUTransferBuffer(state::gpu_device, &cinfo_tbo);
-    BAIL_IF(!tbo, nullptr, SDL_ReleaseGPUTexture(state::gpu_device, tex_swapchain_fmt); SDL_ReleaseGPUTexture(state::gpu_device, tex_screenshot_fmt));
+    SDL_GPUTransferBuffer* tbo = SDL_CreateGPUTransferBuffer(state::sdl_gpu_device, &cinfo_tbo);
+    BAIL_IF(!tbo, nullptr, SDL_ReleaseGPUTexture(state::sdl_gpu_device, tex_swapchain_fmt); SDL_ReleaseGPUTexture(state::sdl_gpu_device, tex_screenshot_fmt));
 
     /* Copy swapchain */
     {
@@ -1772,7 +1772,7 @@ static void screenshot_func_save(const glm::ivec2 tex_size, gpu::fence_t* const 
 
     gpu::wait_for_fence(fence);
 
-    Uint8* tbo_pointer = (Uint8*)SDL_MapGPUTransferBuffer(state::gpu_device, tbo, 0);
+    Uint8* tbo_pointer = (Uint8*)SDL_MapGPUTransferBuffer(state::sdl_gpu_device, tbo, 0);
     BAIL_IF(!tbo_pointer, , );
 
     Uint8* buf = (Uint8*)malloc(tex_size.x * tex_size.y * 3);
@@ -1785,7 +1785,7 @@ static void screenshot_func_save(const glm::ivec2 tex_size, gpu::fence_t* const 
         buf[i * 3 + 1] = tbo_pointer[i * 4 + 1];
         buf[i * 3 + 2] = tbo_pointer[i * 4 + 2];
     }
-    SDL_UnmapGPUTransferBuffer(state::gpu_device, tbo);
+    SDL_UnmapGPUTransferBuffer(state::sdl_gpu_device, tbo);
 
     SDL_Time cur_time;
     SDL_GetCurrentTime(&cur_time);
@@ -1952,7 +1952,7 @@ static void profile_light()
 static glm::uvec2 win_size(0, 0);
 
 SDL_Window* state::window = nullptr;
-SDL_GPUDevice* state::gpu_device = nullptr;
+SDL_GPUDevice* state::sdl_gpu_device = nullptr;
 SDL_GPUTexture* state::gpu_debug_texture = nullptr;
 SDL_GPUSampler* state::gpu_debug_sampler = nullptr;
 SDL_GPUTextureFormat state::gpu_tex_format_best_depth_only = SDL_GPU_TEXTUREFORMAT_D16_UNORM;
@@ -2029,7 +2029,7 @@ void setup_static_gpu_state()
     const char* best_depth_formats_str[SDL_arraysize(best_depth_formats)] = { "D32_FLOAT", "D24_UNORM_S8_UINT", "D24_UNORM", "D16_UNORM" };
     for (int i = 0; i < IM_ARRAYSIZE(best_depth_formats); i++)
     {
-        if (!SDL_GPUTextureSupportsFormat(state::gpu_device, best_depth_formats[i], SDL_GPU_TEXTURETYPE_2D, SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET))
+        if (!SDL_GPUTextureSupportsFormat(state::sdl_gpu_device, best_depth_formats[i], SDL_GPU_TEXTURETYPE_2D, SDL_GPU_TEXTUREUSAGE_DEPTH_STENCIL_TARGET))
             continue;
         dc_log("Best depth only texture format: SDL_GPU_TEXTUREFORMAT_%s", best_depth_formats_str[i]);
         state::gpu_tex_format_best_depth_only = best_depth_formats[i];
@@ -2230,7 +2230,7 @@ int main(int argc, char* argv[])
         if (take_screenshot && swapchain_texture && win_size.x != 0 && win_size.y != 0)
         {
             SDL_GPUTextureCreateInfo cinfo_tex = {};
-            cinfo_tex.format = SDL_GetGPUSwapchainTextureFormat(state::gpu_device, state::window);
+            cinfo_tex.format = SDL_GetGPUSwapchainTextureFormat(state::sdl_gpu_device, state::window);
             cinfo_tex.usage = SDL_GPU_TEXTUREUSAGE_SAMPLER | SDL_GPU_TEXTUREUSAGE_COLOR_TARGET;
             cinfo_tex.type = SDL_GPU_TEXTURETYPE_2D;
             cinfo_tex.width = win_size.x;
@@ -2241,7 +2241,7 @@ int main(int argc, char* argv[])
             cinfo_tex.props = SDL_CreateProperties();
 
             SDL_SetStringProperty(cinfo_tex.props, SDL_PROP_GPU_TEXTURE_CREATE_NAME_STRING, "Intermediate screenshot target");
-            window_target = SDL_CreateGPUTexture(state::gpu_device, &cinfo_tex);
+            window_target = SDL_CreateGPUTexture(state::sdl_gpu_device, &cinfo_tex);
             SDL_DestroyProperties(cinfo_tex.props);
 
             if (!window_target)
@@ -2584,11 +2584,11 @@ int main(int argc, char* argv[])
             blit_info.destination.h = win_size.y;
             blit_info.load_op = SDL_GPU_LOADOP_DONT_CARE;
             SDL_BlitGPUTexture(command_buffer, &blit_info);
-            SDL_ReleaseGPUTexture(state::gpu_device, window_target);
+            SDL_ReleaseGPUTexture(state::sdl_gpu_device, window_target);
 
             gpu::fence_t* fence = gpu::submit_command_buffer_and_acquire_fence(command_buffer);
             screenshot_func_save(win_size, fence, screenshot_tbo);
-            SDL_ReleaseGPUTransferBuffer(state::gpu_device, screenshot_tbo);
+            SDL_ReleaseGPUTransferBuffer(state::sdl_gpu_device, screenshot_tbo);
             gpu::release_fence(fence);
         }
         else
@@ -2601,8 +2601,8 @@ int main(int argc, char* argv[])
     for (game_t* g : games)
         delete g;
 
-    SDL_ReleaseGPUTexture(state::gpu_device, state::gpu_debug_texture);
-    SDL_ReleaseGPUSampler(state::gpu_device, state::gpu_debug_sampler);
+    SDL_ReleaseGPUTexture(state::sdl_gpu_device, state::gpu_debug_texture);
+    SDL_ReleaseGPUSampler(state::sdl_gpu_device, state::gpu_debug_sampler);
 
     connection_t::cull_dead_sockets(100);
 

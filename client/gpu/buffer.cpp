@@ -50,7 +50,7 @@ SDL_GPUBuffer* gpu::create_buffer(const SDL_GPUBufferCreateInfo& cinfo, const ch
         SDL_SetStringProperty(cinfo_named.props, SDL_PROP_GPU_BUFFER_CREATE_NAME_STRING, name);
     }
 
-    SDL_GPUBuffer* ret = SDL_CreateGPUBuffer(state::gpu_device, &cinfo_named);
+    SDL_GPUBuffer* ret = SDL_CreateGPUBuffer(state::sdl_gpu_device, &cinfo_named);
 
     if (!ret)
         dc_log_error("Failed to acquire buffer! SDL_CreateGPUBuffer: %s", SDL_GetError());
@@ -70,24 +70,24 @@ bool gpu::upload_to_buffer(SDL_GPUCopyPass* const copy_pass, SDL_GPUBuffer* cons
     cinfo_tbo.usage = SDL_GPU_TRANSFERBUFFERUSAGE_UPLOAD;
     cinfo_tbo.size = size;
 
-    SDL_GPUTransferBuffer* tbo = SDL_CreateGPUTransferBuffer(state::gpu_device, &cinfo_tbo);
+    SDL_GPUTransferBuffer* tbo = SDL_CreateGPUTransferBuffer(state::sdl_gpu_device, &cinfo_tbo);
     if (!tbo)
     {
         dc_log_error("Failed to create transfer buffer! SDL_CreateGPUTransferBuffer: %s", SDL_GetError());
         return false;
     }
     {
-        void* tbo_pointer = SDL_MapGPUTransferBuffer(state::gpu_device, tbo, 0);
+        void* tbo_pointer = SDL_MapGPUTransferBuffer(state::sdl_gpu_device, tbo, 0);
         if (!tbo_pointer)
         {
             dc_log_error("Failed to map transfer buffer! SDL_MapGPUTransferBuffer: %s", SDL_GetError());
-            SDL_ReleaseGPUTransferBuffer(state::gpu_device, tbo);
+            SDL_ReleaseGPUTransferBuffer(state::sdl_gpu_device, tbo);
             return false;
         }
 
         copy_callback(tbo_pointer, size);
 
-        SDL_UnmapGPUTransferBuffer(state::gpu_device, tbo);
+        SDL_UnmapGPUTransferBuffer(state::sdl_gpu_device, tbo);
     }
 
     SDL_GPUTransferBufferLocation loc_buf = {};
@@ -100,7 +100,7 @@ bool gpu::upload_to_buffer(SDL_GPUCopyPass* const copy_pass, SDL_GPUBuffer* cons
 
     SDL_UploadToGPUBuffer(copy_pass, &loc_buf, &region_buf, cycle);
 
-    SDL_ReleaseGPUTransferBuffer(state::gpu_device, tbo);
+    SDL_ReleaseGPUTransferBuffer(state::sdl_gpu_device, tbo);
 
     return true;
 }

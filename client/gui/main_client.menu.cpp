@@ -1681,8 +1681,8 @@ static void init_mc_gui_shaders()
 
 static void destroy_mc_gui_shaders()
 {
-    SDL_ReleaseGPUGraphicsPipeline(state::gpu_device, pipeline_imgui_regular);
-    SDL_ReleaseGPUGraphicsPipeline(state::gpu_device, pipeline_imgui_crosshair);
+    SDL_ReleaseGPUGraphicsPipeline(state::sdl_gpu_device, pipeline_imgui_regular);
+    SDL_ReleaseGPUGraphicsPipeline(state::sdl_gpu_device, pipeline_imgui_crosshair);
 }
 
 static void init()
@@ -1700,8 +1700,8 @@ static void init()
         if (!ImGui_ImplSDL3_InitForSDLGPU(state::window))
             util::die("Failed to initialize Dear Imgui SDL3 backend\n");
         ImGui_ImplSDLGPU3_InitInfo init_info = {};
-        init_info.Device = state::gpu_device;
-        init_info.ColorTargetFormat = SDL_GetGPUSwapchainTextureFormat(state::gpu_device, state::window);
+        init_info.Device = state::sdl_gpu_device;
+        init_info.ColorTargetFormat = SDL_GetGPUSwapchainTextureFormat(state::sdl_gpu_device, state::window);
         init_info.MSAASamples = SDL_GPU_SAMPLECOUNT_1;
         if (!ImGui_ImplSDLGPU3_Init(&init_info))
             util::die("Failed to initialize Dear Imgui SDLGPU3 backend\n");

@@ -57,7 +57,7 @@ void quit_gpu_fences();
         /* (that or I'm doing something wrong), - Ian 2025-05-22 */                                                            \
         SDL_ClearError();                                                                                                      \
                                                                                                                                \
-        SDL_GPU##RESOURCE_SUB_TYPE* ret = SDL_CreateGPU##RESOURCE_SUB_TYPE(state::gpu_device, &cinfo_named);                   \
+        SDL_GPU##RESOURCE_SUB_TYPE* ret = SDL_CreateGPU##RESOURCE_SUB_TYPE(state::sdl_gpu_device, &cinfo_named);               \
                                                                                                                                \
         if (!ret)                                                                                                              \
             dc_log_error("Failed to acquire %s! SDL_CreateGPU%s: %s", #RESOURCE_SUB_TYPE, #RESOURCE_SUB_TYPE, SDL_GetError()); \
@@ -70,7 +70,7 @@ void quit_gpu_fences();
 #define RELEASE_FUNC_DEF(FUNCTION_NAME, RESOURCE_SUB_TYPE)                                 \
     void gpu::FUNCTION_NAME(SDL_GPU##RESOURCE_SUB_TYPE*& resource, const bool set_to_null) \
     {                                                                                      \
-        SDL_ReleaseGPU##RESOURCE_SUB_TYPE(state::gpu_device, resource);                    \
+        SDL_ReleaseGPU##RESOURCE_SUB_TYPE(state::sdl_gpu_device, resource);                \
         if (set_to_null)                                                                   \
             resource = nullptr;                                                            \
     }

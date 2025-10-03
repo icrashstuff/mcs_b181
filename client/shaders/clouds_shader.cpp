@@ -101,7 +101,7 @@ void state::init_clouds_pipelines()
     depth_stencil_state.compare_op = SDL_GPU_COMPAREOP_GREATER;
 
     SDL_GPUColorTargetDescription color_target_desc[1] = {};
-    color_target_desc[0].format = SDL_GetGPUSwapchainTextureFormat(state::gpu_device, state::window);
+    color_target_desc[0].format = SDL_GetGPUSwapchainTextureFormat(state::sdl_gpu_device, state::window);
 
     SDL_GPUGraphicsPipelineTargetInfo target_info = {};
     target_info.color_target_descriptions = color_target_desc;

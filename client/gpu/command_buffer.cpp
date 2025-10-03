@@ -63,14 +63,14 @@ struct gpu::fence_t
             dc_log_warn("Leaking fence!");
         else
         {
-            SDL_ReleaseGPUFence(state::gpu_device, fence);
+            SDL_ReleaseGPUFence(state::sdl_gpu_device, fence);
             delete this;
         }
     }
 
-    bool is_done() { return SDL_GetAtomicInt(&submitted) && fence != nullptr && SDL_QueryGPUFence(state::gpu_device, fence); }
+    bool is_done() { return SDL_GetAtomicInt(&submitted) && fence != nullptr && SDL_QueryGPUFence(state::sdl_gpu_device, fence); }
 
-    bool is_submitted_but_not_done() { return SDL_GetAtomicInt(&submitted) && fence != nullptr && !SDL_QueryGPUFence(state::gpu_device, fence); }
+    bool is_submitted_but_not_done() { return SDL_GetAtomicInt(&submitted) && fence != nullptr && !SDL_QueryGPUFence(state::sdl_gpu_device, fence); }
 
     bool is_cancelled() { return SDL_GetAtomicInt(&submitted) && fence == nullptr; }
 };
@@ -117,7 +117,7 @@ static gpu::fence_t* pop_fence(const SDL_GPUCommandBuffer* const command_buffer)
 
 SDL_GPUCommandBuffer* gpu::acquire_command_buffer()
 {
-    SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(state::gpu_device);
+    SDL_GPUCommandBuffer* command_buffer = SDL_AcquireGPUCommandBuffer(state::sdl_gpu_device);
 
     if (!command_buffer)
         dc_log_error("SDL_AcquireGPUCommandBuffer failed: %s", SDL_GetError());

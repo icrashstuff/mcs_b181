@@ -94,7 +94,7 @@ void state::init_composite_pipelines()
     rasterizer_state.front_face = SDL_GPU_FRONTFACE_COUNTER_CLOCKWISE;
 
     SDL_GPUColorTargetDescription color_target_desc[1] = {};
-    color_target_desc[0].format = SDL_GetGPUSwapchainTextureFormat(state::gpu_device, state::window);
+    color_target_desc[0].format = SDL_GetGPUSwapchainTextureFormat(state::sdl_gpu_device, state::window);
     color_target_desc[0].blend_state.src_color_blendfactor = SDL_GPU_BLENDFACTOR_SRC_ALPHA;
     color_target_desc[0].blend_state.dst_color_blendfactor = SDL_GPU_BLENDFACTOR_ONE_MINUS_SRC_ALPHA;
     color_target_desc[0].blend_state.color_blend_op = SDL_GPU_BLENDOP_ADD;

@@ -922,7 +922,7 @@ SDL_GPURenderPass* level_t::render_stage_render(
 
     /** Creation info for intermediate color targets */
     SDL_GPUTextureCreateInfo cinfo_color_target = cinfo_depth_target;
-    cinfo_color_target.format = SDL_GetGPUSwapchainTextureFormat(state::gpu_device, state::window);
+    cinfo_color_target.format = SDL_GetGPUSwapchainTextureFormat(state::sdl_gpu_device, state::window);
     cinfo_color_target.usage = SDL_GPU_TEXTUREUSAGE_COLOR_TARGET | SDL_GPU_TEXTUREUSAGE_SAMPLER;
 
     /** Color target info for peels */

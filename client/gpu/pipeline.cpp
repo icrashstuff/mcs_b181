@@ -83,7 +83,7 @@ SDL_GPUShader* gpu::create(const SDL_GPUShaderCreateInfo& cinfo, const char* fmt
 
     SDL_ClearError();
 
-    SDL_GPUShader* ret = SDL_CreateGPUShader(state::gpu_device, &cinfo_named);
+    SDL_GPUShader* ret = SDL_CreateGPUShader(state::sdl_gpu_device, &cinfo_named);
 
     if (!ret)
         dc_log_error("Failed to acquire %s! SDL_CreateGPU%s: %s", "Shader", "Shader", SDL_GetError());
@@ -99,4 +99,4 @@ RELEASE_FUNC_DEF(release, Shader);
 RELEASE_FUNC_DEF(release, GraphicsPipeline);
 RELEASE_FUNC_DEF(release, ComputePipeline);
 
-SDL_GPUShaderFormat gpu::get_shader_formats() { return SDL_GetGPUShaderFormats(state::gpu_device); }
+SDL_GPUShaderFormat gpu::get_shader_formats() { return SDL_GetGPUShaderFormats(state::sdl_gpu_device); }
