@@ -243,12 +243,12 @@ void gpu::simple_test_app()
 
     /* We set the initial format to one that probably won't be supported by the swapchain to force testing of `window_t::format_callback` */
     device_new->window.format.format = VK_FORMAT_R8G8B8A8_UNORM;
-    cinfo_imgui.PipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
-    cinfo_imgui.PipelineRenderingCreateInfo.viewMask = 0;
-    cinfo_imgui.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
-    cinfo_imgui.PipelineRenderingCreateInfo.pColorAttachmentFormats = &device_new->window.format.format;
-    cinfo_imgui.PipelineRenderingCreateInfo.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
-    cinfo_imgui.PipelineRenderingCreateInfo.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
+    cinfo_imgui.PipelineInfoMain.PipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
+    cinfo_imgui.PipelineInfoMain.PipelineRenderingCreateInfo.viewMask = 0;
+    cinfo_imgui.PipelineInfoMain.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
+    cinfo_imgui.PipelineInfoMain.PipelineRenderingCreateInfo.pColorAttachmentFormats = &device_new->window.format.format;
+    cinfo_imgui.PipelineInfoMain.PipelineRenderingCreateInfo.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
+    cinfo_imgui.PipelineInfoMain.PipelineRenderingCreateInfo.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
     cinfo_imgui.MinAllocationSize = 256 * 1024;
 
@@ -294,9 +294,9 @@ void gpu::simple_test_app()
         /* Tetra's ImGui Vulkan Backend has queue locking and does not requires external synchronization */
         if (format_changed)
         {
-            ImGui_ImplVulkan_MainPipelineCreateInfo cinfo = {};
+            ImGui_ImplVulkan_PipelineInfo cinfo = {};
             cinfo.PipelineRenderingCreateInfo = rendering_info;
-            ImGui_ImplVulkan_CreateMainPipeline(cinfo);
+            ImGui_ImplVulkan_CreateMainPipeline(&cinfo);
         }
     };
 
