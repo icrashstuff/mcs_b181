@@ -11,8 +11,6 @@
 
 #ifndef IMGUI_DISABLE
 
-#include "../../imgui.h"
-
 #include <string>
 
 namespace ImGui

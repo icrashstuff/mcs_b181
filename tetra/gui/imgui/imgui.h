@@ -28,8 +28,8 @@
 
 // Library Version
 // (Integer encoded as XYYZZ for use in #if preprocessor conditionals, e.g. '#if IMGUI_VERSION_NUM >= 12345')
-#define IMGUI_VERSION       "1.92.4 WIP #d4f722d5b289d4d75b775acfb0a4b41e7df472a7"
-#define IMGUI_VERSION_NUM   19231
+#define IMGUI_VERSION       "1.92.4 WIP #9809b0b0617c4e6500fce94451fdde7e32c7047c"
+#define IMGUI_VERSION_NUM   19234
 #define IMGUI_HAS_TABLE             // Added BeginTable() - from IMGUI_VERSION_NUM >= 18000
 #define IMGUI_HAS_TEXTURES          // Added ImGuiBackendFlags_RendererHasTextures - from IMGUI_VERSION_NUM >= 19198
 

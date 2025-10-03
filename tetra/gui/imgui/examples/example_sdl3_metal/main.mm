@@ -24,7 +24,7 @@ int main(int, char**)
     if (!SDL_Init(SDL_INIT_VIDEO | SDL_INIT_GAMEPAD))
     {
         printf("Error: SDL_Init(): %s\n", SDL_GetError());
-        return -1;
+        return 1;
     }
 
     // Create SDL window graphics context
@@ -34,7 +34,7 @@ int main(int, char**)
     if (window == nullptr)
     {
         printf("Error: SDL_CreateWindow(): %s\n", SDL_GetError());
-        return -1;
+        return 1;
     }
     SDL_SetWindowPosition(window, SDL_WINDOWPOS_CENTERED, SDL_WINDOWPOS_CENTERED);
     SDL_ShowWindow(window);
@@ -46,7 +46,7 @@ int main(int, char**)
         printf("Error: failed to create Metal device.\n");
         SDL_DestroyWindow(window);
         SDL_Quit();
-        return -1;
+        return 1;
     }
     SDL_MetalView view = SDL_Metal_CreateView(window);
     CAMetalLayer* layer = (__bridge CAMetalLayer*)SDL_Metal_GetLayer(view);
