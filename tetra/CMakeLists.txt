@@ -111,6 +111,13 @@ set(tetra_sdl_gpu_SRC
     ${IMGUI_DIR}/backends/imgui_impl_sdlgpu3.cpp
 )
 
+set(tetra_vulkan_SRC
+    ${TETRA_DIR}tetra_vulkan.cpp
+
+    ${IMGUI_DIR}/backends/imgui_impl_sdl3.cpp
+    ${IMGUI_DIR}/backends/imgui_impl_vulkan.cpp
+)
+
 include(CheckCompilerFlag)
 
 function(tetra_add_compile_option_for_lang target_name scope lang flag)
@@ -164,6 +171,7 @@ endfunction()
 
 option(TETRA_BUILD_GL_COMPONENT "Build tetra::gl (tetra_gl)" OFF)
 option(TETRA_BUILD_SDL_GPU_COMPONENT "Build tetra::sdl_gpu (tetra_sdl_gpu)" OFF)
+option(TETRA_BUILD_VULKAN_COMPONENT "Build tetra::vulkan (tetra_vulkan)" OFF)
 
 ### BEGIN: Target: tetra_core
 add_library(tetra_core OBJECT ${tetra_core_SRC})
@@ -212,3 +220,19 @@ if(TETRA_BUILD_SDL_GPU_COMPONENT)
     add_library(tetra::sdl_gpu ALIAS tetra_sdl_gpu)
 endif()
 ### END: Target: tetra_sdl_gpu
+
+### BEGIN: Target: tetra_vulkan
+if(TETRA_BUILD_VULKAN_COMPONENT)
+    add_library(tetra_vulkan OBJECT ${tetra_vulkan_SRC})
+
+    tetra_common_compile_options(tetra_vulkan)
+
+    target_include_directories(tetra_vulkan PRIVATE ../)
+
+    target_link_libraries(tetra_vulkan PUBLIC tetra_core)
+
+    set_source_files_properties(gui/imgui/backends/imgui_impl_vulkan.cpp PROPERTIES COMPILE_DEFINITIONS IMGUI_IMPL_VULKAN_NO_PROTOTYPES)
+
+    add_library(tetra::vulkan ALIAS tetra_vulkan)
+endif()
+### END: Target: tetra_vulkan
