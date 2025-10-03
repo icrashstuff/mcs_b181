@@ -224,8 +224,6 @@ void do_debug_screen(mc_gui::mc_gui_ctx* ctx, game_t* game, ImDrawList* drawlist
         add_text(ctx, drawlist, 1, cursor_r, "%s", gpu_driver_name);
     if (gpu_driver_info)
         add_text(ctx, drawlist, 1, cursor_r, "%s", gpu_driver_info);
-    add_text(ctx, drawlist, 1, cursor_r, "%s %s", SDL_GetGPUDeviceDriver(state::gpu_device),
-        tetra::SDL_GPUShaderFormat_to_string(SDL_GetGPUShaderFormats(state::gpu_device)).c_str());
 
     /* Highlighted block info */
     {

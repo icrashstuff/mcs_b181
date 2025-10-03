@@ -155,8 +155,6 @@ set(mcs_b181_client_SRC
     shared/inventory.cpp
     shared/java_strings.cpp
     shared/simplex_noise/SimplexNoise.cpp
-
-    tetra/gui/imgui/backends/imgui_impl_vulkan.cpp
 )
 
 if(APPLE)
@@ -166,10 +164,6 @@ else()
 endif()
 
 SET_SOURCE_FILES_PROPERTIES(shared/simplex_noise/SimplexNoise.cpp PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS_RELEASE}")
-
-# We don't use Dear ImGui's default volk wrapper or vulkan prototypes
-# Since we do weirdness with Volk to make KDevelop's parser happy, we only set IMGUI_IMPL_VULKAN_NO_PROTOTYPES for the file that needs it
-SET_SOURCE_FILES_PROPERTIES(tetra/gui/imgui/backends/imgui_impl_vulkan.cpp PROPERTIES COMPILE_DEFINITIONS IMGUI_IMPL_VULKAN_NO_PROTOTYPES)
 
 # chunk_cubic.cpp contains the renderer hint and light flood algorithms and thus needs to be fast
 SET_SOURCE_FILES_PROPERTIES(client/chunk_cubic.cpp PROPERTIES COMPILE_FLAGS "${CMAKE_CXX_FLAGS_RELEASE}")
@@ -182,6 +176,7 @@ set(BUILD_SHARED_LIBS OFF)
 add_subdirectory(shared/sdl_net/)
 
 set(TETRA_BUILD_SDL_GPU_COMPONENT ON)
+set(TETRA_BUILD_VULKAN_COMPONENT ON)
 add_subdirectory(tetra/)
 
 add_subdirectory(client/entt)
@@ -238,7 +233,7 @@ add_bin_common(mcs_b181_client)
 
 target_link_libraries(mcs_b181_client EnTT::EnTT)
 target_link_libraries(mcs_b181_client cubiomes_static)
-target_link_libraries(mcs_b181_client tetra::sdl_gpu)
+target_link_libraries(mcs_b181_client tetra::vulkan)
 target_link_libraries(mcs_b181_client Vulkan::Headers)
 
 target_link_libraries(mcs_b181_bridge tetra::sdl_gpu)

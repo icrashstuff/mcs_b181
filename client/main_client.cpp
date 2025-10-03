@@ -23,14 +23,17 @@
 
 #include "game.h"
 
+#include "gpu/gpu.h"
+
 #include "tetra/tetra_core.h"
-#include "tetra/tetra_sdl_gpu.h"
+#include "tetra/tetra_vulkan.h"
 
 #include <algorithm>
 
 #include "tetra/gui/imgui.h"
 #include "tetra/gui/imgui/backends/imgui_impl_sdl3.h"
 #include "tetra/gui/imgui/backends/imgui_impl_sdlgpu3.h"
+#include "tetra/gui/imgui/backends/imgui_impl_vulkan.h"
 
 #include "tetra/gui/console.h"
 #include "tetra/gui/gui_registrar.h"
@@ -1996,8 +1999,12 @@ static void upload_debug_texture(SDL_GPUCopyPass* const copy_pass)
 
 void setup_static_gpu_state()
 {
+#if 1
+    util::die("Migrate to vulkan");
+#else
     state::window = tetra::window;
     state::gpu_device = tetra::gpu_device;
+#endif
 
     SDL_GPUCommandBuffer* command_buffer = gpu::acquire_command_buffer();
     if (command_buffer == nullptr)
@@ -2101,8 +2108,12 @@ int main(int argc, char* argv[])
     if (!SDLNet_Init())
         util::die("SDLNet_Init: %s", SDL_GetError());
 
+#if 1
+    util::die("Migrate to vulkan");
+#else
     if (tetra::init_gui(window_title, SDL_GPU_SHADERFORMAT_SPIRV | SDL_GPU_SHADERFORMAT_MSL) != 0)
         util::die("tetra::init_gui");
+#endif
 
     setup_static_gpu_state();
 
@@ -2205,7 +2216,11 @@ int main(int argc, char* argv[])
             reload_resources = 0;
         }
 
+#if 1
+        util::die("Migrate to vulkan");
+#else
         tetra::configure_swapchain_if_needed();
+#endif
         SDL_GPUCommandBuffer* command_buffer = gpu::acquire_command_buffer();
         SDL_GPUTexture* swapchain_texture = nullptr;
         if (!SDL_WaitAndAcquireGPUSwapchainTexture(command_buffer, state::window, &swapchain_texture, &win_size.x, &win_size.y))
@@ -2551,7 +2566,11 @@ int main(int argc, char* argv[])
 
         connection_t::cull_dead_sockets(0);
 
+#if 1
+        util::die("Migrate to vulkan");
+#else
         tetra::end_frame(command_buffer, window_target, engine_state_current != ENGINE_STATE_RUNNING);
+#endif
         if (window_target != swapchain_texture)
         {
             SDL_GPUTransferBuffer* screenshot_tbo = screenshot_func_prepare(win_size, command_buffer, window_target);
@@ -2592,8 +2611,12 @@ int main(int argc, char* argv[])
     SDLNet_Quit();
     gpu::quit();
     tetra::deinit_gui();
+#if 1
+    util::die("Migrate to vulkan");
+#else
     state::window = tetra::window;
     state::gpu_device = tetra::gpu_device;
+#endif
     tetra::deinit();
 
     return 0;

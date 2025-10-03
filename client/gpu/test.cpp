@@ -27,6 +27,7 @@
 #include "tetra/gui/imgui/backends/imgui_impl_vulkan.h"
 #include "tetra/licenses.h"
 #include "tetra/tetra_core.h"
+#include "tetra/tetra_vulkan.h"
 #include "tetra/util/convar.h"
 #include "tetra/util/misc.h"
 
@@ -252,15 +253,50 @@ void gpu::simple_test_app()
 
     cinfo_imgui.MinAllocationSize = 256 * 1024;
 
-    ImGui::CreateContext();
+    ImGuiContext* imgui_context = ImGui::CreateContext();
+    ImGui::SetCurrentContext(imgui_context);
 
     ImGui::GetIO().IniFilename = nullptr;
 
     ImGui::StyleColorsDark();
-    if (!ImGui_ImplSDL3_InitForVulkan(gpu::window))
+    if (!ImGui_ImplSDL3_InitForVulkan(window))
         util::die("Failed to initialize Dear ImGui SDL3 backend");
     if (!ImGui_ImplVulkan_Init(&cinfo_imgui))
         util::die("Failed to initialize Dear ImGui Vulkan backend");
+
+    /* Test tetra backend */
+    {
+        tetra::vulkan_backend_init_info_t cinfo_tetra = {};
+        cinfo_tetra.window = window;
+
+        cinfo_tetra.instance_api_version = gpu::instance_api_version;
+
+        cinfo_tetra.instance = gpu::instance;
+        cinfo_tetra.physical = gpu::device_new->physical;
+        cinfo_tetra.device = gpu::device_new->logical;
+
+        cinfo_tetra.queue_family = gpu::device_new->graphics_queue_idx;
+        cinfo_tetra.queue = gpu::device_new->graphics_queue;
+        cinfo_tetra.queue_lock = gpu::device_new->graphics_queue_lock;
+
+        cinfo_tetra.image_count = 2;
+
+        cinfo_tetra.pipeline_cache = gpu::device_new->pipeline_cache;
+
+        cinfo_tetra.allocation_callbacks = gpu::device_new->allocation_callbacks;
+
+        cinfo_tetra.pipeline_create_info = cinfo_imgui.PipelineInfoMain;
+
+        if (vkCmdBeginDebugUtilsLabelEXT && vkCmdEndDebugUtilsLabelEXT)
+        {
+            cinfo_tetra.vkCmdBeginDebugUtilsLabelEXT = vkCmdBeginDebugUtilsLabelEXT;
+            cinfo_tetra.vkCmdEndDebugUtilsLabelEXT = vkCmdEndDebugUtilsLabelEXT;
+        }
+
+        if (tetra::init_gui(cinfo_tetra))
+            util::die("tetra::init_gui()");
+        tetra::show_imgui_ctx_main(false);
+    }
 
     SDL_ShowWindow(window);
     SDL_SetWindowResizable(window, 1);
@@ -272,6 +308,8 @@ void gpu::simple_test_app()
 
         /* Tetra's ImGui Vulkan Backend has queue locking and does not requires external synchronization */
         ImGui_ImplVulkan_SetMinImageCount(image_count);
+
+        tetra::set_image_count(image_count);
     };
 
     device_new->window.format_callback = [](const bool format_changed, const bool colorspace_changed, void* userdata) {
@@ -297,6 +335,8 @@ void gpu::simple_test_app()
             ImGui_ImplVulkan_PipelineInfo cinfo = {};
             cinfo.PipelineRenderingCreateInfo = rendering_info;
             ImGui_ImplVulkan_CreateMainPipeline(&cinfo);
+
+            tetra::set_pipeline_create_info(cinfo);
         }
     };
 
@@ -308,12 +348,25 @@ void gpu::simple_test_app()
         SDL_Event event;
         while (SDL_PollEvent(&event))
         {
-            ImGui_ImplSDL3_ProcessEvent(&event);
+            tetra::process_event(event);
+
+            if (!tetra::imgui_ctx_main_wants_input())
+            {
+                ImGui::SetCurrentContext(imgui_context);
+                ImGui_ImplSDL3_ProcessEvent(&event);
+            }
+
             switch (event.type)
             {
             case SDL_EVENT_QUIT:
                 done = 1;
                 break;
+            case SDL_EVENT_WINDOW_CLOSE_REQUESTED:
+                if (event.window.windowID == SDL_GetWindowID(window))
+                {
+                    done = 1;
+                    break;
+                }
             }
         }
 
@@ -321,6 +374,9 @@ void gpu::simple_test_app()
         if (!frame)
             continue;
 
+        tetra::start_frame(false);
+
+        ImGui::SetCurrentContext(imgui_context);
         ImGui_ImplVulkan_NewFrame();
         ImGui_ImplSDL3_NewFrame();
         ImGui::NewFrame();
@@ -345,9 +401,11 @@ void gpu::simple_test_app()
             tetra::projects_widgets(tetra::get_projects(num_projects), num_projects);
 
             done = !should_close;
+
+            ImGui::End();
         }
 
-        ImGui::End();
+        ImGui::ShowMetricsWindow();
 
         ImGui::Render();
         ImDrawData* draw_data = ImGui::GetDrawData();
@@ -379,6 +437,8 @@ void gpu::simple_test_app()
 
         ImGui_ImplVulkan_RenderDrawData(draw_data, frame->cmd_graphics, VK_NULL_HANDLE);
 
+        tetra::render_frame(frame->cmd_graphics);
+
         device_new->vkCmdEndRenderingKHR(frame->cmd_graphics);
         device_new->transition_image(frame->cmd_graphics, frame->image, color_attachment.imageLayout, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
@@ -394,7 +454,11 @@ void gpu::simple_test_app()
 
     destroy_test_image(device_new, test_image_data);
 
+    ImGui::SetCurrentContext(imgui_context);
     ImGui_ImplVulkan_Shutdown();
     ImGui_ImplSDL3_Shutdown();
-    ImGui::DestroyContext(ImGui::GetCurrentContext());
+    ImGui::DestroyContext(imgui_context);
+    imgui_context = nullptr;
+
+    tetra::deinit_gui();
 }
