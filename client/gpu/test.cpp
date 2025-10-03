@@ -71,6 +71,7 @@ static test_image_data_t* create_test_image(gpu::device_t* device)
         cinfo_image_alloc.usage = VMA_MEMORY_USAGE_AUTO;
 
         VK_DIE(vmaCreateImage(device->allocator, &cinfo_image, &cinfo_image_alloc, &data->image, &data->alloc, nullptr));
+        device->set_object_name(data->image, VK_OBJECT_TYPE_IMAGE, "%s: Image", __FUNCTION__);
     }
 
     /* Create Image View */
@@ -87,6 +88,7 @@ static test_image_data_t* create_test_image(gpu::device_t* device)
         cinfo_image_view.subresourceRange.layerCount = 1;
 
         VK_DIE(device->vkCreateImageView(&cinfo_image_view, &data->view));
+        device->set_object_name(data->view, VK_OBJECT_TYPE_IMAGE_VIEW, "%s: Image View", __FUNCTION__);
     }
 
     /* Create Sampler */
@@ -98,6 +100,7 @@ static test_image_data_t* create_test_image(gpu::device_t* device)
         cinfo_sampler.addressModeU = cinfo_sampler.addressModeV = cinfo_sampler.addressModeW = VK_SAMPLER_ADDRESS_MODE_REPEAT;
 
         VK_DIE(device->vkCreateSampler(&cinfo_sampler, &data->sampler));
+        device->set_object_name(data->sampler, VK_OBJECT_TYPE_SAMPLER, "%s: Sampler", __FUNCTION__);
     }
 
     /* Create command pool */
