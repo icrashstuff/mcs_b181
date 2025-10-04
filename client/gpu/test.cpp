@@ -107,7 +107,7 @@ static test_image_data_t* create_test_image(gpu::device_t* device)
     /* Create command pool */
     VkCommandPoolCreateInfo cinfo_cmd_pool = {};
     cinfo_cmd_pool.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    cinfo_cmd_pool.queueFamilyIndex = device->transfer_queue_idx;
+    cinfo_cmd_pool.queueFamilyIndex = device->transfer_queue.index;
     VkCommandPool cmd_pool = VK_NULL_HANDLE;
     VK_DIE(device->vkCreateCommandPool(&cinfo_cmd_pool, &cmd_pool));
 
@@ -133,7 +133,7 @@ static test_image_data_t* create_test_image(gpu::device_t* device)
     cinfo_buffer.usage = VK_BUFFER_USAGE_TRANSFER_SRC_BIT;
     cinfo_buffer.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
     cinfo_buffer.queueFamilyIndexCount = 1;
-    cinfo_buffer.pQueueFamilyIndices = &device->transfer_queue_idx;
+    cinfo_buffer.pQueueFamilyIndices = &device->transfer_queue.index;
 
     VmaAllocationCreateInfo cinfo_buffer_vma = {};
     cinfo_buffer_vma.usage = VMA_MEMORY_USAGE_CPU_TO_GPU;
@@ -187,9 +187,9 @@ static test_image_data_t* create_test_image(gpu::device_t* device)
     sinfo_cmd_upload.commandBufferCount = 1;
     sinfo_cmd_upload.pCommandBuffers = &cmd_upload;
 
-    SDL_LockMutex(device->transfer_queue_lock);
-    VK_DIE(device->vkQueueSubmit(device->transfer_queue, 1, &sinfo_cmd_upload, wait_fence));
-    SDL_UnlockMutex(device->transfer_queue_lock);
+    SDL_LockMutex(device->transfer_queue.lock);
+    VK_DIE(device->vkQueueSubmit(device->transfer_queue.handle, 1, &sinfo_cmd_upload, wait_fence));
+    SDL_UnlockMutex(device->transfer_queue.lock);
 
     /* Wait for command buffer to complete submission */
     VK_DIE(device->vkWaitForFences(1, &wait_fence, 1, UINT64_MAX));
@@ -229,8 +229,8 @@ void gpu::simple_test_app()
     cinfo_imgui.PhysicalDevice = gpu::device_new->physical;
     cinfo_imgui.Device = gpu::device_new->logical;
 
-    cinfo_imgui.Queue = gpu::device_new->graphics_queue;
-    cinfo_imgui.QueueFamily = gpu::device_new->graphics_queue_idx;
+    cinfo_imgui.Queue = gpu::device_new->graphics_queue.handle;
+    cinfo_imgui.QueueFamily = gpu::device_new->graphics_queue.index;
     cinfo_imgui.ImageCount = cinfo_imgui.MinImageCount = 2;
 
     cinfo_imgui.DescriptorPoolSize = IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE + 1;
@@ -238,7 +238,7 @@ void gpu::simple_test_app()
 
     cinfo_imgui.PipelineCache = gpu::device_new->pipeline_cache;
 
-    cinfo_imgui.QueueLockData = gpu::device_new->graphics_queue_lock;
+    cinfo_imgui.QueueLockData = gpu::device_new->graphics_queue.lock;
     cinfo_imgui.QueueLockFn = [](void* m) { SDL_LockMutex(static_cast<SDL_Mutex*>(m)); };
     cinfo_imgui.QueueUnlockFn = [](void* m) { SDL_UnlockMutex(static_cast<SDL_Mutex*>(m)); };
 
@@ -275,9 +275,9 @@ void gpu::simple_test_app()
         cinfo_tetra.physical = gpu::device_new->physical;
         cinfo_tetra.device = gpu::device_new->logical;
 
-        cinfo_tetra.queue_family = gpu::device_new->graphics_queue_idx;
-        cinfo_tetra.queue = gpu::device_new->graphics_queue;
-        cinfo_tetra.queue_lock = gpu::device_new->graphics_queue_lock;
+        cinfo_tetra.queue_family = gpu::device_new->graphics_queue.index;
+        cinfo_tetra.queue = gpu::device_new->graphics_queue.handle;
+        cinfo_tetra.queue_lock = gpu::device_new->graphics_queue.lock;
 
         cinfo_tetra.image_count = 2;
 

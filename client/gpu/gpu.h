@@ -126,7 +126,7 @@ private:
 
 struct window_t
 {
-    /* TODO: OpenXR handles here */
+    /* TODO-OPT: OpenXR handles here? */
     // XrSwapchain xr_swapchain = XR_NULL_HANDLE;
 
     SDL_Window* sdl_window = nullptr;
@@ -173,6 +173,13 @@ struct window_t
     std::vector<frame_t> frames;
 };
 
+struct queue_t
+{
+    VkQueue handle = VK_NULL_HANDLE;
+    Uint32 index = ~0;
+    SDL_Mutex* lock = nullptr;
+};
+
 struct device_t
 {
     VkPhysicalDevice physical = VK_NULL_HANDLE;
@@ -205,10 +212,6 @@ struct device_t
     /* ============================================= */
     /* ================ Queue stuff ================ */
 
-    Uint32 graphics_queue_idx = ~0;
-    Uint32 transfer_queue_idx = ~0;
-    Uint32 present_queue_idx = ~0;
-
     struct
     {
         VkSharingMode sharingMode;
@@ -223,13 +226,9 @@ struct device_t
         }
     } queue_sharing;
 
-    VkQueue graphics_queue = VK_NULL_HANDLE;
-    VkQueue transfer_queue = VK_NULL_HANDLE;
-    VkQueue present_queue = VK_NULL_HANDLE;
-
-    SDL_Mutex* graphics_queue_lock = nullptr;
-    SDL_Mutex* transfer_queue_lock = nullptr;
-    SDL_Mutex* present_queue_lock = nullptr;
+    queue_t graphics_queue;
+    queue_t transfer_queue;
+    queue_t present_queue;
 
     /** Convenience function to call SDL_LockMutex() on each queue lock */
     void lock_all_queues();

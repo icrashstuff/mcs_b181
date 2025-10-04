@@ -704,9 +704,9 @@ static VkSwapchainKHR create_swapchain(
     std::vector<Uint32> queue_families;
     {
         std::set<Uint32> queue_families_set = {
-            device->graphics_queue_idx,
-            device->present_queue_idx,
-            device->transfer_queue_idx,
+            device->graphics_queue.index,
+            device->present_queue.index,
+            device->transfer_queue.index,
         };
         for (Uint32 it : queue_families_set)
             queue_families.push_back(it);
@@ -953,9 +953,9 @@ gpu::device_t::device_t(SDL_Window* sdl_window, const VkAllocationCallbacks* _al
         util::die("Unable to find suitable Vulkan Device!\n"
                   "Try updating your Operating System and/or Graphics drivers");
 
-    graphics_queue_idx = device_info.graphics_queue_idx;
-    transfer_queue_idx = device_info.transfer_queue_idx;
-    present_queue_idx = device_info.present_queue_idx;
+    graphics_queue.index = device_info.graphics_queue_idx;
+    transfer_queue.index = device_info.transfer_queue_idx;
+    present_queue.index = device_info.present_queue_idx;
     physical = device_info.device;
 
     logical = init_device(instance, device_info, required_device_extensions);
@@ -978,19 +978,19 @@ gpu::device_t::device_t(SDL_Window* sdl_window, const VkAllocationCallbacks* _al
 
     vmaCreateAllocator(&vma_cinfo, &allocator);
 
-    vkGetDeviceQueue(graphics_queue_idx, 0, &graphics_queue);
-    vkGetDeviceQueue(transfer_queue_idx, 0, &transfer_queue);
-    vkGetDeviceQueue(present_queue_idx, 0, &present_queue);
+    vkGetDeviceQueue(graphics_queue.index, 0, &graphics_queue.handle);
+    vkGetDeviceQueue(transfer_queue.index, 0, &transfer_queue.handle);
+    vkGetDeviceQueue(present_queue.index, 0, &present_queue.handle);
 
     /* Name queues */
-    for (const Uint32 family_idx : std::set<Uint32> { graphics_queue_idx, present_queue_idx, transfer_queue_idx })
+    for (const Uint32 family_idx : std::set<Uint32> { graphics_queue.index, present_queue.index, transfer_queue.index })
     {
         std::string families;
-        if (graphics_queue_idx == family_idx)
+        if (graphics_queue.index == family_idx)
             families += "Graphics|";
-        if (transfer_queue_idx == family_idx)
+        if (transfer_queue.index == family_idx)
             families += "Transfer|";
-        if (present_queue_idx == family_idx)
+        if (present_queue.index == family_idx)
             families += "Present|";
         if (families.length())
             families.pop_back();
@@ -1001,7 +1001,7 @@ gpu::device_t::device_t(SDL_Window* sdl_window, const VkAllocationCallbacks* _al
 
     /* Setup queue sharing info */
     {
-        std::set<Uint32> queues { graphics_queue_idx, present_queue_idx, transfer_queue_idx };
+        std::set<Uint32> queues { graphics_queue.index, present_queue.index, transfer_queue.index };
         queue_sharing.queueFamilyIndexCount = queues.size();
         if (queue_sharing.queueFamilyIndexCount == 1)
             queue_sharing.sharingMode = VK_SHARING_MODE_EXCLUSIVE;
@@ -1015,15 +1015,15 @@ gpu::device_t::device_t(SDL_Window* sdl_window, const VkAllocationCallbacks* _al
     }
 
     /* Setup queue locks */
-    for (const Uint32 family_idx : std::set<Uint32> { graphics_queue_idx, present_queue_idx, transfer_queue_idx })
+    for (const Uint32 family_idx : std::set<Uint32> { graphics_queue.index, present_queue.index, transfer_queue.index })
     {
         SDL_Mutex* const lock = SDL_CreateMutex();
-        if (graphics_queue_idx == family_idx)
-            graphics_queue_lock = lock;
-        if (transfer_queue_idx == family_idx)
-            transfer_queue_lock = lock;
-        if (present_queue_idx == family_idx)
-            present_queue_lock = lock;
+        if (graphics_queue.index == family_idx)
+            graphics_queue.lock = lock;
+        if (transfer_queue.index == family_idx)
+            transfer_queue.lock = lock;
+        if (present_queue.index == family_idx)
+            present_queue.lock = lock;
     }
 
     /* Init command pools */
@@ -1032,11 +1032,11 @@ gpu::device_t::device_t(SDL_Window* sdl_window, const VkAllocationCallbacks* _al
         cinfo_command_pool.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
         cinfo_command_pool.flags = VK_COMMAND_POOL_CREATE_RESET_COMMAND_BUFFER_BIT;
 
-        cinfo_command_pool.queueFamilyIndex = graphics_queue_idx;
+        cinfo_command_pool.queueFamilyIndex = graphics_queue.index;
         VK_DIE(vkCreateCommandPool(&cinfo_command_pool, &window.graphics_pool));
         set_object_name(window.graphics_pool, VK_OBJECT_TYPE_COMMAND_POOL, "(Window %u): Graphics pool", SDL_GetWindowID(window.sdl_window));
 
-        cinfo_command_pool.queueFamilyIndex = transfer_queue_idx;
+        cinfo_command_pool.queueFamilyIndex = transfer_queue.index;
         VK_DIE(vkCreateCommandPool(&cinfo_command_pool, &window.transfer_pool));
         set_object_name(window.transfer_pool, VK_OBJECT_TYPE_COMMAND_POOL, "(Window %u): Transfer pool", SDL_GetWindowID(window.sdl_window));
     }
@@ -1091,7 +1091,7 @@ gpu::device_t::~device_t()
     vkDestroyFence(window.acquire_fence);
 
     SDL_Vulkan_DestroySurface(instance, window.sdl_surface, allocation_callbacks);
-    for (SDL_Mutex* m : std::set<SDL_Mutex*> { graphics_queue_lock, transfer_queue_lock, present_queue_lock })
+    for (SDL_Mutex* m : std::set<SDL_Mutex*> { graphics_queue.lock, transfer_queue.lock, present_queue.lock })
         SDL_DestroyMutex(m);
 
     vmaDestroyAllocator(allocator);
@@ -1292,37 +1292,37 @@ void gpu::device_t::submit_frame(window_t* const window, frame_t* frame)
     pinfo.pImageIndices = &frame->image_idx;
 
     if (frame->used_graphics)
-        SDL_LockMutex(graphics_queue_lock);
+        SDL_LockMutex(graphics_queue.lock);
     if (frame->used_transfer)
-        SDL_LockMutex(transfer_queue_lock);
-    SDL_LockMutex(present_queue_lock);
-    VK_DIE(funcs.vkQueueSubmit(graphics_queue, 1, &sinfo, frame->done));
+        SDL_LockMutex(transfer_queue.lock);
+    SDL_LockMutex(present_queue.lock);
+    VK_DIE(funcs.vkQueueSubmit(graphics_queue.handle, 1, &sinfo, frame->done));
     {
-        VkResult result = funcs.vkQueuePresentKHR(present_queue, &pinfo);
+        VkResult result = funcs.vkQueuePresentKHR(present_queue.handle, &pinfo);
         if (is_swapchain_result_non_fatal(result))
             window->swapchain_rebuild_required = 1;
         else
             VK_DIE(result; (void)"vkQueuePresentKHR");
     }
-    SDL_UnlockMutex(present_queue_lock);
+    SDL_UnlockMutex(present_queue.lock);
     if (frame->used_transfer)
-        SDL_UnlockMutex(transfer_queue_lock);
+        SDL_UnlockMutex(transfer_queue.lock);
     if (frame->used_graphics)
-        SDL_UnlockMutex(graphics_queue_lock);
+        SDL_UnlockMutex(graphics_queue.lock);
 }
 
 void gpu::device_t::lock_all_queues()
 {
-    SDL_LockMutex(graphics_queue_lock);
-    SDL_LockMutex(transfer_queue_lock);
-    SDL_LockMutex(present_queue_lock);
+    SDL_LockMutex(graphics_queue.lock);
+    SDL_LockMutex(transfer_queue.lock);
+    SDL_LockMutex(present_queue.lock);
 }
 
 void gpu::device_t::unlock_all_queues()
 {
-    SDL_UnlockMutex(graphics_queue_lock);
-    SDL_UnlockMutex(transfer_queue_lock);
-    SDL_UnlockMutex(present_queue_lock);
+    SDL_UnlockMutex(graphics_queue.lock);
+    SDL_UnlockMutex(transfer_queue.lock);
+    SDL_UnlockMutex(present_queue.lock);
 }
 
 void gpu::device_t::wait_for_device_idle()
