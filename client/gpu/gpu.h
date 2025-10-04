@@ -412,7 +412,24 @@ public:
     {
         return funcs.vkQueueSubmit(queue, submitCount, pSubmits, fence);
     }
+    /** Wrapper around vkQueueSubmit() that handles queue locking */
+    inline VkResult vkQueueSubmit(queue_t queue, uint32_t submitCount, const VkSubmitInfo* pSubmits, VkFence fence)
+    {
+        SDL_LockMutex(queue.lock);
+        VkResult result = funcs.vkQueueSubmit(queue.handle, submitCount, pSubmits, fence);
+        SDL_UnlockMutex(queue.lock);
+        return result;
+    }
     inline VkResult vkQueueWaitIdle(VkQueue queue) { return funcs.vkQueueWaitIdle(queue); }
+
+    /** Wrapper around vkQueueWaitIdle() that handles queue locking */
+    inline VkResult vkQueueWaitIdle(queue_t queue)
+    {
+        SDL_LockMutex(queue.lock);
+        VkResult result = funcs.vkQueueWaitIdle(queue.handle);
+        SDL_UnlockMutex(queue.lock);
+        return result;
+    }
 
     inline VkResult vkAllocateMemory(const VkMemoryAllocateInfo* pAllocateInfo, VkDeviceMemory* pMemory)
     {
@@ -460,6 +477,14 @@ public:
     inline VkResult vkQueueBindSparse(VkQueue queue, uint32_t bindInfoCount, const VkBindSparseInfo* pBindInfo, VkFence fence)
     {
         return funcs.vkQueueBindSparse(queue, bindInfoCount, pBindInfo, fence);
+    }
+    /** Wrapper around vkQueueBindSparse() that handles queue locking */
+    inline VkResult vkQueueBindSparse(queue_t queue, uint32_t bindInfoCount, const VkBindSparseInfo* pBindInfo, VkFence fence)
+    {
+        SDL_LockMutex(queue.lock);
+        VkResult result = funcs.vkQueueBindSparse(queue.handle, bindInfoCount, pBindInfo, fence);
+        SDL_UnlockMutex(queue.lock);
+        return result;
     }
     inline VkResult vkCreateFence(const VkFenceCreateInfo* pCreateInfo, VkFence* pFence)
     {
@@ -942,6 +967,14 @@ public:
         return funcs.vkAcquireNextImageKHR(logical, swapchain, timeout, semaphore, fence, pImageIndex);
     }
     inline VkResult vkQueuePresentKHR(VkQueue queue, const VkPresentInfoKHR* pPresentInfo) { return funcs.vkQueuePresentKHR(queue, pPresentInfo); }
+    /** Wrapper around vkQueuePresentKHR() that handles queue locking */
+    inline VkResult vkQueuePresentKHR(queue_t queue, const VkPresentInfoKHR* pPresentInfo)
+    {
+        SDL_LockMutex(queue.lock);
+        VkResult result = funcs.vkQueuePresentKHR(queue.handle, pPresentInfo);
+        SDL_UnlockMutex(queue.lock);
+        return result;
+    }
     inline VkResult vkGetDeviceGroupPresentCapabilitiesKHR(VkDeviceGroupPresentCapabilitiesKHR* pDeviceGroupPresentCapabilities)
     {
         return funcs.vkGetDeviceGroupPresentCapabilitiesKHR(logical, pDeviceGroupPresentCapabilities);
@@ -988,6 +1021,14 @@ public:
     inline VkResult vkQueueSubmit2KHR(VkQueue queue, uint32_t submitCount, const VkSubmitInfo2* pSubmits, VkFence fence)
     {
         return funcs.vkQueueSubmit2KHR(queue, submitCount, pSubmits, fence);
+    }
+    /** Wrapper around vkQueueSubmit2KHR() that handles queue locking */
+    inline VkResult vkQueueSubmit2KHR(queue_t queue, uint32_t submitCount, const VkSubmitInfo2* pSubmits, VkFence fence)
+    {
+        SDL_LockMutex(queue.lock);
+        VkResult result = funcs.vkQueueSubmit2KHR(queue.handle, submitCount, pSubmits, fence);
+        SDL_UnlockMutex(queue.lock);
+        return result;
     }
 #endif
 };
