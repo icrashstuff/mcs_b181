@@ -36,10 +36,6 @@
 
 /* Forward declaration(s) */
 struct game_resources_t;
-namespace gpu
-{
-struct device_t;
-}
 
 namespace state
 {

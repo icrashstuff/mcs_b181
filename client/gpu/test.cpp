@@ -220,34 +220,34 @@ static void destroy_test_image(gpu::device_t* device, test_image_data_t* data)
 
 void gpu::simple_test_app()
 {
-    if (!device_new)
+    if (!device)
         util::die("GPU API not initialized, did you forget to call gpu::init()?");
 
     ImGui_ImplVulkan_InitInfo cinfo_imgui {};
     cinfo_imgui.ApiVersion = gpu::instance_api_version;
     cinfo_imgui.Instance = gpu::instance;
-    cinfo_imgui.PhysicalDevice = gpu::device_new->physical;
-    cinfo_imgui.Device = gpu::device_new->logical;
+    cinfo_imgui.PhysicalDevice = gpu::device->physical;
+    cinfo_imgui.Device = gpu::device->logical;
 
-    cinfo_imgui.Queue = gpu::device_new->graphics_queue.handle;
-    cinfo_imgui.QueueFamily = gpu::device_new->graphics_queue.index;
+    cinfo_imgui.Queue = gpu::device->graphics_queue.handle;
+    cinfo_imgui.QueueFamily = gpu::device->graphics_queue.index;
     cinfo_imgui.ImageCount = cinfo_imgui.MinImageCount = 2;
 
     cinfo_imgui.DescriptorPoolSize = IMGUI_IMPL_VULKAN_MINIMUM_IMAGE_SAMPLER_POOL_SIZE + 1;
     cinfo_imgui.UseDynamicRendering = true;
 
-    cinfo_imgui.PipelineCache = gpu::device_new->pipeline_cache;
+    cinfo_imgui.PipelineCache = gpu::device->pipeline_cache;
 
-    cinfo_imgui.QueueLockData = gpu::device_new->graphics_queue.lock;
+    cinfo_imgui.QueueLockData = gpu::device->graphics_queue.lock;
     cinfo_imgui.QueueLockFn = [](void* m) { SDL_LockMutex(static_cast<SDL_Mutex*>(m)); };
     cinfo_imgui.QueueUnlockFn = [](void* m) { SDL_UnlockMutex(static_cast<SDL_Mutex*>(m)); };
 
     /* We set the initial format to one that probably won't be supported by the swapchain to force testing of `window_t::format_callback` */
-    device_new->window.format.format = VK_FORMAT_R8G8B8A8_UNORM;
+    device->window.format.format = VK_FORMAT_R8G8B8A8_UNORM;
     cinfo_imgui.PipelineInfoMain.PipelineRenderingCreateInfo.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
     cinfo_imgui.PipelineInfoMain.PipelineRenderingCreateInfo.viewMask = 0;
     cinfo_imgui.PipelineInfoMain.PipelineRenderingCreateInfo.colorAttachmentCount = 1;
-    cinfo_imgui.PipelineInfoMain.PipelineRenderingCreateInfo.pColorAttachmentFormats = &device_new->window.format.format;
+    cinfo_imgui.PipelineInfoMain.PipelineRenderingCreateInfo.pColorAttachmentFormats = &device->window.format.format;
     cinfo_imgui.PipelineInfoMain.PipelineRenderingCreateInfo.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
     cinfo_imgui.PipelineInfoMain.PipelineRenderingCreateInfo.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
@@ -272,18 +272,18 @@ void gpu::simple_test_app()
         cinfo_tetra.instance_api_version = gpu::instance_api_version;
 
         cinfo_tetra.instance = gpu::instance;
-        cinfo_tetra.physical = gpu::device_new->physical;
-        cinfo_tetra.device = gpu::device_new->logical;
+        cinfo_tetra.physical = gpu::device->physical;
+        cinfo_tetra.device = gpu::device->logical;
 
-        cinfo_tetra.queue_family = gpu::device_new->graphics_queue.index;
-        cinfo_tetra.queue = gpu::device_new->graphics_queue.handle;
-        cinfo_tetra.queue_lock = gpu::device_new->graphics_queue.lock;
+        cinfo_tetra.queue_family = gpu::device->graphics_queue.index;
+        cinfo_tetra.queue = gpu::device->graphics_queue.handle;
+        cinfo_tetra.queue_lock = gpu::device->graphics_queue.lock;
 
         cinfo_tetra.image_count = 2;
 
-        cinfo_tetra.pipeline_cache = gpu::device_new->pipeline_cache;
+        cinfo_tetra.pipeline_cache = gpu::device->pipeline_cache;
 
-        cinfo_tetra.allocation_callbacks = gpu::device_new->allocation_callbacks;
+        cinfo_tetra.allocation_callbacks = gpu::device->allocation_callbacks;
 
         cinfo_tetra.pipeline_create_info = cinfo_imgui.PipelineInfoMain;
 
@@ -301,7 +301,7 @@ void gpu::simple_test_app()
     SDL_ShowWindow(window);
     SDL_SetWindowResizable(window, 1);
 
-    device_new->window.num_images_callback = [](Uint32 image_count, void* userdata) {
+    device->window.num_images_callback = [](Uint32 image_count, void* userdata) {
         IM_UNUSED(userdata);
 
         dc_log("Swapchain image count changed");
@@ -312,14 +312,14 @@ void gpu::simple_test_app()
         tetra::set_image_count(image_count);
     };
 
-    device_new->window.format_callback = [](const bool format_changed, const bool colorspace_changed, void* userdata) {
+    device->window.format_callback = [](const bool format_changed, const bool colorspace_changed, void* userdata) {
         IM_UNUSED(colorspace_changed);
         IM_UNUSED(userdata);
         VkPipelineRenderingCreateInfoKHR rendering_info {};
         rendering_info.sType = VK_STRUCTURE_TYPE_PIPELINE_RENDERING_CREATE_INFO_KHR;
         rendering_info.viewMask = 0;
         rendering_info.colorAttachmentCount = 1;
-        rendering_info.pColorAttachmentFormats = &device_new->window.format.format;
+        rendering_info.pColorAttachmentFormats = &device->window.format.format;
         rendering_info.depthAttachmentFormat = VK_FORMAT_UNDEFINED;
         rendering_info.stencilAttachmentFormat = VK_FORMAT_UNDEFINED;
 
@@ -340,7 +340,7 @@ void gpu::simple_test_app()
         }
     };
 
-    test_image_data_t* test_image_data = create_test_image(device_new);
+    test_image_data_t* test_image_data = create_test_image(device);
 
     bool done = 0;
     while (!done)
@@ -370,7 +370,7 @@ void gpu::simple_test_app()
             }
         }
 
-        frame_t* frame = gpu::device_new->acquire_next_frame(&gpu::device_new->window, UINT64_MAX);
+        frame_t* frame = gpu::device->acquire_next_frame(&gpu::device->window, UINT64_MAX);
         if (!frame)
             continue;
 
@@ -416,7 +416,7 @@ void gpu::simple_test_app()
 
         frame->used_graphics = 1;
 
-        VK_DIE(device_new->vkBeginCommandBuffer(frame->cmd_graphics, &binfo_command_buffer));
+        VK_DIE(device->vkBeginCommandBuffer(frame->cmd_graphics, &binfo_command_buffer));
 
         VkRenderingAttachmentInfo color_attachment {};
         color_attachment.sType = VK_STRUCTURE_TYPE_RENDERING_ATTACHMENT_INFO_KHR;
@@ -427,32 +427,32 @@ void gpu::simple_test_app()
 
         VkRenderingInfoKHR binfo_rendering {};
         binfo_rendering.sType = VK_STRUCTURE_TYPE_RENDERING_INFO_KHR;
-        binfo_rendering.renderArea.extent = device_new->window.extent;
+        binfo_rendering.renderArea.extent = device->window.extent;
         binfo_rendering.layerCount = 1;
         binfo_rendering.colorAttachmentCount = 1;
         binfo_rendering.pColorAttachments = &color_attachment;
 
-        device_new->transition_image(frame->cmd_graphics, frame->image, VK_IMAGE_LAYOUT_UNDEFINED, color_attachment.imageLayout);
-        device_new->vkCmdBeginRenderingKHR(frame->cmd_graphics, &binfo_rendering);
+        device->transition_image(frame->cmd_graphics, frame->image, VK_IMAGE_LAYOUT_UNDEFINED, color_attachment.imageLayout);
+        device->vkCmdBeginRenderingKHR(frame->cmd_graphics, &binfo_rendering);
 
         ImGui_ImplVulkan_RenderDrawData(draw_data, frame->cmd_graphics, VK_NULL_HANDLE);
 
         tetra::render_frame(frame->cmd_graphics);
 
-        device_new->vkCmdEndRenderingKHR(frame->cmd_graphics);
-        device_new->transition_image(frame->cmd_graphics, frame->image, color_attachment.imageLayout, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
+        device->vkCmdEndRenderingKHR(frame->cmd_graphics);
+        device->transition_image(frame->cmd_graphics, frame->image, color_attachment.imageLayout, VK_IMAGE_LAYOUT_PRESENT_SRC_KHR);
 
-        device_new->vkEndCommandBuffer(frame->cmd_graphics);
+        device->vkEndCommandBuffer(frame->cmd_graphics);
 
-        device_new->submit_frame(&device_new->window, frame);
+        device->submit_frame(&device->window, frame);
 
         static tetra::iteration_limiter_t fps_cap(1);
         fps_cap.wait();
     }
 
-    device_new->wait_for_device_idle();
+    device->wait_for_device_idle();
 
-    destroy_test_image(device_new, test_image_data);
+    destroy_test_image(device, test_image_data);
 
     ImGui::SetCurrentContext(imgui_context);
     ImGui_ImplVulkan_Shutdown();

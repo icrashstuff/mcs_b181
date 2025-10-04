@@ -744,7 +744,7 @@ static VkSwapchainKHR create_swapchain(
     return swapchain;
 }
 
-gpu::device_t* gpu::device_new = nullptr;
+gpu::device_t* gpu::device = nullptr;
 
 void gpu::init()
 {
@@ -765,7 +765,7 @@ void gpu::init()
     instance = init_instance();
     volkLoadInstanceOnly(gpu::instance);
 
-    device_new = new device_t(gpu::window);
+    device = new device_t(gpu::window);
 
     /* Load ImGui functions */
     ImGui_ImplVulkan_LoadFunctions(
@@ -778,11 +778,11 @@ void gpu::init()
 
 void gpu::quit()
 {
-    device_new->wait_for_device_idle();
+    device->wait_for_device_idle();
 
     internal::quit_gpu_fences();
 
-    delete device_new;
+    delete device;
 
     vkDestroyInstance(instance, nullptr);
     instance = VK_NULL_HANDLE;
@@ -1288,7 +1288,7 @@ void gpu::device_t::submit_frame(window_t* const window, frame_t* frame)
     pinfo.waitSemaphoreCount = 1;
     pinfo.pWaitSemaphores = &present_semaphore;
     pinfo.swapchainCount = 1;
-    pinfo.pSwapchains = &gpu::device_new->window.sdl_swapchain;
+    pinfo.pSwapchains = &gpu::device->window.sdl_swapchain;
     pinfo.pImageIndices = &frame->image_idx;
 
     if (frame->used_graphics)

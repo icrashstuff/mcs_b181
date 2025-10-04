@@ -992,5 +992,5 @@ public:
 #endif
 };
 
-extern device_t* device_new;
+extern device_t* device;
 }
