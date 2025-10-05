@@ -114,6 +114,7 @@ set(mcs_b181_client_SRC
 
     client/gpu/gpu.cpp
     client/gpu/test.cpp
+    client/gpu/fence.cpp
     client/gpu/buffer.cpp
     client/gpu/texture.cpp
     client/gpu/sampler.cpp

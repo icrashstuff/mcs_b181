@@ -294,6 +294,7 @@ static bool is_extension_present(const std::vector<VkExtensionProperties>& exten
 }
 
 /* TODO: Add option to force a device by name? */
+/* TODO: Check properties */
 static bool select_physical_device(
     VkInstance instance, VkSurfaceKHR surface, const std::vector<const char*>& required_device_extensions, gpu::physical_device_info_t& out)
 {
@@ -529,6 +530,7 @@ static VkDevice init_device(VkInstance instance, gpu::physical_device_info_t dev
     VkPhysicalDeviceDynamicRenderingFeatures features_dynamic_rendering = {};
     VkPhysicalDeviceSynchronization2Features features_sync2 = {};
 
+    features_12.timelineSemaphore = 1;
     features_dynamic_rendering.dynamicRendering = 1;
     features_sync2.synchronization2 = 1;
 

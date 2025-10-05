@@ -405,6 +405,34 @@ void gpu::simple_test_app()
             ImGui::End();
         }
 
+        ImGui::Begin("Tests");
+        {
+            static const char* msg_null = "Not tested";
+            static const char* msg_passed = "Passed";
+            static const char* msg_failed = "Failed";
+#define TEST_BUTTON(func)                             \
+    do                                                \
+    {                                                 \
+        static const char* state = msg_null;          \
+        if (ImGui::Button(#func))                     \
+            state = (func) ? msg_passed : msg_failed; \
+        ImGui::SameLine();                            \
+        ImGui::Text("Result:");                       \
+        ImGui::SameLine();                            \
+        ImVec4 color = { 1, 1, 0, 1 };                \
+        if (state == msg_passed)                      \
+            color = ImVec4(0, 1, 0, 1);               \
+        if (state == msg_failed)                      \
+            color = ImVec4(1, 0, 0, 1);               \
+        ImGui::TextColored(color, "%s", state);       \
+    } while (0)
+
+            TEST_BUTTON(gpu::test_fences());
+
+#undef TEST_BUTTON
+        }
+        ImGui::End();
+
         ImGui::ShowMetricsWindow();
 
         ImGui::Render();
