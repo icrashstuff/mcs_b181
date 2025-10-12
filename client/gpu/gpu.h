@@ -29,38 +29,7 @@
 #include "subdiv_buffer.h"
 #include "texture.h"
 
-#include "volk/volk.h"
-
-#include "vk_mem_alloc.h"
-
-#include "tetra/util/misc.h" /* util::die() */
-
-/** Die on an error from a function returning VkResult */
-#define VK_DIE(_CALL)                                                                              \
-    do                                                                                             \
-    {                                                                                              \
-        VkResult result__ = _CALL;                                                                 \
-        if (result__ != VK_SUCCESS)                                                                \
-            util::die("%s failed with code: %d: %s", #_CALL, result__, string_VkResult(result__)); \
-    } while (0)
-
-/** Log an error from a function returning VkResult */
-#define VK_TRY(_CALL)                                                                                 \
-    do                                                                                                \
-    {                                                                                                 \
-        VkResult result__ = _CALL;                                                                    \
-        if (result__ != VK_SUCCESS)                                                                   \
-            dc_log_error("%s failed with code: %d: %s", #_CALL, result__, string_VkResult(result__)); \
-    } while (0)
-
-/** Log an error from a function returning VkResult, and save the result */
-#define VK_TRY_STORE(RESULT, _CALL)                                                               \
-    do                                                                                            \
-    {                                                                                             \
-        RESULT = _CALL;                                                                           \
-        if (RESULT != VK_SUCCESS)                                                                 \
-            dc_log_error("%s failed with code: %d: %s", #_CALL, RESULT, string_VkResult(RESULT)); \
-    } while (0)
+#include "common.h"
 
 namespace gpu
 {

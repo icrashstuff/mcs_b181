@@ -23,9 +23,8 @@
 
 #pragma once
 
-#include "volk/volk.h"
+#include "common.h"
 
-#include <SDL3/SDL.h>
 #include <vector>
 
 namespace gpu

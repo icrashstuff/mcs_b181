@@ -22,9 +22,7 @@
  */
 #pragma once
 
-#include <SDL3/SDL_stdinc.h>
-
-#include "volk/volk.h"
+#include "common.h"
 
 namespace gpu
 {
