@@ -86,7 +86,7 @@ gpu::fence_t* gpu::create_fence()
     return fence;
 }
 
-VkSemaphore gpu::get_fence_handle(fence_t* const fence) { return fence->handle; }
+const VkSemaphore& gpu::get_fence_handle(fence_t* const fence) { return fence->handle; }
 
 void gpu::ref_fence(fence_t* const fence, const Uint32 count)
 {

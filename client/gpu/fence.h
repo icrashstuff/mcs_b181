@@ -57,7 +57,7 @@ struct fence_t;
  *
  * @returns VkSemaphore handle associated with fence
  */
-[[nodiscard]] VkSemaphore get_fence_handle(gpu::fence_t* const fence);
+[[nodiscard]] const VkSemaphore& get_fence_handle(gpu::fence_t* const fence);
 
 /**
  * Check if a fence has been signaled
