@@ -104,27 +104,8 @@ static test_image_data_t* create_test_image(gpu::device_t* device)
         device->set_object_name(data->sampler, VK_OBJECT_TYPE_SAMPLER, "%s: Sampler", __FUNCTION__);
     }
 
-    /* Create command pool */
-    VkCommandPoolCreateInfo cinfo_cmd_pool = {};
-    cinfo_cmd_pool.sType = VK_STRUCTURE_TYPE_COMMAND_POOL_CREATE_INFO;
-    cinfo_cmd_pool.queueFamilyIndex = device->transfer_queue.index;
-    VkCommandPool cmd_pool = VK_NULL_HANDLE;
-    VK_DIE(device->vkCreateCommandPool(&cinfo_cmd_pool, &cmd_pool));
-
-    /* Allocate command buffer */
-    VkCommandBufferAllocateInfo ainfo_cmd_upload = {};
-    ainfo_cmd_upload.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
-    ainfo_cmd_upload.commandPool = cmd_pool;
-    ainfo_cmd_upload.level = VK_COMMAND_BUFFER_LEVEL_PRIMARY;
-    ainfo_cmd_upload.commandBufferCount = 1;
-    VkCommandBuffer cmd_upload = VK_NULL_HANDLE;
-    VK_DIE(device->vkAllocateCommandBuffers(&ainfo_cmd_upload, &cmd_upload));
-
-    /* Begin Command Buffer */
-    VkCommandBufferBeginInfo binfo_cmd_upload = {};
-    binfo_cmd_upload.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_BEGIN_INFO;
-    binfo_cmd_upload.flags = VK_COMMAND_BUFFER_USAGE_ONE_TIME_SUBMIT_BIT;
-    VK_DIE(device->vkBeginCommandBuffer(cmd_upload, &binfo_cmd_upload));
+    /* Create command buffer */
+    gpu::singleshot_cmd_buffer_t* cmd_upload = new gpu::singleshot_cmd_buffer_t(&device->transfer_queue);
 
     /* Create staging buffer */
     VkBufferCreateInfo cinfo_buffer = {};
@@ -159,7 +140,7 @@ static test_image_data_t* create_test_image(gpu::device_t* device)
 
     /* Upload image */
     {
-        device->transition_image(cmd_upload, data->image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
+        device->transition_image(cmd_upload->cmd, data->image, VK_IMAGE_LAYOUT_UNDEFINED, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL);
 
         VkBufferImageCopy region = {};
         region.imageSubresource.aspectMask = VK_IMAGE_ASPECT_COLOR_BIT;
@@ -168,38 +149,22 @@ static test_image_data_t* create_test_image(gpu::device_t* device)
         region.imageSubresource.layerCount = 1;
         region.imageExtent = { size.height, size.width, 1 };
 
-        vkCmdCopyBufferToImage(cmd_upload, staging_buffer, data->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
+        device->vkCmdCopyBufferToImage(cmd_upload->cmd, staging_buffer, data->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, 1, &region);
 
-        device->transition_image(cmd_upload, data->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
+        device->transition_image(cmd_upload->cmd, data->image, VK_IMAGE_LAYOUT_TRANSFER_DST_OPTIMAL, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
     }
 
-    VK_DIE(device->vkEndCommandBuffer(cmd_upload));
-
-    /* Create fence for waiting on submit operation */
-    VkFenceCreateInfo cinfo_wait_fence = {};
-    cinfo_wait_fence.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-    VkFence wait_fence = VK_NULL_HANDLE;
-    VK_DIE(device->vkCreateFence(&cinfo_wait_fence, &wait_fence));
-
     /* Submit command buffer */
-    VkSubmitInfo sinfo_cmd_upload = {};
-    sinfo_cmd_upload.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
-    sinfo_cmd_upload.commandBufferCount = 1;
-    sinfo_cmd_upload.pCommandBuffers = &cmd_upload;
-
-    SDL_LockMutex(device->transfer_queue.lock);
-    VK_DIE(device->vkQueueSubmit(device->transfer_queue.handle, 1, &sinfo_cmd_upload, wait_fence));
-    SDL_UnlockMutex(device->transfer_queue.lock);
+    gpu::fence_t* wait_fence = cmd_upload->end_and_submit();
 
     /* Wait for command buffer to complete submission */
-    VK_DIE(device->vkWaitForFences(1, &wait_fence, 1, UINT64_MAX));
+    gpu::wait_for_fence(wait_fence);
 
     /* Now that the image is prepared we can set up a descriptor through ImGui */
     data->imgui_descriptor = ImGui_ImplVulkan_AddTexture(data->sampler, data->view, VK_IMAGE_LAYOUT_SHADER_READ_ONLY_OPTIMAL);
 
     /* Cleanup */
-    device->vkDestroyFence(wait_fence);
-    device->vkDestroyCommandPool(cmd_pool);
+    gpu::release_fence(wait_fence);
     vmaDestroyBuffer(device->allocator, staging_buffer, staging_buffer_allocation);
 
     return data;

@@ -26,6 +26,7 @@
 #include "command_buffer.h"
 #include "fence.h"
 #include "sampler.h"
+#include "singleshot_command_buffer.h"
 #include "subdiv_buffer.h"
 #include "texture.h"
 

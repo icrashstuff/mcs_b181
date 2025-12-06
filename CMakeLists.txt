@@ -123,6 +123,7 @@ set(mcs_b181_client_SRC
     client/gpu/pipeline_cache.cpp
     client/gpu/subdiv_buffer.cpp
     client/gpu/command_buffer.cpp
+    client/gpu/singleshot_command_buffer.cpp
     client/gpu/smol-v/smolv.cpp
 
     client/gpu/volk/volk.c
