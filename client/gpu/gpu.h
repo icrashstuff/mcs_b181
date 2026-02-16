@@ -60,6 +60,7 @@ struct device_t;
 
 struct frame_t
 {
+    friend struct device_t;
     device_t* device = nullptr;
 
     Uint32 image_idx = ~0;
@@ -77,7 +78,7 @@ struct frame_t
     bool used_transfer = 0;
 
     /** Fence to be associated with command buffer submission */
-    VkFence done = VK_NULL_HANDLE;
+    fence_t* done = nullptr;
 
     /**
      * Acquire a semaphore from the internal buffer
@@ -87,10 +88,10 @@ struct frame_t
      */
     VkSemaphore acquire_semaphore();
 
+protected:
     void reset();
     void free();
 
-private:
     size_t next_semaphore_idx = 0;
     std::vector<VkSemaphore> semaphores;
 };

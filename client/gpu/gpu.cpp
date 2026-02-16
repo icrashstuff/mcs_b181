@@ -854,7 +854,8 @@ VkSemaphore gpu::frame_t::acquire_semaphore()
 
 void gpu::frame_t::reset()
 {
-    VK_DIE(device->funcs.vkResetFences(device->logical, 1, &done));
+    gpu::release_fence(done);
+    done = gpu::create_fence();
     next_semaphore_idx = 0;
     used_graphics = 0;
     used_transfer = 0;
@@ -865,7 +866,7 @@ void gpu::frame_t::free()
     device->funcs.vkFreeCommandBuffers(device->logical, device->window.graphics_pool, 1, &cmd_graphics);
     device->funcs.vkFreeCommandBuffers(device->logical, device->window.transfer_pool, 1, &cmd_transfer);
     device->funcs.vkDestroyImageView(device->logical, image_view, nullptr);
-    device->funcs.vkDestroyFence(device->logical, done, nullptr);
+    gpu::release_fence(done);
     for (VkSemaphore s : semaphores)
         device->funcs.vkDestroySemaphore(device->logical, s, nullptr);
 }
@@ -1145,7 +1146,11 @@ gpu::frame_t* gpu::device_t::acquire_next_frame(window_t* const window, const Ui
         set_object_name(window->sdl_swapchain, VK_OBJECT_TYPE_SWAPCHAIN_KHR, "(Window %u): Swapchain", window_id);
 
         for (frame_t f : window->frames)
+        {
+            if (f.done)
+                gpu::wait_for_fence(f.done);
             f.free();
+        }
         window->frames.resize(0);
     }
 
@@ -1183,12 +1188,6 @@ gpu::frame_t* gpu::device_t::acquire_next_frame(window_t* const window, const Ui
             cinfo_image_view.subresourceRange.layerCount = 1;
             VK_DIE(funcs.vkCreateImageView(logical, &cinfo_image_view, nullptr, &window->frames[i].image_view));
             set_object_name(window->frames[i].image_view, VK_OBJECT_TYPE_IMAGE_VIEW, "(Window %u)(Frame %zu): Swapchain image View", window_id, i);
-
-            VkFenceCreateInfo cinfo_fence {};
-            cinfo_fence.sType = VK_STRUCTURE_TYPE_FENCE_CREATE_INFO;
-            cinfo_fence.flags = VK_FENCE_CREATE_SIGNALED_BIT;
-            VK_DIE(funcs.vkCreateFence(logical, &cinfo_fence, nullptr, &window->frames[i].done));
-            set_object_name(window->frames[i].done, VK_OBJECT_TYPE_FENCE, "(Window %u)(Frame %zu): Done fence", window_id, i);
 
             VkCommandBufferAllocateInfo ainfo_command_buffer {};
             ainfo_command_buffer.sType = VK_STRUCTURE_TYPE_COMMAND_BUFFER_ALLOCATE_INFO;
@@ -1241,6 +1240,8 @@ gpu::frame_t* gpu::device_t::acquire_next_frame(window_t* const window, const Ui
     /* A semaphore might be a better way to delay this, but this is easier */
     frame_t& frame = window->frames[image_idx];
     VK_DIE(funcs.vkWaitForFences(logical, 1, &window->acquire_fence, 1, UINT64_MAX));
+    if (frame.done)
+        gpu::wait_for_fence(frame.done);
     frame.reset();
 
     return &frame;
@@ -1254,14 +1255,23 @@ void gpu::device_t::submit_frame(window_t* const window, frame_t* frame)
 
     VkSemaphore present_semaphore = frame->acquire_semaphore();
 
+    VkSemaphore signal_semaphores[] = { present_semaphore, gpu::get_fence_handle(frame->done) };
+    Uint64 signal_semaphores_values[] = { 1, 1 };
+
     VkCommandBuffer command_buffers[2] = {};
+
+    VkTimelineSemaphoreSubmitInfo sinfo_timeline {};
+    sinfo_timeline.sType = VK_STRUCTURE_TYPE_TIMELINE_SEMAPHORE_SUBMIT_INFO;
+    sinfo_timeline.signalSemaphoreValueCount = SDL_arraysize(signal_semaphores_values);
+    sinfo_timeline.pSignalSemaphoreValues = signal_semaphores_values;
 
     VkSubmitInfo sinfo {};
     sinfo.sType = VK_STRUCTURE_TYPE_SUBMIT_INFO;
+    sinfo.pNext = &sinfo_timeline;
     sinfo.commandBufferCount = 0;
     sinfo.pCommandBuffers = command_buffers;
-    sinfo.signalSemaphoreCount = 1;
-    sinfo.pSignalSemaphores = &present_semaphore;
+    sinfo.signalSemaphoreCount = SDL_arraysize(signal_semaphores);
+    sinfo.pSignalSemaphores = signal_semaphores;
 
     if (frame->used_graphics)
         command_buffers[sinfo.commandBufferCount++] = frame->cmd_graphics;
@@ -1298,7 +1308,7 @@ void gpu::device_t::submit_frame(window_t* const window, frame_t* frame)
     if (frame->used_transfer)
         SDL_LockMutex(transfer_queue.lock);
     SDL_LockMutex(present_queue.lock);
-    VK_DIE(funcs.vkQueueSubmit(graphics_queue.handle, 1, &sinfo, frame->done));
+    VK_DIE(funcs.vkQueueSubmit(graphics_queue.handle, 1, &sinfo, VK_NULL_HANDLE));
     {
         VkResult result = funcs.vkQueuePresentKHR(present_queue.handle, &pinfo);
         if (is_swapchain_result_non_fatal(result))
