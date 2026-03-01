@@ -23,6 +23,11 @@
 #define STB_IMAGE_IMPLEMENTATION
 #define STB_IMAGE_WRITE_IMPLEMENTATION
 
+#ifdef TETRA_ZLIB_PRESENT
+#define STBIW_ZLIB_COMPRESS compress_for_stbiw
+static unsigned char* compress_for_stbiw(unsigned char *data, int data_len, int *out_len, int quality);
+#endif
+
 #include "../stbi.h"
 
 #ifdef STB_IMAGE_IMPLEMENTATION
@@ -199,5 +204,24 @@ STBIWDEF int stbi_physfs_write_jpg(char const* filename, int x, int y, int chann
     PHYSFS_close(fd);
     return result;
 }
+
+#ifdef STBIW_ZLIB_COMPRESS
+#include <zlib.h>
+static unsigned char* compress_for_stbiw(unsigned char* data, int data_len, int* out_len, int quality)
+{
+    uLongf bufSize = compressBound(data_len);
+    unsigned char* buf = STBIW_MALLOC(bufSize);
+    if (buf == NULL)
+        return NULL;
+    if (compress2(buf, &bufSize, data, data_len, quality) != Z_OK)
+    {
+        STBIW_FREE(buf);
+        return NULL;
+    }
+    *out_len = bufSize;
+
+    return buf;
+}
+#endif
 
 #endif // #ifdef STB_IMAGE_WRITE_IMPLEMENTATION

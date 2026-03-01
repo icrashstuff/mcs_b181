@@ -145,6 +145,9 @@ endfunction()
 
 function(tetra_common_compile_options target_name)
     target_compile_definitions(${target_name} PUBLIC SDL_DISABLE_OLD_NAMES=1)
+    if(TARGET ZLIB::ZLIB)
+        target_compile_definitions(${target_name} PUBLIC TETRA_ZLIB_PRESENT=1)
+    endif()
     tetra_add_compile_option(${target_name} PUBLIC -Wall)
     tetra_add_compile_option(${target_name} PUBLIC -Wextra)
     tetra_add_compile_option(${target_name} PUBLIC -Wdocumentation)
@@ -182,6 +185,9 @@ target_include_directories(tetra_core PRIVATE ../)
 
 target_link_libraries(tetra_core PUBLIC PhysFS::PhysFS-static)
 target_link_libraries(tetra_core PUBLIC SDL3::SDL3)
+if(TARGET ZLIB::ZLIB)
+    target_link_libraries(tetra_core PUBLIC ZLIB::ZLIB)
+endif()
 
 add_library(tetra::core ALIAS tetra_core)
 ### END: Target: tetra_core
