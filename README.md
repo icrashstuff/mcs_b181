@@ -4,7 +4,7 @@ A minecraft beta 1.8.x server / bridge / client. This project exists so that I c
 
 ## Notes on the client
 
-- The client requires the assets of minecraft 1.7 or 1.8 (The full releases not the betas)
+- The client requires the assets of minecraft 1.9.X (The full releases not the betas)
 
 ## License
 

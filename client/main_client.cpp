@@ -2288,7 +2288,7 @@ int main(int argc, char* argv[])
 
             ImGui::SetNextWindowSizeConstraints(ImVec2(0, 0), viewport->WorkSize);
             ImGui::SetNextWindowPos(viewport->GetWorkCenter(), ImGuiCond_Always, ImVec2(0.5, 0.5));
-            ImGui::Begin("Configuration Required! (Resources for Minecraft Release 1.7.x/1.8.x (Not beta) are required)", NULL,
+            ImGui::Begin("Configuration Required! (Resources for Minecraft Release 1.9.X are required)", NULL,
                 ImGuiWindowFlags_AlwaysAutoResize | ImGuiWindowFlags_NoCollapse);
 
             float width = viewport->WorkSize.x * 0.75f;
