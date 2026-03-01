@@ -1166,6 +1166,7 @@ gpu::frame_t* gpu::device_t::acquire_next_frame(window_t* const window, const Ui
         for (size_t i = 0; i < image_count; i++)
         {
             window->frames[i].device = this;
+            window->frames[i].window = window;
 
             window->frames[i].image_idx = i;
 

@@ -57,11 +57,13 @@ extern VkInstance instance;
 extern const Uint32 instance_api_version;
 
 struct device_t;
+struct window_t;
 
 struct frame_t
 {
     friend struct device_t;
     device_t* device = nullptr;
+    window_t* window = nullptr;
 
     Uint32 image_idx = ~0;
 
