@@ -106,8 +106,9 @@ void release_fence(fence_t*& fence, const bool set_to_null = true, const Uint32 
  * @param fence Fence to add callback to
  * @param cb Callback
  * @param userdata Userdata to be passed to the callback
+ * @param userdata_len If non-zero then a copy of `userdata` that is `userdata_len` bytes in size will be passed to the callback
  */
-void add_destruction_callback(fence_t* const fence, void (*cb)(void* userdata), void* userdata);
+void add_destruction_callback(fence_t* const fence, void (*cb)(void* userdata), void* userdata, const size_t userdata_len = 0);
 
 /**
  * Mark a fence as canceled

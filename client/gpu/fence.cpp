@@ -45,6 +45,13 @@ enum fence_state_t
     FENCE_STATE_CANCELED,
 };
 
+struct destruction_callback_record_t
+{
+    void (*callback)(void*);
+    void* userdata;
+    size_t userdata_len;
+};
+
 namespace gpu
 {
 struct fence_t
@@ -56,7 +63,7 @@ struct fence_t
 
     VkSemaphore handle = VK_NULL_HANDLE;
 
-    std::vector<std::pair<void (*)(void*), void*>> destruction_callbacks;
+    std::vector<destruction_callback_record_t> destruction_callbacks;
 };
 }
 
@@ -117,7 +124,11 @@ void gpu::release_fence(fence_t*& fence, const bool set_to_null, Uint32 count)
     {
         device->vkDestroySemaphore(fence->handle);
         for (auto& it : fence->destruction_callbacks)
-            it.first(it.second);
+        {
+            it.callback(it.userdata);
+            if (it.userdata_len)
+                free(it.userdata);
+        }
         delete fence;
         SDL_AddAtomicInt(&num_active_fences, -1);
     }
@@ -148,7 +159,16 @@ void gpu::cancel_fence(fence_t* const fence)
     SDL_SetAtomicInt(&fence->state, FENCE_STATE_CANCELED);
 }
 
-void gpu::add_destruction_callback(fence_t* const fence, void (*cb)(void*), void* userdata) { fence->destruction_callbacks.push_back(std::pair(cb, userdata)); }
+void gpu::add_destruction_callback(fence_t* const fence, void (*cb)(void* userdata), void* userdata, const size_t userdata_len)
+{
+    if (userdata_len)
+    {
+        void* userdata_copy = malloc(userdata_len);
+        memcpy(userdata_copy, userdata, userdata_len);
+        userdata = userdata_copy;
+    }
+    fence->destruction_callbacks.push_back({ cb, userdata, userdata_len });
+}
 
 bool gpu::wait_for_fences(const bool wait_all, fence_t* const* fences, const Uint32 num_fences)
 {
@@ -199,7 +219,7 @@ static bool test_fences__callback()
     fence_t* fence = create_fence();
 
     bool destroyed = 0;
-    gpu::add_destruction_callback(fence, destruction_callback_set_bool, &destroyed);
+    gpu::add_destruction_callback(fence, destruction_callback_set_bool, &destroyed, 0);
 
     gpu::release_fence(fence, true);
 
@@ -209,13 +229,29 @@ static bool test_fences__callback()
 }
 REGISTER_TEST(test_fences__callback)
 
+static bool test_fences__callback_copy_user_data()
+{
+    bool failed = 0;
+    fence_t* fence = create_fence();
+
+    bool destroyed = 0;
+    gpu::add_destruction_callback(fence, destruction_callback_set_bool, &destroyed, sizeof(destroyed));
+
+    gpu::release_fence(fence, true);
+
+    tassert(!destroyed);
+
+    return failed;
+}
+REGISTER_TEST(test_fences__callback_copy_user_data)
+
 static bool test_fences__refcount()
 {
     bool failed = 0;
     fence_t* fence = create_fence();
 
     bool destroyed = 0;
-    gpu::add_destruction_callback(fence, destruction_callback_set_bool, &destroyed);
+    gpu::add_destruction_callback(fence, destruction_callback_set_bool, &destroyed, 0);
 
     gpu::ref_fence(fence);
     gpu::release_fence(fence, false);
