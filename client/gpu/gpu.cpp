@@ -785,6 +785,7 @@ void gpu::quit()
     internal::quit_gpu_fences();
 
     delete device;
+    device = VK_NULL_HANDLE;
 
     vkDestroyInstance(instance, nullptr);
     instance = VK_NULL_HANDLE;
