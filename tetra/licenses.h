@@ -56,6 +56,7 @@ struct project_t
 };
 
 extern const license_t license_MIT;
+extern const license_t license_BSD2;
 extern const license_t license_Zlib;
 extern const license_t license_Unlicense;
 

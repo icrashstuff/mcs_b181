@@ -37,6 +37,7 @@ static project_t tetra_projects[] = {
     { "stb_image", "Copyright (c) 2006 - 2024 Sean Barrett, and others", PROJECT_VENDORED, { license_MIT, license_Unlicense } },
     { "stb_image_write", "Copyright (c) 2010 - 2024 Sean Barrett, and others", PROJECT_VENDORED, { license_MIT, license_Unlicense } },
     { "stb_sprintf", "Copyright (c) 2015 - 2024 Sean Barrett, and others", PROJECT_VENDORED, { license_MIT, license_Unlicense } },
+    { "debug_break", "Copyright (c) 2011-2021, Scott Tsai", PROJECT_VENDORED, { license_BSD2 } },
 };
 }
 

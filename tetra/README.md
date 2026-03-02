@@ -13,6 +13,7 @@ This repository contains useful components from an abandoned project of mine tha
 - stb_image
 - stb_image_write
 - stb_sprintf
+- debug_break
 
 ## License
 
@@ -20,7 +21,7 @@ This project "tetra" is licensed under the MIT license, with various components 
 
 The MIT License (SPDX-License-Identifier: MIT)
 
-Copyright (c) 2022, 2024 - 2025 Ian Hangartner <icrashstuff at outlook dot com>
+Copyright (c) 2022, 2024 - 2026 Ian Hangartner <icrashstuff at outlook dot com>
 
 Permission is hereby granted, free of charge, to any person obtaining a
 copy of this software and associated documentation files (the "Software"),
@@ -56,3 +57,4 @@ This project vendors and makes use of the following external software components
 | stb_image            | Copyright (c) 2006 - 2024 Sean Barrett, and others      | MIT License or Unlicense (full text under util/stb/stb_image.h)          |
 | stb_image_write      | Copyright (c) 2010 - 2024 Sean Barrett, and others      | MIT License or Unlicense (full text under util/stb/stb_image_write.h)    |
 | stb_sprintf          | Copyright (c) 2015 - 2024 Sean Barrett, and others      | MIT License or Unlicense (full text under util/stb_sprintf.h)            |
+| debug_break          | Copyright (c) 2011-2021, Scott Tsai                     | BSD-2-Clause License (full text under util/debug_break.h)                |
